@@ -8,6 +8,17 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-09-19
+
+Release tooling only — **the application is unchanged from 0.2.0**, so there is nothing to gain by
+upgrading if you already have it. The binaries are rebuilt from the same source and the same 591
+tests.
+
+- Release notes are now taken from `CHANGELOG.md` at the tagged commit rather than pasted onto the
+  release page by hand afterwards. `./scripts/changelog-section.sh <version>` prints exactly what a
+  release will carry, so it can be checked before tagging. A version with no entry warns and
+  publishes the download table alone rather than failing a build that passed.
+
 ## [0.2.0] - 2026-09-19
 
 **Raspberry Pi and Arduino boards.** A Pi or Arduino can now sit on the schematic as either the
@@ -79,6 +90,7 @@ First public build of CirqAvalonia — an electronic circuit analyzer and mixed-
 
 **501 tests** measure the solver against closed-form answers rather than recorded output.
 
-[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Harlock123/CIRQAvalonia/releases/tag/v0.1.0
