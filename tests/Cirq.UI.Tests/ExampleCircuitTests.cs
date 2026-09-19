@@ -1,3 +1,4 @@
+using Cirq.Components.Nonlinear;
 using Cirq.Components.Boards;
 using Cirq.Components.Passive;
 using Cirq.UI.ViewModels;
@@ -149,6 +150,53 @@ public class ExampleCircuitTests
         // Reference designators must be unique so the netlist can be read.
         var names = viewModel.Circuit.Components.Select(c => c.Name).ToList();
         Assert.Equal(names.Count, names.Distinct(StringComparer.OrdinalIgnoreCase).Count());
+    }
+}
+
+public class RegulatedSupplyExampleTests
+{
+    /// <summary>
+    /// Reported from the running app: the 7805 example showed just under half a volt instead of
+    /// five. The example is built with an output capacitor and the editor runs from initial
+    /// conditions, so switch-on drew a brief inrush that the thermal model read as heat.
+    /// </summary>
+    [Fact]
+    public void TheSevenEightOhFiveExampleActuallyRegulatesToFiveVolts()
+    {
+        using var vm = new MainWindowViewModel();
+        Examples.LoadRegulatedSupply(vm);
+        vm.Simulation.InvalidateTopology();
+        Assert.True(vm.Simulation.Rebuild(), vm.Simulation.Status);
+
+        var regulator = vm.Circuit.Components.OfType<VoltageRegulator>().Single();
+        vm.Simulation.Simulator!.Run(5e-3);
+
+        Assert.Equal(12.0, vm.Simulation.Simulator!.NodeVoltage(regulator.Input), 0.1);
+        Assert.Equal(5.0, vm.Simulation.Simulator!.NodeVoltage(regulator.Output), 0.05);
+        Assert.False(regulator.IsThermallyShutDown);
+        Assert.False(regulator.IsInDropout);
+    }
+
+    [Fact]
+    public void TheExampleHoldsFiveVoltsForTheWholeScopeWindow()
+    {
+        using var vm = new MainWindowViewModel();
+        Examples.LoadRegulatedSupply(vm);
+        vm.Simulation.InvalidateTopology();
+        Assert.True(vm.Simulation.Rebuild(), vm.Simulation.Status);
+
+        var regulator = vm.Circuit.Components.OfType<VoltageRegulator>().Single();
+        var simulator = vm.Simulation.Simulator!;
+
+        // Past the startup ramp, so the readout on screen is steady rather than still climbing.
+        simulator.Run(1e-3);
+        var lowest = double.MaxValue;
+        simulator.TimePointAccepted += _ =>
+            lowest = Math.Min(lowest, simulator.NodeVoltage(regulator.Output));
+
+        simulator.Run(10e-3);
+
+        Assert.True(lowest > 4.9, $"the output sagged to {lowest:0.000} V after settling");
     }
 }
 

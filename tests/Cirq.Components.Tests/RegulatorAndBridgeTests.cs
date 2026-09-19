@@ -96,6 +96,13 @@ public class VoltageRegulatorTests
     public void ShortCircuitIsHeldAtTheCurrentLimit()
     {
         var (sim, reg, _, _) = Regulated(12.0, 0.1);
+
+        // A regulator has two protections and they overlap on a dead short: the current limiter
+        // holds the current first, the die heats, and thermal shutdown takes over within a few
+        // milliseconds — which is what a real part does. Lift the thermal threshold so this test
+        // observes the limiter on its own; RegulatorThermalTests covers the thermal path.
+        reg.ThermalShutdownTemperature = 1e6;
+
         sim.Reset();
         sim.SolveOperatingPoint();
         // The fold-back settles over a few points rather than instantly.
@@ -282,5 +289,133 @@ public class BridgeTests
         Assert.True(samples > 100, $"Only {samples} usable samples.");
         Assert.True(inverted > samples * 0.95,
             $"Only {inverted} of {samples} samples showed the expected inversion.");
+    }
+}
+
+/// <summary>
+/// The junction has thermal mass, so protection has to respond to sustained power rather than to
+/// an instant of it. Getting this wrong is not a cosmetic matter: an output capacitor draws tens
+/// of watts for a few microseconds as it charges, and treating that as heat latched thermal
+/// shutdown at switch-on and left a 7805 sitting at half a volt.
+/// </summary>
+public class RegulatorThermalTests
+{
+    private static (CircuitSimulator Sim, VoltageRegulator Reg, Resistor Load) Supply(
+        double loadResistance, double outputCapacitance)
+    {
+        var circuit = new Circuit();
+        var supply = circuit.Add(new DcVoltageSource(12.0));
+        var gnd = circuit.Add(new Ground());
+        var reg = circuit.Add(new VoltageRegulator(RegulatorModel.Lm7805));
+        var load = circuit.Add(new Resistor(loadResistance));
+
+        circuit.Connect(supply.Negative, gnd.Pin);
+        circuit.Connect(supply.Positive, reg.Input);
+        circuit.Connect(reg.Common, gnd.Pin);
+        circuit.Connect(reg.Output, load.A);
+        circuit.Connect(load.B, gnd.Pin);
+
+        if (outputCapacitance > 0)
+        {
+            var cout = circuit.Add(new Capacitor(outputCapacitance));
+            circuit.Connect(reg.Output, cout.A);
+            circuit.Connect(cout.B, gnd.Pin);
+        }
+
+        // Initial conditions, because that is how the editor runs: t=0 is switch-on with the
+        // capacitor discharged, which is exactly the case that used to fail.
+        var sim = new CircuitSimulator(circuit, new SimulationSettings { UseInitialConditions = true });
+        sim.Reset();
+        sim.SolveOperatingPoint();
+        return (sim, reg, load);
+    }
+
+    [Fact]
+    public void StartingIntoADischargedCapacitorStillReachesFiveVolts()
+    {
+        var (sim, reg, _) = Supply(100, 1e-6);
+
+        sim.Run(1e-3);
+
+        Assert.Equal(5.0, sim.NodeVoltage(reg.Output), 0.05);
+        Assert.False(reg.IsThermallyShutDown);
+    }
+
+    [Theory]
+    [InlineData(1e-6)]
+    [InlineData(10e-6)]
+    [InlineData(100e-6)]
+    public void TheInrushThatChargesAnOutputCapacitorDoesNotTripThermalShutdown(double capacitance)
+    {
+        var (sim, reg, _) = Supply(100, capacitance);
+
+        var trippedDuringStartup = false;
+        sim.TimePointAccepted += _ => trippedDuringStartup |= reg.IsThermallyShutDown;
+
+        sim.Run(5e-3);
+
+        Assert.False(trippedDuringStartup, "charging the output capacitor was mistaken for heating");
+        Assert.Equal(5.0, sim.NodeVoltage(reg.Output), 0.05);
+    }
+
+    [Fact]
+    public void TheJunctionStaysAtAmbientThroughTheInrush()
+    {
+        var (sim, reg, _) = Supply(100, 10e-6);
+
+        var hottest = reg.JunctionTemperature;
+        sim.TimePointAccepted += _ => hottest = Math.Max(hottest, reg.JunctionTemperature);
+
+        sim.Run(100e-6);
+
+        // Tens of watts for tens of microseconds is a few thousandths of a degree on a real die.
+        Assert.True(hottest < reg.AmbientTemperature + 5,
+            $"the junction reached {hottest:0} C during a 100 us inrush");
+    }
+
+    /// <summary>
+    /// The other half of the bargain: giving the die thermal mass must not disable the protection
+    /// it exists for. A dead short is sustained, so it must still shut the regulator down.
+    /// </summary>
+    [Fact]
+    public void ASustainedShortStillTripsThermalShutdown()
+    {
+        var (sim, reg, _) = Supply(0.01, 0);       // 10 mR is a short
+
+        var tripped = false;
+        sim.TimePointAccepted += _ => tripped |= reg.IsThermallyShutDown;
+
+        sim.Run(50e-3);
+
+        Assert.True(tripped, $"a dead short left the junction at {reg.JunctionTemperature:0} C");
+    }
+
+    [Fact]
+    public void AShortTripsWithinAFewMillisecondsRatherThanInstantlyOrNever()
+    {
+        var (sim, reg, _) = Supply(0.01, 0);
+
+        double? trippedAt = null;
+        sim.TimePointAccepted += s =>
+        {
+            if (trippedAt is null && reg.IsThermallyShutDown) trippedAt = s.Time;
+        };
+
+        sim.Run(50e-3);
+
+        Assert.NotNull(trippedAt);
+        Assert.InRange(trippedAt!.Value, 100e-6, 20e-3);
+    }
+
+    [Fact]
+    public void AnOrdinaryLoadNeverHeatsTheJunctionCloseToShutdown()
+    {
+        var (sim, reg, _) = Supply(100, 1e-6);
+
+        sim.Run(100e-3);
+
+        // (12-5) V * 50 mA = 0.35 W, plus quiescent, at 50 C/W.
+        Assert.InRange(reg.JunctionTemperature, 25.0, 80.0);
+        Assert.False(reg.IsThermallyShutDown);
     }
 }

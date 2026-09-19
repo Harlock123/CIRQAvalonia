@@ -8,6 +8,13 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+- **Fixed: regulators shut down at switch-on.** The 7805 example showed about half a volt instead
+  of five. Junction temperature was computed from instantaneous power, so the few microseconds of
+  inrush that charge an output capacitor — tens of watts, briefly — read as a die at hundreds of
+  degrees and latched thermal shutdown. The junction now has thermal mass, so protection responds
+  to sustained power the way a real part does. A dead short still shuts the regulator down, within
+  a few milliseconds rather than instantly.
+
 - The README now carries the macOS quarantine step in its download section. It is required on
   Apple Silicon, not advisory: without it macOS reports "cannot be opened" or "is damaged", which
   reads as a bad download rather than a policy block.

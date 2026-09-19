@@ -89,6 +89,20 @@ public partial class VoltageRegulator : CircuitComponent
     [ObservableProperty]
     public partial double ThermalShutdownTemperature { get; set; } = 150.0;
 
+    /// <summary>
+    /// How long the junction takes to approach its steady-state temperature, in seconds.
+    /// <para>
+    /// The die has thermal mass, so power has to be sustained before it heats up. Without this the
+    /// temperature tracked instantaneous power, and the microsecond inrush that charges an output
+    /// capacitor at switch-on — tens of watts for a few microseconds — read as a junction at
+    /// hundreds of degrees and latched thermal shutdown. A real 7805 starts into a capacitor every
+    /// day. Ten milliseconds still trips a genuine short within a few milliseconds, which is the
+    /// behaviour the protection exists for.
+    /// </para>
+    /// </summary>
+    [ObservableProperty]
+    public partial double ThermalTimeConstant { get; set; } = 10e-3;
+
     public override string ComponentType => "Voltage Regulator";
 
     public override string DesignatorPrefix => "VR";
@@ -241,7 +255,29 @@ public partial class VoltageRegulator : CircuitComponent
 
         PowerDissipation = Math.Abs(vin - vout) * Math.Abs(OutputCurrent)
                            + Math.Abs(vin - common) * Model.QuiescentCurrent;
-        JunctionTemperature = AmbientTemperature + PowerDissipation * Model.ThermalResistance;
+
+        // Where the junction would end up if this power were held indefinitely.
+        var steady = AmbientTemperature + PowerDissipation * Model.ThermalResistance;
+
+        var step = state.TimeStep;
+        if (step > 0 && ThermalTimeConstant > 0)
+        {
+            JunctionTemperature += (steady - JunctionTemperature) * (1.0 - Math.Exp(-step / ThermalTimeConstant));
+        }
+        else if (state.Settings.UseInitialConditions && !state.IsTransient)
+        {
+            // Under initial conditions t=0 is the instant power is applied, not a circuit that
+            // has been running for ever: the die is still at ambient however much power the
+            // inrush is momentarily dissipating.
+            JunctionTemperature = AmbientTemperature;
+        }
+        else
+        {
+            // A plain bias point has been settled for ever, so the junction is at its
+            // steady-state temperature for that dissipation.
+            JunctionTemperature = steady;
+        }
+
         IsThermallyShutDown = JunctionTemperature > ThermalShutdownTemperature;
 
         var headroom = vin - common;
