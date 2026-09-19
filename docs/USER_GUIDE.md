@@ -61,11 +61,11 @@ at the window edge; click the rail to bring it back.
 
 ## Placing components
 
-![The palette with every category expanded, showing passive parts, sources, semiconductors, transistors, LEDs and displays, power, analog ICs, logic gates and the 74xx series](images/02-palette.png)
+![The component palette showing all fifteen categories with their counts — passive, switches, sources, semiconductors, transistors, LEDs and displays, power, analog ICs, logic gates, 74xx series, 4000 series, digital I/O, sensors and actuators, switching and isolation, and dev boards — with the Passive group open](images/02-palette.png)
 
 Click a palette entry, then click the canvas. The part lands where you click, snapped to the grid.
 
-The palette holds **101 components in 14 categories**:
+The palette holds **111 components in 15 categories**:
 
 | Category | Count | Contents |
 | --- | --- | --- |
@@ -78,7 +78,8 @@ The palette holds **101 components in 14 categories**:
 | Power | 7 | Fixed and adjustable regulators, TL431 shunt reference |
 | Analog ICs | 8 | LM741, NE555, LM311, LM339 and friends |
 | Logic Gates | 7 | AND, OR, NAND, NOR, XOR, XNOR, NOT |
-| 74xx Series | 20 | Counters, decoders, flip-flops, shift registers, multiplexers, Schmitt inverter, **4000-series CMOS** |
+| 74xx Series | 17 | Counters, decoders, flip-flops, shift registers, multiplexers, Schmitt inverter |
+| 4000 Series | 13 | CMOS gates, counters, flip-flops, analog switches — see [below](#the-4000-series) |
 | Digital I/O | 4 | Logic toggle, clock, and indicators |
 | Sensors & Actuators | 6 | DC motor, LDR, thermistors, buzzers — see [below](#sensors-and-actuators) |
 | Switching & Isolation | 5 | Relay, fuses, optocouplers — see [below](#switching-and-isolation) |
@@ -233,29 +234,6 @@ transition, so edges are not smeared across a step.
 Useful examples to start from: **NAND Latch**, **Decade Counter**, **Ring Oscillator**,
 **Digit Counter**, **Running Light**.
 
-Three 4000-series CMOS parts sit in the same group as the 74xx family:
-
-- **4017** — a decade counter that decodes for you. Where a 7490 counts in BCD and needs a decoder
-  to show anything, exactly one of the 4017's ten outputs is high at a time and it walks along them
-  on each clock. That is the part behind every LED chaser: ten LEDs, ten pins, no decoder. Carry-out
-  is high for the first five counts, so it divides by ten and chains straight into the next stage.
-- **4511** — the 7447's counterpart. That part sinks current from a common-**anode** display; this
-  one sources it into a common-**cathode** one, so its outputs are active high and the two are not
-  interchangeable. It also has a latch the 7447 lacks: hold `LE` high and the display freezes on
-  whatever was decoded, while the counter behind it carries on. Inputs above nine blank the display
-  rather than showing the odd glyphs a 7447 produces.
-- **4066** — four independent analog switches, and the one part in the group that is not logic at
-  all. Its switched pins carry whatever you put on them — audio, a sensor divider, a reference — and
-  the control pin only decides whether the path exists. Neither switched pin is an input or an
-  output, which is what *bilateral* means. A closed switch is some tens of ohms rather than a short,
-  so feeding a low-impedance load through one loses real signal.
-
-These are CMOS, not TTL, and that matters when you mix families. A 4000-series input on a 5 V rail
-wants 3.5 V before it will call a level high, and a 74xx output only guarantees 3.4 V — so a TTL
-part driving a CMOS input directly is a circuit that works on the bench and not in the simulator,
-or the other way round. Pull the TTL output up to the rail, or drive the CMOS part from something
-that swings rail to rail.
-
 ### Building a power supply
 
 Three parts cover the usual linear supply, and each models the thing that actually bites:
@@ -376,6 +354,90 @@ The isolated side still needs its own ground reference. That is a property of is
 limitation of the simulator — two circuits with nothing at all between them have no solution. A
 real device leaks through some hundreds of gigohms and that is what is modelled, which keeps the
 matrix solvable without meaningfully coupling the halves.
+
+---
+
+## The 4000 series
+
+The 4000-series CMOS parts have a palette group of their own rather than sitting among the 74xx
+ones, because they are a different family with different habits — and mixing the two has a specific
+way of going wrong, covered at the end of this section.
+
+**Gates.** The 4001 (quad NOR), 4011 (quad NAND), 4070 (quad XOR), 4071 (quad OR), 4081 (quad AND)
+and 4069 (hex inverter) do what their 74xx counterparts do, more slowly. The 4011 is the one you
+reach for by reflex, the way a 7400 is in TTL.
+
+The pinout is the trap. A 7400 puts gate two on pins 4 and 5 driving 6, and gate three on 9 and 10
+driving 8; a 4011 puts gate two on 5 and 6 driving 4, and gate three on 8 and 9 driving 10. Only
+gates one and four agree. Dropping a 4011 into a board laid out for a 7400 leaves you with two
+working gates and two that do nothing sensible, which is a long afternoon if you are not expecting
+it — so the parts here have the pinouts they really have, and wiring one as if it were the other
+is a mistake you can make on the canvas too.
+
+The family is at least consistent with itself: where TTL moves the 7402's outputs to pins 1, 4, 10
+and 13, the CMOS NOR has exactly the same pinout as the CMOS NAND.
+
+**4093** — the 4011's function and pinout with hysteresis on every input, and the reason is that it
+makes an oscillator out of almost nothing. Tie one gate's inputs together, run a resistor from its
+output back to them and a capacitor from them to ground, and it runs: the capacitor charges until
+it crosses the upper threshold, the output flips, and it discharges until it crosses the lower one.
+Four gates gets you four oscillators, or one oscillator and three gates to debounce the switches
+feeding it. The period is the two exponentials end to end and the tests predict it rather than
+record it.
+
+**4013** — a dual D flip-flop, the same job as a 7474 with one difference that catches everybody:
+set and reset here are **active high**, where the 7474's preset and clear are active low. A 7474
+with those pins floating sits there and clocks; a 4013 wired the same way is held wherever the
+noise on those pins decides. Tie them low. Feed Q' back to D and it halves the clock, which is what
+most of them end up doing.
+
+**4017** — a decade counter that decodes for you. Where a 7490 counts in BCD and needs a decoder to
+show anything, exactly one of the 4017's ten outputs is high at a time and it walks along them on
+each clock. That is the part behind every LED chaser: ten LEDs, ten pins, no decoder. Carry-out is
+high for the first five counts, so it divides by ten and chains straight into the next stage.
+
+**4040** — twelve flip-flops in a chain, so Q1 is the clock halved and Q12 is the clock divided by
+4096. It is what you use to get from something fast to something slow. It counts on the **falling**
+edge, the other way round from the 4017 beside it, and its reset is active high, so tie that low
+too. Being a ripple counter rather than a synchronous one, its stages do not change together — a
+real 4040 shows brief false codes as the carry walks down the chain, which is why decoding its
+outputs directly is a way to collect glitches.
+
+**4511** — the 7447's counterpart. That part sinks current from a common-**anode** display; this
+one sources it into a common-**cathode** one, so its outputs are active high and the two are not
+interchangeable. It also has a latch the 7447 lacks: hold `LE` high and the display freezes on
+whatever was decoded while the counter behind it carries on. Inputs above nine blank the display
+rather than showing the odd glyphs a 7447 produces.
+
+**4066** — four independent analog switches, and one of two parts here that are not logic at all.
+The switched pins carry whatever you put on them — audio, a sensor divider, a reference — and the
+control pin only decides whether the path exists. Neither switched pin is an input or an output,
+which is what *bilateral* means. A closed switch is some tens of ohms rather than a short, so
+feeding a low-impedance load through one loses real signal.
+
+**4051** — the 4066 with an address decoder in front of it: three address pins pick one of eight
+channels and connect it to the common pin, leaving the other seven open. The path is bilateral
+here too, so the same part reads eight sensors into one ADC pin or fans one signal out to eight
+places, depending only on which end you drive. Inhibit is active high and disconnects everything,
+which is how you park it or gang several onto one bus. Because the decoder only ever closes one
+path, there is no way to short two sources together by accident — which four separate 4066 switches
+will happily let you do.
+
+### Mixing CMOS with TTL
+
+These are CMOS, not TTL, and that matters the moment the two meet. A 4000-series input on a 5 V
+rail wants 3.5 V before it will call a level high, and a 74xx output only guarantees 3.4 V. A TTL
+part driving a CMOS input directly is therefore a circuit that works on someone's bench and not in
+the simulator, or the other way round, depending on the particular chips. Pull the TTL output up to
+the rail with a few kilohms, or drive the CMOS part from something that swings rail to rail.
+
+Going the other way is fine: a CMOS output swings to within 50 mV of both rails, which is more than
+a TTL input asks for.
+
+CMOS is also much slower. The gates here are modelled at around 90 ns at 5 V against 11 ns for the
+TTL equivalents, which is the real difference and occasionally the reason a design that works in
+one family does not in the other. A real part speeds up substantially at 15 V; that is not
+modelled.
 
 ---
 

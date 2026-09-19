@@ -168,7 +168,7 @@ Tests measure the solver against closed-form answers rather than recorded output
 | MOSFET | Square-law saturation current, triode switching, zero gate current, reverse conduction, body diode |
 | JFET | Full I_DSS at zero gate drive, square law across the range, pinch-off, vanishing gate current, P-channel mirroring |
 | Thyristors | SCR blocking and firing, staying on after the gate drive goes away, dropping out when the anode current is interrupted, reverse blocking; triac firing on both half cycles and turning itself off at every zero crossing; diac breakover in either polarity |
-| 4000 series | 4017 one-hot walk, reset, carry dividing by ten; 4511 glyph table, active-high drive, lamp test and blanking priority; 4066 analog pass-through and its on-resistance dividing with the load |
+| 4000 series | Gate truth tables on the CMOS pinout, and that it is *not* the 74xx one; 4093 hysteresis and its relaxation-oscillator period against the closed form; 4013 toggling and its active-high set and reset; 4040 stage-by-stage division and falling-edge clocking; 4017 one-hot walk, reset and carry; 4511 glyph table, active-high drive, lamp test and blanking priority; 4066 and 4051 analog pass-through, switch resistance and off-state leakage |
 | Comparator | Open-collector pull-down and release, driving a higher rail through a pull-up, edge timing |
 | Displays | 7447 glyph table, open-collector drive, lamp test and blanking priority, counter walking 0-9 on the display |
 | Files | Every component type round-trips with its parameters, pins, wires, waypoints and probes; a reloaded circuit solves to the same answer; damaged, unknown and newer-format files are handled without losing the open circuit |
@@ -270,9 +270,9 @@ toolbar used to show: active tool, simulation speed, elapsed time and solver rat
 `Help > Keyboard Shortcuts` lists everything below, and the
 [User Guide](docs/USER_GUIDE.md) walks through building a circuit from an empty canvas.
 
-The palette holds 101 components in 14 collapsible categories:
+The palette holds 111 components in 15 collapsible categories:
 
-![The component palette with every category expanded, showing passive parts, switches, sources, semiconductors, transistors, LEDs and displays, power, analog ICs, logic gates and the 74xx series](docs/images/02-palette.png)
+![The component palette showing all fifteen categories with their counts — passive, switches, sources, semiconductors, transistors, LEDs and displays, power, analog ICs, logic gates, 74xx series, 4000 series, digital I/O, sensors and actuators, switching and isolation, and dev boards — with the Passive group open](docs/images/02-palette.png)
 
 Selecting a component fills the properties panel. It is built by reflection, so a new component
 type gets a complete editor without any UI code:

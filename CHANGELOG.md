@@ -30,19 +30,35 @@ an enhancement MOSFET's is drawn in three segments. The gate is a reverse-biased
 essentially nothing, which is the reason to use one; drive it positive and the part tells you,
 because it has stopped being a FET and started being a diode.
 
-**4000-series CMOS: 4017, 4511 and 4066.** The 4017 decodes for you — exactly one of its ten
-outputs is high and it walks along them on each clock, which is every LED chaser ever built, with
-no decoder. The 4511 is the 7447's counterpart for common-cathode displays, so its outputs are
-active high and the two are not interchangeable; it also has a latch the 7447 lacks, and it blanks
-above nine rather than showing odd glyphs.
+**A 4000-series CMOS group, with thirteen parts in it.** The CMOS parts have a palette category
+of their own now rather than sitting among the 74xx ones, because they are a different family with
+different habits.
 
-The 4066 is four independent analog switches and the one part here that is not logic: its switched
-pins carry whatever you put on them, neither pin is an input or an output, and a closed switch is
-some tens of ohms rather than a short — enough to lose real signal into a low-impedance load.
+The gates are the 4001, 4011, 4070, 4071 and 4081 quads and the 4069 hex inverter, plus the 4093 —
+the 4011 with hysteresis on every input, which is the part that makes an oscillator out of one
+gate, a resistor and a capacitor. Its period is the two exponentials end to end, and the tests
+predict it rather than record it.
+
+The pinout is the trap these parts set, so they have the one they really have: a 7400 puts gate two
+on pins 4 and 5 driving 6, and a 4011 puts it on 5 and 6 driving 4. Only gates one and four agree,
+so dropping one into a board laid out for the other leaves two working gates and two that do
+nothing sensible. The family is at least consistent with itself — unlike TTL, where the 7402 moves
+its outputs, the CMOS NOR shares the CMOS NAND's pinout exactly.
+
+The 4013 is a dual D flip-flop with **active-high** set and reset, where a 7474's preset and clear
+are active low; wiring one like the other leaves it held wherever the noise on those pins decides.
+The 4040 is twelve flip-flops in a chain, so Q12 is the clock divided by 4096, and it counts on the
+falling edge where the 4017 beside it counts on the rising. The 4051 is the 4066 with an address
+decoder in front: three pins pick one of eight channels, and because only one path is ever closed
+there is no way to short two sources together the way four loose 4066 switches will let you.
+
+Joining them are the 4017, 4511 and 4066 from before: the decade counter that decodes for you, the
+7447's counterpart for common-cathode displays, and the quad analog switch.
 
 These are CMOS, not TTL. A 4000-series input on a 5 V rail wants 3.5 V before it reads high and a
 74xx output only guarantees 3.4 V, so driving one directly from the other is a circuit that works
-in one place and not the other.
+in one place and not the other. They are also an order of magnitude slower — about 90 ns a gate at
+5 V against 11 ns for the TTL equivalents.
 
 ## [0.8.0] - 2026-09-19
 
