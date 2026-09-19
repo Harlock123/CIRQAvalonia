@@ -1,6 +1,7 @@
 using Cirq.Components.Electromechanical;
 using Cirq.Components.Boards;
 using Cirq.Components.Bridges;
+using Cirq.Components.Buses;
 using Cirq.Components.Digital;
 using Cirq.Components.Ics;
 using Cirq.Components.Nonlinear;
@@ -212,6 +213,8 @@ public static class ComponentCatalog
             new("7476", "Dual JK flip-flop, falling-edge triggered", () => new Ic7476()),
             new("7486", "Quad 2-input exclusive-OR", () => new Ic7486()),
             new("7490", "Decade / BCD counter", () => new Ic7490()),
+            new("74595", "8-bit shift register with an output latch — three pins become eight",
+                () => new Ic74595()),
             new("74HC14", "Hex Schmitt inverter — hysteresis for slow edges and oscillators",
                 () => new Ic74hc14()),
             new("74138", "3-to-8 decoder with three enables, active-low outputs", () => new Ic74138()),
@@ -241,6 +244,17 @@ public static class ComponentCatalog
                 () => new Ic4093()),
             new("4511", "BCD to 7-segment latch and driver for a common-cathode display",
                 () => new Ic4511()),
+        ]),
+
+        new("Buses",
+        [
+            new("I2C Master", "Plays a written list of I2C transactions onto SDA and SCL",
+                () => new I2cMaster()),
+            new("I2C EEPROM", "24LC256 — writes and reads back over two wires",
+                () => new I2cEeprom()),
+            new("I2C Expander", "PCF8574 — eight pins from two wires, the LCD backpack chip",
+                () => new Pcf8574()),
+            new("SPI Master", "Plays a written list of SPI transfers", () => new SpiMaster()),
         ]),
 
         new("Digital I/O",

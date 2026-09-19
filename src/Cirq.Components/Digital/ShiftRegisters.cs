@@ -201,3 +201,137 @@ public sealed class Ic74165 : DigitalIc
         _lastClock = LogicState.Unknown;
     }
 }
+
+/// <summary>
+/// A 74HC595 eight-bit serial-in, parallel-out shift register with an output latch.
+/// <para>
+/// The part you reach for when you have run out of pins and have something to drive. Three wires
+/// in, eight out, and they chain: the last bit shifted out of one goes into the next, so four of
+/// them daisy-chained is thirty-two outputs off the same three wires.
+/// </para>
+/// <para>
+/// The <b>latch is the point</b>, and it is what separates this from a 74164. Shifting moves bits
+/// through the register without touching the outputs at all; pulsing RCLK copies the whole
+/// register to them at once. Without that the outputs would show every intermediate pattern as
+/// the bits walked through, which on eight LEDs looks like garbage and on eight relays sounds
+/// like it.
+/// </para>
+/// <para>
+/// Pinout: 1-7 = QB to QH, 8 = GND, 9 = QH', 10 = SRCLR, 11 = SRCLK, 12 = RCLK, 13 = OE,
+/// 14 = SER, 15 = QA, 16 = VCC.
+/// </para>
+/// </summary>
+public sealed class Ic74595 : DigitalIc
+{
+    private readonly Terminal[] _outputs = new Terminal[8];
+
+    private LogicState _lastShiftClock = LogicState.Unknown;
+    private LogicState _lastLatchClock = LogicState.Unknown;
+
+    private int _shiftRegister;
+    private int _latched;
+
+    public Ic74595() : base(16)
+    {
+        PropagationDelay = 13e-9;
+
+        var pins = new Terminal[17];
+
+        Terminal Pin(int number, string name, TerminalType type) =>
+            pins[number] = new Terminal($"p{number}", name, type, DipPackage.PinOffset(number, 16));
+
+        for (var i = 0; i < 7; i++)
+            _outputs[i + 1] = Pin(i + 1, $"Q{(char)('B' + i)}", TerminalType.Output);
+
+        Gnd = Pin(8, "GND", TerminalType.Ground);
+        SerialOut = Pin(9, "QH'", TerminalType.Output);
+        Clear = Pin(10, "SRCLR", TerminalType.Input);
+        ShiftClock = Pin(11, "SRCLK", TerminalType.Input);
+        LatchClock = Pin(12, "RCLK", TerminalType.Input);
+        OutputEnable = Pin(13, "OE", TerminalType.Input);
+        SerialIn = Pin(14, "SER", TerminalType.Input);
+        _outputs[0] = Pin(15, "QA", TerminalType.Output);
+        Vcc = Pin(16, "VCC", TerminalType.Power);
+
+        Terminals = [.. pins.Skip(1)];
+        ConfigurePins([SerialIn, ShiftClock, LatchClock, Clear, OutputEnable], [.. _outputs, SerialOut]);
+    }
+
+    /// <summary>QA through QH, the latched outputs.</summary>
+    public IReadOnlyList<Terminal> Outputs => _outputs;
+
+    /// <summary>The last bit out of the register, for chaining into the next one.</summary>
+    public Terminal SerialOut { get; }
+
+    public Terminal SerialIn { get; }
+
+    /// <summary>Rising edges move the register along.</summary>
+    public Terminal ShiftClock { get; }
+
+    /// <summary>A rising edge copies the register to the outputs.</summary>
+    public Terminal LatchClock { get; }
+
+    /// <summary>Active low: empties the shift register without touching the outputs.</summary>
+    public Terminal Clear { get; }
+
+    /// <summary>Active low: releases all eight outputs when high.</summary>
+    public Terminal OutputEnable { get; }
+
+    public override string PartNumber => "74595";
+
+    /// <summary>What is in the shift register, not yet on the pins.</summary>
+    public int ShiftRegister => _shiftRegister;
+
+    /// <summary>What is actually on the pins.</summary>
+    public int Latched => _latched;
+
+    protected override void EvaluatePoweredLogic(IDigitalContext context)
+    {
+        var delay = DelayFor(context);
+
+        var shift = context.ReadInput(ShiftClock, Levels);
+        var latch = context.ReadInput(LatchClock, Levels);
+
+        if (context.ReadInput(Clear, Levels).IsLow())
+        {
+            // Clearing empties the register and leaves the outputs alone, which is the whole
+            // reason it is a separate pin from the latch.
+            _shiftRegister = 0;
+        }
+        else if (_lastShiftClock.IsLow() && shift.IsHigh())
+        {
+            var incoming = context.ReadInput(SerialIn, Levels).IsHigh() ? 1 : 0;
+            _shiftRegister = ((_shiftRegister << 1) | incoming) & 0xFF;
+        }
+
+        if (_lastLatchClock.IsLow() && latch.IsHigh()) _latched = _shiftRegister;
+
+        _lastShiftClock = shift;
+        _lastLatchClock = latch;
+
+        // Output enable is active low, and releases rather than driving low.
+        var released = context.ReadInput(OutputEnable, Levels).IsHigh();
+
+        for (var i = 0; i < 8; i++)
+        {
+            var bit = (_latched & (0x80 >> i)) != 0;
+
+            context.Schedule(this, i,
+                released ? LogicState.HighImpedance : bit ? LogicState.High : LogicState.Low, delay);
+        }
+
+        // The bit about to fall off the end, for the next one in the chain.
+        context.Schedule(this, 8,
+            (_shiftRegister & 0x80) != 0 ? LogicState.High : LogicState.Low, delay);
+    }
+
+    public override void ResetLogic()
+    {
+        base.ResetLogic();
+
+        _lastShiftClock = LogicState.Unknown;
+        _lastLatchClock = LogicState.Unknown;
+        _shiftRegister = 0;
+        _latched = 0;
+    }
+}

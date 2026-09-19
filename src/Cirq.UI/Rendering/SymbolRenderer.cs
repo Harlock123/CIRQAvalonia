@@ -4,6 +4,7 @@ using Avalonia.Media;
 using Cirq.Components.Boards;
 using Cirq.Components.Bridges;
 using Cirq.Components.Passive;
+using Cirq.Components.Buses;
 using Cirq.Components.Digital;
 using Cirq.Components.Electromechanical;
 using Cirq.Components.Ics;
@@ -32,6 +33,8 @@ public static class SymbolRenderer
             case Speaker speaker: DrawSpeaker(context, pen, zoom, speaker); break;
             case Crystal: DrawCrystal(context, pen); break;
             case CharacterLcd lcd: DrawCharacterLcd(context, pen, zoom, lcd); break;
+            case I2cDevice bus: DrawPackage(context, pen, zoom, bus, bus.ComponentType); break;
+            case SpiMaster spi: DrawPackage(context, pen, zoom, spi, spi.ComponentType); break;
             case DipSwitch dip: DrawDipSwitch(context, pen, zoom, dip); break;
             case SolarCell pv: DrawSolarCell(context, pen, zoom, pv); break;
             case OscillatorModule osc: DrawOscillatorModule(context, pen, zoom, osc); break;
@@ -749,6 +752,45 @@ public static class SymbolRenderer
     /// A character LCD, showing what has actually been written to it. The point of the part is
     /// that you can read it, so the symbol is the display rather than a box with a part number.
     /// </summary>
+    /// <summary>
+    /// A package drawn round whatever pins a part happens to have, with a lead to each one.
+    /// The generic box is a fixed size, so a part with twelve pins spread over 140 units came out
+    /// as a starburst with the leads radiating from a stamp in the middle.
+    /// </summary>
+    private static void DrawPackage(
+        DrawingContext context, IPen pen, double zoom, CircuitComponent component, string label)
+    {
+        // Wide enough that the pin names sit near the edges without running into the part
+        // name in the middle, which they did at the first width I tried.
+        double halfWidth = 54, halfHeight = 24;
+
+        foreach (var terminal in component.Terminals)
+        {
+            halfWidth = Math.Max(halfWidth, Math.Abs(terminal.CanvasOffset.X) - 14);
+            halfHeight = Math.Max(halfHeight, Math.Abs(terminal.CanvasOffset.Y) + 14);
+        }
+
+        var body = new Rect(-halfWidth, -halfHeight, halfWidth * 2, halfHeight * 2);
+        context.DrawRectangle(CanvasTheme.SymbolFill, pen, new RoundedRect(body, 4));
+
+        foreach (var terminal in component.Terminals)
+        {
+            var at = terminal.CanvasOffset;
+            var edge = at.X < 0 ? -halfWidth : halfWidth;
+
+            context.DrawLine(pen, new Point(at.X, at.Y), new Point(edge, at.Y));
+
+            if (zoom > 0.55)
+            {
+                DrawCenteredText(context, terminal.Name,
+                    new Point(edge + (at.X < 0 ? 16 : -16), at.Y - 1), 8, zoom, CanvasTheme.LabelBrush);
+            }
+        }
+
+        if (zoom > 0.4)
+            DrawCenteredText(context, label, new Point(0, 0), 9, zoom, CanvasTheme.LabelBrush);
+    }
+
     private static void DrawCharacterLcd(
         DrawingContext context, IPen pen, double zoom, CharacterLcd lcd)
     {
@@ -1587,6 +1629,10 @@ public static class SymbolRenderer
         SwitchingRegulator => 66.0,
         DipSwitch => 94.0,
         CharacterLcd => 72.0,
+
+        // These are drawn as packages sized to their own pins, so the caption has to clear them.
+        Pcf8574 => 98.0,
+        I2cDevice or SpiMaster => 56.0,
         OscillatorModule => 44.0,
         Ne555 => DipPackage.BodyHeight(8) / 2 + 16,
         DigitalIc ic => DipPackage.BodyHeight(ic.PinCount) / 2 + 16,
