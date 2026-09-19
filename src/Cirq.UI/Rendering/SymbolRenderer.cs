@@ -31,6 +31,9 @@ public static class SymbolRenderer
             case Resistor: DrawResistor(context, pen); break;
             case Speaker speaker: DrawSpeaker(context, pen, zoom, speaker); break;
             case Crystal: DrawCrystal(context, pen); break;
+            case DipSwitch dip: DrawDipSwitch(context, pen, zoom, dip); break;
+            case SolarCell pv: DrawSolarCell(context, pen, zoom, pv); break;
+            case OscillatorModule osc: DrawOscillatorModule(context, pen, zoom, osc); break;
             case Thermocouple tc: DrawThermocouple(context, pen, zoom, tc); break;
             case LoadCell cell: DrawLoadCell(context, pen, zoom, cell); break;
             case RotaryEncoder encoder: DrawRotaryEncoder(context, pen, zoom, encoder); break;
@@ -738,6 +741,85 @@ public static class SymbolRenderer
 
             DrawCenteredText(context, "7660", new Point(0, 24), 9, zoom, CanvasTheme.LabelBrush);
         }
+    }
+
+    /// <summary>A DIP switch: the package with a lever per section, up for on.</summary>
+    private static void DrawDipSwitch(DrawingContext context, IPen pen, double zoom, DipSwitch dip)
+    {
+        context.DrawRectangle(CanvasTheme.SymbolFill, pen, new Rect(-26, -80, 52, 160));
+
+        for (var i = 0; i < 8; i++)
+        {
+            var y = -70 + (i * 20);
+
+            context.DrawLine(pen, new Point(-40, y), new Point(-26, y));
+            context.DrawLine(pen, new Point(40, y), new Point(26, y));
+
+            if (zoom <= 0.4) continue;
+
+            // The lever: across when the section is closed, tilted away when it is open.
+            var closed = dip.IsClosed(i);
+            var lever = CanvasTheme.Pen(closed ? CanvasTheme.ValueBrush : CanvasTheme.SymbolBrush, 1.6, zoom);
+
+            context.DrawLine(lever, new Point(-14, y), closed ? new Point(14, y) : new Point(12, y - 6));
+        }
+    }
+
+    /// <summary>A solar cell: the diode it is, with light arriving at it.</summary>
+    private static void DrawSolarCell(DrawingContext context, IPen pen, double zoom, SolarCell pv)
+    {
+        context.DrawLine(pen, new Point(-30, 0), new Point(-6, 0));
+        context.DrawLine(pen, new Point(30, 0), new Point(8, 0));
+
+        // The junction, drawn as the diode a cell actually is.
+        var body = new StreamGeometry();
+        using (var ctx = body.Open())
+        {
+            ctx.BeginFigure(new Point(-6, -16), true);
+            ctx.LineTo(new Point(-6, 16));
+            ctx.LineTo(new Point(8, 0));
+            ctx.EndFigure(true);
+        }
+
+        context.DrawGeometry(CanvasTheme.SymbolFill, pen, body);
+        context.DrawLine(pen, new Point(8, -16), new Point(8, 16));
+
+        if (zoom <= 0.4) return;
+
+        // Light coming in, which is what makes the current.
+        var rays = CanvasTheme.Pen(pv.IsLit ? CanvasTheme.ValueBrush : CanvasTheme.LabelBrush, 1.4, zoom);
+
+        foreach (var dx in new[] { -12.0, 2.0 })
+        {
+            DrawArrowHead(context, rays, new Point(dx - 10, -34), new Point(dx, -20));
+            context.DrawLine(rays, new Point(dx - 10, -34), new Point(dx - 4, -26));
+        }
+    }
+
+    /// <summary>An oscillator can: the package with the wave it produces inside it.</summary>
+    private static void DrawOscillatorModule(
+        DrawingContext context, IPen pen, double zoom, OscillatorModule osc)
+    {
+        context.DrawRectangle(CanvasTheme.SymbolFill, pen, new RoundedRect(new Rect(-28, -30, 56, 60), 4));
+
+        foreach (var (x, y) in new[] { (-40.0, -22.0), (-40.0, 22.0) })
+            context.DrawLine(pen, new Point(x, y), new Point(-28, y));
+
+        foreach (var y in new[] { -22.0, 22.0 })
+            context.DrawLine(pen, new Point(40, y), new Point(28, y));
+
+        if (zoom <= 0.45) return;
+
+        // A square wave inside, lit while it is actually running.
+        var wave = CanvasTheme.Pen(osc.IsRunning ? CanvasTheme.ValueBrush : CanvasTheme.SymbolBrush, 1.6, zoom);
+
+        var path = new PolylineGeometry(
+        [
+            new Point(-16, 6), new Point(-16, -8), new Point(-6, -8), new Point(-6, 6),
+            new Point(6, 6), new Point(6, -8), new Point(16, -8), new Point(16, 6),
+        ], false);
+
+        context.DrawGeometry(null, wave, path);
     }
 
     private static void DrawCrystal(DrawingContext context, IPen pen)
@@ -1465,6 +1547,8 @@ public static class SymbolRenderer
         LoadCell => 40.0,
         ChargePump => 52.0,
         SwitchingRegulator => 66.0,
+        DipSwitch => 94.0,
+        OscillatorModule => 44.0,
         Ne555 => DipPackage.BodyHeight(8) / 2 + 16,
         DigitalIc ic => DipPackage.BodyHeight(ic.PinCount) / 2 + 16,
         _ => 30.0,
