@@ -8,6 +8,33 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**Crystal.** Every other oscillator here takes its frequency from the circuit around it — the
+74HC14, the 4093 and the 4060 all charge a capacitor through a resistor. A crystal is the opposite,
+and it is modelled as what it electrically is: a series R-L-C standing in for the mechanical
+resonance, in parallel with the holder's capacitance. A 32.768 kHz part works out at about 24
+henries of motional inductance, which is what a high Q looks like written as components, and it
+resonates within a tenth of a percent of where it says.
+
+Two honest compromises, both documented on the part. The Q is lower than a real crystal's, because
+a real one takes some hundred thousand cycles to start; the frequency is unaffected, since it
+depends only on L and C. And the stocked parts stop at 1 MHz, because a resonance needs many time
+steps per cycle to land in the right place.
+
+**Electret microphone**, which closes a loop: with the LM386 and the speaker already here, sound
+in, amplifier, sound out, with nothing in the chain that is not a real part. It is not a passive
+transducer — there is a JFET in the can, and it works by sinking a bias current that sound
+modulates, which is why it has a polarity and why it does nothing without a resistor to the supply.
+
+**Servo.** Three wires and an angle set by how long a pulse is — not a voltage, not a duty cycle.
+It moves at a finite speed so a commanded jump takes time to arrive, goes limp when the pulses stop
+rather than snapping back, and reports a pulse that would drive it into its end stop.
+
+**Stepper motor**, four-phase unipolar, which is what the ULN2003 was added to drive. The drive
+pattern is not built in, because the pattern is the interesting part: the rotor follows the vector
+sum of whichever coils are carrying current, so wave drive, full step and half step all fall out of
+what you send. Drive it faster than it can follow and it stops dead while the field carries on
+without it, and says so — a stepper has no feedback, so those steps are simply gone.
+
 ## [0.11.0] - 2026-09-19
 
 Undo and redo, which `Ctrl` `Z` had been silently declining to do since the first commit. The

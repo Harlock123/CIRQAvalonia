@@ -30,6 +30,10 @@ public static class SymbolRenderer
         {
             case Resistor: DrawResistor(context, pen); break;
             case Speaker speaker: DrawSpeaker(context, pen, zoom, speaker); break;
+            case Crystal: DrawCrystal(context, pen); break;
+            case Microphone mic: DrawMicrophone(context, pen, zoom, mic); break;
+            case Servo servo: DrawServo(context, pen, zoom, servo); break;
+            case StepperMotor stepper: DrawStepper(context, pen, zoom, stepper); break;
             case Battery battery: DrawBattery(context, pen, zoom, battery); break;
             case TransientSuppressor tvs: DrawTvs(context, pen, zoom, tvs); break;
             case Varistor varistor: DrawVaristor(context, pen, zoom, varistor); break;
@@ -595,6 +599,113 @@ public static class SymbolRenderer
             // The part number, not the gain: the gain is already the caption underneath, and
             // printing it twice just makes the symbol look like it is stuttering.
             DrawCenteredText(context, amp.ComponentType, new Point(-6, 0), 9, zoom, CanvasTheme.LabelBrush);
+        }
+    }
+
+    /// <summary>A crystal: the quartz blank between its two electrodes.</summary>
+    private static void DrawCrystal(DrawingContext context, IPen pen)
+    {
+        context.DrawLine(pen, new Point(-30, 0), new Point(-12, 0));
+        context.DrawLine(pen, new Point(30, 0), new Point(12, 0));
+
+        // The electrode plates either side of the blank.
+        context.DrawLine(pen, new Point(-12, -14), new Point(-12, 14));
+        context.DrawLine(pen, new Point(12, -14), new Point(12, 14));
+
+        context.DrawRectangle(CanvasTheme.SymbolFill, pen, new Rect(-7, -16, 14, 32));
+    }
+
+    /// <summary>An electret capsule: the can, with the diaphragm drawn across it.</summary>
+    private static void DrawMicrophone(
+        DrawingContext context, IPen pen, double zoom, Microphone mic)
+    {
+        context.DrawLine(pen, new Point(-30, 0), new Point(-16, 0));
+        context.DrawLine(pen, new Point(30, 0), new Point(16, 0));
+
+        context.DrawEllipse(CanvasTheme.SymbolFill, pen, new Point(0, 0), 16, 16);
+        context.DrawLine(pen, new Point(-16, 0), new Point(16, 0));
+
+        // Sound arriving, drawn only while there is any.
+        if (mic.IsHearingSound && zoom > 0.4)
+        {
+            var wave = CanvasTheme.Pen(CanvasTheme.ValueBrush, 1.4, zoom);
+
+            foreach (var r in new[] { 24.0, 32.0 })
+            {
+                var arc = new StreamGeometry();
+                using (var ctx = arc.Open())
+                {
+                    ctx.BeginFigure(new Point(-(r * 0.5), -r * 0.7), false);
+                    ctx.ArcTo(new Point(-(r * 0.5), r * 0.7), new Size(r, r), 0, false,
+                        SweepDirection.CounterClockwise);
+                    ctx.EndFigure(false);
+                }
+                context.DrawGeometry(null, wave, arc);
+            }
+        }
+
+        if (mic.Violations.Count > 0 && zoom > 0.4)
+        {
+            context.DrawEllipse(null, CanvasTheme.Pen(CanvasTheme.ErrorBrush, 2.0, zoom),
+                new Point(0, 0), 24, 24);
+        }
+    }
+
+    /// <summary>A servo: the case, with the output horn drawn where the shaft actually is.</summary>
+    private static void DrawServo(DrawingContext context, IPen pen, double zoom, Servo servo)
+    {
+        context.DrawRectangle(CanvasTheme.SymbolFill, pen, new Rect(-30, -30, 60, 60));
+
+        foreach (var y in new[] { -24.0, 0.0, 24.0 })
+            context.DrawLine(pen, new Point(-40, y), new Point(-30, y));
+
+        // The horn, at the angle the shaft has actually reached.
+        var hub = new Point(4, 0);
+        context.DrawEllipse(null, pen, hub, 13, 13);
+
+        var radians = servo.Angle * Math.PI / 180.0;
+        var arm = servo.IsDriven ? CanvasTheme.Pen(CanvasTheme.ValueBrush, 2.0, zoom) : pen;
+
+        context.DrawLine(arm, hub,
+            new Point(hub.X + (20 * Math.Sin(radians)), hub.Y - (20 * Math.Cos(radians))));
+
+        if (servo.Violations.Count > 0 && zoom > 0.4)
+        {
+            context.DrawEllipse(null, CanvasTheme.Pen(CanvasTheme.ErrorBrush, 2.0, zoom),
+                new Point(0, 0), 38, 38);
+        }
+    }
+
+    /// <summary>A stepper: the motor body with its four windings around the rotor.</summary>
+    private static void DrawStepper(
+        DrawingContext context, IPen pen, double zoom, StepperMotor stepper)
+    {
+        context.DrawEllipse(CanvasTheme.SymbolFill, pen, new Point(0, 0), 30, 30);
+
+        context.DrawLine(pen, new Point(-50, 0), new Point(-30, 0));
+        for (var i = 0; i < 4; i++)
+            context.DrawLine(pen, new Point(50, -30 + (i * 20)), new Point(26, -30 + (i * 20)));
+
+        // One mark per winding, lit while that winding is carrying current.
+        for (var i = 0; i < 4; i++)
+        {
+            var angle = i * Math.PI / 2.0;
+            var at = new Point(20 * Math.Cos(angle), 20 * Math.Sin(angle));
+            var live = Math.Max(stepper.CoilCurrent(i), 0.0) >= stepper.HoldingCurrent;
+
+            context.DrawEllipse(live ? CanvasTheme.ValueBrush : null, pen, at, 5, 5);
+        }
+
+        // The rotor, pointing where the shaft has actually turned to.
+        if (zoom > 0.4)
+        {
+            var radians = stepper.Angle * Math.PI / 180.0;
+            var rotor = stepper.IsSlipping
+                ? CanvasTheme.Pen(CanvasTheme.ErrorBrush, 2.0, zoom)
+                : CanvasTheme.Pen(CanvasTheme.ValueBrush, 2.0, zoom);
+
+            context.DrawLine(rotor, new Point(0, 0),
+                new Point(11 * Math.Cos(radians), 11 * Math.Sin(radians)));
         }
     }
 
@@ -1208,6 +1319,10 @@ public static class SymbolRenderer
         // The triangle reaches 34 either side of centre, so the default would sit both captions
         // inside the body.
         FixedGainAmplifier => 46.0,
+
+        // A servo's case and a stepper's body are both 30 either side of centre, which is exactly
+        // where the default puts the captions.
+        Servo or StepperMotor => 44.0,
         Ne555 => DipPackage.BodyHeight(8) / 2 + 16,
         DigitalIc ic => DipPackage.BodyHeight(ic.PinCount) / 2 + 16,
         _ => 30.0,

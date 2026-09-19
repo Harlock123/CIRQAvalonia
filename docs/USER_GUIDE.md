@@ -65,11 +65,11 @@ at the window edge; click the rail to bring it back.
 
 Click a palette entry, then click the canvas. The part lands where you click, snapped to the grid.
 
-The palette holds **119 components in 15 categories**:
+The palette holds **123 components in 15 categories**:
 
 | Category | Count | Contents |
 | --- | --- | --- |
-| Passive | 6 | Resistor, capacitor, **electrolytic capacitor**, inductor, transformer, potentiometer |
+| Passive | 7 | Resistor, capacitor, electrolytic capacitor, inductor, transformer, potentiometer, **crystal** — see [below](#crystals) |
 | Switches | 3 | SPST, SPDT, push button |
 | Sources | 5 | Ground, DC voltage, DC current, function generator, **battery** — see [below](#batteries) |
 | Semiconductors | 11 | 1N4148, 1N4001, Schottky, zeners, bridge rectifier, SCR, triac, diac, **TVS and varistor** — see [below](#surge-protection) |
@@ -81,7 +81,7 @@ The palette holds **119 components in 15 categories**:
 | 74xx Series | 17 | Counters, decoders, flip-flops, shift registers, multiplexers, Schmitt inverter |
 | 40xx Series | 14 | CMOS gates, counters, flip-flops, analog switches — see [below](#the-40xx-series) |
 | Digital I/O | 4 | Logic toggle, clock, and indicators |
-| Sensors & Actuators | 7 | DC motor, LDR, thermistors, buzzers, **speaker** — see [below](#sensors-and-actuators) |
+| Sensors & Actuators | 10 | DC motor, LDR, thermistors, buzzers, speaker, **microphone, servo, stepper** — see [below](#sensors-and-actuators) |
 | Switching & Isolation | 6 | Relay, fuses, optocouplers, **ULN2003** — see [below](#switching-and-isolation) |
 | Dev Boards | 4 | Raspberry Pi, Arduino Uno / Nano / Mega — see [below](#development-boards) |
 
@@ -563,6 +563,28 @@ a real one at the end of its life conducts at normal working voltage and cooks.
 
 ---
 
+## Crystals
+
+Every other oscillator here takes its frequency from the circuit around it. The 74HC14, the 4093
+and the 4060 all charge a capacitor through a resistor and switch at a threshold, so the components
+set the rate — change the resistor and the frequency moves. A crystal is the opposite: the
+mechanical resonance of a slice of quartz is so sharp that the surrounding circuit can barely
+budge it, which is why a watch keeps time and an RC oscillator does not.
+
+Electrically that is a series R-L-C — the **motional arm**, standing in for the mechanical
+resonance — in parallel with the plain capacitance of the holder. The inductance is enormous and
+the capacitance tiny: a 32.768 kHz part here works out at about 24 henries. That is what a high Q
+looks like written as components.
+
+Two things about the model are worth knowing. The **Q is lower than a real crystal's**, because a
+real one takes something like a hundred thousand cycles to start and you would be waiting seconds
+of simulated time for anything to happen. The frequency is unaffected — it depends only on L and
+C — so what you lose is sharpness, not accuracy. And the stocked parts **stop at 1 MHz**, because a
+resonance needs many time steps per cycle to come out in the right place; a 16 MHz crystal would
+need the simulation step shortened by two orders of magnitude before it meant anything.
+
+---
+
 ## Thyristors: parts that latch
 
 Everything else in the library follows its input. A thyristor remembers, and that is the only thing
@@ -624,6 +646,38 @@ with a capacitor across two pins, which is the whole appeal: there is nothing to
 Its output idles at **half the supply** so it can swing both ways, which is why the speaker is
 coupled through a capacitor rather than wired straight to it. Connect it directly and half the rail
 sits across the voice coil continuously — the speaker's power reading will tell you so.
+
+**Microphone** — an electret capsule, which is not a passive transducer: there is a JFET inside
+the can, and it works by **sinking a bias current** that sound then modulates. That is why it has a
+polarity and why it does nothing until you give it a resistor to the supply — the resistor is what
+turns its current into a voltage. With the LM386 and the speaker this closes the loop: sound in,
+amplifier, sound out, with nothing in the chain that is not a real part. Double-click it to start
+and stop the sound.
+
+The capsule reports being **starved** — a bias resistor so large there is not enough voltage left
+to run the JFET. It cannot report the opposite mistake, because a capsule wired straight to the
+rail is perfectly happy; it is the circuit that has no resistance for the signal to develop across,
+and the capsule cannot see that from its own two pins.
+
+**Servo** — three wires, and an angle set by how long a pulse is. Not a voltage and not a duty
+cycle: between about one and two milliseconds maps across the travel, repeated every twenty
+milliseconds, and the gap between pulses carries no information. That is why changing the PWM
+frequency rather than the pulse length makes a servo behave strangely. It moves at a finite speed,
+so a commanded jump takes time to arrive, and it goes limp when the pulses stop rather than
+snapping back. A pulse outside the range is reported, because a real servo drives against its end
+stop and stalls there.
+
+**Stepper motor** — four-phase unipolar, the sort the ULN2003 exists to drive. It has no idea where
+it is. Energise the coils in order and the rotor follows one step at a time; reverse the order and
+it goes the other way; go faster than it can follow and it stops dead while the field carries on
+without it. Counting steps is the only position feedback there is, which is why losing them
+matters, and the part says when it is.
+
+The drive pattern is not built in, because the pattern is the interesting part. The rotor follows
+the vector sum of whichever coils are actually carrying current, so wave drive, full step and half
+step all fall out of what you send rather than being chosen from a list. Note that the first
+energisation **aligns** the rotor rather than stepping it: a stepper's position is only ever
+relative to where it was switched on.
 
 **Speaker** — a voice coil: a few ohms of wire with some inductance, so the load an amplifier sees
 gets harder with frequency rather than staying put. The impedance on the box is a nominal figure,
