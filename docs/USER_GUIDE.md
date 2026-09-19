@@ -258,6 +258,34 @@ GPIO17=high; GPIO18=clock@1kHz; GPIO22=in-pullup; GPIO12=pwm@500Hz:25%
 | `high` / `low` (or `1` / `0`) | Drive the pin at the board's logic voltage |
 | `clock@1kHz` | A square wave — this is what makes a board a signal *source* |
 | `pwm@500Hz:25%` | A square wave at a stated duty cycle |
+| `seq@1kHz:1101_0010` | Steps through a bit pattern and repeats it |
+| `once@1kHz:001` | Steps through the pattern once, then holds its last step |
+
+### Sequences
+
+`seq` and `once` play a pattern one step at a time, at the rate you give them. A pattern is made of
+`1`, `0` and `z`, and `_` or spaces group it for readability — `1101_0010` is far easier to check
+by eye than `11010010`:
+
+```
+GPIO17=seq@1kHz:1101_0010      loops forever, one step per millisecond
+GPIO27=once@1kHz:001           low, low, high — then holds high
+GPIO22=seq@500Hz:1z0z          releases the pin on every other step
+```
+
+The difference between the two matters:
+
+- **`seq`** wraps round to the start, so it is a repeating waveform — a data pattern, a bit
+  sequence feeding a shift register, an address burst you want to watch cycle on the scope.
+- **`once`** holds its final step instead of wrapping, which is what makes it usable as a
+  power-on **reset pulse** or an initialisation burst. A looping pattern would yank the line back
+  down every few milliseconds; a one-shot lets go and stays let go.
+
+A `z` step releases the pin for that step, exactly as though it were an input, so whatever else is
+on the node decides the level. That is how you model an open-drain line, or hand a shared bus over
+to another device mid-pattern.
+
+Patterns are capped at 256 steps, which is far more than a schematic needs.
 
 Frequencies accept the same engineering notation as everything else (`500Hz`, `1kHz`, `2.5kHz`).
 The **Status** readout underneath says how the line was understood, and names anything it could not

@@ -698,3 +698,304 @@ public class BoardPersistenceTests
         }
     }
 }
+
+public class PinSequenceParsingTests
+{
+    private static readonly BoardProfile Pi = BoardProfile.RaspberryPi40;
+
+    private static PinSetting Single(string text)
+    {
+        var result = PinConfiguration.Parse(text, Pi);
+        Assert.True(result.IsValid, string.Join("; ", result.Problems));
+        return result.Settings.Single();
+    }
+
+    [Fact]
+    public void ALoopingSequenceCarriesItsRateAndPattern()
+    {
+        var setting = Single("GPIO17=seq@1kHz:10110");
+
+        Assert.Equal(PinMode.Sequence, setting.Mode);
+        Assert.Equal(1000.0, setting.Frequency, 6);
+        Assert.Equal("10110", setting.Pattern);
+        Assert.True(setting.IsSequence);
+        Assert.True(setting.IsTimed);
+        Assert.True(setting.IsDriving);
+    }
+
+    [Fact]
+    public void AOneShotSequenceIsADistinctMode()
+    {
+        var setting = Single("GPIO17=once@500Hz:1110");
+
+        Assert.Equal(PinMode.SequenceOnce, setting.Mode);
+        Assert.Equal("1110", setting.Pattern);
+    }
+
+    [Theory]
+    [InlineData("GPIO17=sequence@1kHz:101", PinMode.Sequence)]
+    [InlineData("GPIO17=seq-once@1kHz:101", PinMode.SequenceOnce)]
+    public void BothSpellingsOfEachSequenceModeWork(string text, PinMode expected) =>
+        Assert.Equal(expected, Single(text).Mode);
+
+    [Fact]
+    public void UnderscoresAndSpacesGroupThePatternForReading()
+    {
+        // 1100_1010 is far easier to check by eye than 11001010.
+        Assert.Equal("11001010", Single("GPIO17=seq@1kHz:1100_1010").Pattern);
+        Assert.Equal("1010", Single("GPIO17=seq@1kHz:10 10").Pattern);
+    }
+
+    [Fact]
+    public void APatternMayReleaseThePinOnAStep()
+    {
+        Assert.Equal("1z0z", Single("GPIO17=seq@1kHz:1Z0z").Pattern);
+    }
+
+    [Fact]
+    public void ThePatternDurationIsItsLengthOverTheStepRate()
+    {
+        var setting = Single("GPIO17=seq@1kHz:10110");
+
+        Assert.Equal(5e-3, setting.PatternDuration, 9);
+    }
+
+    [Theory]
+    [InlineData("GPIO17=seq", "needs a step rate and a pattern")]
+    [InlineData("GPIO17=seq@1kHz", "needs a pattern after the rate")]
+    [InlineData("GPIO17=seq@1kHz:", "pattern is empty")]
+    [InlineData("GPIO17=seq@1kHz:10201", "'2' is not a pattern step")]
+    [InlineData("GPIO17=once@1kHz:abc", "'a' is not a pattern step")]
+    [InlineData("GPIO17=seq@banana:101", "not a frequency")]
+    public void MalformedSequencesAreReported(string text, string expected)
+    {
+        var result = PinConfiguration.Parse(text, Pi);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(expected, string.Join("; ", result.Problems));
+    }
+
+    [Fact]
+    public void AnAbsurdlyLongPatternIsRefusedRatherThanAccepted()
+    {
+        var text = $"GPIO17=seq@1kHz:{new string('1', PinConfiguration.MaximumPatternLength + 1)}";
+
+        Assert.Contains("over the 256 limit", string.Join("; ", PinConfiguration.Parse(text, Pi).Problems));
+    }
+
+    [Fact]
+    public void APatternAtExactlyTheLimitIsAccepted()
+    {
+        var text = $"GPIO17=seq@1kHz:{new string('1', PinConfiguration.MaximumPatternLength)}";
+
+        Assert.True(PinConfiguration.Parse(text, Pi).IsValid);
+    }
+
+    [Fact]
+    public void SequencesRoundTripThroughTheirTextForm()
+    {
+        const string original = "GPIO17=seq@1kHz:1011z; GPIO18=once@2kHz:1100; GPIO27=in-pullup";
+
+        var once = PinConfiguration.Parse(original, Pi).Settings;
+        var twice = PinConfiguration.Parse(PinConfiguration.Format(once), Pi).Settings;
+
+        Assert.Equal(once, twice);
+    }
+}
+
+public class PinSequenceBehaviourTests
+{
+    private static (Circuit Circuit, RaspberryPiBoard Board, Terminal Pin) Rig(string pins, string pinName = "GPIO17")
+    {
+        var circuit = new Circuit();
+        var pi = circuit.Add(new RaspberryPiBoard());
+        circuit.Connect(pi.GroundPins[0], circuit.Add(new Ground()).Terminals[0]);
+        pi.Pins = pins;
+
+        var load = circuit.Add(new Resistor(10e3));
+        circuit.Connect(pi.Pin(pinName), load.Terminals[0]);
+        circuit.Connect(load.Terminals[1], pi.GroundPins[1]);
+
+        return (circuit, pi, pi.Pin(pinName));
+    }
+
+    /// <summary>Samples the pin in the middle of each step, where the level is unambiguous.</summary>
+    private static string Play(string pins, double rate, int steps, string pinName = "GPIO17")
+    {
+        var (circuit, _, pin) = Rig(pins, pinName);
+
+        var sim = new CircuitSimulator(circuit);
+        sim.Reset();
+        sim.SolveOperatingPoint();
+
+        var read = new char[steps];
+        for (var i = 0; i < steps; i++)
+        {
+            sim.Run((i + 0.5) / rate - sim.Time);
+            var v = sim.NodeVoltage(pin);
+            read[i] = v > 1.65 ? '1' : v > 0.2 ? 'z' : '0';
+        }
+
+        return new string(read);
+    }
+
+    [Fact]
+    public void ASequencePlaysItsPatternInOrder()
+    {
+        Assert.Equal("10110", Play("GPIO17=seq@1kHz:10110", 1e3, 5));
+    }
+
+    [Fact]
+    public void ASequenceRepeatsOnceItReachesTheEnd()
+    {
+        // Two full passes of a four-step pattern.
+        Assert.Equal("11001100", Play("GPIO17=seq@1kHz:1100", 1e3, 8));
+    }
+
+    [Fact]
+    public void AOneShotHoldsItsLastStepInsteadOfRepeating()
+    {
+        // The same pattern either way, so the two modes can only differ in what happens after
+        // the fourth step: looping starts again, one-shot holds the final zero.
+        Assert.Equal("11101110", Play("GPIO17=seq@1kHz:1110", 1e3, 8));
+        Assert.Equal("11100000", Play("GPIO17=once@1kHz:1110", 1e3, 8));
+    }
+
+    [Fact]
+    public void AOneShotIsUsableAsAStartupResetPulse()
+    {
+        // Low for two steps, then released high for the rest of the run: exactly a reset.
+        Assert.Equal("00111", Play("GPIO17=once@2kHz:001", 2e3, 5));
+    }
+
+    /// <summary>
+    /// A 'z' step releases the pin. Without leakage stamped on the released steps the node has
+    /// nothing holding it, so this also guards the matrix against going singular mid-pattern.
+    /// </summary>
+    [Fact]
+    public void AReleasedStepLetsAnExternalPullDecideTheLevel()
+    {
+        var circuit = new Circuit();
+        var pi = circuit.Add(new RaspberryPiBoard());
+        circuit.Connect(pi.GroundPins[0], circuit.Add(new Ground()).Terminals[0]);
+        pi.Pins = "GPIO17=seq@1kHz:1z0z";
+
+        // An external pull-up: the released steps should follow it to 3.3 V.
+        var pull = circuit.Add(new Resistor(4.7e3));
+        var rail = circuit.Add(new DcVoltageSource(3.3));
+        circuit.Connect(rail.Terminals[0], pull.Terminals[0]);
+        circuit.Connect(pull.Terminals[1], pi.Pin("GPIO17"));
+        circuit.Connect(rail.Terminals[1], pi.GroundPins[1]);
+
+        var sim = new CircuitSimulator(circuit);
+        sim.Reset();
+        sim.SolveOperatingPoint();
+
+        var read = new char[4];
+        for (var i = 0; i < 4; i++)
+        {
+            sim.Run((i + 0.5) / 1e3 - sim.Time);
+            read[i] = sim.NodeVoltage(pi.Pin("GPIO17")) > 1.65 ? '1' : '0';
+        }
+
+        // Steps 0 and 1 are high (driven, then pulled up), step 2 is driven low, step 3 pulled up.
+        Assert.Equal("1101", new string(read));
+    }
+
+    [Fact]
+    public void TheInternalPullUpAlsoWinsOnAReleasedStep()
+    {
+        var (circuit, pi, pin) = Rig("GPIO17=seq@1kHz:0z");
+
+        var sim = new CircuitSimulator(circuit);
+        sim.Reset();
+        sim.SolveOperatingPoint();
+
+        sim.Run(1.5e-3);
+
+        // The 10k load to ground beats the pin's own leakage, so a released step sits low.
+        Assert.True(sim.NodeVoltage(pin) < 0.5, $"released step sat at {sim.NodeVoltage(pin):0.00} V");
+    }
+
+    [Fact]
+    public void ASequenceRunsAtTheRateItWasGiven()
+    {
+        // An alternating pattern at 1 kHz step rate is a 500 Hz square wave: twenty rising
+        // edges in forty milliseconds.
+        var (circuit, _, pin) = Rig("GPIO17=seq@1kHz:10");
+
+        var sim = new CircuitSimulator(circuit);
+        sim.Reset();
+        sim.SolveOperatingPoint();
+
+        var rising = 0;
+        var wasHigh = sim.NodeVoltage(pin) > 1.65;
+        sim.TimePointAccepted += _ =>
+        {
+            var isHigh = sim.NodeVoltage(pin) > 1.65;
+            if (isHigh && !wasHigh) rising++;
+            wasHigh = isHigh;
+        };
+
+        sim.Run(40e-3);
+
+        Assert.InRange(rising, 19, 21);
+    }
+
+    [Fact]
+    public void SeveralPinsRunTheirOwnSequencesIndependently()
+    {
+        var circuit = new Circuit();
+        var pi = circuit.Add(new RaspberryPiBoard());
+        circuit.Connect(pi.GroundPins[0], circuit.Add(new Ground()).Terminals[0]);
+        pi.Pins = "GPIO17=seq@1kHz:1100; GPIO27=seq@1kHz:1010";
+
+        foreach (var name in new[] { "GPIO17", "GPIO27" })
+        {
+            var load = circuit.Add(new Resistor(10e3));
+            circuit.Connect(pi.Pin(name), load.Terminals[0]);
+            circuit.Connect(load.Terminals[1], pi.GroundPins[1]);
+        }
+
+        var sim = new CircuitSimulator(circuit);
+        sim.Reset();
+        sim.SolveOperatingPoint();
+
+        var a = new char[4];
+        var b = new char[4];
+        for (var i = 0; i < 4; i++)
+        {
+            sim.Run((i + 0.5) / 1e3 - sim.Time);
+            a[i] = sim.NodeVoltage(pi.Pin("GPIO17")) > 1.65 ? '1' : '0';
+            b[i] = sim.NodeVoltage(pi.Pin("GPIO27")) > 1.65 ? '1' : '0';
+        }
+
+        Assert.Equal("1100", new string(a));
+        Assert.Equal("1010", new string(b));
+    }
+
+    [Fact]
+    public void ASequencedBoardSurvivesSaveAndReloadStillPlaying()
+    {
+        var circuit = new Circuit();
+        var pi = circuit.Add(new RaspberryPiBoard());
+        pi.Pins = "GPIO17=seq@1kHz:1011z; GPIO18=once@2kHz:110";
+
+        var path = Path.Combine(Path.GetTempPath(), $"cirq-seq-{Guid.NewGuid():N}.cirq");
+        try
+        {
+            Serialization.CircuitSerializer.Save(circuit, path);
+            var board = Serialization.CircuitSerializer.Load(path)
+                .Circuit.Components.OfType<RaspberryPiBoard>().Single();
+
+            var settings = PinConfiguration.Parse(board.Pins, board.Profile).Settings;
+
+            Assert.Equal("1011z", settings.Single(s => s.PinName == "GPIO17").Pattern);
+            Assert.Equal(PinMode.SequenceOnce, settings.Single(s => s.PinName == "GPIO18").Mode);
+        }
+        finally
+        {
+            if (File.Exists(path)) File.Delete(path);
+        }
+    }
+}

@@ -25,14 +25,39 @@ public enum PinMode
 
     /// <summary>A square wave at a set duty cycle — the same mechanism as a clock, named for intent.</summary>
     Pwm,
+
+    /// <summary>Steps through <see cref="PinSetting.Pattern"/> and repeats it.</summary>
+    Sequence,
+
+    /// <summary>Steps through the pattern once, then holds its last step.</summary>
+    SequenceOnce,
 }
 
-/// <summary>One pin's configuration.</summary>
-public sealed record PinSetting(string PinName, PinMode Mode, double Frequency = 1000.0, double DutyCycle = 0.5)
+/// <summary>
+/// One pin's configuration.
+/// <para>
+/// <see cref="Pattern"/> is held as a normalised string of <c>0</c>, <c>1</c> and <c>z</c> rather
+/// than a parsed list, so the record keeps value equality — a list field would compare by
+/// reference and quietly break every round-trip comparison.
+/// </para>
+/// </summary>
+public sealed record PinSetting(
+    string PinName,
+    PinMode Mode,
+    double Frequency = 1000.0,
+    double DutyCycle = 0.5,
+    string Pattern = "")
 {
-    public bool IsDriving => Mode is PinMode.OutputLow or PinMode.OutputHigh or PinMode.Clock or PinMode.Pwm;
+    public bool IsDriving => Mode is PinMode.OutputLow or PinMode.OutputHigh
+        or PinMode.Clock or PinMode.Pwm or PinMode.Sequence or PinMode.SequenceOnce;
 
-    public bool IsTimed => Mode is PinMode.Clock or PinMode.Pwm;
+    public bool IsTimed => Mode is PinMode.Clock or PinMode.Pwm
+        or PinMode.Sequence or PinMode.SequenceOnce;
+
+    public bool IsSequence => Mode is PinMode.Sequence or PinMode.SequenceOnce;
+
+    /// <summary>How long one full pass of the pattern takes, in seconds.</summary>
+    public double PatternDuration => Frequency > 0 ? Pattern.Length / Frequency : double.PositiveInfinity;
 }
 
 /// <summary>
@@ -106,7 +131,7 @@ public static class PinConfiguration
                 continue;
             }
 
-            if (!TryParseSpec(spec, out var mode, out var frequency, out var duty, out var reason))
+            if (!TryParseSpec(spec, out var mode, out var frequency, out var duty, out var pattern, out var reason))
             {
                 problems.Add($"{pin.Name}: {reason}");
                 continue;
@@ -123,18 +148,23 @@ public static class PinConfiguration
             if (mode is PinMode.Pwm && !pin.SupportsPwm)
                 problems.Add($"{pin.Name} has no hardware PWM (simulated anyway)");
 
-            settings.Add(new PinSetting(pin.Name, mode, frequency, duty));
+            settings.Add(new PinSetting(pin.Name, mode, frequency, duty, pattern));
         }
 
         return new Result(settings, problems);
     }
 
+    /// <summary>Longest pattern accepted, which is far more steps than a schematic needs.</summary>
+    public const int MaximumPatternLength = 256;
+
     private static bool TryParseSpec(
-        string spec, out PinMode mode, out double frequency, out double duty, out string reason)
+        string spec, out PinMode mode, out double frequency, out double duty,
+        out string pattern, out string reason)
     {
         mode = PinMode.Input;
         frequency = 1000.0;
         duty = 0.5;
+        pattern = string.Empty;
         reason = string.Empty;
 
         // clock@1kHz  /  pwm@500Hz:25%
@@ -150,6 +180,8 @@ public static class PinConfiguration
             case "low" or "out-low" or "0": mode = PinMode.OutputLow; break;
             case "clock" or "clk": mode = PinMode.Clock; break;
             case "pwm": mode = PinMode.Pwm; break;
+            case "seq" or "sequence": mode = PinMode.Sequence; break;
+            case "once" or "seq-once": mode = PinMode.SequenceOnce; break;
             default:
                 reason = $"'{head}' is not a mode";
                 return false;
@@ -157,6 +189,12 @@ public static class PinConfiguration
 
         if (at < 0)
         {
+            if (mode is PinMode.Sequence or PinMode.SequenceOnce)
+            {
+                reason = $"{head} needs a step rate and a pattern, as {head}@1kHz:1011";
+                return false;
+            }
+
             if (mode is not (PinMode.Clock or PinMode.Pwm)) return true;
             reason = $"{head} needs a frequency, as {head}@1kHz";
             return false;
@@ -170,6 +208,40 @@ public static class PinConfiguration
         {
             reason = $"'{frequencyText}' is not a frequency";
             return false;
+        }
+
+        if (mode is PinMode.Sequence or PinMode.SequenceOnce)
+        {
+            if (colon < 0)
+            {
+                reason = $"{head} needs a pattern after the rate, as {head}@1kHz:1011";
+                return false;
+            }
+
+            // Spaces and underscores are grouping for the reader — 1100_1010 beats 11001010.
+            var raw = tail[(colon + 1)..].Replace("_", string.Empty).Replace(" ", string.Empty);
+
+            if (raw.Length == 0)
+            {
+                reason = "the pattern is empty";
+                return false;
+            }
+
+            if (raw.Length > MaximumPatternLength)
+            {
+                reason = $"the pattern is {raw.Length} steps, over the {MaximumPatternLength} limit";
+                return false;
+            }
+
+            foreach (var c in raw)
+            {
+                if (c is '0' or '1' or 'z' or 'Z') continue;
+                reason = $"'{c}' is not a pattern step — use 0, 1 or z";
+                return false;
+            }
+
+            pattern = raw.ToLowerInvariant();
+            return true;
         }
 
         if (colon >= 0)
@@ -203,6 +275,8 @@ public static class PinConfiguration
             PinMode.OutputLow => $"{s.PinName}=low",
             PinMode.Clock => $"{s.PinName}=clock@{SiPrefix.Format(s.Frequency, "Hz")}",
             PinMode.Pwm => $"{s.PinName}=pwm@{SiPrefix.Format(s.Frequency, "Hz")}:{s.DutyCycle * 100:0.#}%",
+            PinMode.Sequence => $"{s.PinName}=seq@{SiPrefix.Format(s.Frequency, "Hz")}:{s.Pattern}",
+            PinMode.SequenceOnce => $"{s.PinName}=once@{SiPrefix.Format(s.Frequency, "Hz")}:{s.Pattern}",
             _ => $"{s.PinName}=in",
         }));
 }

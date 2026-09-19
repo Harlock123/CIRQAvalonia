@@ -32,7 +32,7 @@ Core ← Engine ← Components ← UI, which keeps the whole engine headless-tes
 
 ```bash
 dotnet run --project src/Cirq.UI     # the editor
-dotnet test                          # 566 tests
+dotnet test                          # 591 tests
 ```
 
 Targets .NET 10. The UI uses Avalonia 12 and ScottPlot 5.1; those two versions are pinned
@@ -159,7 +159,13 @@ would be unreadable and most circuits use three pins:
 
 ```
 GPIO17=high; GPIO18=clock@1kHz; GPIO22=in-pullup; GPIO12=pwm@500Hz:25%
+GPIO23=seq@1kHz:1101_0010; GPIO24=once@1kHz:001
 ```
+
+`seq` loops a bit pattern and `once` plays it through and holds the last step, which is what makes
+a one-shot usable as a reset pulse rather than something that yanks the line back down every few
+milliseconds. A `z` step releases the pin for that step, so an open-drain line or a shared bus
+handed over mid-pattern both fall out of the same mechanism.
 
 Boards are then checked against their datasheet limits as the simulation runs — a Pi GPIO above
 3.3V (it is not 5V tolerant), a pin over its current rating, the total GPIO budget — and a
