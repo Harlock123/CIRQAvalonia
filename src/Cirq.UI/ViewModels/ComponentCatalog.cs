@@ -191,6 +191,14 @@ public static class ComponentCatalog
             new("DAC Bridge", "Logic in, configurable analog out", () => new DacBridge()),
         ]),
 
+        new("Sensors & Actuators",
+        [
+            new("DC Motor", "Armature, back-EMF and rotor inertia — warns if it is left stalled",
+                () => new DcMotor()),
+            new("LDR", "Light-dependent resistor. Double-click it to cover and uncover it",
+                () => new LightDependentResistor()),
+        ]),
+
         new("Switching & Isolation",
         [
             new("Relay (SPDT)", "Coil and changeover contact — warns if the coil has no flyback diode",

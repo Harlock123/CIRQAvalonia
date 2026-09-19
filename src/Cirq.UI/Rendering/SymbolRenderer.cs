@@ -39,6 +39,8 @@ public static class SymbolRenderer
             case DcCurrentSource: DrawCurrentSource(context, pen); break;
             case FunctionGenerator fg: DrawFunctionGenerator(context, pen, fg); break;
             case Led led: DrawLed(context, pen, led); break;
+            case DcMotor motor: DrawMotor(context, pen, zoom, motor); break;
+            case LightDependentResistor ldr: DrawLdr(context, pen, zoom, ldr); break;
             case Relay relay: DrawRelay(context, pen, zoom, relay); break;
             case Fuse fuse: DrawFuse(context, pen, zoom, fuse); break;
             case Optocoupler opto: DrawOptocoupler(context, pen, zoom, opto); break;
@@ -117,6 +119,57 @@ public static class SymbolRenderer
         {
             var warn = CanvasTheme.Pen(CanvasTheme.ErrorBrush, 2.0, zoom);
             context.DrawEllipse(null, warn, new Point(0, 0), 20, 18);
+        }
+    }
+
+    /// <summary>
+    /// A motor: the conventional circle and M, ringed when it is being stalled.
+    /// </summary>
+    private static void DrawMotor(DrawingContext context, IPen pen, double zoom, DcMotor motor)
+    {
+        context.DrawLine(pen, new Point(-30, 0), new Point(-18, 0));
+        context.DrawLine(pen, new Point(18, 0), new Point(30, 0));
+        context.DrawEllipse(CanvasTheme.SymbolFill, pen, new Point(0, 0), 18, 18);
+
+        DrawCenteredText(context, "M", new Point(0, 0), 13, zoom, CanvasTheme.SymbolBrush);
+
+        if (motor.Violations.Count > 0 && zoom > 0.4)
+        {
+            var warn = CanvasTheme.Pen(CanvasTheme.ErrorBrush, 2.0, zoom);
+            context.DrawEllipse(null, warn, new Point(0, 0), 23, 23);
+        }
+    }
+
+    /// <summary>
+    /// A light-dependent resistor: the resistor body inside a circle, with arrows for the light
+    /// falling on it. They point inwards — a cell absorbs light, unlike an LED which emits it.
+    /// </summary>
+    private static void DrawLdr(DrawingContext context, IPen pen, double zoom, LightDependentResistor ldr)
+    {
+        context.DrawLine(pen, new Point(-30, 0), new Point(-20, 0));
+        context.DrawLine(pen, new Point(20, 0), new Point(30, 0));
+        context.DrawEllipse(CanvasTheme.SymbolFill, pen, new Point(0, 0), 20, 20);
+        context.DrawRectangle(CanvasTheme.SymbolFill, pen, new Rect(-12, -6, 24, 12));
+
+        // Two arrows in, brighter when the cell is lit.
+        var brush = ldr.IsLit ? CanvasTheme.ValueBrush : CanvasTheme.LabelBrush;
+        var ray = CanvasTheme.Pen(brush, 1.4, zoom);
+
+        foreach (var offset in new[] { -7.0, 3.0 })
+        {
+            var tail = new Point(-26 + offset, -24);
+            var head = new Point(-14 + offset, -12);
+            context.DrawLine(ray, tail, head);
+
+            var barb = new StreamGeometry();
+            using (var ctx = barb.Open())
+            {
+                ctx.BeginFigure(head, true);
+                ctx.LineTo(new Point(head.X - 5, head.Y - 1));
+                ctx.LineTo(new Point(head.X - 1, head.Y - 5));
+                ctx.EndFigure(true);
+            }
+            context.DrawGeometry(brush, null, barb);
         }
     }
 

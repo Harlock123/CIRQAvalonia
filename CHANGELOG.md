@@ -8,6 +8,16 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+- **New category, Sensors & Actuators: DC motor and LDR.**
+  - The **motor** is modelled electrically and mechanically at once — armature resistance and
+    inductance, a back-EMF proportional to speed, and a rotor whose inertia integrates torque
+    against load. At rest there is no back-EMF, so it draws the stall current and only chokes back
+    as it spins up; that startup surge is what trips supplies. Held stalled it is ringed in red,
+    because with no back-EMF nothing limits the current but armature resistance.
+  - The **LDR** follows the power law a real cadmium-sulphide cell does, covering several decades
+    of resistance between a dark room and daylight. Double-click it on the canvas to cover and
+    uncover it while the simulation runs.
+
 ## [0.4.0] - 2026-09-19
 
 **Build a power supply.** The bridge rectifier and the electrolytic capacitor join the regulators

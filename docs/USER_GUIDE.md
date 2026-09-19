@@ -65,7 +65,7 @@ at the window edge; click the rail to bring it back.
 
 Click a palette entry, then click the canvas. The part lands where you click, snapped to the grid.
 
-The palette holds **84 components in 13 categories**:
+The palette holds **86 components in 14 categories**:
 
 | Category | Count | Contents |
 | --- | --- | --- |
@@ -80,6 +80,7 @@ The palette holds **84 components in 13 categories**:
 | Logic Gates | 7 | AND, OR, NAND, NOR, XOR, XNOR, NOT |
 | 74xx Series | 16 | Counters, decoders, flip-flops, shift registers, multiplexers |
 | Digital I/O | 4 | Logic toggle, clock, and indicators |
+| Sensors & Actuators | 2 | DC motor, LDR — see [below](#sensors-and-actuators) |
 | Switching & Isolation | 5 | Relay, fuses, optocouplers — see [below](#switching-and-isolation) |
 | Dev Boards | 4 | Raspberry Pi, Arduino Uno / Nano / Mega — see [below](#development-boards) |
 
@@ -255,6 +256,34 @@ seconds of wall time.
 Give the regulator headroom. It needs its dropout voltage above the output *at the bottom of the
 ripple*, not on average — a supply that measures fine on a meter can still be dropping out on
 every trough.
+
+---
+
+## Sensors and actuators
+
+**DC Motor** is modelled electrically and mechanically at once, because the two are inseparable.
+The armature is a resistance and an inductance in series with a back-EMF proportional to speed;
+the torque is proportional to current, and the rotor's inertia integrates the difference between
+that torque and the load.
+
+That coupling is why a motor cannot be simulated as a resistor. At rest there is no back-EMF, so
+the armature draws the **stall current** — a 12 V motor with a 3 Ω armature pulls 4 A — and only
+as the rotor spins up does the back-EMF rise and choke the current back to a few hundred
+milliamps. The startup surge is what trips supplies and welds relay contacts, and it falls out of
+the model rather than being asserted.
+
+Load the shaft and it slows until torque balances, so the current a motor draws is set by what it
+is driving rather than by the supply. Load it past what it can turn and it sits stalled with
+nothing but armature resistance limiting the current — the motor is ringed in red and the fault
+named, because that is how they burn out.
+
+**LDR** is a cadmium-sulphide cell whose resistance follows a power law, roughly
+`R = R₁₀·(10/E)^γ` with γ near 0.8. A decade of light is a fixed ratio of resistance — about 6.3×
+at that γ — so the part covers several decades between a dark room and daylight. That span is why
+an LDR is normally read with a comparator against a divider rather than measured directly.
+
+Double-click it on the canvas to cover and uncover it, the same as operating a switch, so a
+light-sensing circuit can be exercised while the simulation runs.
 
 ---
 
