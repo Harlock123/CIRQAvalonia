@@ -32,7 +32,7 @@ Core ← Engine ← Components ← UI, which keeps the whole engine headless-tes
 
 ```bash
 dotnet run --project src/Cirq.UI     # the editor
-dotnet test                          # 686 tests
+dotnet test                          # 705 tests
 ```
 
 Targets .NET 10. The UI uses Avalonia 12 and ScottPlot 5.1; those two versions are pinned
@@ -267,7 +267,7 @@ toolbar used to show: active tool, simulation speed, elapsed time and solver rat
 `Help > Keyboard Shortcuts` lists everything below, and the
 [User Guide](docs/USER_GUIDE.md) walks through building a circuit from an empty canvas.
 
-The palette holds 86 components in 14 collapsible categories:
+The palette holds 90 components in 14 collapsible categories:
 
 ![The component palette with every category expanded, showing passive parts, switches, sources, semiconductors, transistors, LEDs and displays, power, analog ICs, logic gates and the 74xx series](docs/images/02-palette.png)
 

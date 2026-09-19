@@ -8,6 +8,17 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+- **Thermistors, NTC and PTC.** The NTC follows the Beta equation a datasheet actually gives, so
+  it is steeply non-linear — a 10 kΩ B3950 bead reads 33 kΩ at freezing and 2.5 kΩ at 60 °C. A PTC
+  is specified by a coefficient per kelvin instead and is modelled that way rather than by forcing
+  one equation to cover both. Double-click either to swing it between cold and warm while the
+  simulation runs.
+- **Piezo and active buzzers.** A passive piezo is a capacitor, so a steady voltage across it makes
+  no sound whatever — the most common reason a first buzzer circuit is silent. It says so, and is
+  ringed in red, rather than drawing a plausible current and leaving you to wonder. An active
+  buzzer has its own oscillator and sounds on DC. A passive element sounds at whatever it is fed,
+  measured from the drive rather than assumed.
+
 ## [0.5.0] - 2026-09-19
 
 **New category: Sensors & Actuators.**

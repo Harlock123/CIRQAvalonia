@@ -29,6 +29,7 @@ public static class SymbolRenderer
         switch (component)
         {
             case Resistor: DrawResistor(context, pen); break;
+            case Buzzer buzzer: DrawBuzzer(context, pen, zoom, buzzer); break;
             case ElectrolyticCapacitor e: DrawElectrolytic(context, pen, zoom, e); break;
             case Capacitor: DrawCapacitor(context, pen); break;
             case Inductor: DrawInductor(context, pen); break;
@@ -41,6 +42,7 @@ public static class SymbolRenderer
             case Led led: DrawLed(context, pen, led); break;
             case DcMotor motor: DrawMotor(context, pen, zoom, motor); break;
             case LightDependentResistor ldr: DrawLdr(context, pen, zoom, ldr); break;
+            case Thermistor thermistor: DrawThermistor(context, pen, zoom, thermistor); break;
             case Relay relay: DrawRelay(context, pen, zoom, relay); break;
             case Fuse fuse: DrawFuse(context, pen, zoom, fuse); break;
             case Optocoupler opto: DrawOptocoupler(context, pen, zoom, opto); break;
@@ -119,6 +121,77 @@ public static class SymbolRenderer
         {
             var warn = CanvasTheme.Pen(CanvasTheme.ErrorBrush, 2.0, zoom);
             context.DrawEllipse(null, warn, new Point(0, 0), 20, 18);
+        }
+    }
+
+    /// <summary>
+    /// A thermistor: the resistor body with the diagonal stroke and a t, the standard marking for
+    /// a temperature-dependent part. The stroke warms in colour as the bead does.
+    /// </summary>
+    private static void DrawThermistor(
+        DrawingContext context, IPen pen, double zoom, Thermistor thermistor)
+    {
+        context.DrawLine(pen, new Point(-30, 0), new Point(-16, 0));
+        context.DrawLine(pen, new Point(16, 0), new Point(30, 0));
+        context.DrawRectangle(CanvasTheme.SymbolFill, pen, new Rect(-16, -8, 32, 16));
+
+        var warm = CanvasTheme.Pen(
+            thermistor.IsWarm ? CanvasTheme.SelectionBrush : CanvasTheme.LabelBrush, 1.6, zoom);
+
+        // The diagonal through the body, with the foot that marks it as a thermistor.
+        context.DrawLine(warm, new Point(-20, 13), new Point(14, -13));
+        context.DrawLine(warm, new Point(-20, 13), new Point(-20, 6));
+
+        if (zoom > 0.5)
+        {
+            var sign = thermistor.Kind is ThermistorKind.Ntc ? "t°-" : "t°+";
+            DrawCenteredText(context, sign, new Point(0, -18), 8, zoom, CanvasTheme.LabelBrush);
+        }
+    }
+
+    /// <summary>
+    /// A buzzer: the conventional bell-shaped sounder, with arcs radiating from it while it is
+    /// actually making a noise and a warning ring when it is being driven with something that
+    /// will never make it sound.
+    /// </summary>
+    private static void DrawBuzzer(DrawingContext context, IPen pen, double zoom, Buzzer buzzer)
+    {
+        context.DrawLine(pen, new Point(-30, 0), new Point(-14, 0));
+        context.DrawLine(pen, new Point(14, 0), new Point(30, 0));
+
+        // The sounder body: a half-round shell on its side.
+        var body = new StreamGeometry();
+        using (var ctx = body.Open())
+        {
+            ctx.BeginFigure(new Point(-14, -14), true);
+            ctx.LineTo(new Point(-2, -14));
+            ctx.ArcTo(new Point(-2, 14), new Size(14, 14), 0, false, SweepDirection.Clockwise);
+            ctx.LineTo(new Point(-14, 14));
+            ctx.EndFigure(true);
+        }
+        context.DrawGeometry(CanvasTheme.SymbolFill, pen, body);
+
+        if (buzzer.IsSounding && zoom > 0.45)
+        {
+            var wave = CanvasTheme.Pen(CanvasTheme.ValueBrush, 1.3, zoom);
+            foreach (var radius in new[] { 8.0, 14.0 })
+            {
+                var arc = new StreamGeometry();
+                using (var ctx = arc.Open())
+                {
+                    ctx.BeginFigure(new Point(16, -radius), false);
+                    ctx.ArcTo(new Point(16, radius), new Size(radius, radius), 0, false,
+                        SweepDirection.Clockwise);
+                    ctx.EndFigure(false);
+                }
+                context.DrawGeometry(null, wave, arc);
+            }
+        }
+
+        if (buzzer.Violations.Count > 0 && zoom > 0.4)
+        {
+            var warn = CanvasTheme.Pen(CanvasTheme.ErrorBrush, 2.0, zoom);
+            context.DrawEllipse(null, warn, new Point(0, 0), 20, 19);
         }
     }
 

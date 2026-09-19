@@ -65,7 +65,7 @@ at the window edge; click the rail to bring it back.
 
 Click a palette entry, then click the canvas. The part lands where you click, snapped to the grid.
 
-The palette holds **86 components in 14 categories**:
+The palette holds **90 components in 14 categories**:
 
 | Category | Count | Contents |
 | --- | --- | --- |
@@ -80,7 +80,7 @@ The palette holds **86 components in 14 categories**:
 | Logic Gates | 7 | AND, OR, NAND, NOR, XOR, XNOR, NOT |
 | 74xx Series | 16 | Counters, decoders, flip-flops, shift registers, multiplexers |
 | Digital I/O | 4 | Logic toggle, clock, and indicators |
-| Sensors & Actuators | 2 | DC motor, LDR — see [below](#sensors-and-actuators) |
+| Sensors & Actuators | 6 | DC motor, LDR, thermistors, buzzers — see [below](#sensors-and-actuators) |
 | Switching & Isolation | 5 | Relay, fuses, optocouplers — see [below](#switching-and-isolation) |
 | Dev Boards | 4 | Raspberry Pi, Arduino Uno / Nano / Mega — see [below](#development-boards) |
 
@@ -284,6 +284,26 @@ an LDR is normally read with a comparator against a divider rather than measured
 
 Double-click it on the canvas to cover and uncover it, the same as operating a switch, so a
 light-sensing circuit can be exercised while the simulation runs.
+
+**Thermistor** comes in both flavours. An NTC follows the Beta equation, `R = R₂₅·exp(B·(1/T −
+1/T₂₅))` with the temperatures in kelvin — the real curve, and steeply non-linear: a 10 kΩ B3950
+bead reads 33 kΩ at freezing and 2.5 kΩ at 60 °C. Treating that as a straight line is the usual
+reason a home-made thermometer is right at one temperature and nowhere else. A PTC is specified by
+a coefficient per kelvin instead, so it is modelled that way rather than by forcing one equation to
+cover both.
+
+Double-click it to swing between cold and warm while the simulation runs, and pair it with a
+comparator to act on temperature.
+
+**Buzzer** comes in the two sorts you can buy, and the difference is the point rather than a
+detail. A **passive** piezo is a capacitor: it turns a *changing* voltage into movement, so a
+steady one does nothing at all. Wiring one across a pin that is simply switched high is the most
+common reason a first buzzer circuit is silent — so that is reported, with the buzzer ringed in
+red, rather than drawing a plausible current and leaving you to wonder. An **active** buzzer has
+its own oscillator behind the element and DC is exactly what it wants.
+
+A passive element sounds at whatever it is fed, and the frequency shown is measured from the drive
+rather than assumed.
 
 ---
 
