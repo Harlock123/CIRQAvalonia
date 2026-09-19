@@ -206,9 +206,11 @@ jobs:
 
           \`SHA256SUMS\` covers every archive — verify with \`sha256sum -c SHA256SUMS\`.
 
-          **macOS:** these builds are not signed or notarized, so Gatekeeper quarantines them on
-          download. Each macOS archive includes \`MACOS-FIRST-RUN.txt\`; the short version is
-          \`xattr -d com.apple.quarantine CirqAvalonia\`.
+          **macOS:** these builds are not signed or notarized, so Gatekeeper blocks the first
+          launch. Without a terminal: try to open it, choose **Done**, then go to
+          **System Settings > Privacy & Security** and click **Open Anyway**. From a terminal:
+          \`xattr -d com.apple.quarantine CirqAvalonia\`. Each macOS archive carries the same
+          instructions in \`MACOS-FIRST-RUN.txt\`.
 
           **Linux/macOS:** mark it executable if your extractor dropped the bit —
           \`chmod +x CirqAvalonia\`.

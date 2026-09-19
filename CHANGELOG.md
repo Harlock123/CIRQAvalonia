@@ -8,6 +8,15 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**The macOS first-run instructions no longer assume a terminal.** Gatekeeper blocks these builds
+because they are not signed or notarized, and the only route documented was `xattr`. There is a
+Settings one: try to open the app, choose Done, then click **Open Anyway** under
+**System Settings > Privacy & Security**. The README, the release notes and the
+`MACOS-FIRST-RUN.txt` inside each macOS archive all say so now.
+
+The old advice to right-click and choose Open was also out of date — that bypass still works
+through macOS 14, but Apple removed it in macOS 15.
+
 ## [0.9.0] - 2026-09-19
 
 Twenty new components — the thyristor family, JFETs, and a 4000-series CMOS group of its own —

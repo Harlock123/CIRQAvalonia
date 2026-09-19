@@ -42,18 +42,34 @@ Prebuilt binaries for every supported platform are on the
 [releases page](../../releases) — self-contained, so there is no runtime to install first.
 Download, extract, run.
 
-**On macOS, clear the quarantine flag first.** The builds are not signed or notarized, so macOS
-refuses to launch them until the attribute the download put there is removed:
+**On macOS the build is not signed or notarized**, so Gatekeeper blocks the first launch. You get
+"cannot be opened" or "is damaged", which reads like a bad download rather than a policy decision.
+Either route below clears it, permanently — you only do this once per download.
+
+**Without a terminal:**
+
+1. Double-click `CirqAvalonia`. macOS refuses, offering only **Done** or **Move to Bin**. Choose
+   Done — the refusal is the step that arms the next one.
+2. Open **System Settings → Privacy & Security** and scroll to **Security**. An **Open Anyway**
+   button is now there, naming the app.
+3. Click it, authenticate, and launch the app again.
+
+If there is no button, launch the app once more first: it only appears after a blocked attempt, and
+it lapses after about an hour.
+
+**Or from a terminal:**
 
 ```bash
 xattr -d com.apple.quarantine CirqAvalonia
 ./CirqAvalonia
 ```
 
-Without it you get "cannot be opened" or "is damaged", which looks like a bad download rather than
-a policy block. Right-clicking the binary in Finder and choosing **Open** works too. This is
-required on Apple Silicon, not merely advisory — the only real fix is signing and notarization,
-which needs an Apple developer account.
+Right-clicking in Finder and choosing **Open** used to work as well, and still does through
+macOS 14. Apple removed that bypass in macOS 15 (Sequoia), which is why the Settings route is the
+one written out above.
+
+This is required on Apple Silicon, not merely advisory. The only real fix is signing and
+notarization, which needs a paid Apple developer account.
 
 On Linux, mark it executable if your extractor dropped the bit: `chmod +x CirqAvalonia`.
 

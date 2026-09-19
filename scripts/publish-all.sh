@@ -107,14 +107,27 @@ for rid in "${RIDS[@]}"; do
     # Unsigned builds are quarantined by Gatekeeper on first run; tell the user how
     # to clear it rather than letting them hit "app is damaged" with no explanation.
     cat > "$pkg/MACOS-FIRST-RUN.txt" <<'EOF'
-This build is not code-signed or notarized, so macOS quarantines it on download.
+This build is not code-signed or notarized, so macOS quarantines it on download
+and Gatekeeper blocks the first launch. You only need to do this once.
 
-To run it:
+Without a terminal:
+
+  1. Double-click CirqAvalonia. macOS refuses and offers only Done or Move to
+     Bin. Choose Done -- that refusal is what arms the next step.
+  2. Open System Settings > Privacy & Security and scroll to Security. An
+     "Open Anyway" button is now there, naming the app.
+  3. Click it, authenticate, and launch the app again.
+
+If the button is not there, try launching once more first: it only appears
+after a blocked attempt and lapses after about an hour.
+
+Or from a terminal:
 
     xattr -d com.apple.quarantine CirqAvalonia
     ./CirqAvalonia
 
-Or open Finder, right-click CirqAvalonia, choose Open, and confirm the prompt.
+Right-click > Open in Finder also works through macOS 14. Apple removed that
+bypass in macOS 15 (Sequoia).
 EOF
   fi
 
