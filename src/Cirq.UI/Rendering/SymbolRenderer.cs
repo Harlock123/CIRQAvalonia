@@ -31,6 +31,10 @@ public static class SymbolRenderer
             case Resistor: DrawResistor(context, pen); break;
             case Speaker speaker: DrawSpeaker(context, pen, zoom, speaker); break;
             case Crystal: DrawCrystal(context, pen); break;
+            case Thermocouple tc: DrawThermocouple(context, pen, zoom, tc); break;
+            case LoadCell cell: DrawLoadCell(context, pen, zoom, cell); break;
+            case RotaryEncoder encoder: DrawRotaryEncoder(context, pen, zoom, encoder); break;
+            case ChargePump pump: DrawChargePump(context, pen, zoom, pump); break;
             case Microphone mic: DrawMicrophone(context, pen, zoom, mic); break;
             case Servo servo: DrawServo(context, pen, zoom, servo); break;
             case StepperMotor stepper: DrawStepper(context, pen, zoom, stepper); break;
@@ -603,6 +607,108 @@ public static class SymbolRenderer
     }
 
     /// <summary>A crystal: the quartz blank between its two electrodes.</summary>
+    /// <summary>A thermocouple: two dissimilar wires meeting at a junction bead.</summary>
+    private static void DrawThermocouple(
+        DrawingContext context, IPen pen, double zoom, Thermocouple tc)
+    {
+        // The two legs, drawn meeting at a point: the junction is the whole device.
+        context.DrawLine(pen, new Point(-30, -12), new Point(10, 0));
+        context.DrawLine(pen, new Point(-30, 12), new Point(10, 0));
+        context.DrawLine(pen, new Point(10, 0), new Point(30, 0));
+
+        var hot = tc.Temperature > tc.ColdJunctionTemperature + 1.0;
+        var bead = hot ? CanvasTheme.ErrorBrush : CanvasTheme.SymbolBrush;
+
+        context.DrawEllipse(bead, pen, new Point(10, 0), 5, 5);
+
+        if (hot && zoom > 0.45)
+        {
+            // Heat coming off it, so a hot junction is visible without reading the caption.
+            var wave = CanvasTheme.Pen(CanvasTheme.ErrorBrush, 1.3, zoom);
+            foreach (var dx in new[] { -4.0, 4.0 })
+                context.DrawLine(wave, new Point(10 + dx, -12), new Point(10 + dx, -22));
+        }
+    }
+
+    /// <summary>A load cell: the bridge drawn as the diamond of four gauges it is.</summary>
+    private static void DrawLoadCell(DrawingContext context, IPen pen, double zoom, LoadCell cell)
+    {
+        context.DrawLine(pen, new Point(-40, -30), new Point(-22, -18));
+        context.DrawLine(pen, new Point(-40, 30), new Point(-22, 18));
+        context.DrawLine(pen, new Point(40, -30), new Point(22, -18));
+        context.DrawLine(pen, new Point(40, 30), new Point(22, 18));
+
+        // The diamond: four arms meeting at the four pins.
+        var bridge = new PolylineGeometry(
+            [new Point(0, -26), new Point(26, 0), new Point(0, 26), new Point(-26, 0)], true);
+
+        context.DrawGeometry(CanvasTheme.SymbolFill, pen, bridge);
+
+        if (zoom > 0.45)
+        {
+            DrawCenteredText(context, "\u2261", new Point(0, 0), 14, zoom, CanvasTheme.LabelBrush);
+        }
+
+        if (cell.Violations.Count > 0 && zoom > 0.4)
+        {
+            context.DrawEllipse(null, CanvasTheme.Pen(CanvasTheme.ErrorBrush, 2.0, zoom),
+                new Point(0, 0), 34, 34);
+        }
+    }
+
+    /// <summary>An encoder: the shaft, with its two contacts shown open or closed.</summary>
+    private static void DrawRotaryEncoder(
+        DrawingContext context, IPen pen, double zoom, RotaryEncoder encoder)
+    {
+        context.DrawEllipse(CanvasTheme.SymbolFill, pen, new Point(0, 0), 22, 22);
+        context.DrawLine(pen, new Point(-40, 0), new Point(-22, 0));
+
+        // The two contact leads, filled while that contact is closed.
+        foreach (var (y, closed) in new[] { (-20.0, encoder.IsAClosed), (20.0, encoder.IsBClosed) })
+        {
+            context.DrawLine(pen, new Point(40, y), new Point(20, y));
+            context.DrawEllipse(closed ? CanvasTheme.ValueBrush : null, pen, new Point(18, y), 4, 4);
+        }
+
+        // The detent marker, turned to where the shaft has been left.
+        if (zoom > 0.4)
+        {
+            var angle = encoder.Detent * Math.PI / 6.0;
+            var mark = encoder.IsTurning
+                ? CanvasTheme.Pen(CanvasTheme.ValueBrush, 2.0, zoom)
+                : pen;
+
+            context.DrawLine(mark, new Point(0, 0),
+                new Point(14 * Math.Sin(angle), -14 * Math.Cos(angle)));
+        }
+    }
+
+    /// <summary>A charge pump: the package, with the capacitor it shuttles drawn inside it.</summary>
+    private static void DrawChargePump(
+        DrawingContext context, IPen pen, double zoom, ChargePump pump)
+    {
+        context.DrawRectangle(CanvasTheme.SymbolFill, pen, new Rect(-26, -38, 52, 76));
+
+        foreach (var (x, y) in new[] { (-40.0, -30.0), (-40.0, 30.0) })
+            context.DrawLine(pen, new Point(x, y), new Point(-26, y));
+
+        foreach (var y in new[] { -30.0, 0.0, 30.0 })
+            context.DrawLine(pen, new Point(40, y), new Point(26, y));
+
+        if (zoom > 0.45)
+        {
+            // The shuttling capacitor, leaning whichever way the switches are thrown.
+            var brush = pump.IsCharging ? CanvasTheme.ValueBrush : CanvasTheme.LabelBrush;
+            var plates = CanvasTheme.Pen(brush, 1.6, zoom);
+            var x = pump.IsCharging ? -6.0 : 6.0;
+
+            context.DrawLine(plates, new Point(x - 4, -12), new Point(x - 4, 12));
+            context.DrawLine(plates, new Point(x + 4, -12), new Point(x + 4, 12));
+
+            DrawCenteredText(context, "7660", new Point(0, 24), 9, zoom, CanvasTheme.LabelBrush);
+        }
+    }
+
     private static void DrawCrystal(DrawingContext context, IPen pen)
     {
         context.DrawLine(pen, new Point(-30, 0), new Point(-12, 0));
@@ -1323,6 +1429,10 @@ public static class SymbolRenderer
         // A servo's case and a stepper's body are both 30 either side of centre, which is exactly
         // where the default puts the captions.
         Servo or StepperMotor => 44.0,
+
+        // The bridge diamond reaches 26, and the charge pump's package 38.
+        LoadCell => 40.0,
+        ChargePump => 52.0,
         Ne555 => DipPackage.BodyHeight(8) / 2 + 16,
         DigitalIc ic => DipPackage.BodyHeight(ic.PinCount) / 2 + 16,
         _ => 30.0,

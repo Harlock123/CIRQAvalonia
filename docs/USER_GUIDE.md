@@ -65,7 +65,7 @@ at the window edge; click the rail to bring it back.
 
 Click a palette entry, then click the canvas. The part lands where you click, snapped to the grid.
 
-The palette holds **123 components in 15 categories**:
+The palette holds **127 components in 15 categories**:
 
 | Category | Count | Contents |
 | --- | --- | --- |
@@ -75,13 +75,13 @@ The palette holds **123 components in 15 categories**:
 | Semiconductors | 11 | 1N4148, 1N4001, Schottky, zeners, bridge rectifier, SCR, triac, diac, **TVS and varistor** — see [below](#surge-protection) |
 | Transistors | 10 | NPN and PNP bipolars, N- and P-channel MOSFETs, **three JFETs** — see [below](#jfets) |
 | LEDs & Displays | 8 | Six LED colours, common-anode and common-cathode seven-segment |
-| Power | 7 | Fixed and adjustable regulators, TL431 shunt reference |
+| Power | 8 | Fixed and adjustable regulators, TL431 shunt reference, **ICL7660 charge pump** |
 | Analog ICs | 10 | LM741, NE555, LM311, LM339, **LM386** audio amp and **INA126** instrumentation amp |
 | Logic Gates | 7 | AND, OR, NAND, NOR, XOR, XNOR, NOT |
 | 74xx Series | 17 | Counters, decoders, flip-flops, shift registers, multiplexers, Schmitt inverter |
 | 40xx Series | 14 | CMOS gates, counters, flip-flops, analog switches — see [below](#the-40xx-series) |
-| Digital I/O | 4 | Logic toggle, clock, and indicators |
-| Sensors & Actuators | 10 | DC motor, LDR, thermistors, buzzers, speaker, **microphone, servo, stepper** — see [below](#sensors-and-actuators) |
+| Digital I/O | 5 | Logic toggle, clock, indicators, **rotary encoder** |
+| Sensors & Actuators | 12 | DC motor, LDR, thermistors, buzzers, speaker, microphone, servo, stepper, **thermocouple and load cell** — see [below](#sensors-and-actuators) |
 | Switching & Isolation | 6 | Relay, fuses, optocouplers, **ULN2003** — see [below](#switching-and-isolation) |
 | Dev Boards | 4 | Raspberry Pi, Arduino Uno / Nano / Mega — see [below](#development-boards) |
 
@@ -563,6 +563,42 @@ a real one at the end of its life conducts at normal working voltage and cooks.
 
 ---
 
+## Rotary encoders
+
+An incremental encoder does not report a position. Turning it makes two contacts open and close a
+quarter of a cycle apart, and **which one changes first is the only thing that says which way it
+went**. That is what quadrature means, and reading it is the whole job.
+
+These are mechanical contacts, and that is why encoder code is harder than it looks. Every edge
+bounces for a millisecond or two, and a bounce read as a transition sends the count backwards and
+forwards at random. The bounce is modelled rather than assumed away, so a naive counter will
+misread this part exactly as it would misread a real one — and the 4093 and 74HC14 already in the
+palette are what you reach for to fix it. Set **Bounce Duration** to zero if you want the clean
+signal a debounced circuit would see.
+
+Double-click it to turn one detent; set **Reverse** to turn it the other way.
+
+---
+
+## Making a negative rail
+
+Everything else in **Power** makes a positive voltage out of a larger positive one. Several of the
+op-amps want a supply either side of ground, and a single-supply circuit has nowhere to get one.
+
+The **ICL7660** does it by moving charge rather than by regulating: a capacitor is charged across
+the supply, disconnected, turned round, and dumped onto the output, so the output ends up at
+roughly minus the input. That is genuinely what is modelled — four switches changing over at the
+oscillator rate, with your capacitor between them — which means the consequences come out on their
+own.
+
+There are two of those, and both surprise people. It **does not regulate**: the output follows the
+input, so a supply that droops takes the negative rail with it. And because it moves a capacitor's
+worth of charge per cycle, its output impedance is about `1/(f·C)` — a small pump capacitor or a
+slow oscillator gives a rail that sags the moment anything draws from it, and no amount of
+smoothing on the output fixes that.
+
+---
+
 ## Crystals
 
 Every other oscillator here takes its frequency from the circuit around it. The 74HC14, the 4093
@@ -646,6 +682,25 @@ with a capacitor across two pins, which is the whole appeal: there is nothing to
 Its output idles at **half the supply** so it can swing both ways, which is why the speaker is
 coupled through a capacitor rather than wired straight to it. Connect it directly and half the rail
 sits across the voice coil continuously — the speaker's power reading will tell you so.
+
+**Thermocouple** — two dissimilar metals joined, producing a few tens of microvolts per degree.
+It is the canonical thing the INA126 exists to read: forty microvolts per degree means a furnace
+and a warm hand differ by a couple of millivolts.
+
+The catch is the whole subject. **A thermocouple measures a difference, not a temperature.** The
+junction you care about produces an EMF and so does every other junction in the loop, including
+where the wires meet the copper of your circuit — so without knowing how warm the cold end is you
+do not know how hot the hot one is. That is what *cold junction compensation* means, and why the
+cold junction temperature is a property here rather than an assumption. Double-click the junction
+to heat it.
+
+**Load cell** — four strain gauges in a Wheatstone bridge, which is how nearly everything that
+weighs things works. Two gauges stretch under load and two compress, so the bridge goes out of
+balance by a fraction of a percent. It is stamped as the four resistors it actually is, so the
+things that matter behave properly: it **needs exciting** — no voltage across the bridge, no
+output, however much you load it — and the output is proportional to the excitation rather than
+absolute, which is why load cells are rated in millivolts per volt. Two millivolts per volt with
+ten volts of excitation is twenty millivolts for the entire range of the thing.
 
 **Microphone** — an electret capsule, which is not a passive transducer: there is a JFET inside
 the can, and it works by **sinking a bias current** that sound then modulates. That is why it has a

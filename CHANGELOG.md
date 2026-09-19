@@ -8,6 +8,28 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**Thermocouple and load cell**, which give the INA126 something to read. It has been in the
+palette with nothing natural to connect to it, and both of these are what an instrumentation
+amplifier is for: a small difference sitting on a large common voltage.
+
+The thermocouple is forty microvolts per degree for a K type, and the point of it is that **it
+measures a difference, not a temperature** — the cold junction is a property here rather than an
+assumption, which is what cold junction compensation is about. The load cell is stamped as the
+four bridge resistors it actually is, so it needs exciting before it says anything at all, and its
+output is proportional to the excitation rather than absolute. That is why load cells are rated in
+millivolts per volt.
+
+**Rotary encoder**, with the contact bounce that is the whole difficulty of reading one. Two
+contacts a quarter of a cycle apart, and which moves first is the only thing carrying direction. A
+naive counter will misread this exactly as it would misread a real one; the 4093 and the 74HC14 are
+already here to fix that. Bounce can be turned off to see the clean signal.
+
+**ICL7660 charge pump**, so a single supply can produce the negative rail several of the op-amps
+want. It is modelled as what it is — four switches shuttling a capacitor at the oscillator rate —
+rather than as a block that announces minus the input, so the two things that catch people fall out
+of the model: it does not regulate, and its output impedance is about 1/(f·C), which means too
+small a pump capacitor gives a rail that collapses under load.
+
 ## [0.12.0] - 2026-09-19
 
 Four parts that each finish something already here: a crystal, an electret microphone, a hobby

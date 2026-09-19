@@ -32,7 +32,7 @@ Core ← Engine ← Components ← UI, which keeps the whole engine headless-tes
 
 ```bash
 dotnet run --project src/Cirq.UI     # the editor
-dotnet test                          # 950 tests
+dotnet test                          # 978 tests
 ```
 
 Targets .NET 10. The UI uses Avalonia 12 and ScottPlot 5.1; those two versions are pinned
@@ -192,6 +192,10 @@ Tests measure the solver against closed-form answers rather than recorded output
 | MOSFET | Square-law saturation current, triode switching, zero gate current, reverse conduction, body diode |
 | JFET | Full I_DSS at zero gate drive, square law across the range, pinch-off, vanishing gate current, P-channel mirroring |
 | Thyristors | SCR blocking and firing, staying on after the gate drive goes away, dropping out when the anode current is interrupted, reverse blocking; triac firing on both half cycles and turning itself off at every zero crossing; diac breakover in either polarity |
+| Thermocouple | Microvolts per degree for each alloy pair, measuring a difference rather than a temperature, and an INA126 turning two millivolts into something readable |
+| Load cell | Rated output in millivolts per volt, proportional to load and to excitation both, and saying nothing at all when the bridge is not excited |
+| Rotary encoder | Two staggered pulses per detent, which contact moves first carrying the direction, and contacts that bounce on every edge unless told not to |
+| Charge pump | A negative rail from a positive one, following the input because nothing regulates, and sagging when the pump capacitor is too small for the load |
 | Crystal | Resonating within 0.1% of its rated frequency from the motional L and C alone, a motional inductance in henries, and a far larger response on resonance than beside it |
 | Microphone | Biasing part way down the rail, sound swinging the output and silence not, and being starved by too large a bias resistor |
 | Servo | Pulse width setting the angle at both ends of travel and the centre, taking time to travel there, going limp when the pulses stop, and reporting a pulse that drives it into its end stop |
@@ -303,7 +307,7 @@ toolbar used to show: active tool, simulation speed, elapsed time and solver rat
 `Help > Keyboard Shortcuts` lists everything below, and the
 [User Guide](docs/USER_GUIDE.md) walks through building a circuit from an empty canvas.
 
-The palette holds 123 components in 15 collapsible categories:
+The palette holds 127 components in 15 collapsible categories:
 
 ![The component palette showing all fifteen categories with their counts — passive, switches, sources, semiconductors, transistors, LEDs and displays, power, analog ICs, logic gates, 74xx series, 40xx series, digital I/O, sensors and actuators, switching and isolation, and dev boards — with the Passive group open](docs/images/02-palette.png)
 
