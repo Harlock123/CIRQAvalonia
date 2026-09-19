@@ -46,6 +46,11 @@
       </MenuItem>
 
       <MenuItem Header="_Edit">
+        <MenuItem Header="{Binding History.UndoMenuText}" InputGesture="Ctrl+Z" Command="{Binding UndoCommand}"
+                  IsEnabled="{Binding History.CanUndo}" />
+        <MenuItem Header="{Binding History.RedoMenuText}" InputGesture="Ctrl+Y" Command="{Binding RedoCommand}"
+                  IsEnabled="{Binding History.CanRedo}" />
+        <Separator />
         <MenuItem Header="_Rotate" InputGesture="R" Command="{Binding RotateSelectionCommand}" />
         <MenuItem Header="_Delete" InputGesture="Delete" Command="{Binding DeleteSelectionCommand}" />
       </MenuItem>

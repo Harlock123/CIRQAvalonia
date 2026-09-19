@@ -96,6 +96,19 @@ Anything you can operate is ringed with a small dot beside its designator, so yo
 remember which parts those are. Turn the rings off with **View > Mark Interactive Parts** once
 they have served their purpose.
 
+Everything you do to the schematic can be taken back with `Ctrl` `Z`, and put back with `Ctrl` `Y`
+(or `Ctrl` `Shift` `Z`). The Edit menu names what it is about to reverse — **Undo Add Resistor**,
+**Undo Move Capacitor** — so you are not guessing at what the last thing was.
+
+Undo covers edits to the document: placing, moving, rotating and deleting parts, wiring, attaching
+probes, and changing values in the properties panel. A drag across the canvas costs one step rather
+than one per pixel travelled. Opening a file or loading an example starts a fresh history, since
+there is nothing sensible to step back into.
+
+What it does not cover is **operating** the circuit — double-clicking a switch, or pressing Run.
+Those are things you do *to* a running circuit rather than edits to the drawing, and having them
+fill the undo history would push your actual edits out of reach.
+
 ---
 
 ## Wiring
@@ -786,6 +799,7 @@ Also available in the app at **Help > Keyboard Shortcuts**.
 | `W` | Wire tool |
 | `P` | Probe tool |
 | `R` | Rotate selection |
+| `Ctrl` `Z` / `Ctrl` `Y` | Undo / redo (`Ctrl` `Shift` `Z` redoes as well) |
 | `Delete` | Delete selection |
 | `Ctrl` `+` / `Ctrl` `-` | Zoom in / out (the numeric keypad's `+` and `-` work too) |
 | `F` | Zoom to fit — the whole circuit, captions and all |

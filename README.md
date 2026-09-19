@@ -321,6 +321,7 @@ being squeezed onto a volts axis:
 | Wire | `W`, click a terminal, click empty space for corners, click a terminal to finish |
 | Probe | `P`, then click a terminal |
 | Select | `V` — drag to move, `R` to rotate, `Delete` to remove |
+| Undo | `Ctrl`+`Z`, redo with `Ctrl`+`Y` or `Ctrl`+`Shift`+`Z`. The Edit menu names what it will undo. Covers placing, moving, rotating, deleting, wiring, probing and parameter edits; a drag is one step, not one per pixel |
 | View | `Ctrl`+`+` / `Ctrl`+`-` zoom in and out, wheel zooms at the cursor, middle-drag or space-drag pans, `F` fits the whole circuit — captions and all |
 | Scope | The vertical range follows the traces by default, so changing a source amplitude keeps the waveform on screen. The `Auto` checkbox turns that off, and using the vertical `+`/`-` buttons turns it off for you |
 | File | `Ctrl+N` new, `Ctrl+O` open, `Ctrl+S` save, `Ctrl+Shift+S` save as, and `File > Settings` for the theme. The title bar shows the document and an asterisk while there are unsaved edits |

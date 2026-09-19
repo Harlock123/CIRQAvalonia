@@ -29,6 +29,9 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         Circuit.Components.CollectionChanged += OnCircuitChanged;
         Circuit.Wires.CollectionChanged += OnCircuitChanged;
 
+        // Probes are part of the saved document too, so attaching one is an edit like any other.
+        Circuit.Probes.CollectionChanged += OnCircuitChanged;
+
         ApplyScopeSampling();
 
         // Open on a working circuit rather than an empty canvas, already compiled and biased so
@@ -36,7 +39,11 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         Examples.LoadRcLowPass(this);
         Simulation.Rebuild();
         IsModified = false;
+        History.Reset(Circuit);
     }
+
+    /// <summary>Undo and redo for schematic edits.</summary>
+    public UndoHistory History { get; } = new();
 
     public Circuit Circuit { get; }
 
@@ -227,6 +234,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
         CurrentFilePath = path;
         IsModified = false;
+        History.Reset(Circuit);
         Simulation.InvalidateTopology();
         Simulation.Rebuild();
 
@@ -326,6 +334,60 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     private void ShowSettings() => RequestSettings?.Invoke(this, EventArgs.Empty);
 
     [RelayCommand]
+    private void Undo()
+    {
+        var label = History.UndoLabel;
+        if (Restore(History.Undo())) StatusMessage = $"Undid: {label}";
+    }
+
+    [RelayCommand]
+    private void Redo()
+    {
+        var label = History.RedoLabel;
+        if (Restore(History.Redo())) StatusMessage = $"Redid: {label}";
+    }
+
+    /// <summary>
+    /// Puts a snapshot back. The same path a file open takes, because a snapshot is the same
+    /// thing a file is — and recording is suspended throughout, or restoring would itself be
+    /// recorded as an edit.
+    /// </summary>
+    private bool Restore(string? json)
+    {
+        if (json is null) return false;
+
+        Simulation.Pause();
+        History.Suspend();
+
+        try
+        {
+            var result = CircuitSerializer.FromJson(json);
+            ReplaceCircuitWith(result.Circuit);
+        }
+        finally
+        {
+            History.Resume(Circuit);
+        }
+
+        IsModified = true;
+        Simulation.InvalidateTopology();
+        Simulation.Rebuild();
+
+        RequestRedraw?.Invoke(this, EventArgs.Empty);
+        return true;
+    }
+
+    /// <summary>Suspends recording for the span of a gesture, so a drag costs one undo step.</summary>
+    public void BeginInteractiveEdit(string label)
+    {
+        History.Capture(Circuit, label);
+        History.Suspend();
+    }
+
+    /// <summary>Ends a gesture begun with <see cref="BeginInteractiveEdit"/>.</summary>
+    public void EndInteractiveEdit() => History.Resume(Circuit);
+
+    [RelayCommand]
     private void RotateSelection() => RequestRotateSelection?.Invoke(this, EventArgs.Empty);
 
     [RelayCommand]
@@ -393,6 +455,10 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
     /// <summary>Keyboard reference, shown from the Help menu now that commands live in menus.</summary>
     public const string ShortcutReference = """
+        Edit
+          Ctrl+Z       Undo
+          Ctrl+Y       Redo (Ctrl+Shift+Z works too)
+
         Tools
           V            Select
           W            Wire
@@ -505,13 +571,61 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
         Simulation.InvalidateTopology();
         IsModified = true;
+
+        History.Capture(Circuit, DescribeChange(e));
+    }
+
+    /// <summary>A short name for a collection change, for the Edit menu's "Undo ..." text.</summary>
+    private static string DescribeChange(NotifyCollectionChangedEventArgs e)
+    {
+        var added = e.NewItems?.Count ?? 0;
+        var removed = e.OldItems?.Count ?? 0;
+
+        var item = (e.NewItems ?? e.OldItems)?.OfType<object>().FirstOrDefault() switch
+        {
+            CircuitComponent c => c.ComponentType,
+            WireSegment => "Wire",
+            SignalProbe => "Probe",
+            _ => "Item",
+        };
+
+        if (added > 0 && removed == 0) return $"Add {item}";
+        if (removed > 0 && added == 0) return $"Delete {item}";
+        return "Edit";
     }
 
     private void OnComponentChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(CircuitComponent.IsSelected)) return;
+        if (sender is not CircuitComponent component) return;
+        if (!IsDocumentProperty(component, e.PropertyName)) return;
+
         IsModified = true;
+        History.Capture(Circuit, $"Edit {e.PropertyName}");
     }
+
+    /// <summary>
+    /// Whether a property change is an edit to the document or just the device describing itself.
+    /// <para>
+    /// Components raise change notification for derived display properties as they run — a triac
+    /// says so when it fires, a battery as it discharges — and treating those as edits meant that
+    /// simply running a circuit marked the file modified and put an asterisk in the title bar. The
+    /// test is the one the serializer uses: if the property would not be written to the file, it
+    /// is not part of the document.
+    /// </para>
+    /// </summary>
+    private static bool IsDocumentProperty(CircuitComponent component, string? propertyName)
+    {
+        if (string.IsNullOrEmpty(propertyName)) return false;
+        if (propertyName == nameof(CircuitComponent.IsSelected)) return false;
+
+        return PersistedProperties.GetOrAdd(
+            component.GetType(),
+            static type => [.. ComponentReflection.EditableProperties(type).Select(p => p.Name)])
+            .Contains(propertyName);
+    }
+
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Type, HashSet<string>>
+        PersistedProperties = new();
 
     /// <summary>Pushes the scope's timebase into the engine so probe recording is decimated to match.</summary>
     private void ApplyScopeSampling()
@@ -565,6 +679,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         Circuit.Title = "Untitled circuit";
         CurrentFilePath = null;
         IsModified = false;
+        History.Reset(Circuit);
         Simulation.InvalidateTopology();
         StatusMessage = "New circuit";
         RequestZoomToFit?.Invoke(this, EventArgs.Empty);
@@ -584,6 +699,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         Simulation.InvalidateTopology();
         Simulation.Rebuild();
         IsModified = false;
+        History.Reset(Circuit);
         StatusMessage = $"Loaded example: {example.Name}";
         RequestZoomToFit?.Invoke(this, EventArgs.Empty);
         RequestRedraw?.Invoke(this, EventArgs.Empty);

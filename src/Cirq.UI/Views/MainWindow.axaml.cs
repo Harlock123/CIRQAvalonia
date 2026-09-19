@@ -62,6 +62,8 @@ public partial class MainWindow : Window
         if (_canvas is null) return;
 
         _canvas.TopologyChanged += (_, _) => viewModel.Simulation.InvalidateTopology();
+        _canvas.InteractiveEditBegan += (_, label) => viewModel.BeginInteractiveEdit(label);
+        _canvas.InteractiveEditEnded += (_, _) => viewModel.EndInteractiveEdit();
         _canvas.ProbeRequested += (_, terminal) => viewModel.AttachProbe(terminal);
         _canvas.StatusChanged += (_, message) => viewModel.StatusMessage = message;
     }
@@ -143,6 +145,14 @@ public partial class MainWindow : Window
                     _viewModel?.NewCircuitCommand.Execute(null);
                     e.Handled = true;
                     return;
+                case Key.Z:
+                    _viewModel?.UndoCommand.Execute(null);
+                    e.Handled = true;
+                    return;
+                case Key.Y:
+                    _viewModel?.RedoCommand.Execute(null);
+                    e.Handled = true;
+                    return;
             }
         }
 
@@ -168,6 +178,15 @@ public partial class MainWindow : Window
         if (e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift) && e.Key == Key.S)
         {
             _viewModel?.SaveAsCommand.Execute(null);
+            e.Handled = true;
+            return;
+        }
+
+        // Ctrl+Shift+Z redoes as well, which is what the rest of the world does and what anyone
+        // who has not found Ctrl+Y will try.
+        if (e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift) && e.Key == Key.Z)
+        {
+            _viewModel?.RedoCommand.Execute(null);
             e.Handled = true;
             return;
         }

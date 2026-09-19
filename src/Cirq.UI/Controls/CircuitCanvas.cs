@@ -119,6 +119,15 @@ public class CircuitCanvas : Control
     /// <summary>Raised with a short description of what the canvas is currently doing.</summary>
     public event EventHandler<string>? StatusChanged;
 
+    /// <summary>
+    /// Raised when a gesture that will change the document begins, and again when it ends. A drag
+    /// moves a component on every pointer movement; without a pair of boundaries round it the
+    /// undo history would fill with one entry per pixel travelled.
+    /// </summary>
+    public event EventHandler<string>? InteractiveEditBegan;
+
+    public event EventHandler? InteractiveEditEnded;
+
     // ---- interaction state ----------------------------------------------
 
     private Point _panOffset = new(400, 300);
@@ -772,6 +781,7 @@ public class CircuitCanvas : Control
         if (_isDraggingComponent)
         {
             _isDraggingComponent = false;
+            InteractiveEditEnded?.Invoke(this, EventArgs.Empty);
             e.Pointer.Capture(null);
             TopologyChanged?.Invoke(this, EventArgs.Empty);
         }
@@ -837,6 +847,7 @@ public class CircuitCanvas : Control
 
             _isDraggingComponent = true;
             _dragGrabOffset = new CorePoint(world.X - component.X, world.Y - component.Y);
+            InteractiveEditBegan?.Invoke(this, $"Move {component.ComponentType}");
             e.Pointer.Capture(this);
             return;
         }

@@ -8,6 +8,25 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**Undo and redo.** `Ctrl` `Z` did nothing at all, because there was nothing behind it. There is
+now: placing, moving, rotating and deleting parts, wiring, probing and parameter edits all come
+back, with `Ctrl` `Y` or `Ctrl` `Shift` `Z` to put them back again. The Edit menu names what it is
+about to reverse rather than just saying "Undo", and a drag across the canvas costs one step rather
+than one per pixel travelled.
+
+It is built on whole-document snapshots rather than a list of reversible edits. The usual command
+pattern is more efficient and much easier to get subtly wrong — one mutation that forgets to record
+its inverse and the history quietly stops matching the document. Restoring a snapshot is the same
+code path as opening a file, which every component, parameter, wire and probe is already tested
+against.
+
+**Fixed: running a circuit marked it as modified.** Parts describe themselves as they run — a triac
+says so when it fires, a battery as it discharges — and the dirty tracker counted those
+notifications as edits. Pressing Run on the lamp dimmer was enough to put an asterisk in the title
+bar and a "discard changes?" prompt in front of anyone who then tried to close it. A change now
+only counts as an edit if it is a property the serializer would write to the file. Attaching a
+probe, which is saved and was not counted, now does.
+
 ## [0.10.0] - 2026-09-19
 
 Probes can read current, not just voltage — which makes a great deal of what these circuits are
