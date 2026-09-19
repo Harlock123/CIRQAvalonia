@@ -8,6 +8,12 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-09-19
+
+Probes can read current, not just voltage — which makes a great deal of what these circuits are
+already doing visible for the first time. Seven new components alongside it, including a battery
+that sags and runs down like a real one. The palette holds 119 parts in 15 categories, and 908
+tests measure them against closed-form answers.
 **Current probes.** A probe can read the current into the pin it is attached to, not just the
 voltage on it — pick which from the dropdown beside the trace. A great deal of what a circuit is
 doing is only visible as current: the holding current that drops a triac out at every zero
@@ -386,7 +392,8 @@ First public build of CirqAvalonia — an electronic circuit analyzer and mixed-
 
 **501 tests** measure the solver against closed-form answers rather than recorded output.
 
-[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.6.0...v0.7.0
