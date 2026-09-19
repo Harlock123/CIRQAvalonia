@@ -8,6 +8,10 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**The 4000-series palette group is now labelled "40xx Series"**, so it reads as a pair with the
+"74xx Series" group above it rather than as a differently-shaped name for the same kind of thing.
+The parts and their part numbers are unchanged; the palette screenshot is retaken.
+
 **Undo and redo.** `Ctrl` `Z` did nothing at all, because there was nothing behind it. There is
 now: placing, moving, rotating and deleting parts, wiring, probing and parameter edits all come
 back, with `Ctrl` `Y` or `Ctrl` `Shift` `Z` to put them back again. The Edit menu names what it is

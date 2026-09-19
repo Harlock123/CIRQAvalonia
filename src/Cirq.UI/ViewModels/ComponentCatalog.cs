@@ -208,7 +208,7 @@ public static class ComponentCatalog
             new("74165", "8-bit parallel-in serial-out shift register", () => new Ic74165()),
         ]),
 
-        new("4000 Series",
+        new("40xx Series",
         [
             new("4001", "Quad 2-input NOR", () => new Ic4001()),
             new("4011", "Quad 2-input NAND — the workhorse of the family", () => new Ic4011()),

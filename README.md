@@ -197,7 +197,7 @@ Tests measure the solver against closed-form answers rather than recorded output
 | Surge parts | A TVS invisible below its standoff and clamping either polarity above it; a varistor's power law, and wearing out on the energy it absorbs |
 | ULN2003 | Sinking the load current, the Darlington's saturation voltage, a released channel passing nothing, and a load wired to ground doing nothing at all |
 | Amplifiers | LM386 idling at half supply, its stated gain, clipping at the rails; INA126 rejecting four volts of common mode; the speaker's average power |
-| 4000 series | Gate truth tables on the CMOS pinout, and that it is *not* the 74xx one; 4093 hysteresis and its relaxation-oscillator period against the closed form; 4013 toggling and its active-high set and reset; 4040 stage-by-stage division and falling-edge clocking; 4017 one-hot walk, reset and carry; 4511 glyph table, active-high drive, lamp test and blanking priority; 4066 and 4051 analog pass-through, switch resistance and off-state leakage; 4060 oscillating from its own Rt and Ct at the datasheet's 1/(2.3·Rt·Ct), and the frequency tracking a changed capacitor |
+| 40xx series | Gate truth tables on the CMOS pinout, and that it is *not* the 74xx one; 4093 hysteresis and its relaxation-oscillator period against the closed form; 4013 toggling and its active-high set and reset; 4040 stage-by-stage division and falling-edge clocking; 4017 one-hot walk, reset and carry; 4511 glyph table, active-high drive, lamp test and blanking priority; 4066 and 4051 analog pass-through, switch resistance and off-state leakage; 4060 oscillating from its own Rt and Ct at the datasheet's 1/(2.3·Rt·Ct), and the frequency tracking a changed capacitor |
 | Comparator | Open-collector pull-down and release, driving a higher rail through a pull-up, edge timing |
 | Displays | 7447 glyph table, open-collector drive, lamp test and blanking priority, counter walking 0-9 on the display |
 | Files | Every component type round-trips with its parameters, pins, wires, waypoints and probes; a reloaded circuit solves to the same answer; damaged, unknown and newer-format files are handled without losing the open circuit |
@@ -301,7 +301,7 @@ toolbar used to show: active tool, simulation speed, elapsed time and solver rat
 
 The palette holds 119 components in 15 collapsible categories:
 
-![The component palette showing all fifteen categories with their counts — passive, switches, sources, semiconductors, transistors, LEDs and displays, power, analog ICs, logic gates, 74xx series, 4000 series, digital I/O, sensors and actuators, switching and isolation, and dev boards — with the Passive group open](docs/images/02-palette.png)
+![The component palette showing all fifteen categories with their counts — passive, switches, sources, semiconductors, transistors, LEDs and displays, power, analog ICs, logic gates, 74xx series, 40xx series, digital I/O, sensors and actuators, switching and isolation, and dev boards — with the Passive group open](docs/images/02-palette.png)
 
 Selecting a component fills the properties panel. It is built by reflection, so a new component
 type gets a complete editor without any UI code:

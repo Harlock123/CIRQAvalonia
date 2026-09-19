@@ -61,7 +61,7 @@ at the window edge; click the rail to bring it back.
 
 ## Placing components
 
-![The component palette showing all fifteen categories with their counts — passive, switches, sources, semiconductors, transistors, LEDs and displays, power, analog ICs, logic gates, 74xx series, 4000 series, digital I/O, sensors and actuators, switching and isolation, and dev boards — with the Passive group open](images/02-palette.png)
+![The component palette showing all fifteen categories with their counts — passive, switches, sources, semiconductors, transistors, LEDs and displays, power, analog ICs, logic gates, 74xx series, 40xx series, digital I/O, sensors and actuators, switching and isolation, and dev boards — with the Passive group open](images/02-palette.png)
 
 Click a palette entry, then click the canvas. The part lands where you click, snapped to the grid.
 
@@ -79,7 +79,7 @@ The palette holds **119 components in 15 categories**:
 | Analog ICs | 10 | LM741, NE555, LM311, LM339, **LM386** audio amp and **INA126** instrumentation amp |
 | Logic Gates | 7 | AND, OR, NAND, NOR, XOR, XNOR, NOT |
 | 74xx Series | 17 | Counters, decoders, flip-flops, shift registers, multiplexers, Schmitt inverter |
-| 4000 Series | 14 | CMOS gates, counters, flip-flops, analog switches — see [below](#the-4000-series) |
+| 40xx Series | 14 | CMOS gates, counters, flip-flops, analog switches — see [below](#the-40xx-series) |
 | Digital I/O | 4 | Logic toggle, clock, and indicators |
 | Sensors & Actuators | 7 | DC motor, LDR, thermistors, buzzers, **speaker** — see [below](#sensors-and-actuators) |
 | Switching & Isolation | 6 | Relay, fuses, optocouplers, **ULN2003** — see [below](#switching-and-isolation) |
@@ -409,11 +409,11 @@ matrix solvable without meaningfully coupling the halves.
 
 ---
 
-## The 4000 series
+## The 40xx series
 
-The 4000-series CMOS parts have a palette group of their own rather than sitting among the 74xx
-ones, because they are a different family with different habits — and mixing the two has a specific
-way of going wrong, covered at the end of this section.
+The 40xx CMOS parts have a palette group of their own rather than sitting among the 74xx ones,
+because they are a different family with different habits — and mixing the two has a specific way
+of going wrong, covered at the end of this section.
 
 **Gates.** The 4001 (quad NOR), 4011 (quad NAND), 4070 (quad XOR), 4071 (quad OR), 4081 (quad AND)
 and 4069 (hex inverter) do what their 74xx counterparts do, more slowly. The 4011 is the one you
