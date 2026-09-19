@@ -8,6 +8,26 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**A switching regulator, which is the biggest thing the Power group was missing.** Every part in
+it was linear: a 7805 bringing 12 V down to 5 V drops the other seven across itself and turns them
+into heat. A switcher chops the input instead, and an inductor and a diode carry the energy across
+between chops.
+
+The **MC34063** is a controller, not a converter. It brings an oscillator, a comparator against an
+internal 1.25 V, a current limit and a switch; the topology is your wiring. Wired one way it steps
+down, another way it steps up, and the chip cannot tell the difference — there is a test for each,
+using the same part. That is the reason it is not supplied as a sealed block with a voltage on the
+label.
+
+Three things come out of the model rather than being announced: the divider sets the output because
+the chip holds the feedback pin at 1.25 V and nothing else; the frequency is whatever the capacitor
+on CT makes it, since the chip charges that at a fixed current and discharges it faster; and it
+regulates by **skipping whole cycles** rather than by narrowing pulses, which is why a scope on the
+switch node shows bursts and why its ripple is worse than a modern part's.
+
+**New example: File > Examples > Buck Converter**, 12 V down to 5 V, with the switch node, the
+output and the inductor current on the scope.
+
 ## [0.13.0] - 2026-09-19
 
 Four parts that each finish something already in the palette: a thermocouple and a load cell for

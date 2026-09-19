@@ -151,6 +151,8 @@ public static class ComponentCatalog
             new("Regulator 7905", "Fixed -5 V linear regulator", () => new VoltageRegulator(RegulatorModel.Lm7905)),
             new("Regulator LM317", "Adjustable, 1.25 V between OUT and ADJ",
                 () => new VoltageRegulator(RegulatorModel.Lm317)),
+            new("MC34063", "Switching controller — you build the topology around it",
+                () => new SwitchingRegulator()),
             new("ICL7660", "Charge pump — a negative rail from a positive one, no inductor",
                 () => new ChargePump()),
             new("TL431 Reference", "Programmable 2.5 V shunt — the adjustable half of a feedback loop",

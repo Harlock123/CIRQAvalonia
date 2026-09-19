@@ -35,6 +35,7 @@ public static class SymbolRenderer
             case LoadCell cell: DrawLoadCell(context, pen, zoom, cell); break;
             case RotaryEncoder encoder: DrawRotaryEncoder(context, pen, zoom, encoder); break;
             case ChargePump pump: DrawChargePump(context, pen, zoom, pump); break;
+            case SwitchingRegulator reg: DrawSwitchingRegulator(context, pen, zoom, reg); break;
             case Microphone mic: DrawMicrophone(context, pen, zoom, mic); break;
             case Servo servo: DrawServo(context, pen, zoom, servo); break;
             case StepperMotor stepper: DrawStepper(context, pen, zoom, stepper); break;
@@ -684,6 +685,36 @@ public static class SymbolRenderer
     }
 
     /// <summary>A charge pump: the package, with the capacitor it shuttles drawn inside it.</summary>
+    /// <summary>
+    /// A switching controller: the package, with the switch drawn inside it so you can see it
+    /// chopping rather than having to infer it from the scope.
+    /// </summary>
+    private static void DrawSwitchingRegulator(
+        DrawingContext context, IPen pen, double zoom, SwitchingRegulator regulator)
+    {
+        context.DrawRectangle(CanvasTheme.SymbolFill, pen, new Rect(-30, -52, 60, 104));
+
+        foreach (var y in new[] { -40.0, -14.0, 14.0, 40.0 })
+        {
+            context.DrawLine(pen, new Point(-44, y), new Point(-30, y));
+            context.DrawLine(pen, new Point(44, y), new Point(30, y));
+        }
+
+        if (zoom <= 0.45) return;
+
+        // The switch itself: a contact that lifts when it is off.
+        var live = regulator.IsCurrentLimited
+            ? CanvasTheme.Pen(CanvasTheme.ErrorBrush, 1.8, zoom)
+            : CanvasTheme.Pen(regulator.SwitchIsOn ? CanvasTheme.ValueBrush : CanvasTheme.SymbolBrush, 1.8, zoom);
+
+        context.DrawLine(live, new Point(-16, -18), new Point(-4, -18));
+        context.DrawLine(live, new Point(4, -18), new Point(16, -18));
+        context.DrawLine(live, new Point(-4, -18),
+            regulator.SwitchIsOn ? new Point(4, -18) : new Point(3, -27));
+
+        DrawCenteredText(context, "34063", new Point(0, 8), 9, zoom, CanvasTheme.LabelBrush);
+    }
+
     private static void DrawChargePump(
         DrawingContext context, IPen pen, double zoom, ChargePump pump)
     {
@@ -1430,9 +1461,10 @@ public static class SymbolRenderer
         // where the default puts the captions.
         Servo or StepperMotor => 44.0,
 
-        // The bridge diamond reaches 26, and the charge pump's package 38.
+        // The bridge diamond reaches 26, the charge pump's package 38, the controller's 52.
         LoadCell => 40.0,
         ChargePump => 52.0,
+        SwitchingRegulator => 66.0,
         Ne555 => DipPackage.BodyHeight(8) / 2 + 16,
         DigitalIc ic => DipPackage.BodyHeight(ic.PinCount) / 2 + 16,
         _ => 30.0,

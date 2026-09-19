@@ -65,7 +65,7 @@ at the window edge; click the rail to bring it back.
 
 Click a palette entry, then click the canvas. The part lands where you click, snapped to the grid.
 
-The palette holds **127 components in 15 categories**:
+The palette holds **128 components in 15 categories**:
 
 | Category | Count | Contents |
 | --- | --- | --- |
@@ -75,7 +75,7 @@ The palette holds **127 components in 15 categories**:
 | Semiconductors | 11 | 1N4148, 1N4001, Schottky, zeners, bridge rectifier, SCR, triac, diac, **TVS and varistor** — see [below](#surge-protection) |
 | Transistors | 10 | NPN and PNP bipolars, N- and P-channel MOSFETs, **three JFETs** — see [below](#jfets) |
 | LEDs & Displays | 8 | Six LED colours, common-anode and common-cathode seven-segment |
-| Power | 8 | Fixed and adjustable regulators, TL431 shunt reference, **ICL7660 charge pump** |
+| Power | 9 | Fixed and adjustable regulators, TL431 shunt reference, ICL7660 charge pump, **MC34063 switching controller** — see [below](#switching-instead-of-dropping) |
 | Analog ICs | 10 | LM741, NE555, LM311, LM339, **LM386** audio amp and **INA126** instrumentation amp |
 | Logic Gates | 7 | AND, OR, NAND, NOR, XOR, XNOR, NOT |
 | 74xx Series | 17 | Counters, decoders, flip-flops, shift registers, multiplexers, Schmitt inverter |
@@ -248,7 +248,7 @@ You should see a square wave and the exponential charge and discharge of the cap
 the RC time constant here is 10 kΩ × 100 nF = 1 ms, against a half-period of 1 ms, so the capacitor
 gets roughly two-thirds of the way each time.
 
-Everything above is also in **File > Examples**, along with twenty-one other circuits. Six of them
+Everything above is also in **File > Examples**, along with twenty-two other circuits. Six of them
 exercise the newer parts: **Lamp Dimmer** (triac and diac phase control), **SCR Latch** (a thyristor
 that stays on after you let go of the button), **LED Chaser** (a 4017), **4060 Timer** (a chip
 clocking itself from one resistor and one capacitor), **Staircase Generator** (a 4040 addressing a
@@ -577,6 +577,46 @@ palette are what you reach for to fix it. Set **Bounce Duration** to zero if you
 signal a debounced circuit would see.
 
 Double-click it to turn one detent; set **Reverse** to turn it the other way.
+
+---
+
+## Switching instead of dropping
+
+Every other part in **Power** is linear. A 7805 bringing 12 V down to 5 V drops the other seven
+volts across itself and turns them into heat — at 100 mA that is 0.7 W wasted to deliver 0.5 W,
+which is why almost nothing is powered that way any more.
+
+A switcher does not drop the difference, it **chops** it. The switch is either hard on or hard
+off, so it dissipates almost nothing either way, and an inductor and a diode carry the energy
+across in between. **File > Examples > Buck Converter** is the circuit, with the switch node, the
+output and the inductor current all on the scope.
+
+The **MC34063** is a controller rather than a converter. It brings an oscillator, a comparator
+against an internal 1.25 V, a current limit and a switch; **the topology is your wiring**. Put the
+switch between the supply and the inductor and it steps down; put it across the inductor's far end
+and it steps up; turn the diode round and it inverts. The chip cannot tell which you have built,
+which is the thing worth understanding and the reason it is not supplied as a block with a voltage
+on the label.
+
+Three things fall out of the model rather than being announced:
+
+- **The divider sets the output.** The chip holds the feedback pin at 1.25 V and nothing else, so
+  the output is `1.25 × (1 + R1/R2)`. Change the divider and it follows.
+- **The frequency is the timing capacitor's.** The chip charges it at a fixed current and
+  discharges it faster; the rate comes out of that, not out of a setting.
+- **It regulates by skipping cycles**, not by narrowing pulses. When the output is high enough,
+  whole cycles are left out — which is why a scope on the switch node shows bursts rather than an
+  even train, and why an MC34063's ripple is worse than a modern part's.
+
+The current limit is the other half of the design. The chip watches the drop across a sense
+resistor between VCC and the switch and stops the cycle at 300 mV, which is what prevents the
+inductor current running away inside a single on-time. Too small an inductor, or too slow an
+oscillator, and the converter ends up regulating on its current limit rather than its comparator —
+real behaviour, and the part says when it is happening.
+
+A converter's switching instants are decided by the solve rather than being known in advance, so
+they land wherever the time step puts them. For believable ripple figures, shorten the simulation
+time step until the answer stops moving.
 
 ---
 

@@ -49,6 +49,8 @@ public static class Examples
         new("Staircase Generator", "4040 addressing a 4051 to step through a resistor ladder",
             LoadStaircase),
         new("JFET Amplifier", "2N3819 common-source stage with self-bias", LoadJfetAmplifier),
+        new("Buck Converter", "MC34063 stepping 12 V down to 5 V without turning the difference into heat",
+            LoadBuckConverter),
     ];
 
     public static void LoadRcLowPass(MainWindowViewModel vm)
@@ -691,6 +693,87 @@ public static class Examples
         vm.Scope.AddProbe(pi.Pin("GPIO18"), "Clock");
         vm.Scope.AddProbe(pi.Pin("GPIO23"), "Pattern");
         vm.Scope.AddProbe(pi.Pin("GPIO25"), "Button");
+    }
+
+    /// <summary>
+    /// A step-down switching converter, and the counterpart to the linear supply example. The
+    /// 7805 there drops seven volts across itself and turns them into heat; this one chops the
+    /// input instead, and the inductor and diode carry the energy across between chops.
+    /// <para>
+    /// Nothing in the chip knows it is a buck converter. It brings an oscillator, a comparator
+    /// against 1.25 V and a switch; the topology is the wiring around it, and the divider is what
+    /// decides the output.
+    /// </para>
+    /// </summary>
+    public static void LoadBuckConverter(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "MC34063 buck converter";
+
+        var input = Place(circuit, new DcVoltageSource(12.0), -460, 60);
+        var regulator = Place(circuit, new SwitchingRegulator(), -220, 0);
+        var sense = Place(circuit, new Resistor(1.0), -340, -140);
+        var coil = Place(circuit, new Inductor(1e-3), 40, -140);
+        var catchDiode = Place(circuit, new Diode(DiodeModel.D1N5817), -60, -20);
+        var reservoir = Place(circuit, new Capacitor(100e-6) { InitialVoltage = 0 }, 200, -20);
+        var timing = Place(circuit, new Capacitor(1e-9) { InitialVoltage = 0 }, -340, 160);
+        var top = Place(circuit, new Resistor(3e3), 340, -60);
+        var bottom = Place(circuit, new Resistor(1e3), 340, 80);
+        var load = Place(circuit, new Resistor(100), 460, -20);
+
+        var gnd = Place(circuit, new Ground(), -460, 220);
+        var gnd2 = Place(circuit, new Ground(), -60, 120);
+        var gnd3 = Place(circuit, new Ground(), 200, 120);
+        var gnd4 = Place(circuit, new Ground(), 340, 200);
+        var gnd5 = Place(circuit, new Ground(), 460, 120);
+
+        catchDiode.RotationDegrees = 90;
+        coil.RotationDegrees = 0;
+        reservoir.RotationDegrees = 90;
+        timing.RotationDegrees = 90;
+        top.RotationDegrees = 90;
+        bottom.RotationDegrees = 90;
+        load.RotationDegrees = 90;
+
+        circuit.Connect(input.Negative, gnd.Pin);
+        circuit.Connect(input.Positive, regulator.Supply);
+        circuit.Connect(regulator.Ground, gnd.Pin);
+        circuit.Connect(regulator.DriveCollector, regulator.Supply);
+
+        // The sense resistor is how the chip sees the switch current: its own limit trips at
+        // 300 mV across it, which is what stops the inductor current running away.
+        circuit.Connect(regulator.Supply, sense.A);
+        circuit.Connect(sense.B, regulator.CurrentSense);
+        circuit.Connect(regulator.CurrentSense, regulator.SwitchCollector);
+
+        // Switch node: the inductor one way, the catch diode the other. Without the diode the
+        // inductor has nowhere to send its current when the switch opens.
+        circuit.Connect(regulator.SwitchEmitter, coil.A);
+        circuit.Connect(catchDiode.Cathode, regulator.SwitchEmitter);
+        circuit.Connect(catchDiode.Anode, gnd2.Pin);
+
+        circuit.Connect(coil.B, reservoir.A);
+        circuit.Connect(reservoir.B, gnd3.Pin);
+        circuit.Connect(coil.B, load.A);
+        circuit.Connect(load.B, gnd5.Pin);
+
+        // 1.25 V × (1 + 3k/1k) = 5 V. Change the divider and the output follows it.
+        circuit.Connect(coil.B, top.A);
+        circuit.Connect(top.B, regulator.Feedback);
+        circuit.Connect(regulator.Feedback, bottom.A);
+        circuit.Connect(bottom.B, gnd4.Pin);
+
+        circuit.Connect(regulator.Timing, timing.A);
+        circuit.Connect(timing.B, gnd.Pin);
+
+        vm.Scope.TimebasePerDivision = 20e-6;
+        vm.Scope.VoltsPerDivision = 5.0;
+        vm.Scope.Layout = ScopeLayout.Tiled;
+        vm.Scope.AddProbe(regulator.SwitchEmitter, "Switch");
+        vm.Scope.AddProbe(coil.B, "Output");
+
+        var current = vm.Scope.AddProbe(coil.A, "Coil I");
+        current.Kind = Cirq.Core.Probing.ProbeKind.Current;
     }
 
     /// <summary>
