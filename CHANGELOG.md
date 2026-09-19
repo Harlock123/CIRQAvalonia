@@ -8,6 +8,11 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**Every screenshot in the README and the guide is retaken.** Eight of the nine dated from the
+first commit and showed an application with 73 components in 11 categories, before the electrolytic
+capacitor, the current-probe selector, the 40xx group and a good deal else. They now show what the
+application actually looks like.
+
 **The 4000-series palette group is now labelled "40xx Series"**, so it reads as a pair with the
 "74xx Series" group above it rather than as a differently-shaped name for the same kind of thing.
 The parts and their part numbers are unchanged; the palette screenshot is retaken.
