@@ -64,10 +64,20 @@ builds all seven targets in parallel, verifies each one, and publishes them to a
 git tag v0.2.0 && git push origin v0.2.0
 ```
 
-Or run the workflow by hand from the Actions tab with a version. The workflow calls the same two
+Or run the workflow by hand from the Actions tab with a version. The workflow calls the same
 scripts, so CI and a developer's machine cannot drift apart. A version with a pre-release suffix
 (`0.2.0-beta.1`) is published as a prerelease, and re-running for an existing version replaces its
 assets rather than failing.
+
+Release notes come from [`CHANGELOG.md`](CHANGELOG.md): the section matching the version being
+built is lifted into the release page above the download table, so **add the entry before
+tagging** — the workflow reads the changelog at the tagged commit. A version with no entry warns
+and publishes with the download table alone, rather than throwing away a build that passed over
+missing prose.
+
+```bash
+./scripts/changelog-section.sh 0.2.0     # exactly what the release will carry
+```
 
 | Target | Platform |
 | --- | --- |

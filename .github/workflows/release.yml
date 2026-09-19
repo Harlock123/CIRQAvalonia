@@ -168,7 +168,27 @@ jobs:
           VERSION: ${{ needs.prepare.outputs.version }}
         run: |
           set -euo pipefail
-          cat > notes.md <<EOF
+
+          # What is *in* a release is the one thing the pipeline cannot work out for itself, so
+          # it comes from CHANGELOG.md at the tagged commit. A missing entry warns rather than
+          # failing: the binaries are the deliverable, and notes can be edited afterwards, but
+          # a build that passed should not be thrown away over missing prose.
+          if ./scripts/changelog-section.sh "$VERSION" > changelog.md; then
+            {
+              echo "## What's new in $VERSION"
+              echo
+              cat changelog.md
+              echo
+              echo "---"
+              echo
+            } > notes.md
+            echo "Using the CHANGELOG entry for $VERSION"
+          else
+            : > notes.md
+            echo "::warning::CHANGELOG.md has no entry for $VERSION — publishing without release notes"
+          fi
+
+          cat >> notes.md <<EOF
           ## Downloads
 
           Every build is **self-contained**: the .NET runtime travels inside the executable, so

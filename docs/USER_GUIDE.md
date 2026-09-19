@@ -5,7 +5,8 @@ where you want to look, and press run — the analog network is solved with Modi
 while logic devices run on an event scheduler, in the same time loop.
 
 This guide walks through the editor. If you want to know how the solver works instead, that is in
-the [README](../README.md).
+the [README](../README.md), and what changed between releases is in the
+[changelog](../CHANGELOG.md).
 
 **Contents**
 
