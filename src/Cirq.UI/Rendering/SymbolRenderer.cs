@@ -31,6 +31,7 @@ public static class SymbolRenderer
             case Resistor: DrawResistor(context, pen); break;
             case Speaker speaker: DrawSpeaker(context, pen, zoom, speaker); break;
             case Crystal: DrawCrystal(context, pen); break;
+            case CharacterLcd lcd: DrawCharacterLcd(context, pen, zoom, lcd); break;
             case DipSwitch dip: DrawDipSwitch(context, pen, zoom, dip); break;
             case SolarCell pv: DrawSolarCell(context, pen, zoom, pv); break;
             case OscillatorModule osc: DrawOscillatorModule(context, pen, zoom, osc); break;
@@ -744,6 +745,43 @@ public static class SymbolRenderer
     }
 
     /// <summary>A DIP switch: the package with a lever per section, up for on.</summary>
+    /// <summary>
+    /// A character LCD, showing what has actually been written to it. The point of the part is
+    /// that you can read it, so the symbol is the display rather than a box with a part number.
+    /// </summary>
+    private static void DrawCharacterLcd(
+        DrawingContext context, IPen pen, double zoom, CharacterLcd lcd)
+    {
+        var body = new Rect(-110, -46, 220, 92);
+        context.DrawRectangle(CanvasTheme.SymbolFill, pen, new RoundedRect(body, 4));
+
+        // The pin header along the top, as a real module has.
+        for (var i = 0; i < 16; i++)
+        {
+            var x = -100 + (i * 13.3);
+            context.DrawLine(pen, new Point(x, -46), new Point(x, -56));
+        }
+
+        var glass = new Rect(-92, -30, 184, 60);
+        context.DrawRectangle(CanvasTheme.SymbolFill, CanvasTheme.Pen(CanvasTheme.LabelBrush, 1.0, zoom), glass);
+
+        if (zoom <= 0.35) return;
+
+        if (!lcd.DisplayOn)
+        {
+            DrawCenteredText(context, "HD44780", new Point(0, 0), 10, zoom, CanvasTheme.LabelBrush);
+            return;
+        }
+
+        // Both lines, always sixteen characters wide, so the text sits where it would on the
+        // glass rather than shuffling about as it is written.
+        for (var line = 0; line < 2; line++)
+        {
+            DrawCenteredText(context, lcd.Line(line), new Point(0, -13 + (line * 22)), 13, zoom,
+                CanvasTheme.ValueBrush);
+        }
+    }
+
     private static void DrawDipSwitch(DrawingContext context, IPen pen, double zoom, DipSwitch dip)
     {
         context.DrawRectangle(CanvasTheme.SymbolFill, pen, new Rect(-26, -80, 52, 160));
@@ -1548,6 +1586,7 @@ public static class SymbolRenderer
         ChargePump => 52.0,
         SwitchingRegulator => 66.0,
         DipSwitch => 94.0,
+        CharacterLcd => 72.0,
         OscillatorModule => 44.0,
         Ne555 => DipPackage.BodyHeight(8) / 2 + 16,
         DigitalIc ic => DipPackage.BodyHeight(ic.PinCount) / 2 + 16,
