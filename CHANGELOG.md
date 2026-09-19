@@ -8,6 +8,12 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-09-19
+
+A switching regulator, which is the biggest thing the Power group was missing — everything in it
+until now turned the excess volts into heat. The palette holds 128 components in 15 categories,
+and 992 tests measure them against closed-form answers.
+
 **A switching regulator, which is the biggest thing the Power group was missing.** Every part in
 it was linear: a 7805 bringing 12 V down to 5 V drops the other seven across itself and turns them
 into heat. A switcher chops the input instead, and an inductor and a diode carry the energy across
@@ -509,7 +515,8 @@ First public build of CirqAvalonia — an electronic circuit analyzer and mixed-
 
 **501 tests** measure the solver against closed-form answers rather than recorded output.
 
-[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.13.0...HEAD
+[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.14.0...HEAD
+[0.14.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.10.0...v0.11.0
