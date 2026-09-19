@@ -100,6 +100,27 @@ public sealed class SkiaSymbolCanvas(SKCanvas canvas) : ISymbolCanvas, IDisposab
         canvas.DrawText(text, (float)origin.X + x, (float)origin.Y + baseline, font, paint);
     }
 
+    public double MeasureText(string text, double size) => Measure(text, size);
+
+    /// <summary>
+    /// The same measurement without needing a canvas, so a page can be sized before there is
+    /// anything to draw on.
+    /// </summary>
+    public static double Measure(string text, double size)
+    {
+        if (string.IsNullOrEmpty(text)) return 0;
+
+        using var font = new SKFont(Typeface, (float)size);
+        return font.MeasureText(text);
+    }
+
+    /// <summary>Height of a line at this size, ascent to descent.</summary>
+    public static double LineHeight(double size)
+    {
+        using var font = new SKFont(Typeface, (float)size);
+        return font.Metrics.Descent - font.Metrics.Ascent;
+    }
+
     public void Dispose()
     {
         foreach (var paint in _paints) paint.Dispose();

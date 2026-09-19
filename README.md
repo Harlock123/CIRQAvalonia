@@ -32,7 +32,7 @@ Core ← Engine ← Components ← UI, which keeps the whole engine headless-tes
 
 ```bash
 dotnet run --project src/Cirq.UI     # the editor
-dotnet test                          # 1105 tests
+dotnet test                          # 1115 tests
 ```
 
 Targets .NET 10. The UI uses Avalonia 12 and ScottPlot 5.1; those two versions are pinned
@@ -217,6 +217,7 @@ Tests measure the solver against closed-form answers rather than recorded output
 | 40xx series | Gate truth tables on the CMOS pinout, and that it is *not* the 74xx one; 4093 hysteresis and its relaxation-oscillator period against the closed form; 4013 toggling and its active-high set and reset; 4040 stage-by-stage division and falling-edge clocking; 4017 one-hot walk, reset and carry; 4511 glyph table, active-high drive, lamp test and blanking priority; 4066 and 4051 analog pass-through, switch resistance and off-state leakage; 4060 oscillating from its own Rt and Ct at the datasheet's 1/(2.3·Rt·Ct), and the frequency tracking a changed capacitor |
 | Comparator | Open-collector pull-down and release, driving a higher rail through a pull-up, edge timing |
 | Displays | 7447 glyph table, open-collector drive, lamp test and blanking priority, counter walking 0-9 on the display |
+| Parts list | Identical parts collapsing to one line with a count, the value separating otherwise identical parts, grounds left out, R10 sorting after R2, and the table reaching the file rather than merely being given room |
 | Export | Every format writes a file worth opening; a PNG at the size of the circuit and a raster scale that only multiplies pixels; a hand-written BMP header that agrees with its own pixel count; an SVG made of shapes rather than an embedded image; a PDF that starts and ends as one, with two pages when the traces get their own; framing that follows the circuit rather than the view; and a scope that clears the canvas being unable to wipe the schematic above it |
 | Files | Every component type round-trips with its parameters, pins, wires, waypoints and probes; a reloaded circuit solves to the same answer; damaged, unknown and newer-format files are handled without losing the open circuit |
 | Settings | Theme round-trips across a restart, corrupt and newer-format preference files fall back to defaults, opening the dialog writes nothing, choosing a theme saves immediately |
@@ -343,7 +344,7 @@ being squeezed onto a volts axis:
 | View | `Ctrl`+`+` / `Ctrl`+`-` zoom in and out, wheel zooms at the cursor, middle-drag or space-drag pans, `F` fits the whole circuit — captions and all |
 | Scope | The vertical range follows the traces by default, so changing a source amplitude keeps the waveform on screen. The `Auto` checkbox turns that off, and using the vertical `+`/`-` buttons turns it off for you |
 | File | `Ctrl+N` new, `Ctrl+O` open, `Ctrl+S` save, `Ctrl+Shift+S` save as, and `File > Settings` for the theme. The title bar shows the document and an asterisk while there are unsaved edits |
-| Export | `Ctrl+E` writes the schematic and the traces out as PNG, JPEG, BMP, SVG or PDF. SVG and PDF are true vector, drawn by the same code that draws the screen. The frame follows the circuit rather than the view |
+| Export | `Ctrl+E` writes the schematic and the traces out as PNG, JPEG, BMP, SVG or PDF, optionally with a grouped parts list. SVG and PDF are true vector, drawn by the same code that draws the screen. The frame follows the circuit rather than the view |
 | Transport | `F5` run/pause, `F6` single step, `F8` reset |
 | Interactive | Switches, buttons, logic toggles, LDRs and thermistors are operated by double-clicking them. They are ringed with a small dot so you can tell which parts those are; **View > Mark Interactive Parts** turns the rings off |
 | Panels | `F9` collapses the palette to the left, `F10` the properties panel to the right — or click the chevron in either panel's header. A collapsed panel leaves a labelled rail at the edge; click it to bring the panel back. Palette groups also collapse individually (`All` toggles every group) |

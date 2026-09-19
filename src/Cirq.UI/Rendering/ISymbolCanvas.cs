@@ -52,6 +52,12 @@ public interface ISymbolCanvas
     /// because only it knows what it is drawing them with.
     /// </summary>
     void DrawText(string text, Point origin, double size, IBrush brush, SymbolTextAlign align);
+
+    /// <summary>
+    /// How wide that text would be, for the callers that have to lay something out around it —
+    /// the parts list sizes its columns from this.
+    /// </summary>
+    double MeasureText(string text, double size);
 }
 
 /// <summary>Receives the segments of a <see cref="SymbolPath"/> as it is replayed.</summary>

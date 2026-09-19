@@ -141,6 +141,13 @@ public sealed class StorageProviderFileDialogs : ICircuitFileDialogs
 
         var transparent = new CheckBox { Content = "Transparent background" };
 
+        var partsList = new CheckBox
+        {
+            Content = "Include a parts list",
+            [ToolTip.TipProperty] =
+                "A table of what the circuit is made of: quantity, designators, part and value",
+        };
+
         var layoutPanel = new StackPanel
         {
             Spacing = 4,
@@ -210,7 +217,8 @@ public sealed class StorageProviderFileDialogs : ICircuitFileDialogs
                 content,
                 AsSingleFile: oneFile.IsChecked == true,
                 RasterScale: scale.SelectedIndex + 1,
-                TransparentBackground: transparent.IsChecked == true);
+                TransparentBackground: transparent.IsChecked == true,
+                IncludePartsList: partsList.IsChecked == true);
 
             dialog.Close();
         };
@@ -236,6 +244,7 @@ public sealed class StorageProviderFileDialogs : ICircuitFileDialogs
                 },
                 scalePanel,
                 transparent,
+                partsList,
                 new StackPanel
                 {
                     Orientation = Orientation.Horizontal,

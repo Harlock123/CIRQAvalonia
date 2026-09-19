@@ -23,9 +23,15 @@ The frame follows the circuit rather than the window: whatever the view is scrol
 holds the whole thing at its natural size with a margin, captions and probe labels included. The
 editing aids stay behind — no dot grid, no terminal dots, no hover highlighting.
 
+**A parts list** can go in too. It is grouped the way a bill of materials is grouped — by what the
+part is *and* what it is set to, so three 10 kΩ resistors are one line and a 4k7 among them is
+another — with the quantity, the designators, the part and its value. Below the drawing on a single
+sheet, or a page of its own in the combined PDF. Grounds are left out, being net labels rather than
+things you can buy.
+
 Four parts that all come down to the same thing: what a component does when you push it past where
 the datasheet's headline number applies. The palette holds 140 components in 16 categories, and
-1105 tests measure them against closed-form answers.
+1115 tests measure them against closed-form answers.
 
 **Centre-tapped transformer.** The other way to rectify, and for fifty years the usual one. Take
 the tap as your zero volt line and the two ends swing opposite ways, so two diodes do full-wave

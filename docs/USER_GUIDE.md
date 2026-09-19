@@ -1064,6 +1064,16 @@ the one to pick when you want the pieces separately and something to hand someon
 **Transparent background** drops the paper colour so the drawing can go on top of something else.
 It is not offered for JPEG, which has no transparency to give.
 
+**Include a parts list** adds a table of what the circuit is made of, grouped the way a bill of
+materials is grouped — by what the part is *and* what it is set to, so three 10 kΩ resistors are
+one line reading `3 | R1, R2, R3 | Resistor | 10kΩ`, and a 4k7 among them is a line of its own.
+It goes below everything else on a single sheet, and gets a page of its own in the combined PDF.
+
+Ground symbols are left out: a ground is a net label rather than something you can buy. Everything
+else earns a line, instruments included — a function generator standing in for a mains secondary is
+part of what the drawing says, and dropping it would make the list disagree with the schematic
+beside it.
+
 Two things worth knowing:
 
 - **The frame follows the circuit, not the window.** Whatever the view is scrolled to or zoomed at,

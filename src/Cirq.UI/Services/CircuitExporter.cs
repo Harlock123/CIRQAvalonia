@@ -44,13 +44,19 @@ public enum ExportContent
 /// Whether the rings that mark double-clickable parts are drawn. Off by default in an export:
 /// they are a hint to whoever is driving the editor, not part of the circuit.
 /// </param>
+/// <param name="IncludePartsList">
+/// Adds a table of what the circuit is made of — quantity, designators, part and value, grouped
+/// the way a bill of materials is. It goes below everything else on a single sheet, and gets a
+/// page of its own in the combined PDF.
+/// </param>
 public sealed record ExportOptions(
     ExportFormat Format,
     ExportContent Content = ExportContent.Schematic,
     bool AsSingleFile = true,
     double RasterScale = 2.0,
     bool TransparentBackground = false,
-    bool ShowInteractiveMarkers = false);
+    bool ShowInteractiveMarkers = false,
+    bool IncludePartsList = false);
 
 /// <summary>An export the user has asked for: what to write, and where.</summary>
 public sealed record ExportRequest(string Path, ExportOptions Options);
@@ -169,26 +175,51 @@ public static class CircuitExporter
     {
         var schematic = includeSchematic ? SchematicBounds(circuit) : default;
 
+        var rows = options.IncludePartsList ? PartsList.For(circuit) : [];
+        var table = options.IncludePartsList ? MeasurePartsList(rows) : default;
+
         var width = includeSchematic ? schematic.Width : TraceWidth;
         if (includeTraces) width = Math.Max(width, TraceWidth);
+        if (options.IncludePartsList) width = Math.Max(width, table.Width + (Margin * 2));
 
         var traceHeight = includeTraces ? width * TraceAspect : 0;
-        var gutter = includeSchematic && includeTraces ? Gutter : 0;
-        var height = (includeSchematic ? schematic.Height : 0) + gutter + traceHeight;
+
+        var height = (includeSchematic ? schematic.Height : 0)
+                     + (includeSchematic && includeTraces ? Gutter : 0)
+                     + traceHeight
+                     + (options.IncludePartsList ? Gutter + table.Height : 0);
 
         Write(path, width, height, options, canvas =>
         {
+            var y = 0.0;
+
             if (includeSchematic)
             {
-                // Centred, because the traces can be the wider of the two.
-                using var _ = Translate(canvas, (float)((width - schematic.Width) / 2), 0);
-                DrawSchematic(canvas, circuit, schematic, options);
+                // Centred, because the traces or the table can be the wider of the three.
+                using (Translate(canvas, (float)((width - schematic.Width) / 2), 0))
+                {
+                    DrawSchematic(canvas, circuit, schematic, options);
+                }
+
+                y += schematic.Height;
             }
 
             if (includeTraces && scope is not null)
             {
-                var top = (float)((includeSchematic ? schematic.Height : 0) + gutter);
-                DrawScope(canvas, scope, new SKRect(0, top, (float)width, top + (float)traceHeight));
+                if (includeSchematic) y += Gutter;
+
+                DrawScope(canvas, scope, new SKRect(0, (float)y, (float)width, (float)(y + traceHeight)));
+                y += traceHeight;
+            }
+
+            if (options.IncludePartsList)
+            {
+                if (y > 0) y += Gutter;
+
+                using (Translate(canvas, 0, (float)y))
+                {
+                    DrawPartsList(canvas, rows, width);
+                }
             }
         });
     }
@@ -213,6 +244,19 @@ public static class CircuitExporter
             var second = document.BeginPage((float)TraceWidth, (float)height);
             PaintBackground(second, TraceWidth, height, options);
             DrawScope(second, scope, new SKRect(0, 0, (float)TraceWidth, (float)height));
+            document.EndPage();
+        }
+
+        if (options.IncludePartsList)
+        {
+            var rows = PartsList.For(circuit);
+            var table = MeasurePartsList(rows);
+
+            var width = Math.Max(schematic.Width, table.Width + (Margin * 2));
+            var third = document.BeginPage((float)width, (float)table.Height);
+
+            PaintBackground(third, width, table.Height, options);
+            DrawPartsList(third, rows, width);
             document.EndPage();
         }
 
@@ -255,6 +299,26 @@ public static class CircuitExporter
         scope.Render(canvas, area);
 
         canvas.RestoreToCount(depth);
+    }
+
+    private static void DrawPartsList(SKCanvas canvas, IReadOnlyList<PartsListRow> rows, double width)
+    {
+        using var symbols = new SkiaSymbolCanvas(canvas);
+        PartsListRenderer.Draw(symbols, rows, width);
+    }
+
+    /// <summary>
+    /// How big the table will be, before there is a page to draw it on. Measured with the same
+    /// font the export will use, so the page comes out wide enough for it rather than wide enough
+    /// for a guess.
+    /// </summary>
+    private static Size MeasurePartsList(IReadOnlyList<PartsListRow> rows)
+    {
+        using var bitmap = new SKBitmap(1, 1);
+        using var canvas = new SKCanvas(bitmap);
+        using var symbols = new SkiaSymbolCanvas(canvas);
+
+        return PartsListRenderer.Measure(symbols, rows);
     }
 
     private static void DrawSchematic(SKCanvas canvas, Circuit circuit, Rect bounds, ExportOptions options)

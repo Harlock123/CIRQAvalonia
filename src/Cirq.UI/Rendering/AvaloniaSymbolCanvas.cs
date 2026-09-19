@@ -59,6 +59,13 @@ public sealed class AvaloniaSymbolCanvas(DrawingContext context) : ISymbolCanvas
         context.DrawText(formatted, new Point(origin.X + x, origin.Y - (formatted.Height / 2)));
     }
 
+    public double MeasureText(string text, double size) =>
+        string.IsNullOrEmpty(text)
+            ? 0
+            : new FormattedText(
+                text, CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
+                CanvasTheme.LabelTypeface, size, Brushes.Black).Width;
+
     /// <summary>Pours a recorded path into Avalonia's geometry sink.</summary>
     private sealed class StreamSink(StreamGeometryContext sink) : ISymbolPathSink
     {
