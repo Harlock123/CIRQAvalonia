@@ -8,43 +8,52 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
-- **New category, Switching & Isolation: relay, fuse and optocoupler.**
-  - The **relay** reports the thing that actually destroys relay drivers. Its coil is an inductor,
-    so switching it off with no flyback diode produces hundreds of volts backwards; the coil is
-    ringed in red and the fault named. Pull-in and drop-out are different currents, so a coil near
-    the threshold holds its state rather than chattering.
-  - The **fuse** opens on its melting integral, not on instantaneous current — which is why a real
-    fuse survives an inrush many times its rating. Twice the rated current on a 1 A part takes
-    about a sixth of a second; five times takes twenty milliseconds.
-  - The **optocoupler** has no conductive path between its halves, so the output side can sit at a
-    completely different potential. It still needs its own ground reference, which is a property of
-    isolation rather than a limitation.
+## [0.4.0] - 2026-09-19
 
-- **New: bridge rectifier and electrolytic capacitor**, which together with the existing 7812 make
-  up a linear power supply. The bridge is four real diodes rather than an idealised block, so the
-  output peak sits about 1.4 V below the input peak and ripples at twice the input frequency —
-  the losses are the point. The electrolytic is polarised and carries real series resistance,
-  which is what actually sets the ripple on a smoothing capacitor.
-- New example, **File > Examples > Linear Power Supply** — a mains secondary through a bridge and
-  reservoir into a 7812, probing the rippling reservoir rail against the flat regulated one.
-- **Fixed: a regulator starved of input drove its output negative.** The pass element is a
-  follower, so a positive part sits at zero rather than below it however little headroom it has.
-  The old behaviour made the output capacitor of a supply look reverse-biased while the reservoir
-  was still charging.
-- An electrolytic reports being connected backwards or run over its working voltage, and is ringed
-  in red on the canvas. It has to be held backwards for a millisecond first, so a supply's startup
-  transient does not accuse a correctly connected part.
+**Build a power supply.** The bridge rectifier and the electrolytic capacitor join the regulators
+that were already there, and each models the thing that actually bites.
 
-- **Fixed: regulators shut down at switch-on.** The 7805 example showed about half a volt instead
-  of five. Junction temperature was computed from instantaneous power, so the few microseconds of
-  inrush that charge an output capacitor — tens of watts, briefly — read as a die at hundreds of
-  degrees and latched thermal shutdown. The junction now has thermal mass, so protection responds
-  to sustained power the way a real part does. A dead short still shuts the regulator down, within
-  a few milliseconds rather than instantly.
+The bridge is four real diodes rather than an idealised block, so both halves of the cycle pass
+through two of them and the output peak lands about 1.4 V below the input peak, rippling at twice
+the input frequency. Those losses are the reason a supply needs headroom, and an ideal bridge would
+hide exactly the detail worth seeing.
 
-- The README now carries the macOS quarantine step in its download section. It is required on
-  Apple Silicon, not advisory: without it macOS reports "cannot be opened" or "is damaged", which
-  reads as a bad download rather than a policy block.
+The electrolytic is polarised and carries real series resistance — ESR is what sets the ripple on a
+smoothing capacitor, so it is solved rather than assumed. It reports being connected backwards or
+run over its working voltage, and is ringed in red on the canvas.
+
+**File > Examples > Linear Power Supply** puts the whole chain together: a mains secondary through
+a bridge into a 1000 µF reservoir into a 7812. The two probes are the point — the reservoir rail
+sags and recharges twice per cycle while the regulated rail beside it is flat.
+
+**New category: Switching & Isolation** — the boundary between a control circuit and the thing it
+controls. Each part reports the mistake that destroys it.
+
+- The **relay** is a coil and a changeover contact. Switching the coil off with no flyback diode
+  produces hundreds of volts backwards — the spike that kills the transistor driving it. The coil
+  is ringed in red and the fault named. Pull-in and drop-out are deliberately different currents,
+  so a coil sitting near the threshold holds its state instead of chattering.
+- The **fuse** opens on its melting integral rather than on instantaneous current, which is why a
+  real fuse survives an inrush many times its rating. It carries its rated current indefinitely;
+  only the excess accumulates. Twice the rating on a 1 A part takes about a sixth of a second, five
+  times takes twenty milliseconds.
+- The **optocoupler** has no conductive path between its halves, so the output side can sit at a
+  completely different potential — the honest answer to switching something dangerous from a 3.3 V
+  board. The isolated side still needs its own ground reference, which is a property of isolation
+  rather than a limitation.
+
+**Fixed: a 7805 sat at half a volt instead of five.** Junction temperature was computed from
+instantaneous power, so the few microseconds of inrush that charge an output capacitor — tens of
+watts, briefly — read as a die at hundreds of degrees and latched thermal shutdown. The junction
+now has thermal mass, so protection responds to sustained power the way a real part does. A dead
+short still shuts the regulator down, within a few milliseconds rather than instantly.
+
+**Fixed: a regulator starved of input drove its output negative.** The pass element is a follower —
+it sources current but cannot sink it — so a positive part sits at zero however little headroom it
+has. The old behaviour left the output capacitor of a supply looking reverse-biased for as long as
+the reservoir took to charge.
+
+**663 tests** pass, measured against closed-form answers rather than recorded output.
 
 ## [0.3.0] - 2026-09-19
 
@@ -140,7 +149,8 @@ First public build of CirqAvalonia — an electronic circuit analyzer and mixed-
 
 **501 tests** measure the solver against closed-form answers rather than recorded output.
 
-[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Harlock123/CIRQAvalonia/releases/tag/v0.1.0
