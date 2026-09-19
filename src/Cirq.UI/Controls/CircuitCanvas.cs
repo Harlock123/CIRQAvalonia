@@ -319,14 +319,17 @@ public class CircuitCanvas : Control
         var circuit = Circuit;
         if (circuit is null) return;
 
-        using var _ = context.PushTransform(
+        var canvas = new AvaloniaSymbolCanvas(context);
+
+        using var _ = canvas.PushTransform(
             Matrix.CreateScale(Zoom, Zoom) * Matrix.CreateTranslation(_panOffset.X, _panOffset.Y));
 
-        DrawWires(context, circuit);
-        DrawComponents(context, circuit);
-        DrawTerminals(context, circuit);
-        DrawProbes(context, circuit);
-        DrawWireInProgress(context);
+        CircuitRenderer.Draw(canvas, circuit,
+            new CircuitRenderOptions(Zoom, SelectedComponent, ShowInteractiveMarkers));
+
+        // Editing aids rather than part of the circuit, so they stay here and out of an export.
+        DrawTerminals(canvas, circuit);
+        DrawWireInProgress(canvas);
     }
 
     private void DrawGrid(DrawingContext context)
@@ -359,124 +362,7 @@ public class CircuitCanvas : Control
         }
     }
 
-    private void DrawWires(DrawingContext context, Circuit circuit)
-    {
-        foreach (var wire in circuit.Wires)
-        {
-            if (wire.SourceTerminal is null || wire.TargetTerminal is null) continue;
-
-            var brush = wire.IsSelected ? CanvasTheme.SelectionBrush : CanvasTheme.WireBrush;
-            var pen = CanvasTheme.Pen(brush, wire.IsSelected ? 3.0 : 2.0, Zoom);
-            var points = BuildWirePath(wire).Select(p => new Point(p.X, p.Y)).ToList();
-            if (points.Count < 2) continue;
-
-            context.DrawGeometry(null, pen, new PolylineGeometry(points, false));
-        }
-
-        // Junction dots wherever three or more wire ends meet.
-        foreach (var junction in FindJunctions(circuit))
-            context.DrawEllipse(CanvasTheme.WireBrush, null, new Point(junction.X, junction.Y), 4, 4);
-    }
-
-    /// <summary>Full orthogonal path of a wire, inserting elbows between consecutive anchors.</summary>
-    public static IEnumerable<CorePoint> BuildWirePath(WireSegment wire)
-    {
-        var anchors = new List<CorePoint> { wire.SourceTerminal.AbsolutePosition };
-        anchors.AddRange(wire.Waypoints);
-        anchors.Add(wire.TargetTerminal.AbsolutePosition);
-
-        yield return anchors[0];
-        for (var i = 1; i < anchors.Count; i++)
-        {
-            foreach (var point in OrthogonalElbow(anchors[i - 1], anchors[i]))
-                yield return point;
-            yield return anchors[i];
-        }
-    }
-
-    /// <summary>The intermediate corner, if any, needed to join two points with right angles.</summary>
-    private static IEnumerable<CorePoint> OrthogonalElbow(CorePoint from, CorePoint to)
-    {
-        const double epsilon = 0.01;
-        if (Math.Abs(from.X - to.X) < epsilon || Math.Abs(from.Y - to.Y) < epsilon)
-            yield break;
-
-        // Travel horizontally first, then vertically.
-        yield return new CorePoint(to.X, from.Y);
-    }
-
-    private static IEnumerable<CorePoint> FindJunctions(Circuit circuit)
-    {
-        var counts = new Dictionary<(double, double), int>();
-        foreach (var wire in circuit.Wires)
-        {
-            if (wire.SourceTerminal is null || wire.TargetTerminal is null) continue;
-            foreach (var terminal in new[] { wire.SourceTerminal, wire.TargetTerminal })
-            {
-                var p = terminal.AbsolutePosition;
-                var key = (Math.Round(p.X, 2), Math.Round(p.Y, 2));
-                counts[key] = counts.GetValueOrDefault(key) + 1;
-            }
-        }
-
-        foreach (var ((x, y), count) in counts)
-            if (count >= 3)
-                yield return new CorePoint(x, y);
-    }
-
-    private void DrawComponents(DrawingContext context, Circuit circuit)
-    {
-        foreach (var component in circuit.Components)
-        {
-            using (context.PushTransform(
-                       Matrix.CreateRotation(component.RotationDegrees * Math.PI / 180.0) *
-                       Matrix.CreateTranslation(component.X, component.Y)))
-            {
-                SymbolRenderer.Draw(context, component, Zoom, ReferenceEquals(component, SelectedComponent));
-            }
-
-            DrawComponentLabels(context, component);
-
-            if (ShowInteractiveMarkers && component is IInteractiveComponent)
-                DrawInteractiveMarker(context, component);
-        }
-    }
-
-    /// <summary>
-    /// A small ringed dot on a part that can be operated by double-clicking it. Drawn outside the
-    /// symbol, on the opposite side from the designator, so it neither sits on the device nor
-    /// collides with its caption.
-    /// </summary>
-    private void DrawInteractiveMarker(DrawingContext context, CircuitComponent component)
-    {
-        if (Zoom < 0.5) return;
-
-        var offset = SymbolRenderer.LabelOffset(component);
-        // Just clear of the body rather than beside it: an SPDT's upper throw reaches far enough
-        // up and right that a marker tucked against the symbol landed on the contact.
-        var centre = new Point(component.X + 26, component.Y - offset - 2);
-        var pen = CanvasTheme.Pen(CanvasTheme.ValueBrush, 1.2, Zoom);
-
-        context.DrawEllipse(null, pen, centre, 5, 5);
-        context.DrawEllipse(CanvasTheme.ValueBrush, null, centre, 1.8, 1.8);
-    }
-
-    private void DrawComponentLabels(DrawingContext context, CircuitComponent component)
-    {
-        if (Zoom < 0.35) return;
-
-        var offset = SymbolRenderer.LabelOffset(component);
-        var above = new Point(component.X, component.Y - offset);
-        var below = new Point(component.X, component.Y + offset);
-
-        SymbolRenderer.DrawCenteredText(context, component.Name, above, 11, Zoom, CanvasTheme.LabelBrush);
-
-        var value = component.ValueLabel;
-        if (!string.IsNullOrEmpty(value))
-            SymbolRenderer.DrawCenteredText(context, value, below, 11, Zoom, CanvasTheme.ValueBrush);
-    }
-
-    private void DrawTerminals(DrawingContext context, Circuit circuit)
+    private void DrawTerminals(ISymbolCanvas context, Circuit circuit)
     {
         var showAll = ActiveTool is EditorTool.Wire or EditorTool.Probe;
 
@@ -500,41 +386,7 @@ public class CircuitCanvas : Control
         }
     }
 
-    private void DrawProbes(DrawingContext context, Circuit circuit)
-    {
-        foreach (var probe in circuit.Probes)
-        {
-            if (probe.TargetTerminal is null) continue;
-            var position = probe.TargetTerminal.AbsolutePosition;
-            var colour = Color.FromArgb(probe.TraceColor.A, probe.TraceColor.R, probe.TraceColor.G, probe.TraceColor.B);
-            var brush = new SolidColorBrush(colour);
-            var pen = CanvasTheme.Pen(brush, 2.0, Zoom);
-
-            // The probe wears its trace colour so it can be matched to the waveform, but those
-            // colours are chosen to read on the scope's black plot: yellow and cyan on a light
-            // canvas are all but invisible. Outlining the pennant in the symbol colour — and
-            // haloing the mast behind it — keeps the shape legible on any ground without giving
-            // up the colour match. The label follows the theme for the same reason; the pennant
-            // sitting beside it is what carries the identity.
-            var outline = CanvasTheme.Pen(CanvasTheme.SymbolBrush, 0.9, Zoom);
-            var halo = CanvasTheme.Pen(CanvasTheme.SymbolBrush, 3.6, Zoom);
-
-            // A small pennant marking the probed node.
-            var tip = new Point(position.X, position.Y);
-            var mast = new Point(position.X + 6, position.Y - 22);
-            context.DrawLine(halo, tip, mast);
-            context.DrawLine(pen, tip, mast);
-            context.DrawGeometry(brush, outline, new PolylineGeometry(
-                [mast, new Point(mast.X + 18, mast.Y + 5), new Point(mast.X, mast.Y + 10)], true));
-            context.DrawEllipse(brush, outline, tip, 4, 4);
-
-            if (Zoom > 0.5)
-                SymbolRenderer.DrawCenteredText(context, probe.Label,
-                    new Point(mast.X + 30, mast.Y + 5), 10, Zoom, CanvasTheme.LabelBrush);
-        }
-    }
-
-    private void DrawWireInProgress(DrawingContext context)
+    private void DrawWireInProgress(ISymbolCanvas context)
     {
         if (_wireStart is null) return;
 
@@ -548,12 +400,12 @@ public class CircuitCanvas : Control
         var path = new List<Point> { new(anchors[0].X, anchors[0].Y) };
         for (var i = 1; i < anchors.Count; i++)
         {
-            foreach (var elbow in OrthogonalElbow(anchors[i - 1], anchors[i]))
+            foreach (var elbow in CircuitRenderer.OrthogonalElbow(anchors[i - 1], anchors[i]))
                 path.Add(new Point(elbow.X, elbow.Y));
             path.Add(new Point(anchors[i].X, anchors[i].Y));
         }
 
-        context.DrawGeometry(null, pen, new PolylineGeometry(path, false));
+        context.DrawGeometry(null, pen, SymbolPath.Polyline(path, false));
     }
 
     // ---- hit testing -----------------------------------------------------
@@ -645,7 +497,7 @@ public class CircuitCanvas : Control
         foreach (var wire in circuit.Wires)
         {
             if (wire.SourceTerminal is null || wire.TargetTerminal is null) continue;
-            var path = BuildWirePath(wire).ToList();
+            var path = CircuitRenderer.BuildWirePath(wire).ToList();
             for (var i = 1; i < path.Count; i++)
                 if (DistanceToSegment(world, path[i - 1], path[i]) <= tolerance)
                     return wire;

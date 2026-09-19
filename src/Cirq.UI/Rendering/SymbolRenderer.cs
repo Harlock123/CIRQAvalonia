@@ -21,7 +21,7 @@ namespace Cirq.UI.Rendering;
 /// </summary>
 public static class SymbolRenderer
 {
-    public static void Draw(DrawingContext context, CircuitComponent component, double zoom, bool isSelected)
+    public static void Draw(ISymbolCanvas context, CircuitComponent component, double zoom, bool isSelected)
     {
         var stroke = isSelected ? CanvasTheme.SelectionBrush : CanvasTheme.SymbolBrush;
         var pen = CanvasTheme.Pen(stroke, 1.8, zoom);
@@ -99,7 +99,7 @@ public static class SymbolRenderer
 
     // ---- passives --------------------------------------------------------
 
-    private static void DrawResistor(DrawingContext context, IPen pen)
+    private static void DrawResistor(ISymbolCanvas context, IPen pen)
     {
         // Leads in to the zigzag body.
         context.DrawLine(pen, new Point(-30, 0), new Point(-18, 0));
@@ -113,7 +113,7 @@ public static class SymbolRenderer
         }
         points.Add(new Point(18, 0));
 
-        context.DrawGeometry(null, pen, new PolylineGeometry(points, false));
+        context.DrawGeometry(null, pen, SymbolPath.Polyline(points, false));
     }
 
     /// <summary>
@@ -122,7 +122,7 @@ public static class SymbolRenderer
     /// wrong way round is the mistake the symbol exists to prevent.
     /// </summary>
     private static void DrawElectrolytic(
-        DrawingContext context, IPen pen, double zoom, ElectrolyticCapacitor capacitor)
+        ISymbolCanvas context, IPen pen, double zoom, ElectrolyticCapacitor capacitor)
     {
         context.DrawLine(pen, new Point(-30, 0), new Point(-4, 0));
         context.DrawLine(pen, new Point(6, 0), new Point(30, 0));
@@ -132,7 +132,7 @@ public static class SymbolRenderer
 
         // Negative plate: the curve, bowed towards the positive plate so the pair reads -] (-.
         // Its vertex sits where the lead meets it, at x = 6, and the ends fall away to 10.5.
-        var curve = new StreamGeometry();
+        var curve = new SymbolPath();
         using (var ctx = curve.Open())
         {
             ctx.BeginFigure(new Point(10.5, -12), false);
@@ -158,7 +158,7 @@ public static class SymbolRenderer
     /// a temperature-dependent part. The stroke warms in colour as the bead does.
     /// </summary>
     private static void DrawThermistor(
-        DrawingContext context, IPen pen, double zoom, Thermistor thermistor)
+        ISymbolCanvas context, IPen pen, double zoom, Thermistor thermistor)
     {
         context.DrawLine(pen, new Point(-30, 0), new Point(-16, 0));
         context.DrawLine(pen, new Point(16, 0), new Point(30, 0));
@@ -183,13 +183,13 @@ public static class SymbolRenderer
     /// actually making a noise and a warning ring when it is being driven with something that
     /// will never make it sound.
     /// </summary>
-    private static void DrawBuzzer(DrawingContext context, IPen pen, double zoom, Buzzer buzzer)
+    private static void DrawBuzzer(ISymbolCanvas context, IPen pen, double zoom, Buzzer buzzer)
     {
         context.DrawLine(pen, new Point(-30, 0), new Point(-14, 0));
         context.DrawLine(pen, new Point(14, 0), new Point(30, 0));
 
         // The sounder body: a half-round shell on its side.
-        var body = new StreamGeometry();
+        var body = new SymbolPath();
         using (var ctx = body.Open())
         {
             ctx.BeginFigure(new Point(-14, -14), true);
@@ -205,7 +205,7 @@ public static class SymbolRenderer
             var wave = CanvasTheme.Pen(CanvasTheme.ValueBrush, 1.3, zoom);
             foreach (var radius in new[] { 8.0, 14.0 })
             {
-                var arc = new StreamGeometry();
+                var arc = new SymbolPath();
                 using (var ctx = arc.Open())
                 {
                     ctx.BeginFigure(new Point(16, -radius), false);
@@ -227,7 +227,7 @@ public static class SymbolRenderer
     /// <summary>
     /// A motor: the conventional circle and M, ringed when it is being stalled.
     /// </summary>
-    private static void DrawMotor(DrawingContext context, IPen pen, double zoom, DcMotor motor)
+    private static void DrawMotor(ISymbolCanvas context, IPen pen, double zoom, DcMotor motor)
     {
         context.DrawLine(pen, new Point(-30, 0), new Point(-18, 0));
         context.DrawLine(pen, new Point(18, 0), new Point(30, 0));
@@ -246,7 +246,7 @@ public static class SymbolRenderer
     /// A light-dependent resistor: the resistor body inside a circle, with arrows for the light
     /// falling on it. They point inwards — a cell absorbs light, unlike an LED which emits it.
     /// </summary>
-    private static void DrawLdr(DrawingContext context, IPen pen, double zoom, LightDependentResistor ldr)
+    private static void DrawLdr(ISymbolCanvas context, IPen pen, double zoom, LightDependentResistor ldr)
     {
         context.DrawLine(pen, new Point(-30, 0), new Point(-20, 0));
         context.DrawLine(pen, new Point(20, 0), new Point(30, 0));
@@ -263,7 +263,7 @@ public static class SymbolRenderer
             var head = new Point(-14 + offset, -12);
             context.DrawLine(ray, tail, head);
 
-            var barb = new StreamGeometry();
+            var barb = new SymbolPath();
             using (var ctx = barb.Open())
             {
                 ctx.BeginFigure(head, true);
@@ -279,7 +279,7 @@ public static class SymbolRenderer
     /// A relay: the coil as a boxed inductor on the left, the changeover contact on the right,
     /// with the armature drawn against whichever throw is currently made.
     /// </summary>
-    private static void DrawRelay(DrawingContext context, IPen pen, double zoom, Relay relay)
+    private static void DrawRelay(ISymbolCanvas context, IPen pen, double zoom, Relay relay)
     {
         // Coil.
         context.DrawLine(pen, new Point(-40, -20), new Point(-26, -20));
@@ -309,7 +309,7 @@ public static class SymbolRenderer
     }
 
     /// <summary>A fuse: the element in its holder, drawn broken once it has blown.</summary>
-    private static void DrawFuse(DrawingContext context, IPen pen, double zoom, Fuse fuse)
+    private static void DrawFuse(ISymbolCanvas context, IPen pen, double zoom, Fuse fuse)
     {
         context.DrawLine(pen, new Point(-30, 0), new Point(-18, 0));
         context.DrawLine(pen, new Point(18, 0), new Point(30, 0));
@@ -334,7 +334,7 @@ public static class SymbolRenderer
     /// An optocoupler: the emitter and the detector in one package, with the barrier between them
     /// drawn as the dashed line it electrically is.
     /// </summary>
-    private static void DrawOptocoupler(DrawingContext context, IPen pen, double zoom, Optocoupler opto)
+    private static void DrawOptocoupler(ISymbolCanvas context, IPen pen, double zoom, Optocoupler opto)
     {
         var body = new Rect(-26, -30, 52, 60);
         context.DrawRectangle(CanvasTheme.SymbolFill, pen, new RoundedRect(body, 3));
@@ -352,7 +352,7 @@ public static class SymbolRenderer
 
         // Emitter: a diode pointing down the input side.
         context.DrawLine(pen, new Point(-18, -20), new Point(-18, 20));
-        var led = new StreamGeometry();
+        var led = new SymbolPath();
         using (var ctx = led.Open())
         {
             ctx.BeginFigure(new Point(-24, -8), true);
@@ -388,13 +388,13 @@ public static class SymbolRenderer
     /// that it stays on after the thing that triggered it has gone.
     /// </summary>
     private static void DrawThyristor(
-        DrawingContext context, IPen pen, double zoom, CircuitComponent component,
+        ISymbolCanvas context, IPen pen, double zoom, CircuitComponent component,
         bool latched, bool hasGate)
     {
         context.DrawLine(pen, new Point(-40, 0), new Point(-12, 0));
         context.DrawLine(pen, new Point(12, 0), new Point(40, 0));
 
-        var body = new StreamGeometry();
+        var body = new SymbolPath();
         using (var ctx = body.Open())
         {
             ctx.BeginFigure(new Point(-12, -14), true);
@@ -413,7 +413,7 @@ public static class SymbolRenderer
     }
 
     /// <summary>A triac: two thyristors back to back, so it is drawn symmetrically.</summary>
-    private static void DrawTriac(DrawingContext context, IPen pen, double zoom, Triac triac)
+    private static void DrawTriac(ISymbolCanvas context, IPen pen, double zoom, Triac triac)
     {
         context.DrawLine(pen, new Point(-40, 0), new Point(-6, 0));
         context.DrawLine(pen, new Point(6, 0), new Point(40, 0));
@@ -422,7 +422,7 @@ public static class SymbolRenderer
 
         foreach (var sign in new[] { -1.0, 1.0 })
         {
-            var arm = new StreamGeometry();
+            var arm = new SymbolPath();
             using (var ctx = arm.Open())
             {
                 ctx.BeginFigure(new Point(sign * 6, -14), true);
@@ -437,7 +437,7 @@ public static class SymbolRenderer
     }
 
     /// <summary>A diac: the triac's symbol without a gate, because it has none.</summary>
-    private static void DrawDiac(DrawingContext context, IPen pen, double zoom, Diac diac)
+    private static void DrawDiac(ISymbolCanvas context, IPen pen, double zoom, Diac diac)
     {
         context.DrawLine(pen, new Point(-30, 0), new Point(-6, 0));
         context.DrawLine(pen, new Point(6, 0), new Point(30, 0));
@@ -446,7 +446,7 @@ public static class SymbolRenderer
 
         foreach (var sign in new[] { -1.0, 1.0 })
         {
-            var arm = new StreamGeometry();
+            var arm = new SymbolPath();
             using (var ctx = arm.Open())
             {
                 ctx.BeginFigure(new Point(sign * 6, -13), true);
@@ -472,7 +472,7 @@ public static class SymbolRenderer
     /// anything.
     /// </summary>
     private static void DrawUltrasonicRanger(
-        DrawingContext context, IPen pen, double zoom, UltrasonicRanger sonar)
+        ISymbolCanvas context, IPen pen, double zoom, UltrasonicRanger sonar)
     {
         context.DrawRectangle(CanvasTheme.SymbolFill, pen, new RoundedRect(new Rect(-30, -40, 92, 80), 4));
 
@@ -509,7 +509,7 @@ public static class SymbolRenderer
             new Point(18, 24), 8, zoom, CanvasTheme.LabelBrush);
     }
 
-    private static void DrawBattery(DrawingContext context, IPen pen, double zoom, Battery battery)
+    private static void DrawBattery(ISymbolCanvas context, IPen pen, double zoom, Battery battery)
     {
         context.DrawLine(pen, new Point(-30, 0), new Point(-14, 0));
         context.DrawLine(pen, new Point(30, 0), new Point(14, 0));
@@ -535,7 +535,7 @@ public static class SymbolRenderer
     /// A TVS: two zeners back to back, which is what a bidirectional part is. The bent cathode
     /// bars are the zener marking, and facing them away from each other says it clamps both ways.
     /// </summary>
-    private static void DrawTvs(DrawingContext context, IPen pen, double zoom, TransientSuppressor tvs)
+    private static void DrawTvs(ISymbolCanvas context, IPen pen, double zoom, TransientSuppressor tvs)
     {
         context.DrawLine(pen, new Point(-30, 0), new Point(-16, 0));
         context.DrawLine(pen, new Point(30, 0), new Point(16, 0));
@@ -547,7 +547,7 @@ public static class SymbolRenderer
             var tip = sign * 2;
             var back = sign * 16;
 
-            var body = new StreamGeometry();
+            var body = new SymbolPath();
             using (var ctx = body.Open())
             {
                 ctx.BeginFigure(new Point(back, -12), true);
@@ -565,7 +565,7 @@ public static class SymbolRenderer
     }
 
     /// <summary>A varistor: a resistor body with the diagonal that marks a voltage-dependent part.</summary>
-    private static void DrawVaristor(DrawingContext context, IPen pen, double zoom, Varistor varistor)
+    private static void DrawVaristor(ISymbolCanvas context, IPen pen, double zoom, Varistor varistor)
     {
         context.DrawLine(pen, new Point(-30, 0), new Point(-18, 0));
         context.DrawLine(pen, new Point(30, 0), new Point(18, 0));
@@ -581,14 +581,14 @@ public static class SymbolRenderer
     }
 
     /// <summary>A loudspeaker: the coil box and the cone opening out from it.</summary>
-    private static void DrawSpeaker(DrawingContext context, IPen pen, double zoom, Speaker speaker)
+    private static void DrawSpeaker(ISymbolCanvas context, IPen pen, double zoom, Speaker speaker)
     {
         context.DrawLine(pen, new Point(-30, -14), new Point(-14, -14));
         context.DrawLine(pen, new Point(-30, 14), new Point(-14, 14));
 
         context.DrawRectangle(CanvasTheme.SymbolFill, pen, new Rect(-14, -14, 12, 28));
 
-        var cone = new StreamGeometry();
+        var cone = new SymbolPath();
         using (var ctx = cone.Open())
         {
             ctx.BeginFigure(new Point(-2, -14), true);
@@ -606,7 +606,7 @@ public static class SymbolRenderer
 
             foreach (var r in new[] { 24.0, 32.0 })
             {
-                var arc = new StreamGeometry();
+                var arc = new SymbolPath();
                 using (var ctx = arc.Open())
                 {
                     ctx.BeginFigure(new Point(20 + (r * 0.5), -r * 0.7), false);
@@ -630,9 +630,9 @@ public static class SymbolRenderer
     /// rather than left to a feedback network that is not there.
     /// </summary>
     private static void DrawFixedGainAmplifier(
-        DrawingContext context, IPen pen, double zoom, FixedGainAmplifier amp)
+        ISymbolCanvas context, IPen pen, double zoom, FixedGainAmplifier amp)
     {
-        var body = new StreamGeometry();
+        var body = new SymbolPath();
         using (var ctx = body.Open())
         {
             ctx.BeginFigure(new Point(-34, -34), true);
@@ -663,7 +663,7 @@ public static class SymbolRenderer
     /// <summary>A crystal: the quartz blank between its two electrodes.</summary>
     /// <summary>A thermocouple: two dissimilar wires meeting at a junction bead.</summary>
     private static void DrawThermocouple(
-        DrawingContext context, IPen pen, double zoom, Thermocouple tc)
+        ISymbolCanvas context, IPen pen, double zoom, Thermocouple tc)
     {
         // The two legs, drawn meeting at a point: the junction is the whole device.
         context.DrawLine(pen, new Point(-30, -12), new Point(10, 0));
@@ -685,7 +685,7 @@ public static class SymbolRenderer
     }
 
     /// <summary>A load cell: the bridge drawn as the diamond of four gauges it is.</summary>
-    private static void DrawLoadCell(DrawingContext context, IPen pen, double zoom, LoadCell cell)
+    private static void DrawLoadCell(ISymbolCanvas context, IPen pen, double zoom, LoadCell cell)
     {
         context.DrawLine(pen, new Point(-40, -30), new Point(-22, -18));
         context.DrawLine(pen, new Point(-40, 30), new Point(-22, 18));
@@ -693,7 +693,7 @@ public static class SymbolRenderer
         context.DrawLine(pen, new Point(40, 30), new Point(22, 18));
 
         // The diamond: four arms meeting at the four pins.
-        var bridge = new PolylineGeometry(
+        var bridge = SymbolPath.Polyline(
             [new Point(0, -26), new Point(26, 0), new Point(0, 26), new Point(-26, 0)], true);
 
         context.DrawGeometry(CanvasTheme.SymbolFill, pen, bridge);
@@ -712,7 +712,7 @@ public static class SymbolRenderer
 
     /// <summary>An encoder: the shaft, with its two contacts shown open or closed.</summary>
     private static void DrawRotaryEncoder(
-        DrawingContext context, IPen pen, double zoom, RotaryEncoder encoder)
+        ISymbolCanvas context, IPen pen, double zoom, RotaryEncoder encoder)
     {
         context.DrawEllipse(CanvasTheme.SymbolFill, pen, new Point(0, 0), 22, 22);
         context.DrawLine(pen, new Point(-40, 0), new Point(-22, 0));
@@ -743,7 +743,7 @@ public static class SymbolRenderer
     /// chopping rather than having to infer it from the scope.
     /// </summary>
     private static void DrawSwitchingRegulator(
-        DrawingContext context, IPen pen, double zoom, SwitchingRegulator regulator)
+        ISymbolCanvas context, IPen pen, double zoom, SwitchingRegulator regulator)
     {
         context.DrawRectangle(CanvasTheme.SymbolFill, pen, new Rect(-30, -52, 60, 104));
 
@@ -769,7 +769,7 @@ public static class SymbolRenderer
     }
 
     private static void DrawChargePump(
-        DrawingContext context, IPen pen, double zoom, ChargePump pump)
+        ISymbolCanvas context, IPen pen, double zoom, ChargePump pump)
     {
         context.DrawRectangle(CanvasTheme.SymbolFill, pen, new Rect(-26, -38, 52, 76));
 
@@ -804,7 +804,7 @@ public static class SymbolRenderer
     /// as a starburst with the leads radiating from a stamp in the middle.
     /// </summary>
     private static void DrawPackage(
-        DrawingContext context, IPen pen, double zoom, CircuitComponent component, string label)
+        ISymbolCanvas context, IPen pen, double zoom, CircuitComponent component, string label)
     {
         // Wide enough that the pin names sit near the edges without running into the part
         // name in the middle, which they did at the first width I tried.
@@ -838,7 +838,7 @@ public static class SymbolRenderer
     }
 
     private static void DrawCharacterLcd(
-        DrawingContext context, IPen pen, double zoom, CharacterLcd lcd)
+        ISymbolCanvas context, IPen pen, double zoom, CharacterLcd lcd)
     {
         var body = new Rect(-110, -46, 220, 92);
         context.DrawRectangle(CanvasTheme.SymbolFill, pen, new RoundedRect(body, 4));
@@ -870,7 +870,7 @@ public static class SymbolRenderer
         }
     }
 
-    private static void DrawDipSwitch(DrawingContext context, IPen pen, double zoom, DipSwitch dip)
+    private static void DrawDipSwitch(ISymbolCanvas context, IPen pen, double zoom, DipSwitch dip)
     {
         context.DrawRectangle(CanvasTheme.SymbolFill, pen, new Rect(-26, -80, 52, 160));
 
@@ -892,13 +892,13 @@ public static class SymbolRenderer
     }
 
     /// <summary>A solar cell: the diode it is, with light arriving at it.</summary>
-    private static void DrawSolarCell(DrawingContext context, IPen pen, double zoom, SolarCell pv)
+    private static void DrawSolarCell(ISymbolCanvas context, IPen pen, double zoom, SolarCell pv)
     {
         context.DrawLine(pen, new Point(-30, 0), new Point(-6, 0));
         context.DrawLine(pen, new Point(30, 0), new Point(8, 0));
 
         // The junction, drawn as the diode a cell actually is.
-        var body = new StreamGeometry();
+        var body = new SymbolPath();
         using (var ctx = body.Open())
         {
             ctx.BeginFigure(new Point(-6, -16), true);
@@ -924,7 +924,7 @@ public static class SymbolRenderer
 
     /// <summary>An oscillator can: the package with the wave it produces inside it.</summary>
     private static void DrawOscillatorModule(
-        DrawingContext context, IPen pen, double zoom, OscillatorModule osc)
+        ISymbolCanvas context, IPen pen, double zoom, OscillatorModule osc)
     {
         context.DrawRectangle(CanvasTheme.SymbolFill, pen, new RoundedRect(new Rect(-28, -30, 56, 60), 4));
 
@@ -939,7 +939,7 @@ public static class SymbolRenderer
         // A square wave inside, lit while it is actually running.
         var wave = CanvasTheme.Pen(osc.IsRunning ? CanvasTheme.ValueBrush : CanvasTheme.SymbolBrush, 1.6, zoom);
 
-        var path = new PolylineGeometry(
+        var path = SymbolPath.Polyline(
         [
             new Point(-16, 6), new Point(-16, -8), new Point(-6, -8), new Point(-6, 6),
             new Point(6, 6), new Point(6, -8), new Point(16, -8), new Point(16, 6),
@@ -948,7 +948,7 @@ public static class SymbolRenderer
         context.DrawGeometry(null, wave, path);
     }
 
-    private static void DrawCrystal(DrawingContext context, IPen pen)
+    private static void DrawCrystal(ISymbolCanvas context, IPen pen)
     {
         context.DrawLine(pen, new Point(-30, 0), new Point(-12, 0));
         context.DrawLine(pen, new Point(30, 0), new Point(12, 0));
@@ -962,7 +962,7 @@ public static class SymbolRenderer
 
     /// <summary>An electret capsule: the can, with the diaphragm drawn across it.</summary>
     private static void DrawMicrophone(
-        DrawingContext context, IPen pen, double zoom, Microphone mic)
+        ISymbolCanvas context, IPen pen, double zoom, Microphone mic)
     {
         context.DrawLine(pen, new Point(-30, 0), new Point(-16, 0));
         context.DrawLine(pen, new Point(30, 0), new Point(16, 0));
@@ -977,7 +977,7 @@ public static class SymbolRenderer
 
             foreach (var r in new[] { 24.0, 32.0 })
             {
-                var arc = new StreamGeometry();
+                var arc = new SymbolPath();
                 using (var ctx = arc.Open())
                 {
                     ctx.BeginFigure(new Point(-(r * 0.5), -r * 0.7), false);
@@ -997,7 +997,7 @@ public static class SymbolRenderer
     }
 
     /// <summary>A servo: the case, with the output horn drawn where the shaft actually is.</summary>
-    private static void DrawServo(DrawingContext context, IPen pen, double zoom, Servo servo)
+    private static void DrawServo(ISymbolCanvas context, IPen pen, double zoom, Servo servo)
     {
         context.DrawRectangle(CanvasTheme.SymbolFill, pen, new Rect(-30, -30, 60, 60));
 
@@ -1023,7 +1023,7 @@ public static class SymbolRenderer
 
     /// <summary>A stepper: the motor body with its four windings around the rotor.</summary>
     private static void DrawStepper(
-        DrawingContext context, IPen pen, double zoom, StepperMotor stepper)
+        ISymbolCanvas context, IPen pen, double zoom, StepperMotor stepper)
     {
         context.DrawEllipse(CanvasTheme.SymbolFill, pen, new Point(0, 0), 30, 30);
 
@@ -1054,7 +1054,7 @@ public static class SymbolRenderer
         }
     }
 
-    private static void DrawJfet(DrawingContext context, IPen pen, double zoom, JunctionFet jfet)
+    private static void DrawJfet(ISymbolCanvas context, IPen pen, double zoom, JunctionFet jfet)
     {
         context.DrawEllipse(CanvasTheme.SymbolFill, pen, new Point(0, 0), 28, 28);
 
@@ -1092,13 +1092,13 @@ public static class SymbolRenderer
     /// below, and the reference coming in from the side to the point where it is compared.
     /// </summary>
     private static void DrawShuntReference(
-        DrawingContext context, IPen pen, double zoom, ShuntReference shunt)
+        ISymbolCanvas context, IPen pen, double zoom, ShuntReference shunt)
     {
         context.DrawLine(pen, new Point(0, -40), new Point(0, -10));
         context.DrawLine(pen, new Point(0, 40), new Point(0, 16));
 
         // The triangle points from anode up to cathode, as a diode's does.
-        var body = new StreamGeometry();
+        var body = new SymbolPath();
         using (var ctx = body.Open())
         {
             ctx.BeginFigure(new Point(-13, 16), true);
@@ -1115,7 +1115,7 @@ public static class SymbolRenderer
 
         // Reference lead in from the right, arrow pointing at the body.
         context.DrawLine(pen, new Point(40, 0), new Point(12, 4));
-        var head = new StreamGeometry();
+        var head = new SymbolPath();
         using (var ctx = head.Open())
         {
             ctx.BeginFigure(new Point(12, 4), true);
@@ -1137,7 +1137,7 @@ public static class SymbolRenderer
     /// bottom, and one diode drawn inside pointing at the positive corner so the direction is
     /// obvious.
     /// </summary>
-    private static void DrawBridgeRectifier(DrawingContext context, IPen pen, double zoom)
+    private static void DrawBridgeRectifier(ISymbolCanvas context, IPen pen, double zoom)
     {
         const double r = 26;
 
@@ -1152,7 +1152,7 @@ public static class SymbolRenderer
             context.DrawLine(pen, from, to);
         }
 
-        var body = new StreamGeometry();
+        var body = new SymbolPath();
         using (var ctx = body.Open())
         {
             ctx.BeginFigure(new Point(0, -r), true);
@@ -1164,7 +1164,7 @@ public static class SymbolRenderer
         context.DrawGeometry(CanvasTheme.SymbolFill, pen, body);
 
         // One arm shown: a triangle and bar pointing at the + corner.
-        var arrow = new StreamGeometry();
+        var arrow = new SymbolPath();
         using (var ctx = arrow.Open())
         {
             ctx.BeginFigure(new Point(-8, 5), true);
@@ -1182,7 +1182,7 @@ public static class SymbolRenderer
         }
     }
 
-    private static void DrawCapacitor(DrawingContext context, IPen pen)
+    private static void DrawCapacitor(ISymbolCanvas context, IPen pen)
     {
         context.DrawLine(pen, new Point(-30, 0), new Point(-4, 0));
         context.DrawLine(pen, new Point(4, 0), new Point(30, 0));
@@ -1190,12 +1190,12 @@ public static class SymbolRenderer
         context.DrawLine(pen, new Point(4, -12), new Point(4, 12));
     }
 
-    private static void DrawInductor(DrawingContext context, IPen pen)
+    private static void DrawInductor(ISymbolCanvas context, IPen pen)
     {
         context.DrawLine(pen, new Point(-30, 0), new Point(-18, 0));
         context.DrawLine(pen, new Point(18, 0), new Point(30, 0));
 
-        var geometry = new StreamGeometry();
+        var geometry = new SymbolPath();
         using (var ctx = geometry.Open())
         {
             ctx.BeginFigure(new Point(-18, 0), false);
@@ -1210,7 +1210,7 @@ public static class SymbolRenderer
         context.DrawGeometry(null, pen, geometry);
     }
 
-    private static void DrawTransformer(DrawingContext context, IPen pen, IPen thin)
+    private static void DrawTransformer(ISymbolCanvas context, IPen pen, IPen thin)
     {
         DrawWinding(context, pen, -14, -20, 20);
         DrawWinding(context, pen, 14, -20, 20);
@@ -1225,9 +1225,9 @@ public static class SymbolRenderer
         context.DrawLine(pen, new Point(30, 20), new Point(14, 20));
     }
 
-    private static void DrawWinding(DrawingContext context, IPen pen, double x, double top, double height)
+    private static void DrawWinding(ISymbolCanvas context, IPen pen, double x, double top, double height)
     {
-        var geometry = new StreamGeometry();
+        var geometry = new SymbolPath();
         using (var ctx = geometry.Open())
         {
             ctx.BeginFigure(new Point(x, top), false);
@@ -1247,7 +1247,7 @@ public static class SymbolRenderer
     /// A centre-tapped transformer: one primary against a secondary drawn as the two windings it
     /// physically is, with the tap coming off the joint between them.
     /// </summary>
-    private static void DrawCentreTappedTransformer(DrawingContext context, IPen pen, IPen thin)
+    private static void DrawCentreTappedTransformer(ISymbolCanvas context, IPen pen, IPen thin)
     {
         DrawWinding(context, pen, -14, -24, 48);
 
@@ -1270,7 +1270,7 @@ public static class SymbolRenderer
         context.DrawEllipse(pen.Brush, pen, new Point(14, 0), 2.5, 2.5);
     }
 
-    private static void DrawPotentiometer(DrawingContext context, IPen pen)
+    private static void DrawPotentiometer(ISymbolCanvas context, IPen pen)
     {
         context.DrawLine(pen, new Point(-30, 20), new Point(-18, 20));
         context.DrawLine(pen, new Point(30, 20), new Point(18, 20));
@@ -1278,13 +1278,13 @@ public static class SymbolRenderer
 
         // Wiper arrow coming down onto the track.
         context.DrawLine(pen, new Point(0, -30), new Point(0, -6));
-        var arrow = new PolylineGeometry([new Point(-5, -6), new Point(5, -6), new Point(0, 6)], true);
+        var arrow = SymbolPath.Polyline([new Point(-5, -6), new Point(5, -6), new Point(0, 6)], true);
         context.DrawGeometry(pen.Brush, pen, arrow);
     }
 
     // ---- sources ---------------------------------------------------------
 
-    private static void DrawGround(DrawingContext context, IPen pen)
+    private static void DrawGround(ISymbolCanvas context, IPen pen)
     {
         context.DrawLine(pen, new Point(0, -20), new Point(0, -4));
         context.DrawLine(pen, new Point(-14, -4), new Point(14, -4));
@@ -1292,7 +1292,7 @@ public static class SymbolRenderer
         context.DrawLine(pen, new Point(-4, 8), new Point(4, 8));
     }
 
-    private static void DrawVoltageSource(DrawingContext context, IPen pen, double zoom)
+    private static void DrawVoltageSource(ISymbolCanvas context, IPen pen, double zoom)
     {
         context.DrawLine(pen, new Point(-30, 0), new Point(-18, 0));
         context.DrawLine(pen, new Point(18, 0), new Point(30, 0));
@@ -1304,18 +1304,18 @@ public static class SymbolRenderer
         context.DrawLine(pen, new Point(5, 0), new Point(11, 0));
     }
 
-    private static void DrawCurrentSource(DrawingContext context, IPen pen)
+    private static void DrawCurrentSource(ISymbolCanvas context, IPen pen)
     {
         context.DrawLine(pen, new Point(-30, 0), new Point(-18, 0));
         context.DrawLine(pen, new Point(18, 0), new Point(30, 0));
         context.DrawEllipse(CanvasTheme.SymbolFill, pen, new Point(0, 0), 18, 18);
 
         context.DrawLine(pen, new Point(-9, 0), new Point(9, 0));
-        var head = new PolylineGeometry([new Point(9, 0), new Point(2, -5), new Point(2, 5)], true);
+        var head = SymbolPath.Polyline([new Point(9, 0), new Point(2, -5), new Point(2, 5)], true);
         context.DrawGeometry(pen.Brush, pen, head);
     }
 
-    private static void DrawFunctionGenerator(DrawingContext context, IPen pen, FunctionGenerator generator)
+    private static void DrawFunctionGenerator(ISymbolCanvas context, IPen pen, FunctionGenerator generator)
     {
         context.DrawLine(pen, new Point(-30, 0), new Point(-18, 0));
         context.DrawLine(pen, new Point(18, 0), new Point(30, 0));
@@ -1337,22 +1337,22 @@ public static class SymbolRenderer
             points.Add(new Point(x, y));
         }
 
-        context.DrawGeometry(null, pen, new PolylineGeometry(points, false));
+        context.DrawGeometry(null, pen, SymbolPath.Polyline(points, false));
     }
 
     // ---- semiconductors --------------------------------------------------
 
-    private static void DrawDiode(DrawingContext context, IPen pen)
+    private static void DrawDiode(ISymbolCanvas context, IPen pen)
     {
         context.DrawLine(pen, new Point(-30, 0), new Point(-8, 0));
         context.DrawLine(pen, new Point(8, 0), new Point(30, 0));
 
-        var triangle = new PolylineGeometry([new Point(-8, -11), new Point(8, 0), new Point(-8, 11)], true);
+        var triangle = SymbolPath.Polyline([new Point(-8, -11), new Point(8, 0), new Point(-8, 11)], true);
         context.DrawGeometry(pen.Brush, pen, triangle);
         context.DrawLine(pen, new Point(8, -11), new Point(8, 11));
     }
 
-    private static void DrawLed(DrawingContext context, IPen pen, Led led)
+    private static void DrawLed(ISymbolCanvas context, IPen pen, Led led)
     {
         DrawDiode(context, pen);
 
@@ -1374,7 +1374,7 @@ public static class SymbolRenderer
         }
     }
 
-    private static void DrawRegulator(DrawingContext context, IPen pen, double zoom, VoltageRegulator regulator)
+    private static void DrawRegulator(ISymbolCanvas context, IPen pen, double zoom, VoltageRegulator regulator)
     {
         context.DrawLine(pen, new Point(-40, 0), new Point(-26, 0));
         context.DrawLine(pen, new Point(26, 0), new Point(40, 0));
@@ -1384,7 +1384,7 @@ public static class SymbolRenderer
         DrawCenteredText(context, regulator.Model.Name, new Point(0, 0), 9, zoom, CanvasTheme.LabelBrush);
     }
 
-    private static void DrawOpAmp(DrawingContext context, IPen pen, double zoom)
+    private static void DrawOpAmp(ISymbolCanvas context, IPen pen, double zoom)
     {
         context.DrawLine(pen, new Point(-40, 20), new Point(-26, 20));
         context.DrawLine(pen, new Point(-40, -20), new Point(-26, -20));
@@ -1392,7 +1392,7 @@ public static class SymbolRenderer
         context.DrawLine(pen, new Point(0, -30), new Point(0, -18));
         context.DrawLine(pen, new Point(0, 30), new Point(0, 18));
 
-        var body = new PolylineGeometry([new Point(-26, -30), new Point(26, 0), new Point(-26, 30)], true);
+        var body = SymbolPath.Polyline([new Point(-26, -30), new Point(26, 0), new Point(-26, 30)], true);
         context.DrawGeometry(CanvasTheme.SymbolFill, pen, body);
 
         // Input polarity marks: non-inverting is the lower pin.
@@ -1403,7 +1403,7 @@ public static class SymbolRenderer
 
     // ---- transistors -----------------------------------------------------
 
-    private static void DrawBipolar(DrawingContext context, IPen pen, BipolarTransistor bjt)
+    private static void DrawBipolar(ISymbolCanvas context, IPen pen, BipolarTransistor bjt)
     {
         context.DrawEllipse(CanvasTheme.SymbolFill, pen, new Point(0, 0), 28, 28);
 
@@ -1424,7 +1424,7 @@ public static class SymbolRenderer
             to: bjt.IsNpn ? new Point(16, 26) : new Point(-8, 10));
     }
 
-    private static void DrawMosfet(DrawingContext context, IPen pen, Mosfet mosfet)
+    private static void DrawMosfet(ISymbolCanvas context, IPen pen, Mosfet mosfet)
     {
         context.DrawEllipse(CanvasTheme.SymbolFill, pen, new Point(0, 0), 28, 28);
 
@@ -1454,7 +1454,7 @@ public static class SymbolRenderer
     }
 
     /// <summary>Filled triangular arrow head at the <paramref name="to"/> end of a segment.</summary>
-    private static void DrawArrowHead(DrawingContext context, IPen pen, Point from, Point to)
+    private static void DrawArrowHead(ISymbolCanvas context, IPen pen, Point from, Point to)
     {
         var dx = to.X - from.X;
         var dy = to.Y - from.Y;
@@ -1469,7 +1469,7 @@ public static class SymbolRenderer
         var baseX = to.X - ux * size;
         var baseY = to.Y - uy * size;
 
-        var head = new PolylineGeometry(
+        var head = SymbolPath.Polyline(
         [
             new Point(to.X, to.Y),
             new Point(baseX - uy * halfWidth, baseY + ux * halfWidth),
@@ -1481,7 +1481,7 @@ public static class SymbolRenderer
 
     // ---- switches --------------------------------------------------------
 
-    private static void DrawToggleSwitch(DrawingContext context, IPen pen, ToggleSwitch sw)
+    private static void DrawToggleSwitch(ISymbolCanvas context, IPen pen, ToggleSwitch sw)
     {
         context.DrawLine(pen, new Point(-30, 0), new Point(-14, 0));
         context.DrawLine(pen, new Point(14, 0), new Point(30, 0));
@@ -1494,7 +1494,7 @@ public static class SymbolRenderer
         context.DrawLine(pen, new Point(-14, 0), end);
     }
 
-    private static void DrawPushButton(DrawingContext context, IPen pen, PushButton button)
+    private static void DrawPushButton(ISymbolCanvas context, IPen pen, PushButton button)
     {
         context.DrawLine(pen, new Point(-30, 0), new Point(-14, 0));
         context.DrawLine(pen, new Point(14, 0), new Point(30, 0));
@@ -1517,7 +1517,7 @@ public static class SymbolRenderer
         }
     }
 
-    private static void DrawSpdtSwitch(DrawingContext context, IPen pen, SpdtSwitch sw)
+    private static void DrawSpdtSwitch(ISymbolCanvas context, IPen pen, SpdtSwitch sw)
     {
         context.DrawLine(pen, new Point(-30, 0), new Point(-14, 0));
         context.DrawLine(pen, new Point(30, -20), new Point(16, -20));
@@ -1533,7 +1533,7 @@ public static class SymbolRenderer
 
     // ---- comparator ------------------------------------------------------
 
-    private static void DrawComparator(DrawingContext context, IPen pen, double zoom)
+    private static void DrawComparator(ISymbolCanvas context, IPen pen, double zoom)
     {
         context.DrawLine(pen, new Point(-40, 20), new Point(-26, 20));
         context.DrawLine(pen, new Point(-40, -20), new Point(-26, -20));
@@ -1541,7 +1541,7 @@ public static class SymbolRenderer
         context.DrawLine(pen, new Point(0, -30), new Point(0, -18));
         context.DrawLine(pen, new Point(0, 30), new Point(0, 18));
 
-        var body = new PolylineGeometry(
+        var body = SymbolPath.Polyline(
             [new Point(-26, -30), new Point(26, 0), new Point(-26, 30)], true);
         context.DrawGeometry(CanvasTheme.SymbolFill, pen, body);
 
@@ -1551,7 +1551,7 @@ public static class SymbolRenderer
 
         // A step glyph inside the triangle, which is what separates a comparator symbol from an
         // op-amp at a glance.
-        context.DrawGeometry(null, pen, new PolylineGeometry(
+        context.DrawGeometry(null, pen, SymbolPath.Polyline(
         [
             new Point(-12, 8), new Point(-2, 8), new Point(-2, -8), new Point(8, -8),
         ], false));
@@ -1560,7 +1560,7 @@ public static class SymbolRenderer
     // ---- seven-segment display -------------------------------------------
 
     private static void DrawSevenSegment(
-        DrawingContext context, IPen pen, double zoom, SevenSegmentDisplay display)
+        ISymbolCanvas context, IPen pen, double zoom, SevenSegmentDisplay display)
     {
         // Package body and pin legs.
         var body = new Rect(-50, -72, 100, 144);
@@ -1598,12 +1598,12 @@ public static class SymbolRenderer
     }
 
     private static void DrawSegment(
-        DrawingContext context, SevenSegmentDisplay display, int index,
+        ISymbolCanvas context, SevenSegmentDisplay display, int index,
         Point[] shape, Color lit, Color dark)
     {
         var brightness = display.SegmentBrightness[index];
         var brush = new SolidColorBrush(Blend(dark, lit, brightness));
-        context.DrawGeometry(brush, null, new PolylineGeometry(shape, true));
+        context.DrawGeometry(brush, null, SymbolPath.Polyline(shape, true));
     }
 
     /// <summary>Mixes between the unlit and lit colours, with a floor so segments stay visible.</summary>
@@ -1650,14 +1650,14 @@ public static class SymbolRenderer
 
     // ---- packages --------------------------------------------------------
 
-    private static void DrawDip(DrawingContext context, IPen pen, double zoom, int pinCount, string partNumber)
+    private static void DrawDip(ISymbolCanvas context, IPen pen, double zoom, int pinCount, string partNumber)
     {
         var height = DipPackage.BodyHeight(pinCount);
         var body = new Rect(-DipPackage.HalfWidth + 10, -height / 2, (DipPackage.HalfWidth - 10) * 2, height);
         context.DrawRectangle(CanvasTheme.SymbolFill, pen, new RoundedRect(body, 3));
 
         // Pin 1 notch on the top edge.
-        var notch = new StreamGeometry();
+        var notch = new SymbolPath();
         using (var ctx = notch.Open())
         {
             ctx.BeginFigure(new Point(-6, body.Top), false);
@@ -1721,7 +1721,7 @@ public static class SymbolRenderer
     /// inside the body rather than outside it, because the outside is where the wires go and a
     /// forty-pin header leaves no room for both.
     /// </summary>
-    private static void DrawBoard(DrawingContext context, IPen pen, double zoom, DeveloperBoard board)
+    private static void DrawBoard(ISymbolCanvas context, IPen pen, double zoom, DeveloperBoard board)
     {
         var profile = board.Profile;
         var height = BoardPackage.BodyHeight(profile);
@@ -1748,7 +1748,7 @@ public static class SymbolRenderer
     }
 
     private static void DrawPinColumn(
-        DrawingContext context, IPen pen, double zoom, BoardProfile profile,
+        ISymbolCanvas context, IPen pen, double zoom, BoardProfile profile,
         IReadOnlyList<BoardPin> pins, Rect body, bool left)
     {
         for (var i = 0; i < pins.Count; i++)
@@ -1778,25 +1778,20 @@ public static class SymbolRenderer
 
     /// <summary>Draws text butted against a point rather than centred on it, for pin columns.</summary>
     private static void DrawAlignedText(
-        DrawingContext context, string text, Point anchor, double screenSize, double zoom,
+        ISymbolCanvas context, string text, Point anchor, double screenSize, double zoom,
         IBrush brush, bool alignLeft)
     {
-        if (string.IsNullOrEmpty(text)) return;
-
-        var formatted = new FormattedText(
-            text, CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
-            CanvasTheme.LabelTypeface, screenSize, brush);
-
         using (context.PushTransform(
                    Matrix.CreateScale(1 / zoom, 1 / zoom) * Matrix.CreateTranslation(anchor.X, anchor.Y)))
         {
-            context.DrawText(formatted, new Point(alignLeft ? 0 : -formatted.Width, -formatted.Height / 2));
+            context.DrawText(text, default, screenSize, brush,
+                alignLeft ? SymbolTextAlign.Left : SymbolTextAlign.Right);
         }
     }
 
     // ---- logic -----------------------------------------------------------
 
-    private static void DrawLogicGate(DrawingContext context, IPen pen, LogicGate gate)
+    private static void DrawLogicGate(ISymbolCanvas context, IPen pen, LogicGate gate)
     {
         foreach (var terminal in gate.InputTerminals)
             context.DrawLine(pen, new Point(terminal.CanvasOffset.X, terminal.CanvasOffset.Y),
@@ -1817,7 +1812,7 @@ public static class SymbolRenderer
             case GateFunction.Not:
             case GateFunction.Buffer:
                 context.DrawGeometry(CanvasTheme.SymbolFill, pen,
-                    new PolylineGeometry([new Point(-20, -18), new Point(bodyRight, 0), new Point(-20, 18)], true));
+                    SymbolPath.Polyline([new Point(-20, -18), new Point(bodyRight, 0), new Point(-20, 18)], true));
                 break;
             case GateFunction.Xor:
             case GateFunction.Xnor:
@@ -1833,9 +1828,9 @@ public static class SymbolRenderer
             context.DrawEllipse(CanvasTheme.SymbolFill, pen, new Point(bodyRight + 4, 0), 4, 4);
     }
 
-    private static void DrawAndBody(DrawingContext context, IPen pen, double right)
+    private static void DrawAndBody(ISymbolCanvas context, IPen pen, double right)
     {
-        var geometry = new StreamGeometry();
+        var geometry = new SymbolPath();
         using (var ctx = geometry.Open())
         {
             ctx.BeginFigure(new Point(-20, -20), true);
@@ -1847,9 +1842,9 @@ public static class SymbolRenderer
         context.DrawGeometry(CanvasTheme.SymbolFill, pen, geometry);
     }
 
-    private static void DrawOrBody(DrawingContext context, IPen pen, double right, double backX)
+    private static void DrawOrBody(ISymbolCanvas context, IPen pen, double right, double backX)
     {
-        var geometry = new StreamGeometry();
+        var geometry = new SymbolPath();
         using (var ctx = geometry.Open())
         {
             ctx.BeginFigure(new Point(backX, -20), true);
@@ -1861,9 +1856,9 @@ public static class SymbolRenderer
         context.DrawGeometry(CanvasTheme.SymbolFill, pen, geometry);
     }
 
-    private static void DrawOrArc(DrawingContext context, IPen pen, double x)
+    private static void DrawOrArc(ISymbolCanvas context, IPen pen, double x)
     {
-        var geometry = new StreamGeometry();
+        var geometry = new SymbolPath();
         using (var ctx = geometry.Open())
         {
             ctx.BeginFigure(new Point(x, -20), false);
@@ -1873,7 +1868,7 @@ public static class SymbolRenderer
         context.DrawGeometry(null, pen, geometry);
     }
 
-    private static void DrawToggle(DrawingContext context, IPen pen, double zoom, LogicToggle toggle)
+    private static void DrawToggle(ISymbolCanvas context, IPen pen, double zoom, LogicToggle toggle)
     {
         context.DrawLine(pen, new Point(18, 0), new Point(30, 0));
         context.DrawRectangle(CanvasTheme.SymbolFill, pen, new RoundedRect(new Rect(-20, -16, 38, 32), 4));
@@ -1886,7 +1881,7 @@ public static class SymbolRenderer
             CanvasTheme.LabelBrush);
     }
 
-    private static void DrawClock(DrawingContext context, IPen pen)
+    private static void DrawClock(ISymbolCanvas context, IPen pen)
     {
         context.DrawLine(pen, new Point(18, 0), new Point(30, 0));
         context.DrawRectangle(CanvasTheme.SymbolFill, pen, new RoundedRect(new Rect(-20, -16, 38, 32), 4));
@@ -1897,10 +1892,10 @@ public static class SymbolRenderer
             new(-14, 6), new(-14, -6), new(-6, -6), new(-6, 6),
             new(2, 6), new(2, -6), new(10, -6), new(10, 6), new(13, 6),
         };
-        context.DrawGeometry(null, pen, new PolylineGeometry(points, false));
+        context.DrawGeometry(null, pen, SymbolPath.Polyline(points, false));
     }
 
-    private static void DrawBridge(DrawingContext context, IPen pen, double zoom, string label)
+    private static void DrawBridge(ISymbolCanvas context, IPen pen, double zoom, string label)
     {
         context.DrawLine(pen, new Point(-40, 0), new Point(-24, 0));
         context.DrawLine(pen, new Point(24, 0), new Point(40, 0));
@@ -1908,7 +1903,7 @@ public static class SymbolRenderer
         DrawCenteredText(context, label, new Point(0, 0), 11, zoom, CanvasTheme.LabelBrush);
     }
 
-    private static void DrawGenericBox(DrawingContext context, IPen pen, double zoom, CircuitComponent component)
+    private static void DrawGenericBox(ISymbolCanvas context, IPen pen, double zoom, CircuitComponent component)
     {
         foreach (var terminal in component.Terminals)
         {
@@ -1928,18 +1923,12 @@ public static class SymbolRenderer
     /// the glyphs only.
     /// </summary>
     public static void DrawCenteredText(
-        DrawingContext context, string text, Point center, double screenSize, double zoom, IBrush brush)
+        ISymbolCanvas context, string text, Point center, double screenSize, double zoom, IBrush brush)
     {
-        if (string.IsNullOrEmpty(text)) return;
-
-        var formatted = new FormattedText(
-            text, CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
-            CanvasTheme.LabelTypeface, screenSize, brush);
-
         using (context.PushTransform(
                    Matrix.CreateScale(1 / zoom, 1 / zoom) * Matrix.CreateTranslation(center.X, center.Y)))
         {
-            context.DrawText(formatted, new Point(-formatted.Width / 2, -formatted.Height / 2));
+            context.DrawText(text, default, screenSize, brush, SymbolTextAlign.Centre);
         }
     }
 }
