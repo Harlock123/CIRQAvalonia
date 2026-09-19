@@ -70,6 +70,18 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     public partial bool ShowGrid { get; set; } = true;
 
+    /// <summary>
+    /// Marks the parts you can operate by double-clicking them.
+    /// <para>
+    /// There is nothing about a switch, an LDR or a thermistor on the canvas that says it can be
+    /// poked, and the only place that is written down is the palette description you have already
+    /// scrolled past. On by default for that reason, and switchable off from the View menu once
+    /// you know.
+    /// </para>
+    /// </summary>
+    [ObservableProperty]
+    public partial bool ShowInteractiveMarkers { get; set; } = true;
+
     [ObservableProperty]
     public partial double GridSize { get; set; } = 10.0;
 

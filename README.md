@@ -32,7 +32,7 @@ Core ← Engine ← Components ← UI, which keeps the whole engine headless-tes
 
 ```bash
 dotnet run --project src/Cirq.UI     # the editor
-dotnet test                          # 705 tests
+dotnet test                          # 709 tests
 ```
 
 Targets .NET 10. The UI uses Avalonia 12 and ScottPlot 5.1; those two versions are pinned
@@ -291,6 +291,7 @@ rate is decoupled from the solver:
 | Scope | The vertical range follows the traces by default, so changing a source amplitude keeps the waveform on screen. The `Auto` checkbox turns that off, and using the vertical `+`/`-` buttons turns it off for you |
 | File | `Ctrl+N` new, `Ctrl+O` open, `Ctrl+S` save, `Ctrl+Shift+S` save as, and `File > Settings` for the theme. The title bar shows the document and an asterisk while there are unsaved edits |
 | Transport | `F5` run/pause, `F6` single step, `F8` reset |
+| Interactive | Switches, buttons, logic toggles, LDRs and thermistors are operated by double-clicking them. They are ringed with a small dot so you can tell which parts those are; **View > Mark Interactive Parts** turns the rings off |
 | Panels | `F9` collapses the palette to the left, `F10` the properties panel to the right — or click the chevron in either panel's header. A collapsed panel leaves a labelled rail at the edge; click it to bring the panel back. Palette groups also collapse individually (`All` toggles every group) |
 
 The toolbar wraps onto extra rows rather than overflowing, and `MinWidth` is deliberately small, so

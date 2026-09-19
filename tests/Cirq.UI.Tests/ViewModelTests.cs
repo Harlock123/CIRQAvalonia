@@ -1,6 +1,6 @@
 using Cirq.Components.Passive;
-using Cirq.Components.Sources;
 using Cirq.Core.Topology;
+using Cirq.Components.Sources;
 using Cirq.UI.ViewModels;
 
 namespace Cirq.UI.Tests;
@@ -356,5 +356,75 @@ public class ScopeAutoScaleTests
 
         Assert.True(scope.DisplayMaximum > scope.DisplayMinimum);
         Assert.InRange(2.5, scope.DisplayMinimum, scope.DisplayMaximum);
+    }
+}
+
+/// <summary>
+/// The marker exists so that the parts you can poke are discoverable without reading the palette
+/// description, so what matters is that it covers exactly the operable parts and nothing else.
+/// </summary>
+public class InteractiveMarkerTests
+{
+    [Fact]
+    public void MarkersAreOnByDefaultBecauseTheyExistToBeDiscovered()
+    {
+        using var vm = new MainWindowViewModel();
+
+        Assert.True(vm.ShowInteractiveMarkers);
+    }
+
+    [Fact]
+    public void EveryOperablePartInThePaletteIsOneTheMarkerWouldRing()
+    {
+        // Whatever the canvas offers to double-click has to be what the marker points at; if a
+        // component becomes operable and this list is not the source of truth, they drift.
+        var operable = ComponentCatalog.AllItems
+            .Select(item => item.Create())
+            .OfType<IInteractiveComponent>()
+            .ToList();
+
+        Assert.NotEmpty(operable);
+
+        foreach (var component in operable)
+            Assert.False(string.IsNullOrWhiteSpace(component.InteractionHint));
+    }
+
+    [Fact]
+    public void TheOperablePartsAreTheOnesYouWouldExpect()
+    {
+        var names = ComponentCatalog.AllItems
+            .Select(item => item.Create())
+            .Where(c => c is IInteractiveComponent)
+            .Select(c => c.ComponentType)
+            .Distinct()
+            .ToHashSet();
+
+        // Switches and the two sensors that can be covered or warmed.
+        Assert.Contains("Push Button", names);
+        Assert.Contains("LDR", names);
+        Assert.Contains("NTC Thermistor", names);
+
+        // A resistor is not something you poke.
+        Assert.DoesNotContain("Resistor", names);
+        Assert.DoesNotContain("Capacitor", names);
+    }
+
+    [Fact]
+    public void OperatingAPartChangesWhatItReportsWithoutTouchingTheTopology()
+    {
+        using var vm = new MainWindowViewModel();
+        vm.Circuit.Clear();
+
+        var ldr = (LightDependentResistor)ComponentCatalog.AllItems
+            .First(i => i.Name == "LDR").Create();
+        vm.Circuit.Add(ldr);
+
+        var before = ldr.Resistance;
+        var hint = ldr.InteractionHint;
+
+        ldr.Interact();
+
+        Assert.NotEqual(before, ldr.Resistance);
+        Assert.NotEqual(hint, ldr.InteractionHint);
     }
 }

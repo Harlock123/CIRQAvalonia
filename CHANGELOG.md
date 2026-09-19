@@ -8,6 +8,10 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+- Parts you can operate by double-clicking — switches, buttons, logic toggles, LDRs, thermistors —
+  are now ringed with a small dot on the canvas, so which ones those are no longer depends on
+  having read the palette description. **View > Mark Interactive Parts** turns the rings off.
+
 ## [0.6.0] - 2026-09-19
 
 **Thermistors, NTC and PTC.** The NTC follows the Beta equation a datasheet actually gives,

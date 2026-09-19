@@ -66,6 +66,9 @@
         <Separator />
         <MenuItem Header="Show _Grid" ToggleType="CheckBox" IsChecked="{Binding ShowGrid, Mode=TwoWay}" />
         <MenuItem Header="_Snap to Grid" ToggleType="CheckBox" IsChecked="{Binding SnapToGrid, Mode=TwoWay}" />
+        <MenuItem Header="Mark _Interactive Parts" ToggleType="CheckBox"
+                  IsChecked="{Binding ShowInteractiveMarkers, Mode=TwoWay}"
+                  ToolTip.Tip="Ring the parts you can operate by double-clicking them" />
         <Separator />
         <MenuItem Header="Component _Palette" InputGesture="F9" ToggleType="CheckBox"
                   IsChecked="{Binding IsPaletteExpanded, Mode=TwoWay}" />
@@ -209,6 +212,7 @@
                                 SelectedComponent="{Binding SelectedComponent, Mode=TwoWay}"
                                 PendingItem="{Binding PendingItem, Mode=TwoWay}"
                                 ShowGrid="{Binding ShowGrid}"
+                                ShowInteractiveMarkers="{Binding ShowInteractiveMarkers}"
                                 SnapToGrid="{Binding SnapToGrid}"
                                 GridSize="{Binding GridSize}" />
 

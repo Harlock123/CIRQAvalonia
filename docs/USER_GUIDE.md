@@ -88,7 +88,12 @@ Click a category header to open or close it. **All** in the palette header toggl
 once — useful when you are hunting for a part and do not remember which group it is in.
 
 Switches, push buttons and logic toggles are operated by **double-clicking them on the canvas**,
-not through the properties panel. A push button is momentary; a switch latches.
+not through the properties panel. A push button is momentary; a switch latches. LDRs and
+thermistors work the same way — double-clicking covers or warms them.
+
+Anything you can operate is ringed with a small dot beside its designator, so you do not have to
+remember which parts those are. Turn the rings off with **View > Mark Interactive Parts** once
+they have served their purpose.
 
 ---
 
@@ -501,6 +506,7 @@ Also available in the app at **Help > Keyboard Shortcuts**.
 | Double-click | Operate a switch, push button or logic toggle |
 | `F5` / `F6` / `F8` | Run-pause / step / reset |
 | `F9` / `F10` | Collapse the palette / the properties panel |
+| View menu | **Mark Interactive Parts** rings everything you can double-click |
 | `Ctrl+N` / `Ctrl+O` / `Ctrl+S` / `Ctrl+Shift+S` | New / open / save / save as |
 
 ---

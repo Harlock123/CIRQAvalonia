@@ -49,6 +49,9 @@ public class CircuitCanvas : Control
     public static readonly StyledProperty<bool> ShowGridProperty =
         AvaloniaProperty.Register<CircuitCanvas, bool>(nameof(ShowGrid), true);
 
+    public static readonly StyledProperty<bool> ShowInteractiveMarkersProperty =
+        AvaloniaProperty.Register<CircuitCanvas, bool>(nameof(ShowInteractiveMarkers), true);
+
     public Circuit? Circuit
     {
         get => GetValue(CircuitProperty);
@@ -98,6 +101,13 @@ public class CircuitCanvas : Control
         set => SetValue(ShowGridProperty, value);
     }
 
+    /// <summary>Whether components that can be double-clicked are marked as such.</summary>
+    public bool ShowInteractiveMarkers
+    {
+        get => GetValue(ShowInteractiveMarkersProperty);
+        set => SetValue(ShowInteractiveMarkersProperty, value);
+    }
+
     // ---- events ----------------------------------------------------------
 
     /// <summary>Raised when components or wires are added or removed, so the engine can recompile.</summary>
@@ -140,7 +150,8 @@ public class CircuitCanvas : Control
     {
         AffectsRender<CircuitCanvas>(
             CircuitProperty, ActiveToolProperty, SelectedComponentProperty,
-            ZoomProperty, GridSizeProperty, ShowGridProperty, PendingItemProperty);
+            ZoomProperty, GridSizeProperty, ShowGridProperty, PendingItemProperty,
+            ShowInteractiveMarkersProperty);
     }
 
     public CircuitCanvas()
@@ -369,7 +380,29 @@ public class CircuitCanvas : Control
             }
 
             DrawComponentLabels(context, component);
+
+            if (ShowInteractiveMarkers && component is IInteractiveComponent)
+                DrawInteractiveMarker(context, component);
         }
+    }
+
+    /// <summary>
+    /// A small ringed dot on a part that can be operated by double-clicking it. Drawn outside the
+    /// symbol, on the opposite side from the designator, so it neither sits on the device nor
+    /// collides with its caption.
+    /// </summary>
+    private void DrawInteractiveMarker(DrawingContext context, CircuitComponent component)
+    {
+        if (Zoom < 0.5) return;
+
+        var offset = SymbolRenderer.LabelOffset(component);
+        // Just clear of the body rather than beside it: an SPDT's upper throw reaches far enough
+        // up and right that a marker tucked against the symbol landed on the contact.
+        var centre = new Point(component.X + 26, component.Y - offset - 2);
+        var pen = CanvasTheme.Pen(CanvasTheme.ValueBrush, 1.2, Zoom);
+
+        context.DrawEllipse(null, pen, centre, 5, 5);
+        context.DrawEllipse(CanvasTheme.ValueBrush, null, centre, 1.8, 1.8);
     }
 
     private void DrawComponentLabels(DrawingContext context, CircuitComponent component)
