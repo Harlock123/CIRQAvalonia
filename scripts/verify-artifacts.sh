@@ -15,6 +15,8 @@ DIST="${1:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/dist}"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
+KNOWN_RIDS=(win-x64 win-x86 win-arm64 osx-x64 osx-arm64 linux-x64 linux-arm64)
+
 # Each RID, and the two strings `file` must report for a correct binary.
 expect_for() {
   case "$1" in
@@ -45,15 +47,23 @@ failures=0
 for archive in "${archives[@]}"; do
   base="$(basename "$archive")"
 
-  # cirqavalonia-<version>-<rid>.<ext>  ->  <rid>
-  rid="$(echo "$base" | sed -E 's/^cirqavalonia-[^-]+-(.+)\.(zip|tar\.gz)$/\1/')"
+  # Match the platform as a known suffix rather than parsing out the version. A
+  # pre-release version contains hyphens of its own (0.1.1-rc.1), so splitting the
+  # name on "-" mistook part of the version for the platform.
+  rid=""
+  for candidate in "${KNOWN_RIDS[@]}"; do
+    case "$base" in
+      *"-$candidate".zip|*"-$candidate".tar.gz) rid="$candidate"; break ;;
+    esac
+  done
 
-  expected="$(expect_for "$rid")"
-  if [ -z "$expected" ]; then
-    printf '%-44s %-9s %s\n' "$base" "-" "FAIL  unrecognised platform '$rid'"
+  if [ -z "$rid" ]; then
+    printf '%-44s %-9s %s\n' "$base" "-" "FAIL  no recognised platform in the name"
     failures=$((failures + 1))
     continue
   fi
+
+  expected="$(expect_for "$rid")"
 
   out="$WORK/$rid"
   rm -rf "$out"; mkdir -p "$out"
