@@ -8,6 +8,14 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-09-19
+
+Four parts that each finish something already in the palette: a thermocouple and a load cell for
+the instrumentation amplifier to read, a rotary encoder with the contact bounce that makes reading
+one hard, and a charge pump for the negative rail a single supply cannot otherwise give you. The
+palette holds 127 components in 15 categories, and 978 tests measure them against closed-form
+answers.
+
 **Thermocouple and load cell**, which give the INA126 something to read. It has been in the
 palette with nothing natural to connect to it, and both of these are what an instrumentation
 amplifier is for: a small difference sitting on a large common voltage.
@@ -481,7 +489,8 @@ First public build of CirqAvalonia — an electronic circuit analyzer and mixed-
 
 **501 tests** measure the solver against closed-form answers rather than recorded output.
 
-[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.13.0...HEAD
+[0.13.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.9.0...v0.10.0
