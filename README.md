@@ -71,6 +71,14 @@ one written out above.
 This is required on Apple Silicon, not merely advisory. The only real fix is signing and
 notarization, which needs a paid Apple developer account.
 
+**Signing is the intention, just not yet.** Leaving it unsigned is a decision rather than an
+oversight. Notarization is per build, not per project: every archive of every release has to go to
+Apple, come back, and be stapled individually. So the cost is not one afternoon of setup — it is a
+step welded onto every release, and releases here currently land within hours of each other. Apple
+is not quick at its end either. Until the pace settles down, the one-time click above is the better
+trade for everyone. The plan has not changed — a Developer ID certificate, hardened runtime and a
+notarized `.app` bundle — and when it happens this whole section goes away.
+
 On Linux, mark it executable if your extractor dropped the bit: `chmod +x CirqAvalonia`.
 
 ## Building releases
