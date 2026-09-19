@@ -130,12 +130,13 @@ public static class SymbolRenderer
         // Positive plate: straight.
         context.DrawLine(pen, new Point(-4, -12), new Point(-4, 12));
 
-        // Negative plate: the curve, drawn hollow-side towards the positive plate.
+        // Negative plate: the curve, bowed towards the positive plate so the pair reads -] (-.
+        // Its vertex sits where the lead meets it, at x = 6, and the ends fall away to 10.5.
         var curve = new StreamGeometry();
         using (var ctx = curve.Open())
         {
-            ctx.BeginFigure(new Point(6, -12), false);
-            ctx.CubicBezierTo(new Point(12, -6), new Point(12, 6), new Point(6, 12));
+            ctx.BeginFigure(new Point(10.5, -12), false);
+            ctx.CubicBezierTo(new Point(4.5, -6), new Point(4.5, 6), new Point(10.5, 12));
             ctx.EndFigure(false);
         }
         context.DrawGeometry(null, pen, curve);
