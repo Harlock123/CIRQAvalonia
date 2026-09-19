@@ -8,6 +8,10 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+- The README now carries the macOS quarantine step in its download section. It is required on
+  Apple Silicon, not advisory: without it macOS reports "cannot be opened" or "is damaged", which
+  reads as a bad download rather than a policy block.
+
 ## [0.3.0] - 2026-09-19
 
 **New example: File > Examples > Raspberry Pi GPIO.** A Pi driving two LEDs and reading a button

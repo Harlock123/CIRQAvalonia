@@ -40,6 +40,22 @@ together in `Directory.Packages.props` because they must agree on SkiaSharp (see
 
 Prebuilt binaries for every supported platform are on the
 [releases page](../../releases) — self-contained, so there is no runtime to install first.
+Download, extract, run.
+
+**On macOS, clear the quarantine flag first.** The builds are not signed or notarized, so macOS
+refuses to launch them until the attribute the download put there is removed:
+
+```bash
+xattr -d com.apple.quarantine CirqAvalonia
+./CirqAvalonia
+```
+
+Without it you get "cannot be opened" or "is damaged", which looks like a bad download rather than
+a policy block. Right-clicking the binary in Finder and choosing **Open** works too. This is
+required on Apple Silicon, not merely advisory — the only real fix is signing and notarization,
+which needs an Apple developer account.
+
+On Linux, mark it executable if your extractor dropped the bit: `chmod +x CirqAvalonia`.
 
 ## Building releases
 
