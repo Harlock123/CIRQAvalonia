@@ -8,6 +8,10 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+- The digital examples — Decade Counter, Digit Counter, Ring Oscillator and Running Light — now
+  show their traces tiled rather than stacked. Stacked mode centres each lane on its offset, which
+  put the top of a 0-3.4V logic swing outside its lane; the Ring Oscillator was losing most of its
+  waveform. Tiled gives every trace its own auto-ranged axes.
 - New example, **File > Examples > Raspberry Pi GPIO** — a Pi driving two LEDs and reading a button
   on an internal pull-up, wiring all three things a GPIO pin can do into one circuit. Double-click
   the button on the canvas to press it.

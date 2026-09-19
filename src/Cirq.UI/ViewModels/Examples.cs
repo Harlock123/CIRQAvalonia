@@ -255,7 +255,10 @@ public static class Examples
 
         vm.Scope.TimebasePerDivision = 100e-6;
         vm.Scope.VoltsPerDivision = 2.0;
-        vm.Scope.Layout = ScopeLayout.Stacked;
+        // Tiled, not stacked: these are unipolar 0-3.4V logic traces, and stacked mode centres
+        // each lane on its offset, which puts the top of the swing outside the lane. Tiled gives
+        // every trace its own auto-ranged axes, which is what logic wants.
+        vm.Scope.Layout = ScopeLayout.Tiled;
         vm.Scope.AddProbe(counter.Qa, "QA");
         vm.Scope.AddProbe(counter.Qb, "QB");
         vm.Scope.AddProbe(counter.Qc, "QC");
@@ -281,7 +284,7 @@ public static class Examples
 
         vm.Scope.TimebasePerDivision = 50e-9;
         vm.Scope.VoltsPerDivision = 1.0;
-        vm.Scope.Layout = ScopeLayout.Stacked;
+        vm.Scope.Layout = ScopeLayout.Tiled;
         for (var i = 0; i < 3; i++)
             vm.Scope.AddProbe(inverters[i].Out, $"Stage {i + 1}");
     }
@@ -334,7 +337,7 @@ public static class Examples
 
         vm.Scope.TimebasePerDivision = 50e-3;
         vm.Scope.VoltsPerDivision = 2.0;
-        vm.Scope.Layout = ScopeLayout.Stacked;
+        vm.Scope.Layout = ScopeLayout.Tiled;
         vm.Scope.AddProbe(counter.Qa, "QA");
         vm.Scope.AddProbe(counter.Qd, "QD");
     }
@@ -487,7 +490,7 @@ public static class Examples
 
         vm.Scope.TimebasePerDivision = 50e-3;
         vm.Scope.VoltsPerDivision = 2.0;
-        vm.Scope.Layout = ScopeLayout.Stacked;
+        vm.Scope.Layout = ScopeLayout.Tiled;
         vm.Scope.AddProbe(register.Outputs[0], "QA");
         vm.Scope.AddProbe(register.Outputs[3], "QD");
         vm.Scope.AddProbe(register.Outputs[7], "QH");
