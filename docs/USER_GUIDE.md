@@ -65,22 +65,23 @@ at the window edge; click the rail to bring it back.
 
 Click a palette entry, then click the canvas. The part lands where you click, snapped to the grid.
 
-The palette holds **128 components in 15 categories**:
+The palette holds **137 components in 16 categories**:
 
 | Category | Count | Contents |
 | --- | --- | --- |
 | Passive | 7 | Resistor, capacitor, electrolytic capacitor, inductor, transformer, potentiometer, **crystal** — see [below](#crystals) |
-| Switches | 3 | SPST, SPDT, push button |
-| Sources | 5 | Ground, DC voltage, DC current, function generator, **battery** — see [below](#batteries) |
+| Switches | 4 | SPST, SPDT, push button, **8-way DIP switch** |
+| Sources | 6 | Ground, DC voltage, DC current, function generator, battery, **solar cell** — see [below](#batteries-and-panels) |
 | Semiconductors | 11 | 1N4148, 1N4001, Schottky, zeners, bridge rectifier, SCR, triac, diac, **TVS and varistor** — see [below](#surge-protection) |
 | Transistors | 10 | NPN and PNP bipolars, N- and P-channel MOSFETs, **three JFETs** — see [below](#jfets) |
-| LEDs & Displays | 8 | Six LED colours, common-anode and common-cathode seven-segment |
+| LEDs & Displays | 9 | Six LED colours, seven-segment displays, **HD44780 character LCD** — see [below](#the-character-lcd) |
 | Power | 9 | Fixed and adjustable regulators, TL431 shunt reference, ICL7660 charge pump, **MC34063 switching controller** — see [below](#switching-instead-of-dropping) |
 | Analog ICs | 10 | LM741, NE555, LM311, LM339, **LM386** audio amp and **INA126** instrumentation amp |
 | Logic Gates | 7 | AND, OR, NAND, NOR, XOR, XNOR, NOT |
-| 74xx Series | 17 | Counters, decoders, flip-flops, shift registers, multiplexers, Schmitt inverter |
+| 74xx Series | 18 | Counters, decoders, flip-flops, shift registers (including the **74595**), multiplexers, Schmitt inverter |
 | 40xx Series | 14 | CMOS gates, counters, flip-flops, analog switches — see [below](#the-40xx-series) |
-| Digital I/O | 5 | Logic toggle, clock, indicators, **rotary encoder** |
+| Buses | 4 | I2C master, EEPROM and port expander, SPI master — see [below](#i2c-and-spi) |
+| Digital I/O | 6 | Logic toggle, clock, indicators, rotary encoder, **oscillator module** |
 | Sensors & Actuators | 12 | DC motor, LDR, thermistors, buzzers, speaker, microphone, servo, stepper, **thermocouple and load cell** — see [below](#sensors-and-actuators) |
 | Switching & Isolation | 6 | Relay, fuses, optocouplers, **ULN2003** — see [below](#switching-and-isolation) |
 | Dev Boards | 4 | Raspberry Pi, Arduino Uno / Nano / Mega — see [below](#development-boards) |
@@ -248,7 +249,7 @@ You should see a square wave and the exponential charge and discharge of the cap
 the RC time constant here is 10 kΩ × 100 nF = 1 ms, against a half-period of 1 ms, so the capacitor
 gets roughly two-thirds of the way each time.
 
-Everything above is also in **File > Examples**, along with twenty-two other circuits. Six of them
+Everything above is also in **File > Examples**, along with twenty-four other circuits. Six of them
 exercise the newer parts: **Lamp Dimmer** (triac and diac phase control), **SCR Latch** (a thyristor
 that stays on after you let go of the button), **LED Chaser** (a 4017), **4060 Timer** (a chip
 clocking itself from one resistor and one capacitor), **Staircase Generator** (a 4040 addressing a
@@ -520,7 +521,7 @@ modelled.
 
 ---
 
-## Batteries
+## Batteries and panels
 
 Every other source in the palette is ideal: it holds its voltage into a dead short and never runs
 out. A battery does neither, and the difference is most of why a circuit that behaves on the bench
@@ -537,6 +538,16 @@ capacity — so a stalled motor or a relay left energised visibly empties it. Th
 holds up across most of the discharge and then falls off a cliff, which is the shape a real cell
 has and the reason batteries give so little warning. Turn **Discharges** off in the inspector if
 you want the sag without the clock running.
+
+**Solar cell.** A panel is a current source in parallel with the diode it is made of, and that
+one fact explains everything awkward about them. Light makes **current**, not voltage: the current
+is almost exactly proportional to brightness while the voltage barely moves — halving the light
+costs about 150 mV out of three and a half.
+
+The consequence is the knee. Draw less than the light is making and the voltage holds up; draw more
+and it collapses, because there is no more current to be had at any voltage. A panel is not a
+battery with a smaller capacity: there is a maximum power point part way down that knee, and
+loading it either side of that gives you less. Double-click it to shade it.
 
 ---
 
@@ -636,6 +647,65 @@ input, so a supply that droops takes the negative rail with it. And because it m
 worth of charge per cycle, its output impedance is about `1/(f·C)` — a small pump capacitor or a
 slow oscillator gives a rail that sags the moment anything draws from it, and no amount of
 smoothing on the output fixes that.
+
+---
+
+## The character LCD
+
+The HD44780 sixteen-by-two module, and the first display most people drive. It is a parallel port
+with a controller behind it: put a byte on the data pins, say whether it is a **command** or a
+**character** with RS, and pulse E. The controller latches on the **falling** edge of E, which is
+why every driver pulses it rather than just setting the level.
+
+Four-bit mode is what almost everyone uses, because sixteen pins is a lot. It starts in eight-bit
+mode as a real one does, and a function set with the data-length bit clear moves it to four — from
+then on each byte is two latches, high nibble first. The initialisation dance every library
+performs therefore works here for the same reason it works on hardware.
+
+Two things catch people, and both behave here as they do on a real module. **Line two is an
+address, not a continuation**: running off the end of line one does not wrap onto it, you have to
+set the cursor to 0x40. And **reading is not modelled** — tie RW low. The busy flag is what RW is
+for, and virtually all driver code waits a fixed time instead of polling it.
+
+---
+
+## I2C and SPI
+
+Two ways to talk to a chip over a handful of wires, with opposite trade-offs.
+
+**I2C** is two wires for any number of devices, each with an address. It is **open drain**: nothing
+on the bus ever drives a line high — every device can only pull down or let go — and a pair of
+resistors to the supply makes the high level. That is what lets a dozen devices share two wires
+without fighting, and it is why **a bus with no pull-ups does not work at all** rather than working
+badly. Forgetting them is the classic first mistake and it fails here the way it fails on a
+breadboard.
+
+There is no processor to run a driver, so the master plays a written list of transactions:
+
+```
+w 50 00 00 48 49 21     ; write three bytes to device 0x50 at offset 0x0000
+w 50 00 00              ; point it back at the start
+r 50 3                  ; read the three back
+```
+
+Addresses are seven-bit and written as themselves — `50`, not `A0` — with the read/write bit added
+for you, which is the opposite of the confusion most datasheets cause. **Addressing is nothing but
+the acknowledge**: a device claims a transfer by pulling the line down during the ninth clock, and
+talking to an address nobody answers to leaves the line high. That is the only symptom you get, and
+it is what `LastTransferAcknowledged` reports.
+
+Two devices are stocked: a **24LC256 EEPROM**, and a **PCF8574 port expander** — eight pins from
+two wires, and the chip on the back of every "I2C LCD" backpack. The expander's outputs are
+quasi-bidirectional: writing a one releases the pin to a weak pull-up rather than driving it high,
+which is why these sink an LED nicely and barely source anything.
+
+**SPI** is the opposite trade: no addressing, no acknowledgement, push-pull rather than open drain,
+and a select pin for every device. Faster and far simpler to decode, at the cost of a pin per chip.
+Its master takes a list of hex bytes, one transfer per line, and clocks them out most significant
+bit first with data set while the clock is low — mode zero, which is what nearly everything expects.
+
+**File > Examples > I2C EEPROM** and **SPI Shift Register** are both wired up, with the bus lines
+on the scope.
 
 ---
 

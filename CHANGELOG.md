@@ -8,6 +8,37 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**I2C and SPI.** The dev boards have had GPIO and sequencing for a dozen releases with no way to
+talk to anything. It turned out to need no new engine at all: I2C is open drain, which is a
+released output and a pair of pull-up resistors, and both were already there. What was missing were
+devices that speak the protocol.
+
+The I2C master plays a written list of transactions — `w 50 00 00 A5` writes, `r 50 4` reads —
+since there is no processor here to run a driver. The slave side is a real decoder: start is the
+data line falling while the clock is high, bits are sampled on the rising clock, and every ninth is
+an acknowledge. Addressing is nothing more than which device pulls the line down during that slot,
+so talking to an address nobody answers to leaves the line high and that is the only symptom, as on
+hardware. A **24LC256 EEPROM** and a **PCF8574 port expander** sit on it. A bus with no pull-ups
+does nothing whatsoever, which is a test.
+
+SPI is the opposite trade and much simpler, and its master drives a **74595** — a real gap in the
+74xx list as well, since the latch is what separates it from the 74164 that was already there.
+
+**HD44780 character LCD**, modelled as the parallel port it is rather than as a text box: a byte on
+the data pins, RS saying command or character, and the controller latching on E falling. Four-bit
+mode works the way it works on hardware, so the initialisation dance every library performs works
+here for the same reason. Line two is an address rather than a continuation. The symbol is the
+display, because a part whose point is that you can read it should not be a box with a part number.
+
+**Solar cell**, a current source in parallel with the diode it is made of — which is why the
+current follows the light and the voltage barely does, why there is a knee, and why there is a
+maximum power point part way down it.
+
+**8-way DIP switch** and a **crystal oscillator module**, the four-pin can that is actually on
+boards as distinct from the bare resonator.
+
+**New examples:** I2C EEPROM, and SPI Shift Register.
+
 ## [0.14.0] - 2026-09-19
 
 A switching regulator, which is the biggest thing the Power group was missing — everything in it

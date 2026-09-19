@@ -1,4 +1,5 @@
 using Cirq.Components.Boards;
+using Cirq.Components.Buses;
 using Cirq.Components.Digital;
 using Cirq.Components.Nonlinear;
 using Cirq.Components.Ics;
@@ -51,6 +52,9 @@ public static class Examples
         new("JFET Amplifier", "2N3819 common-source stage with self-bias", LoadJfetAmplifier),
         new("Buck Converter", "MC34063 stepping 12 V down to 5 V without turning the difference into heat",
             LoadBuckConverter),
+        new("I2C EEPROM", "Three bytes written over two wires and read back again", LoadI2cEeprom),
+        new("SPI Shift Register", "An SPI master clocking a byte into a 74595 and onto eight LEDs",
+            LoadSpiShiftRegister),
     ];
 
     public static void LoadRcLowPass(MainWindowViewModel vm)
@@ -693,6 +697,116 @@ public static class Examples
         vm.Scope.AddProbe(pi.Pin("GPIO18"), "Clock");
         vm.Scope.AddProbe(pi.Pin("GPIO23"), "Pattern");
         vm.Scope.AddProbe(pi.Pin("GPIO25"), "Button");
+    }
+
+    /// <summary>
+    /// An I²C bus with one device on it, writing three bytes and reading them back.
+    /// <para>
+    /// The two pull-up resistors are not optional decoration. Nothing on an I²C bus ever drives a
+    /// line high — every device can only pull down or let go — so without them there is no high
+    /// level to make and nothing works at all. Delete one and watch.
+    /// </para>
+    /// </summary>
+    public static void LoadI2cEeprom(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "I2C EEPROM";
+
+        var rail = Place(circuit, new DcVoltageSource(3.3), -420, 120);
+        var master = Place(circuit, new I2cMaster
+        {
+            Transactions = "w 50 00 00 48 49 21; w 50 00 00; r 50 3",
+            ClockFrequency = 100e3,
+        }, -180, -40);
+        var eeprom = Place(circuit, new I2cEeprom(), 220, -40);
+
+        var sdaPull = Place(circuit, new Resistor(4.7e3), 20, -180);
+        var sclPull = Place(circuit, new Resistor(4.7e3), 140, -180);
+
+        var gnd = Place(circuit, new Ground(), -420, 260);
+        var gnd2 = Place(circuit, new Ground(), 220, 160);
+
+        sdaPull.RotationDegrees = 90;
+        sclPull.RotationDegrees = 90;
+
+        circuit.Connect(rail.Negative, gnd.Pin);
+        circuit.Connect(master.Vcc, rail.Positive);
+        circuit.Connect(master.Gnd, gnd.Pin);
+        circuit.Connect(eeprom.Vcc, rail.Positive);
+        circuit.Connect(eeprom.Gnd, gnd2.Pin);
+
+        circuit.Connect(master.Sda, eeprom.Sda);
+        circuit.Connect(master.Scl, eeprom.Scl);
+
+        circuit.Connect(rail.Positive, sdaPull.A);
+        circuit.Connect(sdaPull.B, master.Sda);
+        circuit.Connect(rail.Positive, sclPull.A);
+        circuit.Connect(sclPull.B, master.Scl);
+
+        vm.Scope.TimebasePerDivision = 100e-6;
+        vm.Scope.VoltsPerDivision = 2.0;
+        vm.Scope.Layout = ScopeLayout.Tiled;
+        vm.Scope.AddProbe(master.Scl, "SCL");
+        vm.Scope.AddProbe(master.Sda, "SDA");
+    }
+
+    /// <summary>
+    /// An SPI master clocking a byte into a 74595 and out onto eight LEDs.
+    /// <para>
+    /// Three wires become eight outputs, which is what shift registers are for. The select line
+    /// doubles as the latch here: the outputs update when the transfer ends, so the LEDs never
+    /// show the intermediate patterns the bits make on their way through.
+    /// </para>
+    /// </summary>
+    public static void LoadSpiShiftRegister(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "SPI shift register";
+
+        var rail = Place(circuit, new DcVoltageSource(5.0), -460, 120);
+        var master = Place(circuit, new SpiMaster
+        {
+            Transactions = "5A",
+            ClockFrequency = 200e3,
+        }, -240, -40);
+        var register = Place(circuit, new Ic74595(), 40, -40);
+
+        var gnd = Place(circuit, new Ground(), -460, 260);
+        var gnd2 = Place(circuit, new Ground(), 40, 220);
+        var ledGround = Place(circuit, new Ground(), 420, 300);
+
+        circuit.Connect(rail.Negative, gnd.Pin);
+        circuit.Connect(master.Vcc, rail.Positive);
+        circuit.Connect(master.Gnd, gnd.Pin);
+        circuit.Connect(register.Vcc, rail.Positive);
+        circuit.Connect(register.Gnd, gnd2.Pin);
+
+        circuit.Connect(master.Clock, register.ShiftClock);
+        circuit.Connect(master.MasterOut, register.SerialIn);
+        circuit.Connect(master.ChipSelect, register.LatchClock);
+
+        circuit.Connect(register.Clear, rail.Positive);
+        circuit.Connect(register.OutputEnable, gnd2.Pin);
+
+        string[] colours = ["Red", "Amber", "Yellow", "Green", "Red", "Amber", "Yellow", "Green"];
+
+        for (var i = 0; i < 8; i++)
+        {
+            var y = -150 + (i * 40);
+            var resistor = Place(circuit, new Resistor(330), 260, y);
+            var led = Place(circuit, Led.OfColour(colours[i]), 400, y);
+
+            circuit.Connect(register.Outputs[i], resistor.A);
+            circuit.Connect(resistor.B, led.Anode);
+            circuit.Connect(led.Cathode, ledGround.Pin);
+        }
+
+        vm.Scope.TimebasePerDivision = 10e-6;
+        vm.Scope.VoltsPerDivision = 2.0;
+        vm.Scope.Layout = ScopeLayout.Tiled;
+        vm.Scope.AddProbe(master.Clock, "SCK");
+        vm.Scope.AddProbe(master.MasterOut, "MOSI");
+        vm.Scope.AddProbe(register.Outputs[0], "QA");
     }
 
     /// <summary>
