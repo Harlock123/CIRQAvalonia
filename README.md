@@ -32,7 +32,7 @@ Core ← Engine ← Components ← UI, which keeps the whole engine headless-tes
 
 ```bash
 dotnet run --project src/Cirq.UI     # the editor
-dotnet test                          # 865 tests
+dotnet test                          # 908 tests
 ```
 
 Targets .NET 10. The UI uses Avalonia 12 and ScottPlot 5.1; those two versions are pinned
@@ -192,6 +192,11 @@ Tests measure the solver against closed-form answers rather than recorded output
 | MOSFET | Square-law saturation current, triode switching, zero gate current, reverse conduction, body diode |
 | JFET | Full I_DSS at zero gate drive, square law across the range, pinch-off, vanishing gate current, P-channel mirroring |
 | Thyristors | SCR blocking and firing, staying on after the gate drive goes away, dropping out when the anode current is interrupted, reverse blocking; triac firing on both half cycles and turning itself off at every zero crossing; diac breakover in either polarity |
+| Current probes | Ohm's law through a resistor, equal and opposite at the two ends, a capacitor's charging current against `C dv/dt`, a transistor's three terminals summing to zero, a switch carrying nothing when open |
+| Battery | Sag against the internal resistance, a coin cell sagging where a lead-acid does not, coulomb counting against the rating, a discharge curve that is flat and then is not |
+| Surge parts | A TVS invisible below its standoff and clamping either polarity above it; a varistor's power law, and wearing out on the energy it absorbs |
+| ULN2003 | Sinking the load current, the Darlington's saturation voltage, a released channel passing nothing, and a load wired to ground doing nothing at all |
+| Amplifiers | LM386 idling at half supply, its stated gain, clipping at the rails; INA126 rejecting four volts of common mode; the speaker's average power |
 | 4000 series | Gate truth tables on the CMOS pinout, and that it is *not* the 74xx one; 4093 hysteresis and its relaxation-oscillator period against the closed form; 4013 toggling and its active-high set and reset; 4040 stage-by-stage division and falling-edge clocking; 4017 one-hot walk, reset and carry; 4511 glyph table, active-high drive, lamp test and blanking priority; 4066 and 4051 analog pass-through, switch resistance and off-state leakage; 4060 oscillating from its own Rt and Ct at the datasheet's 1/(2.3·Rt·Ct), and the frequency tracking a changed capacitor |
 | Comparator | Open-collector pull-down and release, driving a higher rail through a pull-up, edge timing |
 | Displays | 7447 glyph table, open-collector drive, lamp test and blanking priority, counter walking 0-9 on the display |
@@ -294,7 +299,7 @@ toolbar used to show: active tool, simulation speed, elapsed time and solver rat
 `Help > Keyboard Shortcuts` lists everything below, and the
 [User Guide](docs/USER_GUIDE.md) walks through building a circuit from an empty canvas.
 
-The palette holds 112 components in 15 collapsible categories:
+The palette holds 119 components in 15 collapsible categories:
 
 ![The component palette showing all fifteen categories with their counts — passive, switches, sources, semiconductors, transistors, LEDs and displays, power, analog ICs, logic gates, 74xx series, 4000 series, digital I/O, sensors and actuators, switching and isolation, and dev boards — with the Passive group open](docs/images/02-palette.png)
 
@@ -304,7 +309,9 @@ type gets a complete editor without any UI code:
 ![The properties panel showing a selected function generator with its placement, amplitude, offset, duty cycle, edge time, frequency, output resistance and waveform shape](docs/images/03-inspector.png)
 
 Probes attach to terminals and stream into the scope, which redraws on its own timer so the render
-rate is decoupled from the solver:
+rate is decoupled from the solver. A probe reads **voltage, current or logic level** — pick which
+from the trace list — and each trace carries its own unit, so a current reads `26.4 mA` rather than
+being squeezed onto a volts axis:
 
 ![The 555 astable example running, with the capacitor and output waveforms on the oscilloscope](docs/images/04-scope.png)
 

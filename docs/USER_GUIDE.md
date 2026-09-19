@@ -65,24 +65,24 @@ at the window edge; click the rail to bring it back.
 
 Click a palette entry, then click the canvas. The part lands where you click, snapped to the grid.
 
-The palette holds **112 components in 15 categories**:
+The palette holds **119 components in 15 categories**:
 
 | Category | Count | Contents |
 | --- | --- | --- |
 | Passive | 6 | Resistor, capacitor, **electrolytic capacitor**, inductor, transformer, potentiometer |
 | Switches | 3 | SPST, SPDT, push button |
-| Sources | 4 | Ground, DC voltage, DC current, function generator |
-| Semiconductors | 9 | 1N4148, 1N4001, Schottky, 5.1 V and 12 V zeners, bridge rectifier, **SCR, triac, diac** — see [below](#thyristors-parts-that-latch) |
+| Sources | 5 | Ground, DC voltage, DC current, function generator, **battery** — see [below](#batteries) |
+| Semiconductors | 11 | 1N4148, 1N4001, Schottky, zeners, bridge rectifier, SCR, triac, diac, **TVS and varistor** — see [below](#surge-protection) |
 | Transistors | 10 | NPN and PNP bipolars, N- and P-channel MOSFETs, **three JFETs** — see [below](#jfets) |
 | LEDs & Displays | 8 | Six LED colours, common-anode and common-cathode seven-segment |
 | Power | 7 | Fixed and adjustable regulators, TL431 shunt reference |
-| Analog ICs | 8 | LM741, NE555, LM311, LM339 and friends |
+| Analog ICs | 10 | LM741, NE555, LM311, LM339, **LM386** audio amp and **INA126** instrumentation amp |
 | Logic Gates | 7 | AND, OR, NAND, NOR, XOR, XNOR, NOT |
 | 74xx Series | 17 | Counters, decoders, flip-flops, shift registers, multiplexers, Schmitt inverter |
 | 4000 Series | 14 | CMOS gates, counters, flip-flops, analog switches — see [below](#the-4000-series) |
 | Digital I/O | 4 | Logic toggle, clock, and indicators |
-| Sensors & Actuators | 6 | DC motor, LDR, thermistors, buzzers — see [below](#sensors-and-actuators) |
-| Switching & Isolation | 5 | Relay, fuses, optocouplers — see [below](#switching-and-isolation) |
+| Sensors & Actuators | 7 | DC motor, LDR, thermistors, buzzers, **speaker** — see [below](#sensors-and-actuators) |
+| Switching & Isolation | 6 | Relay, fuses, optocouplers, **ULN2003** — see [below](#switching-and-isolation) |
 | Dev Boards | 4 | Raspberry Pi, Arduino Uno / Nano / Mega — see [below](#development-boards) |
 
 Click a category header to open or close it. **All** in the palette header toggles every group at
@@ -161,6 +161,30 @@ to remove the probe entirely.
 
 **Auto** is on by default and is the setting most people want: change a source's amplitude and the
 waveform stays on screen instead of running off the top.
+
+---
+
+## Measuring current
+
+A probe reads a **voltage** by default, but it can read the **current** into the pin it is attached
+to instead. Pick which from the dropdown beside the trace in the scope's trace list.
+
+That is worth knowing about, because a great deal of what a circuit is doing is only visible as
+current. The holding current that drops a triac out at every zero crossing, the flyback spike a
+relay coil produces, what a motor draws as it stalls, whether an LED is getting 5 mA or 50 — none
+of it shows up in a voltage trace unless you put a shunt in and do the arithmetic yourself.
+
+The sign convention is a clamp meter's: **positive is current flowing into the component through
+the pin you clamped**. Probe both ends of a resistor and you get equal and opposite readings; probe
+all three pins of a transistor and they sum to zero.
+
+Each trace carries its own unit, so a current reads `26.4 mA` rather than `0.0264`. In **Tiled**
+layout every trace gets its own axis, labelled with its own unit, which is the comfortable way to
+look at a current and the voltage driving it together. In **Unified** layout they share one axis
+and it is labelled for whatever is on it.
+
+Changing what a probe measures clears the trace — the samples already recorded are in the wrong
+units, and rescaling them would be a lie.
 
 ---
 
@@ -350,6 +374,17 @@ current for ever, so only the excess counts. Doubling the rated current on a 1 A
 takes about a sixth of a second; five times the rating takes twenty milliseconds. Once blown it
 stays blown.
 
+**ULN2003** — seven Darlington drivers, and the way logic drives anything with a coil in it. A
+74xx output will not run a relay or a stepper winding, and doing it with a transistor per channel
+is seven transistors and fourteen resistors.
+
+Every channel **sinks**, which is the thing to get right: the load goes between the supply and the
+output pin, not between the output and ground. An output that is off is not driving low, it is
+disconnected — so a load wired from an output down to ground does nothing at all, which is the
+usual first mistake. Being a Darlington it does not saturate to nothing either: about a volt stays
+across a conducting output, which matters when a 5 V relay is running off a 5 V rail. Tie the COM
+pin to the load's supply and the internal flyback diodes have somewhere to send the inductive kick.
+
 **Optocoupler** — an infrared LED facing a phototransistor with no conductive path between them, so
 the output side can sit at a completely different potential. This is the honest answer to "how do I
 switch something dangerous from a 3.3 V board".
@@ -472,6 +507,49 @@ modelled.
 
 ---
 
+## Batteries
+
+Every other source in the palette is ideal: it holds its voltage into a dead short and never runs
+out. A battery does neither, and the difference is most of why a circuit that behaves on the bench
+supply misbehaves on cells.
+
+**Internal resistance** is the whole story. Five are stocked — an AA, a 9 V PP3, an 18650, a CR2032
+coin cell and a sealed lead-acid — and they span four hundred to one in impedance. A coin cell is
+ten ohms, so asking it for the twenty milliamps an LED wants costs it two hundred millivolts and it
+browns out whatever it is powering. The lead-acid cell is twenty milliohms and will weld a
+screwdriver. Swap one for the other under the same load and watch the rail move.
+
+**It runs down.** Charge is counted out as it is taken — amps for seconds, against the rated
+capacity — so a stalled motor or a relay left energised visibly empties it. The terminal voltage
+holds up across most of the discharge and then falls off a cliff, which is the shape a real cell
+has and the reason batteries give so little warning. Turn **Discharges** off in the inspector if
+you want the sag without the clock running.
+
+---
+
+## Surge protection
+
+Two parts whose job is to survive something the rest of the circuit cannot. Both sit there doing
+nothing until the voltage across them goes somewhere it should not.
+
+**TVS diode** — a zener bred for speed and current rather than for a precise voltage. Below its
+standoff voltage it does nothing at all, which is the point: it has to be invisible to the circuit
+it is protecting. Past that it turns on hard. It is bidirectional here, so it clamps whichever way
+the surge arrives. Picking one with a standoff below the working voltage is the classic mistake —
+it then conducts continuously, gets hot, and takes out the thing it was defending — and the part
+says so.
+
+**Varistor (MOV)** — the part across the mains input of almost everything. Where a TVS has a sharp
+silicon knee, an MOV is a very high-order power law, `I ∝ V^30`, which makes it soft: it starts
+conducting well before its rated voltage and never quite stops. That is why an MOV is not a
+regulator and why it belongs behind a fuse.
+
+It also **wears out**, which is the thing about MOVs nobody expects. Every surge takes a little of
+it permanently. The absorbed energy is counted against the rating here, and a spent one says so —
+a real one at the end of its life conducts at normal working voltage and cooks.
+
+---
+
 ## Thyristors: parts that latch
 
 Everything else in the library follows its input. A thyristor remembers, and that is the only thing
@@ -521,6 +599,34 @@ circuit that does it is almost never the circuit you meant to build.
 
 Four models are stocked — 2N3819, J201 and 2N5457 N-channel, 2N5460 P-channel — and three of them
 are in the palette.
+
+---
+
+## Audio and instrumentation
+
+**LM386** — the chip behind almost every small speaker project. Single supply, no feedback network
+to design, a few hundred milliwatts into eight ohms. The gain is twenty as it comes and two hundred
+with a capacitor across two pins, which is the whole appeal: there is nothing to get wrong.
+
+Its output idles at **half the supply** so it can swing both ways, which is why the speaker is
+coupled through a capacitor rather than wired straight to it. Connect it directly and half the rail
+sits across the voice coil continuously — the speaker's power reading will tell you so.
+
+**Speaker** — a voice coil: a few ohms of wire with some inductance, so the load an amplifier sees
+gets harder with frequency rather than staying put. The impedance on the box is a nominal figure,
+not a resistance, which is why an "8 ohm" speaker measures about six with a meter. It reports the
+power it is taking, averaged over the coil's thermal time constant, because the rating is thermal
+and it is the average that decides whether the coil survives.
+
+**INA126** — for reading a small difference sitting on top of a large common voltage: a
+thermocouple, a strain gauge, a current shunt. An op-amp difference stage can do it, but its
+accuracy depends on four resistors matching and yours will not. This has them trimmed on the die,
+and the common-mode rejection is what you are paying for.
+
+The gain on the real part is set by one external resistor, `G = 5 + 80kΩ/R_G`. Here it is a number
+you set on the part, with that formula available both ways. The **REF** pin is not decoration: on a
+single supply the output cannot go below ground, so a difference that swings both ways needs the
+reference lifted off it — tie REF to ground and half the measurement is lost at the rail.
 
 ---
 

@@ -8,6 +8,46 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**Current probes.** A probe can read the current into the pin it is attached to, not just the
+voltage on it — pick which from the dropdown beside the trace. A great deal of what a circuit is
+doing is only visible as current: the holding current that drops a triac out at every zero
+crossing, a relay's flyback spike, what a motor draws as it stalls, whether an LED is getting 5 mA
+or 50. None of that showed up before without adding a shunt and doing the arithmetic yourself.
+
+The convention is a clamp meter's — positive is current flowing into the component through the pin
+you clamped — so the two ends of a resistor read equal and opposite and a transistor's three pins
+sum to zero. Traces carry their own units now, so a current reads `26.4 mA` rather than being
+squeezed onto an axis labelled volts.
+
+**Battery.** Every other source holds its voltage into a dead short and never runs out. Five cells
+are stocked — AA, 9 V PP3, 18650, CR2032 and sealed lead-acid — spanning four hundred to one in
+internal resistance, which is most of why a circuit that behaves on the bench supply misbehaves on
+cells. A coin cell is ten ohms, so an LED's worth of current costs it two hundred millivolts. It
+also runs down: charge is counted out as it is taken, and the terminal voltage holds up across most
+of the discharge and then falls off a cliff, which is why batteries give so little warning.
+
+**TVS diode and varistor.** Two parts for surviving what the rest of the circuit cannot. The TVS is
+invisible below its standoff voltage and clamps hard above it, either polarity. The varistor is a
+power law rather than a knee — `I ∝ V^30` — so it is soft, starts conducting early and never quite
+stops, which is why it belongs behind a fuse. It also wears out on the energy it absorbs, and says
+when it has, because a spent MOV conducts at working voltage and cooks.
+
+**ULN2003.** Seven Darlington sinks, which is how logic drives anything with a coil in it. Every
+channel sinks rather than sources, so the load goes between the supply and the output pin — wire
+one from an output to ground and nothing happens at all, which is modelled rather than smoothed
+over. A conducting output keeps about a volt across it, as a Darlington does, which matters when a
+5 V relay runs off a 5 V rail.
+
+**LM386, speaker and INA126.** The LM386 idles at half its single supply so it can swing both ways,
+which is why the speaker couples through a capacitor; wire it direct and half the rail sits across
+the voice coil. The speaker is a real voice coil with inductance, so the load gets harder with
+frequency, and it reports the power it is taking averaged over the coil's thermal time constant.
+The INA126 lifts a small difference off a large common voltage and rejects the common mode, with
+the datasheet's `G = 5 + 80kΩ/R_G` available both ways.
+
+Not added: a PWM source. `DutyCycle` is already an editable property on both the function generator
+and the clock, so it would have been a second name for a part that is already there.
+
 **The macOS first-run instructions no longer assume a terminal.** Gatekeeper blocks these builds
 because they are not signed or notarized, and the only route documented was `xattr`. There is a
 Settings one: try to open the app, choose Done, then click **Open Anyway** under

@@ -97,11 +97,17 @@ public abstract partial class DigitalComponent : CircuitComponent, IDigitalDevic
             return;
         }
 
-        system.StampTheveninSource(branch, node, reference, OutputVoltage(state), Levels.OutputResistance);
+        system.StampTheveninSource(branch, node, reference, OutputVoltage(state), OutputImpedance);
     }
 
     /// <summary>Voltage driven for a given output state. Overridden where the supply rail matters.</summary>
     protected virtual double OutputVoltage(LogicState state) => Levels.VoltageFor(state);
+
+    /// <summary>
+    /// Impedance behind a driven output. The logic family's figure suits something driving
+    /// another gate; a part built to drive a load rather than a pin overrides it.
+    /// </summary>
+    protected virtual double OutputImpedance => Levels.OutputResistance;
 
     /// <summary>Current sourced by an output pin at the last solved point (positive = sourcing).</summary>
     public double OutputCurrent(MnaSystem system, int index) => -system.BranchCurrent(this, index);

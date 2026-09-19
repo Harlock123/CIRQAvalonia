@@ -29,6 +29,11 @@ public static class SymbolRenderer
         switch (component)
         {
             case Resistor: DrawResistor(context, pen); break;
+            case Speaker speaker: DrawSpeaker(context, pen, zoom, speaker); break;
+            case Battery battery: DrawBattery(context, pen, zoom, battery); break;
+            case TransientSuppressor tvs: DrawTvs(context, pen, zoom, tvs); break;
+            case Varistor varistor: DrawVaristor(context, pen, zoom, varistor); break;
+            case FixedGainAmplifier amp: DrawFixedGainAmplifier(context, pen, zoom, amp); break;
             case Buzzer buzzer: DrawBuzzer(context, pen, zoom, buzzer); break;
             case ElectrolyticCapacitor e: DrawElectrolytic(context, pen, zoom, e); break;
             case Capacitor: DrawCapacitor(context, pen); break;
@@ -438,6 +443,161 @@ public static class SymbolRenderer
     /// A JFET: the channel bar with the gate arrow, pointing in on an N-channel part and out on a
     /// P-channel one. No gap in the channel, because a JFET conducts with no gate drive at all.
     /// </summary>
+    /// <summary>
+    /// A battery: alternating long and short plates, the oldest symbol in electronics. Two cells
+    /// drawn rather than one, which is how a pack is conventionally shown.
+    /// </summary>
+    private static void DrawBattery(DrawingContext context, IPen pen, double zoom, Battery battery)
+    {
+        context.DrawLine(pen, new Point(-30, 0), new Point(-14, 0));
+        context.DrawLine(pen, new Point(30, 0), new Point(14, 0));
+
+        // Long plate is positive, short plate negative, and they alternate.
+        foreach (var (x, half) in new[] { (-14.0, 14.0), (-6.0, 6.0), (6.0, 14.0), (14.0, 6.0) })
+            context.DrawLine(pen, new Point(x, -half), new Point(x, half));
+
+        if (zoom > 0.5)
+        {
+            // A flat cell is worth seeing without reading the caption.
+            var brush = battery.IsFlat ? CanvasTheme.ErrorBrush : CanvasTheme.ValueBrush;
+            var filled = Math.Clamp(battery.StateOfCharge, 0.0, 1.0) * 24.0;
+
+            context.DrawRectangle(null, CanvasTheme.Pen(brush, 1.0, zoom),
+                new Rect(-12, 20, 24, 6));
+
+            if (filled > 0.5) context.DrawRectangle(brush, null, new Rect(-12, 20, filled, 6));
+        }
+    }
+
+    /// <summary>
+    /// A TVS: two zeners back to back, which is what a bidirectional part is. The bent cathode
+    /// bars are the zener marking, and facing them away from each other says it clamps both ways.
+    /// </summary>
+    private static void DrawTvs(DrawingContext context, IPen pen, double zoom, TransientSuppressor tvs)
+    {
+        context.DrawLine(pen, new Point(-30, 0), new Point(-16, 0));
+        context.DrawLine(pen, new Point(30, 0), new Point(16, 0));
+
+        var fill = tvs.IsClamping ? CanvasTheme.SymbolBrush : CanvasTheme.SymbolFill;
+
+        foreach (var sign in new[] { -1.0, 1.0 })
+        {
+            var tip = sign * 2;
+            var back = sign * 16;
+
+            var body = new StreamGeometry();
+            using (var ctx = body.Open())
+            {
+                ctx.BeginFigure(new Point(back, -12), true);
+                ctx.LineTo(new Point(back, 12));
+                ctx.LineTo(new Point(tip, 0));
+                ctx.EndFigure(true);
+            }
+            context.DrawGeometry(fill, pen, body);
+
+            // The zener bar, bent at both ends.
+            context.DrawLine(pen, new Point(tip, -12), new Point(tip, 12));
+            context.DrawLine(pen, new Point(tip, -12), new Point(tip - (sign * 6), -12));
+            context.DrawLine(pen, new Point(tip, 12), new Point(tip + (sign * 6), 12));
+        }
+    }
+
+    /// <summary>A varistor: a resistor body with the diagonal that marks a voltage-dependent part.</summary>
+    private static void DrawVaristor(DrawingContext context, IPen pen, double zoom, Varistor varistor)
+    {
+        context.DrawLine(pen, new Point(-30, 0), new Point(-18, 0));
+        context.DrawLine(pen, new Point(30, 0), new Point(18, 0));
+
+        var brush = varistor.IsWornOut ? CanvasTheme.ErrorBrush : CanvasTheme.SymbolBrush;
+        var body = CanvasTheme.Pen(brush, 1.6, zoom);
+
+        context.DrawRectangle(CanvasTheme.SymbolFill, body, new Rect(-18, -11, 36, 22));
+
+        // The diagonal through the body, with the U-shaped kink that says "voltage dependent".
+        context.DrawLine(body, new Point(-22, 12), new Point(8, -14));
+        context.DrawLine(body, new Point(8, -14), new Point(18, -14));
+    }
+
+    /// <summary>A loudspeaker: the coil box and the cone opening out from it.</summary>
+    private static void DrawSpeaker(DrawingContext context, IPen pen, double zoom, Speaker speaker)
+    {
+        context.DrawLine(pen, new Point(-30, -14), new Point(-14, -14));
+        context.DrawLine(pen, new Point(-30, 14), new Point(-14, 14));
+
+        context.DrawRectangle(CanvasTheme.SymbolFill, pen, new Rect(-14, -14, 12, 28));
+
+        var cone = new StreamGeometry();
+        using (var ctx = cone.Open())
+        {
+            ctx.BeginFigure(new Point(-2, -14), true);
+            ctx.LineTo(new Point(16, -26));
+            ctx.LineTo(new Point(16, 26));
+            ctx.LineTo(new Point(-2, 14));
+            ctx.EndFigure(true);
+        }
+        context.DrawGeometry(CanvasTheme.SymbolFill, pen, cone);
+
+        // Sound coming out of it, drawn only while there is any.
+        if (speaker.IsSounding && zoom > 0.4)
+        {
+            var wave = CanvasTheme.Pen(CanvasTheme.ValueBrush, 1.4, zoom);
+
+            foreach (var r in new[] { 24.0, 32.0 })
+            {
+                var arc = new StreamGeometry();
+                using (var ctx = arc.Open())
+                {
+                    ctx.BeginFigure(new Point(20 + (r * 0.5), -r * 0.7), false);
+                    ctx.ArcTo(new Point(20 + (r * 0.5), r * 0.7), new Size(r, r), 0, false,
+                        SweepDirection.Clockwise);
+                    ctx.EndFigure(false);
+                }
+                context.DrawGeometry(null, wave, arc);
+            }
+        }
+
+        if (speaker.Violations.Count > 0 && zoom > 0.4)
+        {
+            context.DrawEllipse(null, CanvasTheme.Pen(CanvasTheme.ErrorBrush, 2.0, zoom),
+                new Point(4, 0), 34, 34);
+        }
+    }
+
+    /// <summary>
+    /// A fixed-gain amplifier: the same triangle an op-amp gets, with its gain written inside
+    /// rather than left to a feedback network that is not there.
+    /// </summary>
+    private static void DrawFixedGainAmplifier(
+        DrawingContext context, IPen pen, double zoom, FixedGainAmplifier amp)
+    {
+        var body = new StreamGeometry();
+        using (var ctx = body.Open())
+        {
+            ctx.BeginFigure(new Point(-34, -34), true);
+            ctx.LineTo(new Point(-34, 34));
+            ctx.LineTo(new Point(38, 0));
+            ctx.EndFigure(true);
+        }
+
+        var outline = amp.IsClipping ? CanvasTheme.Pen(CanvasTheme.ErrorBrush, 1.6, zoom) : pen;
+        context.DrawGeometry(CanvasTheme.SymbolFill, outline, body);
+
+        context.DrawLine(pen, new Point(-50, -20), new Point(-34, -20));
+        context.DrawLine(pen, new Point(-50, 20), new Point(-34, 20));
+        context.DrawLine(pen, new Point(38, 0), new Point(50, 0));
+        context.DrawLine(pen, new Point(0, -45), new Point(0, -22));
+        context.DrawLine(pen, new Point(0, 45), new Point(0, 22));
+
+        if (zoom > 0.45)
+        {
+            DrawCenteredText(context, "+", new Point(-26, -20), 11, zoom, CanvasTheme.LabelBrush);
+            DrawCenteredText(context, "\u2212", new Point(-26, 20), 11, zoom, CanvasTheme.LabelBrush);
+            // The part number, not the gain: the gain is already the caption underneath, and
+            // printing it twice just makes the symbol look like it is stuttering.
+            DrawCenteredText(context, amp.ComponentType, new Point(-6, 0), 9, zoom, CanvasTheme.LabelBrush);
+        }
+    }
+
     private static void DrawJfet(DrawingContext context, IPen pen, double zoom, JunctionFet jfet)
     {
         context.DrawEllipse(CanvasTheme.SymbolFill, pen, new Point(0, 0), 28, 28);
@@ -1044,6 +1204,10 @@ public static class SymbolRenderer
     public static double LabelOffset(CircuitComponent component) => component switch
     {
         DeveloperBoard board => BoardPackage.BodyHeight(board.Profile) / 2 + 16,
+
+        // The triangle reaches 34 either side of centre, so the default would sit both captions
+        // inside the body.
+        FixedGainAmplifier => 46.0,
         Ne555 => DipPackage.BodyHeight(8) / 2 + 16,
         DigitalIc ic => DipPackage.BodyHeight(ic.PinCount) / 2 + 16,
         _ => 30.0,
