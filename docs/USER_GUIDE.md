@@ -65,7 +65,7 @@ at the window edge; click the rail to bring it back.
 
 Click a palette entry, then click the canvas. The part lands where you click, snapped to the grid.
 
-The palette holds **79 components in 12 categories**:
+The palette holds **84 components in 13 categories**:
 
 | Category | Count | Contents |
 | --- | --- | --- |
@@ -80,6 +80,7 @@ The palette holds **79 components in 12 categories**:
 | Logic Gates | 7 | AND, OR, NAND, NOR, XOR, XNOR, NOT |
 | 74xx Series | 16 | Counters, decoders, flip-flops, shift registers, multiplexers |
 | Digital I/O | 4 | Logic toggle, clock, and indicators |
+| Switching & Isolation | 5 | Relay, fuses, optocouplers — see [below](#switching-and-isolation) |
 | Dev Boards | 4 | Raspberry Pi, Arduino Uno / Nano / Mega — see [below](#development-boards) |
 
 Click a category header to open or close it. **All** in the palette header toggles every group at
@@ -254,6 +255,37 @@ seconds of wall time.
 Give the regulator headroom. It needs its dropout voltage above the output *at the bottom of the
 ripple*, not on average — a supply that measures fine on a meter can still be dropping out on
 every trough.
+
+---
+
+## Switching and isolation
+
+Three parts for the boundary between a control circuit and the thing it controls. Each reports the
+mistake that actually destroys it.
+
+**Relay** — a coil and a changeover contact. The coil is an inductor, so interrupting its current
+produces `v = L·di/dt`: hundreds of volts, backwards, in microseconds. That spike is what kills the
+transistor driving it, and the relay says so — the coil is ringed in red and the status bar names
+the fault. Put a diode across the coil, cathode to the positive end, and the warning goes away
+because the spike now has somewhere to go.
+
+Pull-in and drop-out are deliberately different currents, so a coil sitting near the threshold
+holds its state instead of chattering. `COM` connects to `NC` at rest and to `NO` when energised.
+
+**Fuse** — opens on its melting integral rather than on instantaneous current, which is why a real
+fuse survives an inrush many times its rating: the heat has to accumulate. A fuse carries its rated
+current for ever, so only the excess counts. Doubling the rated current on a 1 A / 0.5 A²s fuse
+takes about a sixth of a second; five times the rating takes twenty milliseconds. Once blown it
+stays blown.
+
+**Optocoupler** — an infrared LED facing a phototransistor with no conductive path between them, so
+the output side can sit at a completely different potential. This is the honest answer to "how do I
+switch something dangerous from a 3.3 V board".
+
+The isolated side still needs its own ground reference. That is a property of isolation, not a
+limitation of the simulator — two circuits with nothing at all between them have no solution. A
+real device leaks through some hundreds of gigohms and that is what is modelled, which keeps the
+matrix solvable without meaningfully coupling the halves.
 
 ---
 

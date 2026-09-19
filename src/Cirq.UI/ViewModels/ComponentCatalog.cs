@@ -1,3 +1,4 @@
+using Cirq.Components.Electromechanical;
 using Cirq.Components.Boards;
 using Cirq.Components.Bridges;
 using Cirq.Components.Digital;
@@ -188,6 +189,19 @@ public static class ComponentCatalog
             new("Clock", "Free-running logic clock", () => new ClockSource(1e3)),
             new("ADC Bridge", "Analog in, logic out, with hysteresis", () => new AdcBridge()),
             new("DAC Bridge", "Logic in, configurable analog out", () => new DacBridge()),
+        ]),
+
+        new("Switching & Isolation",
+        [
+            new("Relay (SPDT)", "Coil and changeover contact — warns if the coil has no flyback diode",
+                () => new Relay()),
+            new("Fuse 1A", "Opens on its melting integral, not on instantaneous current",
+                () => new Fuse(1.0)),
+            new("Fuse 500mA", "Half-amp quick-blow", () => new Fuse(0.5)),
+            new("Optocoupler PC817", "LED and phototransistor, galvanically isolated",
+                () => new Optocoupler(OptocouplerModel.Pc817)),
+            new("Optocoupler 4N35", "Isolated, with a higher saturation knee",
+                () => new Optocoupler(OptocouplerModel.FourN35)),
         ]),
 
         new("Dev Boards",

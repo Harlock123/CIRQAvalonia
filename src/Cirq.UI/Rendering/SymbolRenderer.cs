@@ -5,6 +5,7 @@ using Cirq.Components.Boards;
 using Cirq.Components.Bridges;
 using Cirq.Components.Passive;
 using Cirq.Components.Digital;
+using Cirq.Components.Electromechanical;
 using Cirq.Components.Ics;
 using Cirq.Components.Nonlinear;
 using Cirq.Components.Sources;
@@ -38,6 +39,9 @@ public static class SymbolRenderer
             case DcCurrentSource: DrawCurrentSource(context, pen); break;
             case FunctionGenerator fg: DrawFunctionGenerator(context, pen, fg); break;
             case Led led: DrawLed(context, pen, led); break;
+            case Relay relay: DrawRelay(context, pen, zoom, relay); break;
+            case Fuse fuse: DrawFuse(context, pen, zoom, fuse); break;
+            case Optocoupler opto: DrawOptocoupler(context, pen, zoom, opto); break;
             case BridgeRectifier: DrawBridgeRectifier(context, pen, zoom); break;
             case Diode: DrawDiode(context, pen); break;
             case SevenSegmentDisplay display: DrawSevenSegment(context, pen, zoom, display); break;
@@ -113,6 +117,113 @@ public static class SymbolRenderer
         {
             var warn = CanvasTheme.Pen(CanvasTheme.ErrorBrush, 2.0, zoom);
             context.DrawEllipse(null, warn, new Point(0, 0), 20, 18);
+        }
+    }
+
+    /// <summary>
+    /// A relay: the coil as a boxed inductor on the left, the changeover contact on the right,
+    /// with the armature drawn against whichever throw is currently made.
+    /// </summary>
+    private static void DrawRelay(DrawingContext context, IPen pen, double zoom, Relay relay)
+    {
+        // Coil.
+        context.DrawLine(pen, new Point(-40, -20), new Point(-26, -20));
+        context.DrawLine(pen, new Point(-40, 20), new Point(-26, 20));
+        context.DrawRectangle(CanvasTheme.SymbolFill, pen, new Rect(-26, -20, 18, 40));
+
+        // The dashed mechanical link from coil to contact.
+        var link = CanvasTheme.Pen(CanvasTheme.SymbolBrush, 1.0, zoom, new DashStyle([2, 3], 0));
+        context.DrawLine(link, new Point(-8, 0), new Point(14, 0));
+
+        // Contact: common on the right, throwing between NO above and NC below.
+        context.DrawLine(pen, new Point(40, -30), new Point(26, -30));
+        context.DrawLine(pen, new Point(40, 30), new Point(26, 30));
+        context.DrawLine(pen, new Point(40, 0), new Point(26, 0));
+
+        var throwTo = relay.IsEnergised ? new Point(26, -30) : new Point(26, 30);
+        context.DrawLine(pen, new Point(26, 0), throwTo);
+
+        context.DrawEllipse(CanvasTheme.SymbolBrush, null, new Point(26, -30), 2.5, 2.5);
+        context.DrawEllipse(CanvasTheme.SymbolBrush, null, new Point(26, 30), 2.5, 2.5);
+
+        if (relay.Violations.Count > 0 && zoom > 0.4)
+        {
+            var warn = CanvasTheme.Pen(CanvasTheme.ErrorBrush, 2.0, zoom);
+            context.DrawEllipse(null, warn, new Point(-17, 0), 18, 26);
+        }
+    }
+
+    /// <summary>A fuse: the element in its holder, drawn broken once it has blown.</summary>
+    private static void DrawFuse(DrawingContext context, IPen pen, double zoom, Fuse fuse)
+    {
+        context.DrawLine(pen, new Point(-30, 0), new Point(-18, 0));
+        context.DrawLine(pen, new Point(18, 0), new Point(30, 0));
+        context.DrawRectangle(CanvasTheme.SymbolFill, pen, new RoundedRect(new Rect(-18, -9, 36, 18), 3));
+
+        if (fuse.HasBlown)
+        {
+            // Broken element, with the gap that stopped the current.
+            var broken = CanvasTheme.Pen(CanvasTheme.ErrorBrush, 1.6, zoom);
+            context.DrawLine(broken, new Point(-18, 0), new Point(-6, 0));
+            context.DrawLine(broken, new Point(-6, 0), new Point(-3, -5));
+            context.DrawLine(broken, new Point(3, 5), new Point(6, 0));
+            context.DrawLine(broken, new Point(6, 0), new Point(18, 0));
+        }
+        else
+        {
+            context.DrawLine(pen, new Point(-18, 0), new Point(18, 0));
+        }
+    }
+
+    /// <summary>
+    /// An optocoupler: the emitter and the detector in one package, with the barrier between them
+    /// drawn as the dashed line it electrically is.
+    /// </summary>
+    private static void DrawOptocoupler(DrawingContext context, IPen pen, double zoom, Optocoupler opto)
+    {
+        var body = new Rect(-26, -30, 52, 60);
+        context.DrawRectangle(CanvasTheme.SymbolFill, pen, new RoundedRect(body, 3));
+
+        foreach (var (from, to) in new[]
+                 {
+                     (new Point(-40, -20), new Point(-26, -20)),
+                     (new Point(-40, 20), new Point(-26, 20)),
+                     (new Point(40, -20), new Point(26, -20)),
+                     (new Point(40, 20), new Point(26, 20)),
+                 })
+        {
+            context.DrawLine(pen, from, to);
+        }
+
+        // Emitter: a diode pointing down the input side.
+        context.DrawLine(pen, new Point(-18, -20), new Point(-18, 20));
+        var led = new StreamGeometry();
+        using (var ctx = led.Open())
+        {
+            ctx.BeginFigure(new Point(-24, -8), true);
+            ctx.LineTo(new Point(-12, -8));
+            ctx.LineTo(new Point(-18, 4));
+            ctx.EndFigure(true);
+        }
+        context.DrawGeometry(opto.IsConducting ? CanvasTheme.ValueBrush : CanvasTheme.SymbolFill, pen, led);
+        context.DrawLine(pen, new Point(-24, 4), new Point(-12, 4));
+
+        // The barrier.
+        var barrier = CanvasTheme.Pen(CanvasTheme.SymbolBrush, 1.0, zoom, new DashStyle([2, 2], 0));
+        context.DrawLine(barrier, new Point(-4, -26), new Point(-4, 26));
+
+        // Detector: a transistor with no base lead, because light is its base drive.
+        context.DrawLine(pen, new Point(12, -14), new Point(12, 14));
+        context.DrawLine(pen, new Point(12, -7), new Point(26, -20));
+        context.DrawLine(pen, new Point(12, 7), new Point(26, 20));
+
+        // Light crossing the barrier.
+        if (zoom > 0.5)
+        {
+            var ray = CanvasTheme.Pen(
+                opto.IsConducting ? CanvasTheme.ValueBrush : CanvasTheme.LabelBrush, 1.0, zoom);
+            context.DrawLine(ray, new Point(-9, -4), new Point(8, -4));
+            context.DrawLine(ray, new Point(-9, 4), new Point(8, 4));
         }
     }
 

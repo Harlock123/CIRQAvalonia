@@ -8,6 +8,18 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+- **New category, Switching & Isolation: relay, fuse and optocoupler.**
+  - The **relay** reports the thing that actually destroys relay drivers. Its coil is an inductor,
+    so switching it off with no flyback diode produces hundreds of volts backwards; the coil is
+    ringed in red and the fault named. Pull-in and drop-out are different currents, so a coil near
+    the threshold holds its state rather than chattering.
+  - The **fuse** opens on its melting integral, not on instantaneous current — which is why a real
+    fuse survives an inrush many times its rating. Twice the rated current on a 1 A part takes
+    about a sixth of a second; five times takes twenty milliseconds.
+  - The **optocoupler** has no conductive path between its halves, so the output side can sit at a
+    completely different potential. It still needs its own ground reference, which is a property of
+    isolation rather than a limitation.
+
 - **New: bridge rectifier and electrolytic capacitor**, which together with the existing 7812 make
   up a linear power supply. The bridge is four real diodes rather than an idealised block, so the
   output peak sits about 1.4 V below the input peak and ripples at twice the input frequency —
