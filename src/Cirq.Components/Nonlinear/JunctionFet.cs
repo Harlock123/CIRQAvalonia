@@ -125,22 +125,28 @@ public partial class JunctionFet : CircuitComponent
 
         if (overdrive <= 0) return (0, 0, 0);
 
-        var lambda = Model.ChannelModulation;
+        var lambda = Math.Max(Model.ChannelModulation, 0);
+        var modulation = 1.0 + (lambda * vds);
 
         if (vds >= overdrive)
         {
             // Saturation: current set by the gate, with a gentle slope from channel modulation.
-            var id = beta * overdrive * overdrive * (1.0 + (lambda * vds));
-            return (id,
-                2.0 * beta * overdrive * (1.0 + (lambda * vds)),
+            return (beta * overdrive * overdrive * modulation,
+                2.0 * beta * overdrive * modulation,
                 beta * overdrive * overdrive * lambda);
         }
 
         // Triode: the channel behaves as a voltage-controlled resistance.
-        var triode = beta * vds * ((2.0 * overdrive) - vds);
-        return (triode,
-            2.0 * beta * vds,
-            2.0 * beta * (overdrive - vds));
+        //
+        // Channel modulation applies here too, as it does in the MOSFET model. Leaving it to the
+        // saturation branch alone makes the current jump by a few percent as the device crosses
+        // between them, and a discontinuity is exactly what Newton cannot walk down: an amplifier
+        // whose drain dipped into triode on startup hunted either side of the boundary until the
+        // solver gave up. With it, current, gm and gds all meet at vds = overdrive.
+        var core = vds * ((2.0 * overdrive) - vds);
+        return (beta * core * modulation,
+            2.0 * beta * vds * modulation,
+            beta * ((2.0 * (overdrive - vds) * modulation) + (core * lambda)));
     }
 
     public override void StampMatrix(MnaSystem system, SimulationState state)

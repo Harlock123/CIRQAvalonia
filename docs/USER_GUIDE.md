@@ -211,7 +211,11 @@ You should see a square wave and the exponential charge and discharge of the cap
 the RC time constant here is 10 kΩ × 100 nF = 1 ms, against a half-period of 1 ms, so the capacitor
 gets roughly two-thirds of the way each time.
 
-Everything above is also in **File > Examples**, along with fifteen other circuits.
+Everything above is also in **File > Examples**, along with twenty-one other circuits. Six of them
+exercise the newer parts: **Lamp Dimmer** (triac and diac phase control), **SCR Latch** (a thyristor
+that stays on after you let go of the button), **LED Chaser** (a 4017), **4060 Timer** (a chip
+clocking itself from one resistor and one capacitor), **Staircase Generator** (a 4040 addressing a
+4051) and **JFET Amplifier**.
 
 ---
 
@@ -677,7 +681,8 @@ Also available in the app at **Help > Keyboard Shortcuts**.
 | `P` | Probe tool |
 | `R` | Rotate selection |
 | `Delete` | Delete selection |
-| `F` | Zoom to fit |
+| `Ctrl` `+` / `Ctrl` `-` | Zoom in / out (the numeric keypad's `+` and `-` work too) |
+| `F` | Zoom to fit — the whole circuit, captions and all |
 | Wheel | Zoom at the pointer |
 | Middle-drag / space-drag | Pan |
 | Double-click | Operate a switch, push button or logic toggle |

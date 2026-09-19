@@ -96,6 +96,38 @@ public class JunctionFetTests
         Assert.Contains("forward-biased", string.Join(" | ", fet.Violations));
     }
 
+    /// <summary>
+    /// The drain current has to cross the triode/saturation boundary without a step in it. It did
+    /// not once: channel modulation was applied to the saturation branch only, so the current
+    /// jumped about three percent at <c>vds = overdrive</c>. A discontinuity is the one thing
+    /// Newton cannot walk down, and an amplifier whose drain dipped into triode on startup hunted
+    /// either side of the boundary until the solver gave up.
+    /// <para>
+    /// The slope is allowed to change here — that is what the two regions mean. What is measured
+    /// is the step across the join, against the slope on either side of it.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void TheDrainCurrentIsSmoothAcrossTheTriodeBoundary()
+    {
+        var model = JfetModel.J2N3819;      // pinch-off 3 V, so at Vgs = 0 the boundary is 3 V
+        const double boundary = 3.0;
+        const double step = 0.002;
+
+        double At(double vds) => Math.Abs(Biased(vgs: 0.0, vdd: vds, model: model).Fet.DrainCurrent);
+
+        var below = At(boundary - step);
+        var above = At(boundary + step);
+
+        // What the triode side is doing just before the join, as a scale to judge the step by.
+        var triodeSlope = Math.Abs(At(boundary - step) - At(boundary - (3 * step)));
+
+        Assert.True(Math.Abs(above - below) <= (triodeSlope * 2.0) + 1e-6,
+            $"the current steps {Math.Abs(above - below) * 1e6:0.0} uA across the boundary while " +
+            $"moving {triodeSlope * 1e6:0.0} uA per equivalent step beside it — the two branches " +
+            "do not meet");
+    }
+
     [Fact]
     public void APChannelPartMirrorsTheNChannelOne()
     {

@@ -208,6 +208,24 @@ public class CircuitCanvas : Control
     /// <summary>Centres the view on the circuit's extents, or on the origin when it is empty.</summary>
     public void ZoomToFit() => FitTo(Bounds.Size);
 
+    /// <summary>
+    /// Steps the zoom about the middle of the viewport, which is where the menu and the keyboard
+    /// have to work from — the wheel zooms about the pointer instead, because there is one.
+    /// </summary>
+    public void ZoomBy(double factor)
+    {
+        var centre = new Point(Bounds.Width / 2, Bounds.Height / 2);
+        var worldBefore = ScreenToWorld(centre);
+
+        _viewAdjustedByUser = true;
+        Zoom = Math.Clamp(Zoom * factor, CanvasTheme.MinZoom, CanvasTheme.MaxZoom);
+
+        var worldAfter = ScreenToWorld(centre);
+        _panOffset += new Point((worldAfter.X - worldBefore.X) * Zoom, (worldAfter.Y - worldBefore.Y) * Zoom);
+
+        InvalidateVisual();
+    }
+
     private void FitTo(Size viewport)
     {
         var circuit = Circuit;
@@ -219,11 +237,40 @@ public class CircuitCanvas : Control
             return;
         }
 
-        const double margin = 80.0;
-        var minX = circuit.Components.Min(c => c.X) - margin;
-        var maxX = circuit.Components.Max(c => c.X) + margin;
-        var minY = circuit.Components.Min(c => c.Y) - margin;
-        var maxY = circuit.Components.Max(c => c.Y) + margin;
+        // The extents of what is actually drawn, not of the component centres. A fixed margin
+        // round the centres was enough for a resistor and nowhere near enough for a 40-pin board,
+        // whose symbol is some eight hundred units tall: fitting to its centre left most of the
+        // part off screen, which is the one case where fitting matters most.
+        const double margin = 40.0;
+
+        double minX = double.MaxValue, maxX = double.MinValue;
+        double minY = double.MaxValue, maxY = double.MinValue;
+
+        void Include(double x, double y)
+        {
+            minX = Math.Min(minX, x);
+            maxX = Math.Max(maxX, x);
+            minY = Math.Min(minY, y);
+            maxY = Math.Max(maxY, y);
+        }
+
+        foreach (var component in circuit.Components)
+        {
+            var bounds = VisualBoundsOf(component);
+            Include(bounds.Left, bounds.Top);
+            Include(bounds.Right, bounds.Bottom);
+        }
+
+        // Wires route orthogonally through waypoints that can sit well outside the parts they
+        // join, so a circuit steered round an obstacle is wider than its components are.
+        foreach (var wire in circuit.Wires)
+            foreach (var waypoint in wire.Waypoints)
+                Include(waypoint.X, waypoint.Y);
+
+        minX -= margin;
+        maxX += margin;
+        minY -= margin;
+        maxY += margin;
 
         var scaleX = viewport.Width / Math.Max(maxX - minX, 1);
         var scaleY = viewport.Height / Math.Max(maxY - minY, 1);
@@ -557,6 +604,25 @@ public class CircuitCanvas : Control
         return new Rect(
             component.X - halfWidth, component.Y - halfHeight,
             halfWidth * 2, halfHeight * 2);
+    }
+
+    /// <summary>
+    /// Everything a component puts on the canvas: its symbol and both captions. The designator and
+    /// value sit a component-dependent distance above and below the centre — on a board that is
+    /// most of the symbol's height away from it — so they are part of the extents, not decoration
+    /// on top of them.
+    /// </summary>
+    public static Rect VisualBoundsOf(CircuitComponent component)
+    {
+        var bounds = BoundsOf(component);
+
+        // Captions are centred text of about eleven pixels, drawn at the label offset.
+        var caption = SymbolRenderer.LabelOffset(component) + 12;
+
+        var top = Math.Min(bounds.Top, component.Y - caption);
+        var bottom = Math.Max(bounds.Bottom, component.Y + caption);
+
+        return new Rect(bounds.Left, top, bounds.Width, bottom - top);
     }
 
     /// <summary>Wire whose drawn path passes within a few pixels of the point.</summary>

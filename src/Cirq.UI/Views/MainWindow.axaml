@@ -62,6 +62,8 @@
       </MenuItem>
 
       <MenuItem Header="_View">
+        <MenuItem Header="Zoom _In" InputGesture="Ctrl+OemPlus" Command="{Binding ZoomInCommand}" />
+        <MenuItem Header="Zoom _Out" InputGesture="Ctrl+OemMinus" Command="{Binding ZoomOutCommand}" />
         <MenuItem Header="Zoom to _Fit" InputGesture="F" Command="{Binding ZoomToFitCommand}" />
         <Separator />
         <MenuItem Header="Show _Grid" ToggleType="CheckBox" IsChecked="{Binding ShowGrid, Mode=TwoWay}" />

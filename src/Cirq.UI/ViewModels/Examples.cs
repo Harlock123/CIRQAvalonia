@@ -4,6 +4,7 @@ using Cirq.Components.Nonlinear;
 using Cirq.Components.Ics;
 using Cirq.Components.Passive;
 using Cirq.Components.Sources;
+using Cirq.Core.Digital;
 using Cirq.Core.Topology;
 
 namespace Cirq.UI.ViewModels;
@@ -38,6 +39,16 @@ public static class Examples
             LoadRaspberryPiGpio),
         new("Linear Power Supply", "Mains secondary through a bridge and reservoir into a 7812",
             LoadLinearPowerSupply),
+        new("Lamp Dimmer", "Triac and diac phase control — move the firing angle and the lamp dims",
+            LoadLampDimmer),
+        new("SCR Latch", "A push button fires it and only interrupting the anode turns it off",
+            LoadScrLatch),
+        new("LED Chaser", "4017 walking a lit output along ten LEDs", LoadLedChaser),
+        new("4060 Timer", "A 4060 clocking itself from one resistor and one capacitor",
+            Load4060Timer),
+        new("Staircase Generator", "4040 addressing a 4051 to step through a resistor ladder",
+            LoadStaircase),
+        new("JFET Amplifier", "2N3819 common-source stage with self-bias", LoadJfetAmplifier),
     ];
 
     public static void LoadRcLowPass(MainWindowViewModel vm)
@@ -680,6 +691,290 @@ public static class Examples
         vm.Scope.AddProbe(pi.Pin("GPIO18"), "Clock");
         vm.Scope.AddProbe(pi.Pin("GPIO23"), "Pattern");
         vm.Scope.AddProbe(pi.Pin("GPIO25"), "Button");
+    }
+
+    /// <summary>
+    /// Triac phase control, which is what is inside a lamp dimmer. The RC charges from the mains
+    /// through each half cycle; when it reaches the diac's breakover the diac dumps it into the
+    /// triac gate, and the triac conducts for whatever is left of that half. It then turns itself
+    /// off at the zero crossing, because the current falls below its holding current, and the
+    /// whole thing starts again. Raise the resistor and it fires later and the lamp dims.
+    /// </summary>
+    public static void LoadLampDimmer(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "Triac lamp dimmer";
+
+        var mains = Place(circuit, new FunctionGenerator(Waveform.Sine, 50, 320), -360, 40);
+        var lamp = Place(circuit, new Resistor(240), -140, -100);
+        var triac = Place(circuit, new Triac(), 80, 40);
+        var gateResistor = Place(circuit, new Resistor(47e3), 80, -100);
+        var timing = Place(circuit, new Capacitor(100e-9), 240, 40);
+        var diac = Place(circuit, new Diac(), 240, -40);
+        var gnd = Place(circuit, new Ground(), -360, 200);
+        var gnd2 = Place(circuit, new Ground(), 240, 200);
+
+        lamp.RotationDegrees = 0;
+        timing.RotationDegrees = 90;
+
+        circuit.Connect(mains.Output, lamp.A);
+        circuit.Connect(lamp.B, triac.MainTerminal2);
+        circuit.Connect(triac.MainTerminal1, gnd.Pin);
+        circuit.Connect(mains.Return, gnd.Pin);
+
+        // The phase-shift network, taken across the triac so it charges while the triac blocks.
+        circuit.Connect(triac.MainTerminal2, gateResistor.A);
+        circuit.Connect(gateResistor.B, timing.A);
+        circuit.Connect(timing.B, gnd2.Pin);
+        circuit.Connect(timing.A, diac.A);
+        circuit.Connect(diac.B, triac.Gate);
+
+        vm.Scope.TimebasePerDivision = 5e-3;
+        vm.Scope.VoltsPerDivision = 100.0;
+        vm.Scope.AddProbe(mains.Output, "Mains");
+        vm.Scope.AddProbe(lamp.B, "Lamp");
+    }
+
+    /// <summary>
+    /// What makes a thyristor different from everything else here: it remembers. Double-click the
+    /// push button and the SCR fires; let go and it stays on, because the gate has no further say.
+    /// The only way to put it out is to take the anode current away, which is what the switch in
+    /// series with the lamp is for.
+    /// </summary>
+    public static void LoadScrLatch(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "SCR latch";
+
+        var supply = Place(circuit, new DcVoltageSource(12.0), -360, 60);
+        var interrupter = Place(circuit, new ToggleSwitch(closed: true), -200, -80);
+        var lamp = Place(circuit, new Resistor(120), -20, -80);
+        var scr = Place(circuit, new SiliconControlledRectifier(), 160, 60);
+        var trigger = Place(circuit, new PushButton(), -20, 120);
+        var gateResistor = Place(circuit, new Resistor(2.2e3), 160, 180);
+        var gnd = Place(circuit, new Ground(), -360, 220);
+        var gnd2 = Place(circuit, new Ground(), 340, 160);
+
+        scr.RotationDegrees = 90;
+
+        circuit.Connect(supply.Negative, gnd.Pin);
+        circuit.Connect(supply.Positive, interrupter.A);
+        circuit.Connect(interrupter.B, lamp.A);
+        circuit.Connect(lamp.B, scr.Anode);
+        circuit.Connect(scr.Cathode, gnd2.Pin);
+
+        // Gate drive: a momentary pulse from the rail is all it takes.
+        circuit.Connect(supply.Positive, trigger.A);
+        circuit.Connect(trigger.B, gateResistor.A);
+        circuit.Connect(gateResistor.B, scr.Gate);
+
+        vm.Scope.TimebasePerDivision = 50e-3;
+        vm.Scope.VoltsPerDivision = 5.0;
+        vm.Scope.AddProbe(lamp.B, "Anode");
+        vm.Scope.AddProbe(scr.Gate, "Gate");
+    }
+
+    /// <summary>
+    /// The archetypal 4000-series circuit. A 4017 decodes for you, so exactly one output is high
+    /// and it walks along them — ten LEDs, ten pins, and no decoder anywhere.
+    /// </summary>
+    public static void LoadLedChaser(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "4017 LED chaser";
+
+        var supply = Place(circuit, new DcVoltageSource(5.0), -420, 140);
+        var gnd = Place(circuit, new Ground(), -420, 280);
+        var ledGround = Place(circuit, new Ground(), 340, 340);
+
+        // CMOS wants a rail-to-rail input, so the clock is set to the same family as the counter.
+        var clock = Place(circuit, new ClockSource(6.0) { Levels = LogicLevels.Cmos5V }, -300, -40);
+        var counter = Place(circuit, new Ic4017(), -100, 20);
+
+        circuit.Connect(supply.Negative, gnd.Pin);
+        circuit.Connect(counter.Vcc, supply.Positive);
+        circuit.Connect(counter.Gnd, gnd.Pin);
+
+        circuit.Connect(clock.Out, counter.Clock);
+        circuit.Connect(counter.ClockInhibit, gnd.Pin);
+        circuit.Connect(counter.Reset, gnd.Pin);
+
+        string[] colours = ["Red", "Amber", "Yellow", "Green", "Blue",
+                            "Red", "Amber", "Yellow", "Green", "Blue"];
+
+        for (var i = 0; i < 10; i++)
+        {
+            var y = -160 + (i * 36);
+            var resistor = Place(circuit, new Resistor(330), 140, y);
+            var led = Place(circuit, Led.OfColour(colours[i]), 300, y);
+
+            circuit.Connect(counter.Outputs[i], resistor.A);
+            circuit.Connect(resistor.B, led.Anode);
+            circuit.Connect(led.Cathode, ledGround.Pin);
+        }
+
+        vm.Scope.TimebasePerDivision = 100e-3;
+        vm.Scope.VoltsPerDivision = 2.0;
+        vm.Scope.Layout = ScopeLayout.Tiled;
+        vm.Scope.AddProbe(counter.Outputs[0], "Q0");
+        vm.Scope.AddProbe(counter.Outputs[5], "Q5");
+        vm.Scope.AddProbe(counter.CarryOut, "Carry");
+    }
+
+    /// <summary>
+    /// The 4060 clocking itself. Rt from REXT, Ct from CEXT and Rs from RS all meet at one node,
+    /// and that node plus the two inverters inside the chip is the whole oscillator — the scope
+    /// shows it charging and being thrown past the rail on every flip. The counter then divides it
+    /// down, which is why one chip and three passives make a timer.
+    /// </summary>
+    public static void Load4060Timer(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "4060 self-clocking timer";
+
+        var supply = Place(circuit, new DcVoltageSource(5.0), -420, 120);
+        var gnd = Place(circuit, new Ground(), -420, 260);
+        var timingGround = Place(circuit, new Ground(), 60, 340);
+        var ledGround = Place(circuit, new Ground(), 400, 260);
+
+        var counter = Place(circuit, new Ic4060(), -120, 0);
+        var rt = Place(circuit, new Resistor(10e3), 60, -80);
+        var ct = Place(circuit, new Capacitor(100e-9), 60, 0);
+        var rs = Place(circuit, new Resistor(47e3), 60, 80);
+
+        circuit.Connect(supply.Negative, gnd.Pin);
+        circuit.Connect(counter.Vcc, supply.Positive);
+        circuit.Connect(counter.Gnd, gnd.Pin);
+        circuit.Connect(counter.MasterReset, gnd.Pin);
+
+        // The three timing components meet at one node, which is the timing node itself.
+        circuit.Connect(counter.ResistorPin, rt.A);
+        circuit.Connect(counter.CapacitorPin, ct.A);
+        circuit.Connect(counter.ClockOscillator, rs.A);
+        circuit.Connect(rt.B, ct.B);
+        circuit.Connect(ct.B, rs.B);
+
+        var limiter = Place(circuit, new Resistor(330), 240, 160);
+        var led = Place(circuit, Led.OfColour("Green"), 400, 160);
+        // Q6: the oscillator divided by 64, which is slow enough to watch and fast enough to see
+        // change inside one screen of the scope.
+        circuit.Connect(counter.Outputs[2], limiter.A);
+        circuit.Connect(limiter.B, led.Anode);
+        circuit.Connect(led.Cathode, ledGround.Pin);
+
+        // The timing node needs a ground reference for the scope to make sense of it.
+        circuit.Connect(timingGround.Pin, gnd.Pin);
+
+        vm.Scope.TimebasePerDivision = 20e-3;
+        vm.Scope.VoltsPerDivision = 2.0;
+        vm.Scope.Layout = ScopeLayout.Tiled;
+        vm.Scope.AddProbe(counter.ClockOscillator, "Osc");
+        vm.Scope.AddProbe(counter.Outputs[0], "Q4");
+        vm.Scope.AddProbe(counter.Outputs[2], "Q6");
+    }
+
+    /// <summary>
+    /// A 4051 is not a logic part: its channels carry whatever analog voltage you put on them. Here
+    /// a 4040 counts on its three low stages, the 4051 walks the taps of a resistor ladder, and
+    /// the common pin produces a staircase — one chip doing what eight switches would.
+    /// </summary>
+    public static void LoadStaircase(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "4040 and 4051 staircase generator";
+
+        var supply = Place(circuit, new DcVoltageSource(5.0), -460, 160);
+        var gnd = Place(circuit, new Ground(), -460, 300);
+        var ladderGround = Place(circuit, new Ground(), 300, 380);
+
+        var clock = Place(circuit, new ClockSource(400.0) { Levels = LogicLevels.Cmos5V }, -340, -60);
+        var counter = Place(circuit, new Ic4040(), -160, 0);
+        var mux = Place(circuit, new Ic4051(), 80, 0);
+        var load = Place(circuit, new Resistor(100e3), 260, -180);
+
+        circuit.Connect(supply.Negative, gnd.Pin);
+        foreach (var vcc in new[] { counter.Vcc, mux.Vcc }) circuit.Connect(vcc, supply.Positive);
+        foreach (var pin in new[] { counter.Gnd, mux.Gnd, counter.Reset, mux.Inhibit, mux.NegativeSupply })
+            circuit.Connect(pin, gnd.Pin);
+
+        circuit.Connect(clock.Out, counter.Clock);
+
+        // Three stages of the counter are three address bits, so it sweeps the eight channels.
+        circuit.Connect(counter.Outputs[0], mux.A);
+        circuit.Connect(counter.Outputs[1], mux.B);
+        circuit.Connect(counter.Outputs[2], mux.C);
+
+        // A ladder of eight equal resistors from the rail to ground, tapped at every junction.
+        var previous = supply.Positive;
+        for (var i = 7; i >= 0; i--)
+        {
+            var rung = Place(circuit, new Resistor(1e3), 420, -180 + ((7 - i) * 50));
+            circuit.Connect(previous, rung.A);
+            circuit.Connect(rung.A, mux.Channel(i));
+            previous = rung.B;
+        }
+
+        circuit.Connect(previous, ladderGround.Pin);
+
+        circuit.Connect(mux.Common, load.A);
+        circuit.Connect(load.B, gnd.Pin);
+
+        vm.Scope.TimebasePerDivision = 5e-3;
+        vm.Scope.VoltsPerDivision = 1.0;
+        vm.Scope.AddProbe(mux.Common, "Staircase");
+        vm.Scope.AddProbe(counter.Outputs[0], "Q1");
+    }
+
+    /// <summary>
+    /// A JFET is a depletion device, so it conducts with the gate at zero and biases itself: the
+    /// source resistor lifts the source above the gate, which is the same as pulling the gate
+    /// negative, and the drain current settles where the two agree. No divider, no coupling to the
+    /// supply — which is most of why the part is still around.
+    /// </summary>
+    public static void LoadJfetAmplifier(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "2N3819 common-source amplifier";
+
+        var supply = Place(circuit, new DcVoltageSource(15.0), -420, 60);
+        var signal = Place(circuit, new FunctionGenerator(Waveform.Sine, 1e3, 0.4), -420, -160);
+        var coupling = Place(circuit, new Capacitor(100e-9), -240, -160);
+        var gateResistor = Place(circuit, new Resistor(1e6), -140, -40);
+        var jfet = Place(circuit, new JunctionFet(JfetModel.J2N3819), 40, -80);
+        var drainResistor = Place(circuit, new Resistor(2.2e3), 40, -240);
+        var sourceResistor = Place(circuit, new Resistor(470), 40, 60);
+        var bypass = Place(circuit, new Capacitor(10e-6), 200, 60);
+
+        var gnd = Place(circuit, new Ground(), -420, 200);
+        var gateGround = Place(circuit, new Ground(), -140, 80);
+        var sourceGround = Place(circuit, new Ground(), 120, 200);
+
+        gateResistor.RotationDegrees = 90;
+        drainResistor.RotationDegrees = 90;
+        sourceResistor.RotationDegrees = 90;
+        bypass.RotationDegrees = 90;
+
+        circuit.Connect(supply.Negative, gnd.Pin);
+        circuit.Connect(signal.Return, gnd.Pin);
+
+        circuit.Connect(signal.Output, coupling.A);
+        circuit.Connect(coupling.B, jfet.Gate);
+        circuit.Connect(jfet.Gate, gateResistor.A);
+        circuit.Connect(gateResistor.B, gateGround.Pin);
+
+        circuit.Connect(supply.Positive, drainResistor.A);
+        circuit.Connect(drainResistor.B, jfet.Drain);
+
+        // Self-bias, with the source resistor bypassed so the gain is not degenerated away.
+        circuit.Connect(jfet.Source, sourceResistor.A);
+        circuit.Connect(sourceResistor.B, sourceGround.Pin);
+        circuit.Connect(jfet.Source, bypass.A);
+        circuit.Connect(bypass.B, sourceGround.Pin);
+
+        vm.Scope.TimebasePerDivision = 500e-6;
+        vm.Scope.VoltsPerDivision = 1.0;
+        vm.Scope.AddProbe(jfet.Gate, "In");
+        vm.Scope.AddProbe(jfet.Drain, "Out");
     }
 
     private static T Place<T>(Circuit circuit, T component, double x, double y) where T : CircuitComponent

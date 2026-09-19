@@ -8,6 +8,30 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**Zoom to fit now fits.** It measured the extents from the component centres and added a fixed
+margin, which was ample for a resistor and nowhere near enough for a 40-pin board — a Mega's symbol
+is some eight hundred units tall, so fitting to its centre left most of the part off screen, in the
+one case where fitting matters most. It now measures what is actually drawn, captions included, and
+takes wire waypoints into account so a circuit routed around an obstacle is not clipped either.
+
+**Zoom in and out**, on the View menu and on `Ctrl` `+` / `Ctrl` `-`. The numeric keypad's `+` and
+`-` work as well, since typing an actual `+` means holding shift on most layouts. The wheel still
+zooms about the pointer; the menu and keyboard zoom about the middle of the view.
+
+**Six new examples**, for the parts added over the last few releases: **Lamp Dimmer** (triac and
+diac phase control, firing once per half cycle and turning itself off at every zero crossing),
+**SCR Latch** (press the button and it stays on — only interrupting the anode puts it out), **LED
+Chaser** (a 4017 walking ten LEDs), **4060 Timer** (a chip clocking itself from one resistor and one
+capacitor), **Staircase Generator** (a 4040 addressing a 4051 across a resistor ladder) and **JFET
+Amplifier**.
+
+**Fixed: the JFET's two regions did not meet.** Channel-length modulation was applied to the
+saturation branch only, so the drain current stepped about three percent as the device crossed
+`vds = overdrive`. A discontinuity is the one thing Newton cannot walk down, and the JFET amplifier
+found it: with the source bypass capacitor still charging the stage sits in triode, and the solver
+hunted either side of the boundary until it gave up. Current, transconductance and output
+conductance now all meet at the boundary, as they already did in the MOSFET model.
+
 **Thyristors: SCR, triac and diac.** Everything else in the library follows its input; these parts
 remember. An SCR fires on a gate pulse and the gate then has no further say at all — it conducts
 until the anode current falls below its holding current, which on DC means until something

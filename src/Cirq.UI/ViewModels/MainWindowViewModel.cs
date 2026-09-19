@@ -307,6 +307,9 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     /// <summary>Raised when the canvas should recentre on the circuit.</summary>
     public event EventHandler? RequestZoomToFit;
 
+    /// <summary>Raised with the factor to multiply the zoom by.</summary>
+    public event EventHandler<double>? RequestZoomBy;
+
     /// <summary>Raised when the selected component should be rotated.</summary>
     public event EventHandler? RequestRotateSelection;
 
@@ -330,6 +333,15 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
     [RelayCommand]
     private void ZoomToFit() => RequestZoomToFit?.Invoke(this, EventArgs.Empty);
+
+    /// <summary>One step of zoom, matching what a wheel notch does.</summary>
+    private const double ZoomStep = 1.25;
+
+    [RelayCommand]
+    private void ZoomIn() => RequestZoomBy?.Invoke(this, ZoomStep);
+
+    [RelayCommand]
+    private void ZoomOut() => RequestZoomBy?.Invoke(this, 1.0 / ZoomStep);
 
     [RelayCommand]
     private void Exit() => RequestClose?.Invoke(this, EventArgs.Empty);
@@ -390,6 +402,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
           Esc          Cancel the current wire / clear the selection
 
         View
+          Ctrl + / -   Zoom in / out (the numeric keypad works too)
           F            Zoom to fit
           Wheel        Zoom at the cursor
           Middle drag  Pan (or hold Space and drag)

@@ -48,6 +48,7 @@ public partial class MainWindow : Window
 
         viewModel.RequestRedraw += (_, _) => Dispatcher.UIThread.Post(() => _canvas?.InvalidateVisual());
         viewModel.RequestZoomToFit += (_, _) => Dispatcher.UIThread.Post(() => _canvas?.RequestFit());
+        viewModel.RequestZoomBy += (_, factor) => Dispatcher.UIThread.Post(() => _canvas?.ZoomBy(factor));
 
         Dispatcher.UIThread.Post(() =>
         {
@@ -140,6 +141,25 @@ public partial class MainWindow : Window
                     return;
                 case Key.N:
                     _viewModel?.NewCircuitCommand.Execute(null);
+                    e.Handled = true;
+                    return;
+            }
+        }
+
+        // Zoom, on every spelling of plus and minus a keyboard offers. The unshifted key is
+        // OemPlus on most layouts, the numeric keypad reports Add and Subtract, and typing an
+        // actual "+" means holding shift as well — so all of them count rather than only the one
+        // the menu has room to print.
+        if (e.KeyModifiers is KeyModifiers.Control or (KeyModifiers.Control | KeyModifiers.Shift))
+        {
+            switch (e.Key)
+            {
+                case Key.OemPlus or Key.Add:
+                    _viewModel?.ZoomInCommand.Execute(null);
+                    e.Handled = true;
+                    return;
+                case Key.OemMinus or Key.Subtract:
+                    _viewModel?.ZoomOutCommand.Execute(null);
                     e.Handled = true;
                     return;
             }
