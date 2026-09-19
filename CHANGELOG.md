@@ -8,6 +8,10 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+- New example, **File > Examples > Raspberry Pi GPIO** — a Pi driving two LEDs and reading a button
+  on an internal pull-up, wiring all three things a GPIO pin can do into one circuit. Double-click
+  the button on the canvas to press it.
+
 ## [0.2.0] - 2026-09-19
 
 **Raspberry Pi and Arduino boards.** A Pi or Arduino can now sit on the schematic as either the

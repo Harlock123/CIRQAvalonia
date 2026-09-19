@@ -203,7 +203,7 @@ You should see a square wave and the exponential charge and discharge of the cap
 the RC time constant here is 10 kΩ × 100 nF = 1 ms, against a half-period of 1 ms, so the capacitor
 gets roughly two-thirds of the way each time.
 
-Everything above is also in **File > Examples**, along with thirteen other circuits.
+Everything above is also in **File > Examples**, along with fourteen other circuits.
 
 ---
 
@@ -287,6 +287,10 @@ on the node decides the level. That is how you model an open-drain line, or hand
 to another device mid-pattern.
 
 Patterns are capped at 256 steps, which is far more than a schematic needs.
+
+**File > Examples > Raspberry Pi GPIO** wires all three pin roles at once — one pin toggling, one
+playing a pattern, and one reading a button on the internal pull-up. Double-click the button on the
+canvas to press it and watch the input fall.
 
 Frequencies accept the same engineering notation as everything else (`500Hz`, `1kHz`, `2.5kHz`).
 The **Status** readout underneath says how the line was understood, and names anything it could not

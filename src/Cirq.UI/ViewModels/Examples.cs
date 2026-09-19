@@ -1,3 +1,4 @@
+using Cirq.Components.Boards;
 using Cirq.Components.Digital;
 using Cirq.Components.Nonlinear;
 using Cirq.Components.Ics;
@@ -33,6 +34,8 @@ public static class Examples
         new("Running Light", "74164 shift register walking a bit across eight LEDs", LoadRunningLight),
         new("Window Detector", "LM339 outputs wired together to flag an out-of-range voltage",
             LoadWindowDetector),
+        new("Raspberry Pi GPIO", "Pi driving two LEDs and reading a button on an internal pull-up",
+            LoadRaspberryPiGpio),
     ];
 
     public static void LoadRcLowPass(MainWindowViewModel vm)
@@ -545,6 +548,68 @@ public static class Examples
         vm.Scope.VoltsPerDivision = 1.0;
         vm.Scope.AddProbe(signal.Output, "Signal");
         vm.Scope.AddProbe(out0, "In range");
+    }
+
+    /// <summary>
+    /// The canonical first Raspberry Pi circuit, with each of the three things a GPIO pin can do:
+    /// one pin toggling, one playing a bit pattern, and one reading a button.
+    /// <para>
+    /// The button pin uses the Pi's internal pull-up, so the input idles high and the button pulls
+    /// it down — which is why the button goes to ground rather than to 3.3V. Wiring it the other
+    /// way needs an external pull-down and is the usual reason a first attempt reads garbage.
+    /// </para>
+    /// <para>
+    /// The rates are far faster than you would blink a real LED, because the simulation runs at
+    /// 1/1000 speed by default and a 2 Hz blink would take eight minutes of wall time per cycle.
+    /// Set <b>Simulate &gt; Speed</b> to real time to see human-scale rates.
+    /// </para>
+    /// </summary>
+    public static void LoadRaspberryPiGpio(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "Raspberry Pi GPIO";
+
+        var pi = Place(circuit, new RaspberryPiBoard(), -300, 0);
+
+        // GPIO18 toggles, GPIO23 plays a pattern, GPIO25 reads. All three on the even-numbered
+        // side of the header so the wiring runs out to the right rather than back across the body.
+        pi.Pins = "GPIO18=clock@500Hz; GPIO23=seq@1kHz:1100_1010; GPIO25=in-pullup";
+
+        // 330R on 3.3V gives about 4.5 mA through a red LED — comfortably inside the Pi's 16 mA
+        // per-pin rating, which the board checks as it runs.
+        var r1 = Place(circuit, new Resistor(330), -60, -180);
+        var led1 = Place(circuit, Led.OfColour("Red"), 60, -180);
+        var r2 = Place(circuit, new Resistor(330), -60, -80);
+        var led2 = Place(circuit, Led.OfColour("Green"), 60, -80);
+        var button = Place(circuit, new PushButton(), -60, 60);
+
+        var gndLeds = Place(circuit, new Ground(), 180, 20);
+        var gndButton = Place(circuit, new Ground(), 60, 140);
+        var gndBoard = Place(circuit, new Ground(), -300, 300);
+
+        // The board's own ground is what everything else is measured against.
+        circuit.Connect(pi.GroundPins[0], gndBoard.Pin);
+
+        circuit.Connect(pi.Pin("GPIO18"), r1.A);
+        circuit.Connect(r1.B, led1.Anode);
+        circuit.Connect(led1.Cathode, gndLeds.Pin);
+
+        circuit.Connect(pi.Pin("GPIO23"), r2.A);
+        circuit.Connect(r2.B, led2.Anode);
+        circuit.Connect(led2.Cathode, gndLeds.Pin);
+
+        // Double-click the button on the canvas to press it and watch the input fall.
+        circuit.Connect(pi.Pin("GPIO25"), button.A);
+        circuit.Connect(button.B, gndButton.Pin);
+
+        // Tiled rather than stacked: these are 0-3.3V logic traces, and stacking centres each
+        // lane on its offset, which pushes a unipolar trace off the top of its lane.
+        vm.Scope.TimebasePerDivision = 1e-3;
+        vm.Scope.VoltsPerDivision = 1.0;
+        vm.Scope.Layout = ScopeLayout.Tiled;
+        vm.Scope.AddProbe(pi.Pin("GPIO18"), "Clock");
+        vm.Scope.AddProbe(pi.Pin("GPIO23"), "Pattern");
+        vm.Scope.AddProbe(pi.Pin("GPIO25"), "Button");
     }
 
     private static T Place<T>(Circuit circuit, T component, double x, double y) where T : CircuitComponent

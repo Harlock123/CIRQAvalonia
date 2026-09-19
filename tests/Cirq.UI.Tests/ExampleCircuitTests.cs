@@ -1,3 +1,5 @@
+using Cirq.Components.Boards;
+using Cirq.Components.Passive;
 using Cirq.UI.ViewModels;
 
 namespace Cirq.UI.Tests;
@@ -147,5 +149,85 @@ public class ExampleCircuitTests
         // Reference designators must be unique so the netlist can be read.
         var names = viewModel.Circuit.Components.Select(c => c.Name).ToList();
         Assert.Equal(names.Count, names.Distinct(StringComparer.OrdinalIgnoreCase).Count());
+    }
+}
+
+/// <summary>
+/// The Raspberry Pi example is the one circuit that exercises a development board, so it is worth
+/// checking it behaves rather than merely compiling: the board's own rule checks must stay quiet,
+/// and each of the three pin roles must actually do its job.
+/// </summary>
+public class RaspberryPiExampleTests
+{
+    private static (MainWindowViewModel Vm, DeveloperBoard Board) Load()
+    {
+        var vm = new MainWindowViewModel();
+        Examples.LoadRaspberryPiGpio(vm);
+        vm.Simulation.InvalidateTopology();
+        Assert.True(vm.Simulation.Rebuild(), vm.Simulation.Status);
+        return (vm, vm.Circuit.Components.OfType<DeveloperBoard>().Single());
+    }
+
+    [Fact]
+    public void TheLedsAreResistoredWithinThePinsCurrentRating()
+    {
+        var (vm, board) = Load();
+        using var _ = vm;
+
+        vm.Simulation.Simulator!.Run(1e-3);
+        board.CheckLimits(vm.Simulation.Simulator!.System);
+
+        // An example that trips the board's own warnings would be teaching the wrong thing.
+        Assert.Empty(board.Violations);
+        Assert.InRange(board.GpioCurrent, 0.001, 0.016);
+    }
+
+    [Fact]
+    public void TheButtonPinIdlesHighOnTheInternalPullUpAndFallsWhenPressed()
+    {
+        var (vm, board) = Load();
+        using var _ = vm;
+
+        var pin = board.Pin("GPIO25");
+        var button = vm.Circuit.Components.OfType<PushButton>().Single();
+
+        vm.Simulation.Simulator!.Run(1e-3);
+        var released = vm.Simulation.Simulator!.NodeVoltage(pin);
+
+        button.IsPressed = true;
+        vm.Simulation.InvalidateTopology();
+        Assert.True(vm.Simulation.Rebuild(), vm.Simulation.Status);
+        vm.Simulation.Simulator!.Run(1e-3);
+        var pressed = vm.Simulation.Simulator!.NodeVoltage(pin);
+
+        Assert.True(released > 3.0, $"idle sat at {released:0.00} V, expected the pull-up to hold it high");
+        Assert.True(pressed < 0.3, $"pressed sat at {pressed:0.00} V, expected the button to pull it down");
+    }
+
+    [Fact]
+    public void TheDrivenPinsActuallySwitchOverTheScopeWindow()
+    {
+        var (vm, board) = Load();
+        using var _ = vm;
+
+        var simulator = vm.Simulation.Simulator!;
+        double clockLow = double.MaxValue, clockHigh = double.MinValue;
+        double patternLow = double.MaxValue, patternHigh = double.MinValue;
+
+        simulator.TimePointAccepted += _ =>
+        {
+            var clock = simulator.NodeVoltage(board.Pin("GPIO18"));
+            var pattern = simulator.NodeVoltage(board.Pin("GPIO23"));
+            clockLow = Math.Min(clockLow, clock);
+            clockHigh = Math.Max(clockHigh, clock);
+            patternLow = Math.Min(patternLow, pattern);
+            patternHigh = Math.Max(patternHigh, pattern);
+        };
+
+        // One screen's worth at the timebase the example sets.
+        simulator.Run(10e-3);
+
+        Assert.True(clockHigh - clockLow > 2.0, $"clock pin only moved {clockHigh - clockLow:0.00} V");
+        Assert.True(patternHigh - patternLow > 2.0, $"pattern pin only moved {patternHigh - patternLow:0.00} V");
     }
 }
