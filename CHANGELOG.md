@@ -8,16 +8,28 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
-- **Thermistors, NTC and PTC.** The NTC follows the Beta equation a datasheet actually gives, so
-  it is steeply non-linear — a 10 kΩ B3950 bead reads 33 kΩ at freezing and 2.5 kΩ at 60 °C. A PTC
-  is specified by a coefficient per kelvin instead and is modelled that way rather than by forcing
-  one equation to cover both. Double-click either to swing it between cold and warm while the
-  simulation runs.
-- **Piezo and active buzzers.** A passive piezo is a capacitor, so a steady voltage across it makes
-  no sound whatever — the most common reason a first buzzer circuit is silent. It says so, and is
-  ringed in red, rather than drawing a plausible current and leaving you to wonder. An active
-  buzzer has its own oscillator and sounds on DC. A passive element sounds at whatever it is fed,
-  measured from the drive rather than assumed.
+## [0.6.0] - 2026-09-19
+
+**Thermistors, NTC and PTC.** The NTC follows the Beta equation a datasheet actually gives,
+`R = R₂₅·exp(B·(1/T − 1/T₂₅))` with the temperatures in kelvin. That curve is steeply non-linear —
+a 10 kΩ B3950 bead reads 33 kΩ at freezing and 2.5 kΩ at 60 °C — and treating it as a straight
+line is the usual reason a home-made thermometer is right at one temperature and nowhere else.
+
+A PTC is specified by a coefficient per kelvin rather than a Beta, so it is modelled that way
+instead of forcing one equation to cover both. Double-click either to swing it between cold and
+warm while the simulation runs, and pair it with a comparator to act on temperature.
+
+**Piezo and active buzzers**, and the difference between them is the point rather than a detail.
+
+A **passive** piezo is a capacitor: it turns a *changing* voltage into movement, so a steady one
+does nothing at all. Wiring one across a pin that is simply switched high is the most common reason
+a first buzzer circuit is silent, so that is reported and the part ringed in red rather than
+drawing a plausible current and leaving you to wonder. It sounds at whatever it is fed, and the
+frequency shown is measured from the drive rather than assumed.
+
+An **active** buzzer has its own oscillator behind the element, so DC is exactly what it wants.
+
+**705 tests** pass, measured against closed-form answers rather than recorded output.
 
 ## [0.5.0] - 2026-09-19
 
@@ -190,7 +202,8 @@ First public build of CirqAvalonia — an electronic circuit analyzer and mixed-
 
 **501 tests** measure the solver against closed-form answers rather than recorded output.
 
-[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.2.0...v0.3.0
