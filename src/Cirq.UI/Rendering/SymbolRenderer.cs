@@ -46,6 +46,10 @@ public static class SymbolRenderer
             case Relay relay: DrawRelay(context, pen, zoom, relay); break;
             case Fuse fuse: DrawFuse(context, pen, zoom, fuse); break;
             case Optocoupler opto: DrawOptocoupler(context, pen, zoom, opto); break;
+            case SiliconControlledRectifier scr: DrawThyristor(context, pen, zoom, scr, scr.IsLatched, true); break;
+            case Triac triac: DrawTriac(context, pen, zoom, triac); break;
+            case Diac diac: DrawDiac(context, pen, zoom, diac); break;
+            case JunctionFet jfet: DrawJfet(context, pen, zoom, jfet); break;
             case ShuntReference shunt: DrawShuntReference(context, pen, zoom, shunt); break;
             case BridgeRectifier: DrawBridgeRectifier(context, pen, zoom); break;
             case Diode: DrawDiode(context, pen); break;
@@ -351,6 +355,119 @@ public static class SymbolRenderer
                 opto.IsConducting ? CanvasTheme.ValueBrush : CanvasTheme.LabelBrush, 1.0, zoom);
             context.DrawLine(ray, new Point(-9, -4), new Point(8, -4));
             context.DrawLine(ray, new Point(-9, 4), new Point(8, 4));
+        }
+    }
+
+    /// <summary>
+    /// An SCR: a diode with a gate lead. Filled while it is latched, so whether it is conducting
+    /// is visible without reading the caption — which matters for a part whose whole character is
+    /// that it stays on after the thing that triggered it has gone.
+    /// </summary>
+    private static void DrawThyristor(
+        DrawingContext context, IPen pen, double zoom, CircuitComponent component,
+        bool latched, bool hasGate)
+    {
+        context.DrawLine(pen, new Point(-40, 0), new Point(-12, 0));
+        context.DrawLine(pen, new Point(12, 0), new Point(40, 0));
+
+        var body = new StreamGeometry();
+        using (var ctx = body.Open())
+        {
+            ctx.BeginFigure(new Point(-12, -14), true);
+            ctx.LineTo(new Point(-12, 14));
+            ctx.LineTo(new Point(12, 0));
+            ctx.EndFigure(true);
+        }
+        context.DrawGeometry(latched ? CanvasTheme.ValueBrush : CanvasTheme.SymbolFill, pen, body);
+        context.DrawLine(pen, new Point(12, -14), new Point(12, 14));
+
+        if (hasGate)
+        {
+            context.DrawLine(pen, new Point(0, 40), new Point(8, 14));
+            context.DrawLine(pen, new Point(8, 14), new Point(12, 5));
+        }
+    }
+
+    /// <summary>A triac: two thyristors back to back, so it is drawn symmetrically.</summary>
+    private static void DrawTriac(DrawingContext context, IPen pen, double zoom, Triac triac)
+    {
+        context.DrawLine(pen, new Point(-40, 0), new Point(-6, 0));
+        context.DrawLine(pen, new Point(6, 0), new Point(40, 0));
+
+        var fill = triac.IsLatched ? CanvasTheme.ValueBrush : CanvasTheme.SymbolFill;
+
+        foreach (var sign in new[] { -1.0, 1.0 })
+        {
+            var arm = new StreamGeometry();
+            using (var ctx = arm.Open())
+            {
+                ctx.BeginFigure(new Point(sign * 6, -14), true);
+                ctx.LineTo(new Point(sign * 6, 14));
+                ctx.LineTo(new Point(sign * -6, 0));
+                ctx.EndFigure(true);
+            }
+            context.DrawGeometry(fill, pen, arm);
+        }
+
+        context.DrawLine(pen, new Point(0, 40), new Point(-6, 14));
+    }
+
+    /// <summary>A diac: the triac's symbol without a gate, because it has none.</summary>
+    private static void DrawDiac(DrawingContext context, IPen pen, double zoom, Diac diac)
+    {
+        context.DrawLine(pen, new Point(-30, 0), new Point(-6, 0));
+        context.DrawLine(pen, new Point(6, 0), new Point(30, 0));
+
+        var fill = diac.IsLatched ? CanvasTheme.ValueBrush : CanvasTheme.SymbolFill;
+
+        foreach (var sign in new[] { -1.0, 1.0 })
+        {
+            var arm = new StreamGeometry();
+            using (var ctx = arm.Open())
+            {
+                ctx.BeginFigure(new Point(sign * 6, -13), true);
+                ctx.LineTo(new Point(sign * 6, 13));
+                ctx.LineTo(new Point(sign * -6, 0));
+                ctx.EndFigure(true);
+            }
+            context.DrawGeometry(fill, pen, arm);
+        }
+    }
+
+    /// <summary>
+    /// A JFET: the channel bar with the gate arrow, pointing in on an N-channel part and out on a
+    /// P-channel one. No gap in the channel, because a JFET conducts with no gate drive at all.
+    /// </summary>
+    private static void DrawJfet(DrawingContext context, IPen pen, double zoom, JunctionFet jfet)
+    {
+        context.DrawEllipse(CanvasTheme.SymbolFill, pen, new Point(0, 0), 28, 28);
+
+        // Gate lead straight onto the channel. There is no gap here, unlike the MOSFET's
+        // insulated gate: a JFET's gate is a junction, in contact with the channel it pinches.
+        context.DrawLine(pen, new Point(-40, 0), new Point(-8, 0));
+
+        // The channel: one unbroken bar, against the MOSFET's three segments. That is the
+        // difference the symbol is carrying — this device conducts with no gate drive at all.
+        context.DrawLine(pen, new Point(-8, -18), new Point(-8, 18));
+
+        context.DrawLine(pen, new Point(-8, -14), new Point(16, -14));
+        context.DrawLine(pen, new Point(16, -14), new Point(16, -26));
+        context.DrawLine(pen, new Point(16, -26), new Point(20, -40));
+
+        context.DrawLine(pen, new Point(-8, 14), new Point(16, 14));
+        context.DrawLine(pen, new Point(16, 14), new Point(16, 26));
+        context.DrawLine(pen, new Point(16, 26), new Point(20, 40));
+
+        // The gate arrow points in on an N-channel part and out on a P-channel one, the same
+        // way a bipolar's emitter arrow reads: along the way the junction would conduct.
+        DrawArrowHead(context, pen,
+            from: jfet.Model.IsNChannel ? new Point(-30, 0) : new Point(-8, 0),
+            to: jfet.Model.IsNChannel ? new Point(-8, 0) : new Point(-30, 0));
+
+        if (jfet.Violations.Count > 0 && zoom > 0.4)
+        {
+            var warn = CanvasTheme.Pen(CanvasTheme.ErrorBrush, 2.0, zoom);
+            context.DrawEllipse(null, warn, new Point(0, 0), 33, 33);
         }
     }
 

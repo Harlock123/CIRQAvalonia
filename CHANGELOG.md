@@ -8,6 +8,42 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**Thyristors: SCR, triac and diac.** Everything else in the library follows its input; these parts
+remember. An SCR fires on a gate pulse and the gate then has no further say at all — it conducts
+until the anode current falls below its holding current, which on DC means until something
+interrupts the supply. A triac is two of them back to back, so it latches either way and either
+gate polarity fires it, which also means it turns itself off at every zero crossing and has to be
+re-fired each half cycle. That is phase control, and it is why a lamp dimmer works.
+
+A diac has no gate at all: it blocks until about 32 V across it and then conducts whichever way
+pushed it there. It is the thing that fires the triac, and with an RC to set the firing angle the
+three of them are a lamp dimmer in three components.
+
+All three show `conducting` or `blocking` and are drawn filled while they conduct, so the latch is
+visible on the canvas instead of something you infer from the scope.
+
+**JFETs: 2N3819, J201 and 2N5460.** A depletion device, which is what separates it from every
+MOSFET already in the library: it conducts with no gate drive at all, and it takes a negative gate
+on an N-channel part to pinch the channel off. Wiring one expecting it to start off is the usual
+first surprise, and the symbol says so if you know to look — the channel is one unbroken bar where
+an enhancement MOSFET's is drawn in three segments. The gate is a reverse-biased junction drawing
+essentially nothing, which is the reason to use one; drive it positive and the part tells you,
+because it has stopped being a FET and started being a diode.
+
+**4000-series CMOS: 4017, 4511 and 4066.** The 4017 decodes for you — exactly one of its ten
+outputs is high and it walks along them on each clock, which is every LED chaser ever built, with
+no decoder. The 4511 is the 7447's counterpart for common-cathode displays, so its outputs are
+active high and the two are not interchangeable; it also has a latch the 7447 lacks, and it blanks
+above nine rather than showing odd glyphs.
+
+The 4066 is four independent analog switches and the one part here that is not logic: its switched
+pins carry whatever you put on them, neither pin is an input or an output, and a closed switch is
+some tens of ohms rather than a short — enough to lose real signal into a low-impedance load.
+
+These are CMOS, not TTL. A 4000-series input on a 5 V rail wants 3.5 V before it reads high and a
+74xx output only guarantees 3.4 V, so driving one directly from the other is a circuit that works
+in one place and not the other.
+
 ## [0.8.0] - 2026-09-19
 
 **TL431 programmable shunt reference.** A zener whose voltage you choose. Tie its reference pin to

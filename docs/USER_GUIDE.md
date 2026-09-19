@@ -65,20 +65,20 @@ at the window edge; click the rail to bring it back.
 
 Click a palette entry, then click the canvas. The part lands where you click, snapped to the grid.
 
-The palette holds **92 components in 14 categories**:
+The palette holds **101 components in 14 categories**:
 
 | Category | Count | Contents |
 | --- | --- | --- |
 | Passive | 6 | Resistor, capacitor, **electrolytic capacitor**, inductor, transformer, potentiometer |
 | Switches | 3 | SPST, SPDT, push button |
 | Sources | 4 | Ground, DC voltage, DC current, function generator |
-| Semiconductors | 6 | 1N4148, 1N4001, Schottky, 5.1 V and 12 V zeners, **bridge rectifier** |
-| Transistors | 7 | NPN and PNP bipolars, N- and P-channel MOSFETs |
+| Semiconductors | 9 | 1N4148, 1N4001, Schottky, 5.1 V and 12 V zeners, bridge rectifier, **SCR, triac, diac** — see [below](#thyristors-parts-that-latch) |
+| Transistors | 10 | NPN and PNP bipolars, N- and P-channel MOSFETs, **three JFETs** — see [below](#jfets) |
 | LEDs & Displays | 8 | Six LED colours, common-anode and common-cathode seven-segment |
 | Power | 7 | Fixed and adjustable regulators, TL431 shunt reference |
 | Analog ICs | 8 | LM741, NE555, LM311, LM339 and friends |
 | Logic Gates | 7 | AND, OR, NAND, NOR, XOR, XNOR, NOT |
-| 74xx Series | 17 | Counters, decoders, flip-flops, shift registers, multiplexers, Schmitt inverter |
+| 74xx Series | 20 | Counters, decoders, flip-flops, shift registers, multiplexers, Schmitt inverter, **4000-series CMOS** |
 | Digital I/O | 4 | Logic toggle, clock, and indicators |
 | Sensors & Actuators | 6 | DC motor, LDR, thermistors, buzzers — see [below](#sensors-and-actuators) |
 | Switching & Isolation | 5 | Relay, fuses, optocouplers — see [below](#switching-and-isolation) |
@@ -233,6 +233,29 @@ transition, so edges are not smeared across a step.
 Useful examples to start from: **NAND Latch**, **Decade Counter**, **Ring Oscillator**,
 **Digit Counter**, **Running Light**.
 
+Three 4000-series CMOS parts sit in the same group as the 74xx family:
+
+- **4017** — a decade counter that decodes for you. Where a 7490 counts in BCD and needs a decoder
+  to show anything, exactly one of the 4017's ten outputs is high at a time and it walks along them
+  on each clock. That is the part behind every LED chaser: ten LEDs, ten pins, no decoder. Carry-out
+  is high for the first five counts, so it divides by ten and chains straight into the next stage.
+- **4511** — the 7447's counterpart. That part sinks current from a common-**anode** display; this
+  one sources it into a common-**cathode** one, so its outputs are active high and the two are not
+  interchangeable. It also has a latch the 7447 lacks: hold `LE` high and the display freezes on
+  whatever was decoded, while the counter behind it carries on. Inputs above nine blank the display
+  rather than showing the odd glyphs a 7447 produces.
+- **4066** — four independent analog switches, and the one part in the group that is not logic at
+  all. Its switched pins carry whatever you put on them — audio, a sensor divider, a reference — and
+  the control pin only decides whether the path exists. Neither switched pin is an input or an
+  output, which is what *bilateral* means. A closed switch is some tens of ohms rather than a short,
+  so feeding a low-impedance load through one loses real signal.
+
+These are CMOS, not TTL, and that matters when you mix families. A 4000-series input on a 5 V rail
+wants 3.5 V before it will call a level high, and a 74xx output only guarantees 3.4 V — so a TTL
+part driving a CMOS input directly is a circuit that works on the bench and not in the simulator,
+or the other way round. Pull the TTL output up to the rail, or drive the CMOS part from something
+that swings rail to rail.
+
 ### Building a power supply
 
 Three parts cover the usual linear supply, and each models the thing that actually bites:
@@ -353,6 +376,58 @@ The isolated side still needs its own ground reference. That is a property of is
 limitation of the simulator — two circuits with nothing at all between them have no solution. A
 real device leaks through some hundreds of gigohms and that is what is modelled, which keeps the
 matrix solvable without meaningfully coupling the halves.
+
+---
+
+## Thyristors: parts that latch
+
+Everything else in the library follows its input. A thyristor remembers, and that is the only thing
+you need to understand about the family.
+
+**SCR** — a diode you switch on with a gate pulse and cannot switch off. It blocks both ways until
+the gate is driven, then conducts forwards only. The gate has no further say: once it has fired,
+removing the drive does nothing at all. It conducts until the anode current falls below its holding
+current, which on DC means until something interrupts the supply. That is why an SCR makes an
+excellent crowbar and a poor lamp switch.
+
+**Triac** — two SCRs back to back in one package, so it latches in either direction, and gate drive
+of either polarity fires it. It drops out the moment the current falls below the holding current,
+so a triac on AC turns itself off at every zero crossing and has to be re-fired each half cycle.
+That is the whole of phase control: fire it late in each half and the load sees only the tail of
+the waveform. Fire it later still and the lamp dims.
+
+**Diac** — no gate at all, which is the point. It blocks until the voltage across it reaches its
+breakover, around 32 V, then conducts whichever way pushed it there. It is the thing that fires a
+triac: an RC charges towards the mains, the diac breaks over and dumps the capacitor into the triac
+gate, and moving the RC's time constant moves the firing angle. A lamp dimmer in three components.
+
+Each of the three shows `conducting` or `blocking` as its value and is drawn filled while it
+conducts, so the latch is visible on the canvas rather than something you infer from the scope.
+
+If one of these will not stay on, the holding current is almost always why — the load is drawing
+less than the part needs to hold itself latched. If one will not fire, check the gate resistor:
+it sets the gate current, and the trigger threshold is a current, not a voltage.
+
+---
+
+## JFETs
+
+A JFET is a **depletion** device, and that is what separates it from every MOSFET in the library:
+it conducts with no gate drive at all. Zero volts from gate to source gives you the full `I_DSS`,
+and it takes a *negative* gate on an N-channel part to pinch the channel off. Wiring one up
+expecting it to start off is the usual first surprise. The symbol says so, if you know to look —
+the channel is one unbroken bar, where an enhancement MOSFET's is drawn in three segments.
+
+The drain current follows the square law, `I_D = I_DSS·(1 − V_GS/V_P)²`, so it is gentler than a
+MOSFET's and the reason JFETs turn up in audio.
+
+The gate is a reverse-biased junction and draws essentially nothing, which is the reason to reach
+for one. It is also a real diode: drive the gate positive on an N-channel part and it stops being a
+FET and starts being a diode. The part reports that rather than quietly conducting, because a
+circuit that does it is almost never the circuit you meant to build.
+
+Four models are stocked — 2N3819, J201 and 2N5457 N-channel, 2N5460 P-channel — and three of them
+are in the palette.
 
 ---
 

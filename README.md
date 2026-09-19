@@ -16,7 +16,7 @@ CirqAvalonia.slnx
 ├── src/
 │   ├── Cirq.Core/         Domain model: components, terminals, nets, MNA stamping contract
 │   ├── Cirq.Engine/       LU solver, Newton-Raphson, transient loop, digital event scheduler
-│   ├── Cirq.Components/   Component library (RCL, transistors, diodes, 741, 555, 74xx, displays, dev boards)
+│   ├── Cirq.Components/   Component library (RCL, transistors, diodes, thyristors, 741, 555, 74xx/4000, displays, boards)
 │   └── Cirq.UI/           Avalonia editor, schematic canvas, inspector, ScottPlot scope
 └── tests/
     ├── Cirq.Engine.Tests/      Solver accuracy against closed-form solutions
@@ -166,6 +166,9 @@ Tests measure the solver against closed-form answers rather than recorded output
 | Regulators | Line and load regulation, dropout, current limiting, LM317 divider programming |
 | BJT | Beta in forward active, saturation, cutoff, exponential Vbe, PNP mirroring, KCL at all three terminals |
 | MOSFET | Square-law saturation current, triode switching, zero gate current, reverse conduction, body diode |
+| JFET | Full I_DSS at zero gate drive, square law across the range, pinch-off, vanishing gate current, P-channel mirroring |
+| Thyristors | SCR blocking and firing, staying on after the gate drive goes away, dropping out when the anode current is interrupted, reverse blocking; triac firing on both half cycles and turning itself off at every zero crossing; diac breakover in either polarity |
+| 4000 series | 4017 one-hot walk, reset, carry dividing by ten; 4511 glyph table, active-high drive, lamp test and blanking priority; 4066 analog pass-through and its on-resistance dividing with the load |
 | Comparator | Open-collector pull-down and release, driving a higher rail through a pull-up, edge timing |
 | Displays | 7447 glyph table, open-collector drive, lamp test and blanking priority, counter walking 0-9 on the display |
 | Files | Every component type round-trips with its parameters, pins, wires, waypoints and probes; a reloaded circuit solves to the same answer; damaged, unknown and newer-format files are handled without losing the open circuit |
@@ -267,7 +270,7 @@ toolbar used to show: active tool, simulation speed, elapsed time and solver rat
 `Help > Keyboard Shortcuts` lists everything below, and the
 [User Guide](docs/USER_GUIDE.md) walks through building a circuit from an empty canvas.
 
-The palette holds 92 components in 14 collapsible categories:
+The palette holds 101 components in 14 collapsible categories:
 
 ![The component palette with every category expanded, showing passive parts, switches, sources, semiconductors, transistors, LEDs and displays, power, analog ICs, logic gates and the 74xx series](docs/images/02-palette.png)
 
