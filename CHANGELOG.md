@@ -8,6 +8,12 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-09-19
+
+Four parts that each finish something already here: a crystal, an electret microphone, a hobby
+servo and a four-phase stepper. The palette holds 123 components in 15 categories, and 950 tests
+measure them against closed-form answers.
+
 **Crystal.** Every other oscillator here takes its frequency from the circuit around it — the
 74HC14, the 4093 and the 4060 all charge a capacitor through a resistor. A crystal is the opposite,
 and it is modelled as what it electrically is: a series R-L-C standing in for the mechanical
@@ -453,7 +459,8 @@ First public build of CirqAvalonia — an electronic circuit analyzer and mixed-
 
 **501 tests** measure the solver against closed-form answers rather than recorded output.
 
-[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.8.0...v0.9.0
