@@ -17,9 +17,10 @@ Settings one: try to open the app, choose Done, then click **Open Anyway** under
 The old advice to right-click and choose Open was also out of date — that bypass still works
 through macOS 14, but Apple removed it in macOS 15.
 
-The README also now says why the builds are unsigned, which is a decision rather than an oversight:
-notarization is per build, so it is a step welded onto every release rather than one afternoon of
-setup, and releases here currently land within hours of each other.
+The README and the `MACOS-FIRST-RUN.txt` in each macOS archive now also say why the builds are
+unsigned, which is a decision rather than an oversight: notarization is per build, so it is a step
+welded onto every release rather than one afternoon of setup, and releases here currently land
+within hours of each other.
 
 ## [0.9.0] - 2026-09-19
 

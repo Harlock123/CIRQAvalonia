@@ -128,6 +128,19 @@ Or from a terminal:
 
 Right-click > Open in Finder also works through macOS 14. Apple removed that
 bypass in macOS 15 (Sequoia).
+
+
+Why you are having to do this at all
+------------------------------------
+
+The build is unsigned by decision rather than by oversight. Notarization is per
+build, not per project: every archive of every release has to go to Apple, come
+back, and be stapled individually. That is a step welded onto every release
+rather than one afternoon of setup, and releases here currently land within
+hours of each other. Apple is not quick at its end either.
+
+The intent has not changed -- a Developer ID certificate, hardened runtime and
+a notarized .app bundle -- and when that happens this file goes away.
 EOF
   fi
 
