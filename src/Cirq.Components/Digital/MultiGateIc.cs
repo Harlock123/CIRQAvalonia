@@ -17,9 +17,13 @@ public abstract class MultiGateIc : DigitalIc
     /// <summary>One gate: the pins feeding it, and the pin it drives.</summary>
     protected sealed record GateDefinition(int[] InputPins, int OutputPin);
 
+    /// <summary>Widest gate that still gets a stack buffer rather than a heap array.</summary>
+    private const int StackLimit = 8;
+
     private readonly GateDefinition[] _gates;
     private readonly Terminal[][] _gateInputs;
     private readonly Terminal[] _gateOutputs;
+    private readonly int _widestGate;
 
     protected MultiGateIc(
         int pinCount,
@@ -56,6 +60,8 @@ public abstract class MultiGateIc : DigitalIc
             _gateOutputs[g] = Pin(definition.OutputPin, $"{g + 1}Y", TerminalType.Output);
         }
 
+        foreach (var gate in _gateInputs) _widestGate = Math.Max(_widestGate, gate.Length);
+
         Gnd = Pin(gndPin, "GND", TerminalType.Ground);
         Vcc = Pin(vccPin, "VCC", TerminalType.Power);
 
@@ -81,10 +87,18 @@ public abstract class MultiGateIc : DigitalIc
     {
         var delay = DelayFor(context);
 
+        // One buffer for the whole call, sized to the widest gate in the package and re-sliced
+        // per gate. A stackalloc inside the loop is not released until the method returns, so the
+        // frame grew with every gate instead of being reused (CA2014). Nothing outlives the call:
+        // Evaluate returns a LogicState, and a Span cannot be stored anyway.
+        Span<LogicState> buffer = _widestGate <= StackLimit
+            ? stackalloc LogicState[StackLimit]
+            : new LogicState[_widestGate];
+
         for (var g = 0; g < _gates.Length; g++)
         {
             var inputs = _gateInputs[g];
-            Span<LogicState> states = inputs.Length <= 8 ? stackalloc LogicState[inputs.Length] : new LogicState[inputs.Length];
+            var states = buffer[..inputs.Length];
 
             for (var i = 0; i < inputs.Length; i++)
                 states[i] = context.ReadInput(inputs[i], Levels);
