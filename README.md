@@ -16,7 +16,7 @@ CirqAvalonia.slnx
 ├── src/
 │   ├── Cirq.Core/         Domain model: components, terminals, nets, MNA stamping contract
 │   ├── Cirq.Engine/       LU solver, Newton-Raphson, transient loop, digital event scheduler
-│   ├── Cirq.Components/   Component library (RCL, transistors, diodes, 741, 555, 74xx, displays)
+│   ├── Cirq.Components/   Component library (RCL, transistors, diodes, 741, 555, 74xx, displays, dev boards)
 │   └── Cirq.UI/           Avalonia editor, schematic canvas, inspector, ScottPlot scope
 └── tests/
     ├── Cirq.Engine.Tests/      Solver accuracy against closed-form solutions
@@ -32,7 +32,7 @@ Core ← Engine ← Components ← UI, which keeps the whole engine headless-tes
 
 ```bash
 dotnet run --project src/Cirq.UI     # the editor
-dotnet test                          # 501 tests
+dotnet test                          # 566 tests
 ```
 
 Targets .NET 10. The UI uses Avalonia 12 and ScottPlot 5.1; those two versions are pinned
@@ -146,6 +146,28 @@ Tests measure the solver against closed-form answers rather than recorded output
 | Settings | Theme round-trips across a restart, corrupt and newer-format preference files fall back to defaults, opening the dialog writes nothing, choosing a theme saves immediately |
 | UI | Background transport, probe decimation, reflection-built inspector, dirty tracking, every example compiles, runs, saves and reopens |
 
+## Development boards
+
+Raspberry Pi and Arduino boards sit on the schematic as ordinary logic devices, either sourcing
+signals or reading them. Electrically a board is a pin map plus a per-pin mode, and the existing
+machinery covers all of it: `LogicState.HighImpedance` — built for the 7447's open-collector
+outputs — is exactly a GPIO configured as an input, which is what lets a pin change direction
+without changing the size of the matrix, so retyping the setup never recompiles the netlist.
+
+A board's pins are configured with one line, because a forty-pin header as forty inspector rows
+would be unreadable and most circuits use three pins:
+
+```
+GPIO17=high; GPIO18=clock@1kHz; GPIO22=in-pullup; GPIO12=pwm@500Hz:25%
+```
+
+Boards are then checked against their datasheet limits as the simulation runs — a Pi GPIO above
+3.3V (it is not 5V tolerant), a pin over its current rating, the total GPIO budget — and a
+violation is reported in the status bar. These are deliberately kept separate from solver errors:
+the circuit solves perfectly well, it is the hardware that would not survive it.
+
+The [User Guide](docs/USER_GUIDE.md#development-boards) has the full pin-mode reference.
+
 ## Saving circuits
 
 Circuits are saved as `.cirq` files — plain, indented JSON, so a schematic is readable and diffs
@@ -213,7 +235,7 @@ toolbar used to show: active tool, simulation speed, elapsed time and solver rat
 `Help > Keyboard Shortcuts` lists everything below, and the
 [User Guide](docs/USER_GUIDE.md) walks through building a circuit from an empty canvas.
 
-The palette holds 73 components in 11 collapsible categories:
+The palette holds 77 components in 12 collapsible categories:
 
 ![The component palette with every category expanded, showing passive parts, switches, sources, semiconductors, transistors, LEDs and displays, power, analog ICs, logic gates and the 74xx series](docs/images/02-palette.png)
 

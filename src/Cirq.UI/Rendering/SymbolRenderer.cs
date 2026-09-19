@@ -1,6 +1,7 @@
 using System.Globalization;
 using Avalonia;
 using Avalonia.Media;
+using Cirq.Components.Boards;
 using Cirq.Components.Bridges;
 using Cirq.Components.Digital;
 using Cirq.Components.Ics;
@@ -51,6 +52,7 @@ public static class SymbolRenderer
             case LogicGate gate: DrawLogicGate(context, pen, gate); break;
             case LogicToggle toggle: DrawToggle(context, pen, zoom, toggle); break;
             case ClockSource: DrawClock(context, pen); break;
+            case DeveloperBoard board: DrawBoard(context, pen, zoom, board); break;
             case AdcBridge: DrawBridge(context, pen, zoom, "A/D"); break;
             case DacBridge: DrawBridge(context, pen, zoom, "D/A"); break;
             default: DrawGenericBox(context, pen, zoom, component); break;
@@ -542,6 +544,99 @@ public static class SymbolRenderer
         }
 
         DrawCenteredText(context, partNumber, new Point(0, 0), 10, zoom, CanvasTheme.LabelBrush);
+    }
+
+    /// <summary>
+    /// How far from a symbol's centre its designator and value captions belong.
+    /// <para>
+    /// A fixed offset puts the caption inside the body of anything taller than a resistor — a
+    /// 16-pin DIP already overlapped, and a 40-pin board buries the caption in its pin rows.
+    /// </para>
+    /// </summary>
+    public static double LabelOffset(CircuitComponent component) => component switch
+    {
+        DeveloperBoard board => BoardPackage.BodyHeight(board.Profile) / 2 + 16,
+        Ne555 => DipPackage.BodyHeight(8) / 2 + 16,
+        DigitalIc ic => DipPackage.BodyHeight(ic.PinCount) / 2 + 16,
+        _ => 30.0,
+    };
+
+    /// <summary>
+    /// A development board: an outline with every header pin labelled. Pin names are printed
+    /// inside the body rather than outside it, because the outside is where the wires go and a
+    /// forty-pin header leaves no room for both.
+    /// </summary>
+    private static void DrawBoard(DrawingContext context, IPen pen, double zoom, DeveloperBoard board)
+    {
+        var profile = board.Profile;
+        var height = BoardPackage.BodyHeight(profile);
+        var half = BoardPackage.HalfWidth - 18;
+        var body = new Rect(-half, -height / 2, half * 2, height);
+
+        context.DrawRectangle(CanvasTheme.SymbolFill, pen, new RoundedRect(body, 5));
+
+        // Header strips, so the two pin columns read as connectors rather than loose legs.
+        var strip = 9.0;
+        foreach (var left in new[] { true, false })
+        {
+            var x = left ? body.Left : body.Right - strip;
+            context.DrawRectangle(null, thinPenFor(pen), new Rect(x, body.Top + 12, strip, height - 24));
+        }
+
+        DrawPinColumn(context, pen, zoom, profile, profile.LeftPins, body, left: true);
+        DrawPinColumn(context, pen, zoom, profile, profile.RightPins, body, left: false);
+
+        DrawCenteredText(context, $"{profile.LogicVoltage:0.0}V logic", new Point(0, height / 2 - 12), 8, zoom,
+            CanvasTheme.ValueBrush);
+
+        static IPen thinPenFor(IPen pen) => new Pen(pen.Brush, pen.Thickness * 0.6);
+    }
+
+    private static void DrawPinColumn(
+        DrawingContext context, IPen pen, double zoom, BoardProfile profile,
+        IReadOnlyList<BoardPin> pins, Rect body, bool left)
+    {
+        for (var i = 0; i < pins.Count; i++)
+        {
+            var pin = pins[i];
+            var offset = BoardPackage.PinOffset(profile, i, left);
+            var edge = left ? body.Left : body.Right;
+
+            context.DrawLine(pen, new Point(offset.X, offset.Y), new Point(edge, offset.Y));
+
+            // Power and ground pins are worth picking out: they are what a beginner mis-wires.
+            var brush = pin.Function switch
+            {
+                PinFunction.Power => CanvasTheme.ValueBrush,
+                PinFunction.Ground => CanvasTheme.LabelBrush,
+                PinFunction.Reserved => CanvasTheme.LabelBrush,
+                _ => CanvasTheme.SymbolBrush,
+            };
+
+            if (zoom > 0.55)
+            {
+                var textX = left ? body.Left + 14 : body.Right - 14;
+                DrawAlignedText(context, pin.Label, new Point(textX, offset.Y), 7, zoom, brush, alignLeft: left);
+            }
+        }
+    }
+
+    /// <summary>Draws text butted against a point rather than centred on it, for pin columns.</summary>
+    private static void DrawAlignedText(
+        DrawingContext context, string text, Point anchor, double screenSize, double zoom,
+        IBrush brush, bool alignLeft)
+    {
+        if (string.IsNullOrEmpty(text)) return;
+
+        var formatted = new FormattedText(
+            text, CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
+            CanvasTheme.LabelTypeface, screenSize, brush);
+
+        using (context.PushTransform(
+                   Matrix.CreateScale(1 / zoom, 1 / zoom) * Matrix.CreateTranslation(anchor.X, anchor.Y)))
+        {
+            context.DrawText(formatted, new Point(alignLeft ? 0 : -formatted.Width, -formatted.Height / 2));
+        }
     }
 
     // ---- logic -----------------------------------------------------------

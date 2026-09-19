@@ -1,3 +1,4 @@
+using Cirq.Components.Boards;
 using Cirq.Components.Bridges;
 using Cirq.Components.Digital;
 using Cirq.Components.Ics;
@@ -183,6 +184,15 @@ public static class ComponentCatalog
             new("Clock", "Free-running logic clock", () => new ClockSource(1e3)),
             new("ADC Bridge", "Analog in, logic out, with hysteresis", () => new AdcBridge()),
             new("DAC Bridge", "Logic in, configurable analog out", () => new DacBridge()),
+        ]),
+
+        new("Dev Boards",
+        [
+            new("Raspberry Pi", "40-pin header, 3.3V logic — not 5V tolerant",
+                () => new RaspberryPiBoard()),
+            new("Arduino Uno R3", "14 digital, 6 analog, 5V logic", () => new ArduinoUnoBoard()),
+            new("Arduino Nano", "14 digital, 8 analog, 5V logic", () => new ArduinoNanoBoard()),
+            new("Arduino Mega 2560", "54 digital, 16 analog, 5V logic", () => new ArduinoMegaBoard()),
         ]),
     ];
 

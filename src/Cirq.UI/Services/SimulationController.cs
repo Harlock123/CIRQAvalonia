@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Cirq.Components.Boards;
 using Cirq.Core.Simulation;
 using Cirq.Core.Topology;
 using Cirq.Engine.Simulation;
@@ -66,6 +67,16 @@ public sealed partial class SimulationController : ObservableObject, IDisposable
 
     [ObservableProperty]
     public partial bool HasError { get; private set; }
+
+    /// <summary>
+    /// Electrical rule violations found on any development board in the circuit, or empty.
+    /// <para>
+    /// Surfaced separately from <see cref="Status"/> because these are not solver failures — the
+    /// circuit solves perfectly well, it is the hardware that would not survive it.
+    /// </para>
+    /// </summary>
+    [ObservableProperty]
+    public partial string BoardWarning { get; private set; } = string.Empty;
 
     /// <summary>Time points solved per wall-clock second, for the status bar.</summary>
     [ObservableProperty]
@@ -165,6 +176,7 @@ public sealed partial class SimulationController : ObservableObject, IDisposable
                 Simulator!.Step();
                 SimulationTime = Simulator.Time;
                 Status = $"Stepped to {FormatTime(SimulationTime)}";
+                CheckBoards();
             }
             catch (Exception ex)
             {
@@ -174,6 +186,31 @@ public sealed partial class SimulationController : ObservableObject, IDisposable
         }
 
         Advanced?.Invoke();
+    }
+
+    /// <summary>
+    /// Asks every board in the circuit whether it is being mistreated, and keeps the first
+    /// complaint. Cheap enough to run per slice: it is a pass over the configurable pins of the
+    /// handful of boards a schematic has, not over the whole netlist.
+    /// </summary>
+    private void CheckBoards()
+    {
+        var system = Simulator?.System;
+        if (system is null) return;
+
+        string? first = null;
+        var total = 0;
+
+        foreach (var board in Circuit.Components.OfType<DeveloperBoard>())
+        {
+            board.CheckLimits(system);
+            total += board.Violations.Count;
+            first ??= board.Violations.Count > 0 ? $"{board.Name}: {board.Violations[0]}" : null;
+        }
+
+        BoardWarning = first is null
+            ? string.Empty
+            : total > 1 ? $"{first}  (+{total - 1} more)" : first;
     }
 
     /// <summary>Stops, clears all history, and re-solves the bias point.</summary>
@@ -230,6 +267,10 @@ public sealed partial class SimulationController : ObservableObject, IDisposable
                             steps++;
                         }
                     }
+
+                    // Once per slice rather than per step: a violation that matters persists for
+                    // far longer than one time point, and this way it costs nothing measurable.
+                    CheckBoards();
 
                     SimulationTime = simulator.Time;
                 }

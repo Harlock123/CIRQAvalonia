@@ -18,10 +18,11 @@ the [README](../README.md).
 7. [Running a simulation](#running-a-simulation)
 8. [Worked example: an RC low-pass](#worked-example-an-rc-low-pass)
 9. [Digital and mixed-signal circuits](#digital-and-mixed-signal-circuits)
-10. [Saving and loading](#saving-and-loading)
-11. [Appearance](#appearance)
-12. [Keyboard reference](#keyboard-reference)
-13. [When a circuit will not simulate](#when-a-circuit-will-not-simulate)
+10. [Development boards](#development-boards)
+11. [Saving and loading](#saving-and-loading)
+12. [Appearance](#appearance)
+13. [Keyboard reference](#keyboard-reference)
+14. [When a circuit will not simulate](#when-a-circuit-will-not-simulate)
 
 ---
 
@@ -63,7 +64,7 @@ at the window edge; click the rail to bring it back.
 
 Click a palette entry, then click the canvas. The part lands where you click, snapped to the grid.
 
-The palette holds **73 components in 11 categories**:
+The palette holds **77 components in 12 categories**:
 
 | Category | Count | Contents |
 | --- | --- | --- |
@@ -78,6 +79,7 @@ The palette holds **73 components in 11 categories**:
 | Logic Gates | 7 | AND, OR, NAND, NOR, XOR, XNOR, NOT |
 | 74xx Series | 16 | Counters, decoders, flip-flops, shift registers, multiplexers |
 | Digital I/O | 4 | Logic toggle, clock, and indicators |
+| Dev Boards | 4 | Raspberry Pi, Arduino Uno / Nano / Mega — see [below](#development-boards) |
 
 Click a category header to open or close it. **All** in the palette header toggles every group at
 once — useful when you are hunting for a part and do not remember which group it is in.
@@ -222,6 +224,71 @@ transition, so edges are not smeared across a step.
 
 Useful examples to start from: **NAND Latch**, **Decade Counter**, **Ring Oscillator**,
 **Digit Counter**, **Running Light**.
+
+---
+
+## Development boards
+
+A Raspberry Pi or Arduino can sit on the schematic as either the **source** of signals or the
+**sink** for them, with its whole header available to wire.
+
+| Board | Logic | Pins |
+| --- | --- | --- |
+| Raspberry Pi (40-pin) | 3.3V, **not 5V tolerant** | 26 GPIO, 8 GND, 2×5V, 2×3.3V |
+| Arduino Uno R3 | 5V | 14 digital (6 PWM), 6 analog |
+| Arduino Nano | 5V | 14 digital (6 PWM), 8 analog |
+| Arduino Mega 2560 | 5V | 54 digital (15 PWM), 16 analog |
+
+One Pi component covers the Pi 2, 3, 4, 5 and Zero — they all share the same header. Pins are laid
+out as they are on the hardware, odd numbers down one side and even down the other, so counting
+pins on screen matches counting them on the board.
+
+### Setting pins up
+
+Select a board and fill in its **Pins** field. One line describes the whole setup:
+
+```
+GPIO17=high; GPIO18=clock@1kHz; GPIO22=in-pullup; GPIO12=pwm@500Hz:25%
+```
+
+| Mode | Meaning |
+| --- | --- |
+| `in` | Read the pin. This is what an unlisted pin does, so a board powers up with everything reading |
+| `in-pullup` / `in-pulldown` | Read, with the internal pull engaged |
+| `high` / `low` (or `1` / `0`) | Drive the pin at the board's logic voltage |
+| `clock@1kHz` | A square wave — this is what makes a board a signal *source* |
+| `pwm@500Hz:25%` | A square wave at a stated duty cycle |
+
+Frequencies accept the same engineering notation as everything else (`500Hz`, `1kHz`, `2.5kHz`).
+The **Status** readout underneath says how the line was understood, and names anything it could not
+parse — a typo in one entry costs that pin, not the whole setup.
+
+Power pins are real sources: a board feeds 5V and 3.3V to the circuit around it, which you can turn
+off with **Supplies Power** if the board is being powered externally. Wire at least one **GND** pin
+into your circuit — every other pin on the board is measured against it.
+
+### The board tells you when you are about to break it
+
+Boards are checked against their datasheet limits as the simulation runs, and a violation appears
+in red in the status bar:
+
+- A **Raspberry Pi GPIO above 3.3V**. The Pi is not 5V tolerant, and tying a GPIO to 5V logic is
+  the single most common way to destroy one. An Arduino in the identical circuit says nothing,
+  because a 5V board is fine there.
+- A **pin over its current rating** — 16 mA on a Pi, 20 mA on an Arduino. An LED with no series
+  resistor lands here.
+- The **total GPIO budget** — 50 mA on a Pi, 200 mA on an Arduino — which several pins can exceed
+  while each one stays inside its own rating.
+
+These are not solver failures. The circuit solves perfectly well; it is the hardware that would
+not survive it, which is exactly the thing a simulator is for finding out.
+
+### A note on logic levels
+
+Boards use real thresholds, so real interfacing problems show up. A 74xx TTL output tops out at
+3.4V and a 5V CMOS input wants 3.5V to call it high — so an Arduino reads a bare TTL gate as
+undefined rather than as a one. That is not a modelling artefact; it is the reason level shifters
+exist.
 
 ---
 

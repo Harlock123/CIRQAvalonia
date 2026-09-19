@@ -376,8 +376,9 @@ public class CircuitCanvas : Control
     {
         if (Zoom < 0.35) return;
 
-        var above = new Point(component.X, component.Y - 30);
-        var below = new Point(component.X, component.Y + 30);
+        var offset = SymbolRenderer.LabelOffset(component);
+        var above = new Point(component.X, component.Y - offset);
+        var below = new Point(component.X, component.Y + offset);
 
         SymbolRenderer.DrawCenteredText(context, component.Name, above, 11, Zoom, CanvasTheme.LabelBrush);
 
