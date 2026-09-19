@@ -212,6 +212,12 @@ jobs:
           \`xattr -d com.apple.quarantine CirqAvalonia\`. Each macOS archive carries the same
           instructions in \`MACOS-FIRST-RUN.txt\`.
 
+          That is a decision rather than an oversight. Notarization is per build, not per project:
+          every archive of every release has to go to Apple, come back, and be stapled
+          individually, so it is a step welded onto every release rather than one afternoon of
+          setup — and releases here currently land within hours of each other. The intent has not
+          changed, and when it happens this paragraph goes away.
+
           **Linux/macOS:** mark it executable if your extractor dropped the bit —
           \`chmod +x CirqAvalonia\`.
 
