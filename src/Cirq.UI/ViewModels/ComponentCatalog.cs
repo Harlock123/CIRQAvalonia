@@ -132,6 +132,8 @@ public static class ComponentCatalog
             new("Regulator 7905", "Fixed -5 V linear regulator", () => new VoltageRegulator(RegulatorModel.Lm7905)),
             new("Regulator LM317", "Adjustable, 1.25 V between OUT and ADJ",
                 () => new VoltageRegulator(RegulatorModel.Lm317)),
+            new("TL431 Reference", "Programmable 2.5 V shunt — the adjustable half of a feedback loop",
+                () => new ShuntReference()),
             new("Regulator LD1117", "Low-dropout 3.3 V regulator", () => new VoltageRegulator(RegulatorModel.Ld1117)),
         ]),
 
@@ -177,6 +179,8 @@ public static class ComponentCatalog
             new("7476", "Dual JK flip-flop, falling-edge triggered", () => new Ic7476()),
             new("7486", "Quad 2-input exclusive-OR", () => new Ic7486()),
             new("7490", "Decade / BCD counter", () => new Ic7490()),
+            new("74HC14", "Hex Schmitt inverter — hysteresis for slow edges and oscillators",
+                () => new Ic74hc14()),
             new("74138", "3-to-8 decoder with three enables, active-low outputs", () => new Ic74138()),
             new("74151", "8-to-1 multiplexer with complementary outputs", () => new Ic74151()),
             new("74164", "8-bit serial-in parallel-out shift register", () => new Ic74164()),

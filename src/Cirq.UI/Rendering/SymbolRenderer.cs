@@ -46,6 +46,7 @@ public static class SymbolRenderer
             case Relay relay: DrawRelay(context, pen, zoom, relay); break;
             case Fuse fuse: DrawFuse(context, pen, zoom, fuse); break;
             case Optocoupler opto: DrawOptocoupler(context, pen, zoom, opto); break;
+            case ShuntReference shunt: DrawShuntReference(context, pen, zoom, shunt); break;
             case BridgeRectifier: DrawBridgeRectifier(context, pen, zoom); break;
             case Diode: DrawDiode(context, pen); break;
             case SevenSegmentDisplay display: DrawSevenSegment(context, pen, zoom, display); break;
@@ -350,6 +351,51 @@ public static class SymbolRenderer
                 opto.IsConducting ? CanvasTheme.ValueBrush : CanvasTheme.LabelBrush, 1.0, zoom);
             context.DrawLine(ray, new Point(-9, -4), new Point(8, -4));
             context.DrawLine(ray, new Point(-9, 4), new Point(8, 4));
+        }
+    }
+
+    /// <summary>
+    /// A TL431: drawn as the adjustable zener it behaves like — cathode bar at the top, anode
+    /// below, and the reference coming in from the side to the point where it is compared.
+    /// </summary>
+    private static void DrawShuntReference(
+        DrawingContext context, IPen pen, double zoom, ShuntReference shunt)
+    {
+        context.DrawLine(pen, new Point(0, -40), new Point(0, -10));
+        context.DrawLine(pen, new Point(0, 40), new Point(0, 16));
+
+        // The triangle points from anode up to cathode, as a diode's does.
+        var body = new StreamGeometry();
+        using (var ctx = body.Open())
+        {
+            ctx.BeginFigure(new Point(-13, 16), true);
+            ctx.LineTo(new Point(13, 16));
+            ctx.LineTo(new Point(0, -10));
+            ctx.EndFigure(true);
+        }
+        context.DrawGeometry(CanvasTheme.SymbolFill, pen, body);
+
+        // Cathode bar with the bent ends that mark it as a zener rather than a plain diode.
+        context.DrawLine(pen, new Point(-13, -10), new Point(13, -10));
+        context.DrawLine(pen, new Point(-13, -10), new Point(-18, -4));
+        context.DrawLine(pen, new Point(13, -10), new Point(18, -16));
+
+        // Reference lead in from the right, arrow pointing at the body.
+        context.DrawLine(pen, new Point(40, 0), new Point(12, 4));
+        var head = new StreamGeometry();
+        using (var ctx = head.Open())
+        {
+            ctx.BeginFigure(new Point(12, 4), true);
+            ctx.LineTo(new Point(20, 1));
+            ctx.LineTo(new Point(19, 8));
+            ctx.EndFigure(true);
+        }
+        context.DrawGeometry(CanvasTheme.SymbolBrush, null, head);
+
+        if (shunt.Violations.Count > 0 && zoom > 0.4)
+        {
+            var warn = CanvasTheme.Pen(CanvasTheme.ErrorBrush, 2.0, zoom);
+            context.DrawEllipse(null, warn, new Point(0, 2), 24, 24);
         }
     }
 

@@ -65,7 +65,7 @@ at the window edge; click the rail to bring it back.
 
 Click a palette entry, then click the canvas. The part lands where you click, snapped to the grid.
 
-The palette holds **90 components in 14 categories**:
+The palette holds **92 components in 14 categories**:
 
 | Category | Count | Contents |
 | --- | --- | --- |
@@ -75,10 +75,10 @@ The palette holds **90 components in 14 categories**:
 | Semiconductors | 6 | 1N4148, 1N4001, Schottky, 5.1 V and 12 V zeners, **bridge rectifier** |
 | Transistors | 7 | NPN and PNP bipolars, N- and P-channel MOSFETs |
 | LEDs & Displays | 8 | Six LED colours, common-anode and common-cathode seven-segment |
-| Power | 6 | Fixed and adjustable regulators |
+| Power | 7 | Fixed and adjustable regulators, TL431 shunt reference |
 | Analog ICs | 8 | LM741, NE555, LM311, LM339 and friends |
 | Logic Gates | 7 | AND, OR, NAND, NOR, XOR, XNOR, NOT |
-| 74xx Series | 16 | Counters, decoders, flip-flops, shift registers, multiplexers |
+| 74xx Series | 17 | Counters, decoders, flip-flops, shift registers, multiplexers, Schmitt inverter |
 | Digital I/O | 4 | Logic toggle, clock, and indicators |
 | Sensors & Actuators | 6 | DC motor, LDR, thermistors, buzzers — see [below](#sensors-and-actuators) |
 | Switching & Isolation | 5 | Relay, fuses, optocouplers — see [below](#switching-and-isolation) |
@@ -257,6 +257,19 @@ bridge into a 1000 µF reservoir into a 7812. The two probes are the point: the 
 sags and recharges twice per mains cycle, and the regulated rail beside it is flat. It is the one
 example that sets the simulation speed, because a 50 Hz cycle at the usual 1/1000 would take fifty
 seconds of wall time.
+
+**TL431** is a programmable shunt reference — a zener whose voltage you choose. Tie its reference
+pin to its cathode and it is a fixed 2.5 V shunt; feed the reference from a divider off the cathode
+and it holds the cathode at 2.495 × (1 + R₁/R₂). It needs a milliamp or so through it to regulate
+at all, and sizing the feed resistor so the load takes everything is the classic way to end up with
+a circuit that almost works, so it reports being starved.
+
+**74HC14** is a hex Schmitt-trigger inverter, and its two thresholds are what make it useful. An
+ordinary gate has one, so an input creeping through it produces a burst of output chatter. A
+Schmitt input will not call a rising input high until it clears about 0.58 of the supply, nor a
+falling one low until it drops past about 0.38 — and between them it remembers. That is what cleans
+up a slow edge, debounces a contact, and lets a single gate with a resistor from output back to
+input and a capacitor to ground free-run as an oscillator.
 
 Give the regulator headroom. It needs its dropout voltage above the output *at the bottom of the
 ripple*, not on average — a supply that measures fine on a meter can still be dropping out on

@@ -8,6 +8,16 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+- **TL431 programmable shunt reference.** A zener whose voltage you choose: tie the reference to
+  the cathode for a fixed 2.5 V shunt, or feed it from a divider and it holds the cathode at
+  2.495 × (1 + R₁/R₂). It needs a milliamp or so to regulate, and reports being starved — sizing
+  the feed resistor so the load takes everything is the classic way to end up with a circuit that
+  almost works.
+- **74HC14 hex Schmitt-trigger inverter.** Two thresholds rather than one, so a rising input must
+  clear the upper before it counts as high and a falling one must drop past the lower. That is
+  what cleans up a slow edge, debounces a contact, and lets a single gate with an RC around it
+  free-run as an oscillator.
+
 ## [0.7.0] - 2026-09-19
 
 **Parts you can operate are now marked as such.** Switches, push buttons, logic toggles, LDRs and
