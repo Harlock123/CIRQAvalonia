@@ -8,6 +8,12 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-09-19
+
+I2C and SPI, which the development boards have wanted since they were added, along with the
+character LCD that most people put on the other end of them. The palette holds 137 components in
+16 categories, and 1051 tests measure them against closed-form answers.
+
 **I2C and SPI.** The dev boards have had GPIO and sequencing for a dozen releases with no way to
 talk to anything. It turned out to need no new engine at all: I2C is open drain, which is a
 released output and a pair of pull-up resistors, and both were already there. What was missing were
@@ -546,7 +552,8 @@ First public build of CirqAvalonia — an electronic circuit analyzer and mixed-
 
 **501 tests** measure the solver against closed-form answers rather than recorded output.
 
-[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.14.0...HEAD
+[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.15.0...HEAD
+[0.15.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.11.0...v0.12.0
