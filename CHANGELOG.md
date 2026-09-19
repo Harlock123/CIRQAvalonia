@@ -30,7 +30,7 @@ an enhancement MOSFET's is drawn in three segments. The gate is a reverse-biased
 essentially nothing, which is the reason to use one; drive it positive and the part tells you,
 because it has stopped being a FET and started being a diode.
 
-**A 4000-series CMOS group, with thirteen parts in it.** The CMOS parts have a palette category
+**A 4000-series CMOS group, with fourteen parts in it.** The CMOS parts have a palette category
 of their own now rather than sitting among the 74xx ones, because they are a different family with
 different habits.
 
@@ -45,10 +45,21 @@ so dropping one into a board laid out for the other leaves two working gates and
 nothing sensible. The family is at least consistent with itself — unlike TTL, where the 7402 moves
 its outputs, the CMOS NOR shares the CMOS NAND's pinout exactly.
 
+The 4060 is fourteen stages with an oscillator of its own, and it is built rather than declared:
+RS is an inverter's input, REXT its output and CEXT the output of a second one behind it, so
+hanging Rt and Ct off those three pins is the whole oscillator and the frequency falls out of the
+network. Wired the way the datasheet wires it, it lands on the datasheet's 1/(2.3·Rt·Ct), which is
+what the test checks — and doubling the capacitor halves it, because nothing anywhere sets a
+frequency. The input protection diodes are modelled too, since the capacitor throws the timing node
+a whole supply past the rail twice a cycle and Rs exists to keep them out of the timing.
+
 The 4013 is a dual D flip-flop with **active-high** set and reset, where a 7474's preset and clear
 are active low; wiring one like the other leaves it held wherever the noise on those pins decides.
 The 4040 is twelve flip-flops in a chain, so Q12 is the clock divided by 4096, and it counts on the
-falling edge where the 4017 beside it counts on the rising. The 4051 is the 4066 with an address
+falling edge where the 4017 beside it counts on the rising. The 4060 counts on the falling edge
+too, its reset stops the oscillator as well as clearing the count, and its first three stages and
+its eleventh never reach a pin — so the divisions on offer are ÷16 to ÷1024 and then ÷4096 to
+÷16384, with no ÷2048. The 4051 is the 4066 with an address
 decoder in front: three pins pick one of eight channels, and because only one path is ever closed
 there is no way to short two sources together the way four loose 4066 switches will let you.
 

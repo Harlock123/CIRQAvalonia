@@ -65,7 +65,7 @@ at the window edge; click the rail to bring it back.
 
 Click a palette entry, then click the canvas. The part lands where you click, snapped to the grid.
 
-The palette holds **111 components in 15 categories**:
+The palette holds **112 components in 15 categories**:
 
 | Category | Count | Contents |
 | --- | --- | --- |
@@ -79,7 +79,7 @@ The palette holds **111 components in 15 categories**:
 | Analog ICs | 8 | LM741, NE555, LM311, LM339 and friends |
 | Logic Gates | 7 | AND, OR, NAND, NOR, XOR, XNOR, NOT |
 | 74xx Series | 17 | Counters, decoders, flip-flops, shift registers, multiplexers, Schmitt inverter |
-| 4000 Series | 13 | CMOS gates, counters, flip-flops, analog switches — see [below](#the-4000-series) |
+| 4000 Series | 14 | CMOS gates, counters, flip-flops, analog switches — see [below](#the-4000-series) |
 | Digital I/O | 4 | Logic toggle, clock, and indicators |
 | Sensors & Actuators | 6 | DC motor, LDR, thermistors, buzzers — see [below](#sensors-and-actuators) |
 | Switching & Isolation | 5 | Relay, fuses, optocouplers — see [below](#switching-and-isolation) |
@@ -402,6 +402,33 @@ edge, the other way round from the 4017 beside it, and its reset is active high,
 too. Being a ripple counter rather than a synchronous one, its stages do not change together — a
 real 4040 shows brief false codes as the carry walks down the chain, which is why decoding its
 outputs directly is a way to collect glitches.
+
+**4060** — fourteen stages like the 4040, plus the thing that makes it the part behind almost
+every long-delay timer ever built: an oscillator of its own. Hang a resistor and a capacitor off
+three pins and the chip clocks itself, so one part takes you from nothing to a divided-down output.
+
+The oscillator is not a number you set here. `RS` is the input of an inverter, `REXT` is that
+inverter's output, and `CEXT` is the output of a second one behind it; those three pins and your
+own Rt and Ct are the whole circuit. The timing node charges towards REXT through Rt, and each time
+it crosses the threshold CEXT flips and shoves the node a supply's worth the other way through Ct.
+So the frequency comes out of the network — change a resistor on the canvas and it changes, the way
+it would on a breadboard.
+
+Wire it the way the datasheet does — Rt from REXT, Ct from CEXT and Rs from RS, all three meeting
+at one node — and it lands on the datasheet's `f = 1/(2.3·Rt·Ct)`. Rs wants to be several times Rt.
+Its job is to keep the input protection diodes out of the timing, because the capacitor throws the
+node a whole supply past the rail twice a cycle and something has to catch it. Those diodes are
+modelled, so leaving Rs out has a consequence here rather than none.
+
+Three things about this part regularly cost an afternoon, and all three are modelled. It counts on
+the **falling** edge. Master reset is active **high** and stops the oscillator as well as clearing
+the count, so a floating MR pin gets you a chip that does nothing whatsoever. And the first three
+stages are not brought out, nor is the eleventh — the outputs run Q4 to Q10 and then jump to Q12,
+so the divisions you can have are ÷16 up to ÷1024, then ÷4096 to ÷16384. If you were counting on
+÷2048, it is not there.
+
+You can also ignore the oscillator entirely: drive RS yourself, leave REXT and CEXT floating, and
+it is a plain fourteen-stage counter.
 
 **4511** — the 7447's counterpart. That part sinks current from a common-**anode** display; this
 one sources it into a common-**cathode** one, so its outputs are active high and the two are not

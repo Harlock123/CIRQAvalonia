@@ -208,6 +208,8 @@ public static class ComponentCatalog
                 () => new Ic4017()),
             new("4040", "12-stage binary ripple counter, divides down to 4096", () => new Ic4040()),
             new("4051", "8-channel analog multiplexer / demultiplexer", () => new Ic4051()),
+            new("4060", "14-stage counter with an on-chip oscillator — a timer in three parts",
+                () => new Ic4060()),
             new("4066", "Quad bilateral analog switch", () => new Ic4066()),
             new("4069", "Hex inverter", () => new Ic4069()),
             new("4070", "Quad 2-input exclusive-OR", () => new Ic4070()),
