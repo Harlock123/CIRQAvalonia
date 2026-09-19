@@ -8,15 +8,35 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
-- **New category, Sensors & Actuators: DC motor and LDR.**
-  - The **motor** is modelled electrically and mechanically at once — armature resistance and
-    inductance, a back-EMF proportional to speed, and a rotor whose inertia integrates torque
-    against load. At rest there is no back-EMF, so it draws the stall current and only chokes back
-    as it spins up; that startup surge is what trips supplies. Held stalled it is ringed in red,
-    because with no back-EMF nothing limits the current but armature resistance.
-  - The **LDR** follows the power law a real cadmium-sulphide cell does, covering several decades
-    of resistance between a dark room and daylight. Double-click it on the canvas to cover and
-    uncover it while the simulation runs.
+## [0.5.0] - 2026-09-19
+
+**New category: Sensors & Actuators.**
+
+**DC Motor** is modelled electrically and mechanically at once, because the two cannot be
+separated. The armature is a resistance and an inductance in series with a back-EMF proportional
+to speed; the torque is proportional to current, and the rotor's inertia integrates the difference
+between that torque and the load.
+
+That coupling is why a motor cannot be simulated as a resistor. At rest there is no back-EMF, so
+the armature draws the stall current — 4 A for a 12 V motor with a 3 Ω armature — and only as the
+rotor spins up does the back-EMF rise and choke the current back to a few hundred milliamps. That
+startup surge is what trips supplies and welds relay contacts, and it falls out of the model
+rather than being asserted. Load the shaft and it slows until torque balances, so the current a
+motor draws is set by what it is driving rather than by the supply.
+
+Load it past what it can turn and it sits stalled with nothing but armature resistance limiting
+the current. The motor is ringed in red and the fault named, because that is how they burn out. A
+momentary stall at switch-on does not count — every motor has one.
+
+**LDR** is a cadmium-sulphide cell whose resistance follows a power law, so a decade of light is a
+fixed ratio of resistance and the part spans several decades between a dark room and daylight:
+about 900 Ω under bright indoor lighting against 400 kΩ covered. That span is why an LDR is
+normally read with a comparator against a divider rather than measured directly.
+
+Double-click it on the canvas to cover and uncover it, the same as operating a switch, so a
+light-sensing circuit can be exercised while the simulation runs.
+
+**686 tests** pass, measured against closed-form answers rather than recorded output.
 
 ## [0.4.0] - 2026-09-19
 
@@ -159,7 +179,8 @@ First public build of CirqAvalonia — an electronic circuit analyzer and mixed-
 
 **501 tests** measure the solver against closed-form answers rather than recorded output.
 
-[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.1.0...v0.2.0
