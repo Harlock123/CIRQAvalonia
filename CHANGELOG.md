@@ -8,6 +8,15 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+- **New: bridge rectifier and electrolytic capacitor**, which together with the existing 7812 make
+  up a linear power supply. The bridge is four real diodes rather than an idealised block, so the
+  output peak sits about 1.4 V below the input peak and ripples at twice the input frequency —
+  the losses are the point. The electrolytic is polarised and carries real series resistance,
+  which is what actually sets the ripple on a smoothing capacitor.
+- An electrolytic reports being connected backwards or run over its working voltage, and is ringed
+  in red on the canvas. It has to be held backwards for a millisecond first, so a supply's startup
+  transient does not accuse a correctly connected part.
+
 - **Fixed: regulators shut down at switch-on.** The 7805 example showed about half a volt instead
   of five. Junction temperature was computed from instantaneous power, so the few microseconds of
   inrush that charge an output capacitor — tens of watts, briefly — read as a die at hundreds of

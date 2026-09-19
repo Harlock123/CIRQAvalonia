@@ -44,10 +44,17 @@ public partial class Capacitor : TwoTerminalComponent
     /// <summary>Current through the capacitor at the last accepted time point.</summary>
     public double Current => _previousCurrent;
 
+    /// <summary>
+    /// The two nodes the capacitance itself sits between. Normally the terminals, but a part with
+    /// series resistance puts the capacitance against an internal node and the resistance between
+    /// that node and the terminal — see <c>ElectrolyticCapacitor</c>.
+    /// </summary>
+    protected virtual (int Positive, int Negative) CapacitanceNodes(MnaSystem system) =>
+        (system.Node(A), system.Node(B));
+
     public override void StampMatrix(MnaSystem system, SimulationState state)
     {
-        var na = system.Node(A);
-        var nb = system.Node(B);
+        var (na, nb) = CapacitanceNodes(system);
 
         if (LeakageResistance is { } rLeak and > 0) system.StampConductance(na, nb, 1.0 / rLeak);
 
@@ -88,7 +95,8 @@ public partial class Capacitor : TwoTerminalComponent
 
     public override void CommitTimeStep(MnaSystem system, SimulationState state)
     {
-        var v = VoltageAcross(system, A, B);
+        var (na, nb) = CapacitanceNodes(system);
+        var v = system.NodeVoltage(na) - system.NodeVoltage(nb);
 
         if (!state.IsTransient)
         {

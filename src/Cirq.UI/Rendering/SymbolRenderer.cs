@@ -3,10 +3,10 @@ using Avalonia;
 using Avalonia.Media;
 using Cirq.Components.Boards;
 using Cirq.Components.Bridges;
+using Cirq.Components.Passive;
 using Cirq.Components.Digital;
 using Cirq.Components.Ics;
 using Cirq.Components.Nonlinear;
-using Cirq.Components.Passive;
 using Cirq.Components.Sources;
 using Cirq.Core.Topology;
 
@@ -28,6 +28,7 @@ public static class SymbolRenderer
         switch (component)
         {
             case Resistor: DrawResistor(context, pen); break;
+            case ElectrolyticCapacitor e: DrawElectrolytic(context, pen, zoom, e); break;
             case Capacitor: DrawCapacitor(context, pen); break;
             case Inductor: DrawInductor(context, pen); break;
             case Transformer: DrawTransformer(context, pen, thin); break;
@@ -37,6 +38,7 @@ public static class SymbolRenderer
             case DcCurrentSource: DrawCurrentSource(context, pen); break;
             case FunctionGenerator fg: DrawFunctionGenerator(context, pen, fg); break;
             case Led led: DrawLed(context, pen, led); break;
+            case BridgeRectifier: DrawBridgeRectifier(context, pen, zoom); break;
             case Diode: DrawDiode(context, pen); break;
             case SevenSegmentDisplay display: DrawSevenSegment(context, pen, zoom, display); break;
             case BipolarTransistor bjt: DrawBipolar(context, pen, bjt); break;
@@ -76,6 +78,92 @@ public static class SymbolRenderer
         points.Add(new Point(18, 0));
 
         context.DrawGeometry(null, pen, new PolylineGeometry(points, false));
+    }
+
+    /// <summary>
+    /// A polarised capacitor: a straight plate on the positive side against a curved one, with a
+    /// "+" so the orientation is readable without tracing the wires. Getting an electrolytic the
+    /// wrong way round is the mistake the symbol exists to prevent.
+    /// </summary>
+    private static void DrawElectrolytic(
+        DrawingContext context, IPen pen, double zoom, ElectrolyticCapacitor capacitor)
+    {
+        context.DrawLine(pen, new Point(-30, 0), new Point(-4, 0));
+        context.DrawLine(pen, new Point(6, 0), new Point(30, 0));
+
+        // Positive plate: straight.
+        context.DrawLine(pen, new Point(-4, -12), new Point(-4, 12));
+
+        // Negative plate: the curve, drawn hollow-side towards the positive plate.
+        var curve = new StreamGeometry();
+        using (var ctx = curve.Open())
+        {
+            ctx.BeginFigure(new Point(6, -12), false);
+            ctx.CubicBezierTo(new Point(12, -6), new Point(12, 6), new Point(6, 12));
+            ctx.EndFigure(false);
+        }
+        context.DrawGeometry(null, pen, curve);
+
+        if (zoom > 0.5)
+            DrawCenteredText(context, "+", new Point(-13, -13), 10, zoom, CanvasTheme.SymbolBrush);
+
+        // A part that has been reverse-biased or over-volted is called out on the symbol itself,
+        // because the schematic is where you would fix it.
+        if (capacitor.Violations.Count > 0 && zoom > 0.4)
+        {
+            var warn = CanvasTheme.Pen(CanvasTheme.ErrorBrush, 2.0, zoom);
+            context.DrawEllipse(null, warn, new Point(0, 0), 20, 18);
+        }
+    }
+
+    /// <summary>
+    /// A packaged bridge: the diamond with the AC pair on the flanks and the DC pair top and
+    /// bottom, and one diode drawn inside pointing at the positive corner so the direction is
+    /// obvious.
+    /// </summary>
+    private static void DrawBridgeRectifier(DrawingContext context, IPen pen, double zoom)
+    {
+        const double r = 26;
+
+        foreach (var (from, to) in new[]
+                 {
+                     (new Point(-40, 0), new Point(-r, 0)),
+                     (new Point(40, 0), new Point(r, 0)),
+                     (new Point(0, -40), new Point(0, -r)),
+                     (new Point(0, 40), new Point(0, r)),
+                 })
+        {
+            context.DrawLine(pen, from, to);
+        }
+
+        var body = new StreamGeometry();
+        using (var ctx = body.Open())
+        {
+            ctx.BeginFigure(new Point(0, -r), true);
+            ctx.LineTo(new Point(r, 0));
+            ctx.LineTo(new Point(0, r));
+            ctx.LineTo(new Point(-r, 0));
+            ctx.EndFigure(true);
+        }
+        context.DrawGeometry(CanvasTheme.SymbolFill, pen, body);
+
+        // One arm shown: a triangle and bar pointing at the + corner.
+        var arrow = new StreamGeometry();
+        using (var ctx = arrow.Open())
+        {
+            ctx.BeginFigure(new Point(-8, 5), true);
+            ctx.LineTo(new Point(8, 5));
+            ctx.LineTo(new Point(0, -7));
+            ctx.EndFigure(true);
+        }
+        context.DrawGeometry(CanvasTheme.SymbolBrush, pen, arrow);
+        context.DrawLine(pen, new Point(-8, -7), new Point(8, -7));
+
+        if (zoom > 0.55)
+        {
+            DrawCenteredText(context, "+", new Point(13, -15), 9, zoom, CanvasTheme.SymbolBrush);
+            DrawCenteredText(context, "-", new Point(13, 15), 9, zoom, CanvasTheme.SymbolBrush);
+        }
     }
 
     private static void DrawCapacitor(DrawingContext context, IPen pen)

@@ -31,6 +31,7 @@ public static class CanvasTheme
         IBrush Terminal,
         IBrush TerminalHover,
         IBrush Probe,
+        IBrush Error,
         Color GridDot,
         Color GridMajor,
         Color SegmentUnlit);
@@ -46,6 +47,7 @@ public static class CanvasTheme
         ThemeManager.Brush("TerminalFill"),
         ThemeManager.Brush("TerminalHover"),
         ThemeManager.Brush("TerminalHover"),
+        ThemeManager.Brush("TextError"),
         ThemeManager.Color("CanvasGridDot"),
         ThemeManager.Color("CanvasGridMajor"),
         ThemeManager.Color("SegmentUnlit"));
@@ -63,6 +65,9 @@ public static class CanvasTheme
     public static IBrush TerminalBrush => Current.Terminal;
     public static IBrush TerminalHoverBrush => Current.TerminalHover;
     public static IBrush ProbeBrush => Current.Probe;
+
+    /// <summary>Used to ring a part that is being used outside its ratings.</summary>
+    public static IBrush ErrorBrush => Current.Error;
 
     public static Color GridDot => Current.GridDot;
     public static Color GridMajor => Current.GridMajor;

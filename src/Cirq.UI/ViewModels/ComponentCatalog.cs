@@ -60,6 +60,8 @@ public static class ComponentCatalog
         new("Passive",
         [
             new("Resistor", "Ideal linear resistor", () => new Resistor(1e3)),
+            new("Electrolytic Cap", "Polarised, with real ESR — warns if reversed or over its rating",
+                () => new ElectrolyticCapacitor(100e-6)),
             new("Capacitor", "Trapezoidal / Backward-Euler companion model", () => new Capacitor(100e-9)),
             new("Inductor", "Branch-current formulation", () => new Inductor(1e-3)),
             new("Transformer", "Two magnetically coupled windings", () => new Transformer()),
@@ -88,6 +90,8 @@ public static class ComponentCatalog
         [
             new("Diode 1N4148", "Small-signal switching diode", () => new Diode(DiodeModel.D1N4148)),
             new("Diode 1N4001", "General purpose rectifier", () => new Diode(DiodeModel.D1N4001)),
+            new("Bridge Rectifier", "Four 1N4001 diodes in a package, full-wave",
+                () => new BridgeRectifier()),
             new("Schottky 1N5817", "Low forward drop, fast recovery", () => new Diode(DiodeModel.D1N5817)),
             new("Zener 5.1V", "Diode with modelled reverse breakdown", () => new Diode(DiodeModel.Zener(5.1))),
             new("Zener 12V", "12 V shunt regulator diode", () => new Diode(DiodeModel.Zener(12.0))),

@@ -65,14 +65,14 @@ at the window edge; click the rail to bring it back.
 
 Click a palette entry, then click the canvas. The part lands where you click, snapped to the grid.
 
-The palette holds **77 components in 12 categories**:
+The palette holds **79 components in 12 categories**:
 
 | Category | Count | Contents |
 | --- | --- | --- |
-| Passive | 5 | Resistor, capacitor, inductor, transformer, potentiometer |
+| Passive | 6 | Resistor, capacitor, **electrolytic capacitor**, inductor, transformer, potentiometer |
 | Switches | 3 | SPST, SPDT, push button |
 | Sources | 4 | Ground, DC voltage, DC current, function generator |
-| Semiconductors | 5 | 1N4148, 1N4001, Schottky, 5.1 V and 12 V zeners |
+| Semiconductors | 6 | 1N4148, 1N4001, Schottky, 5.1 V and 12 V zeners, **bridge rectifier** |
 | Transistors | 7 | NPN and PNP bipolars, N- and P-channel MOSFETs |
 | LEDs & Displays | 8 | Six LED colours, common-anode and common-cathode seven-segment |
 | Power | 6 | Fixed and adjustable regulators |
@@ -225,6 +225,29 @@ transition, so edges are not smeared across a step.
 
 Useful examples to start from: **NAND Latch**, **Decade Counter**, **Ring Oscillator**,
 **Digit Counter**, **Running Light**.
+
+### Building a power supply
+
+Three parts cover the usual linear supply, and each models the thing that actually bites:
+
+- **Bridge Rectifier** (Semiconductors) — four real diodes, not an idealised block, so the output
+  peak sits about 1.4 V below the input peak. Both halves of the cycle conduct, giving ripple at
+  twice the input frequency.
+- **Electrolytic Cap** (Passive) — polarised, with real series resistance. ESR is what actually
+  sets the ripple on a smoothing capacitor, so it is solved rather than assumed.
+- **Regulator 7805 / 7809 / 7812 / 7905 / LM317 / LD1117** (Power) — fixed and adjustable linear
+  regulators, with dropout, current limiting and thermal shutdown.
+
+An electrolytic reports being used outside its ratings, and is ringed in red on the canvas:
+
+- **Connected backwards.** The classic destructive mistake — a reversed electrolytic vents. It
+  has to be held backwards for a millisecond before it complains, so the startup transient of a
+  supply coming up around it does not raise a false alarm.
+- **Over its working voltage**, which is the other number printed on the can.
+
+Give the regulator headroom. It needs its dropout voltage above the output *at the bottom of the
+ripple*, not on average — a supply that measures fine on a meter can still be dropping out on
+every trough.
 
 ---
 
