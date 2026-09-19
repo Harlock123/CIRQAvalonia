@@ -8,13 +8,28 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
-- The digital examples — Decade Counter, Digit Counter, Ring Oscillator and Running Light — now
-  show their traces tiled rather than stacked. Stacked mode centres each lane on its offset, which
-  put the top of a 0-3.4V logic swing outside its lane; the Ring Oscillator was losing most of its
-  waveform. Tiled gives every trace its own auto-ranged axes.
-- New example, **File > Examples > Raspberry Pi GPIO** — a Pi driving two LEDs and reading a button
-  on an internal pull-up, wiring all three things a GPIO pin can do into one circuit. Double-click
-  the button on the canvas to press it.
+## [0.3.0] - 2026-09-19
+
+**New example: File > Examples > Raspberry Pi GPIO.** A Pi driving two LEDs and reading a button
+on its internal pull-up — all three things a GPIO pin can do in one circuit. One pin toggles, one
+plays a bit pattern, one reads. Double-click the button on the canvas to press it and watch the
+input fall.
+
+The button goes to ground rather than to 3.3V because the pin uses the internal pull-up; wiring it
+the other way needs an external pull-down, and is the usual reason a first attempt reads garbage.
+330R on 3.3V gives about 4.5 mA per LED, comfortably inside the Pi's 16 mA per-pin rating, so the
+board's own rule checks stay quiet.
+
+**Digital waveforms are no longer clipped.** Decade Counter, Digit Counter, Ring Oscillator and
+Running Light now show their traces tiled rather than stacked. Stacked mode centres each lane on
+its offset, which pushed the top of a 0-3.4V logic swing outside its lane — the Ring Oscillator
+was losing most of its waveform, and the Digit Counter the top of QA. Tiled gives every trace its
+own auto-ranged axes.
+
+Stacked mode itself is unchanged: it assumes traces sit around zero, which suits AC-coupled or
+bipolar signals rather than logic.
+
+**596 tests** pass, measured against closed-form answers rather than recorded output.
 
 ## [0.2.0] - 2026-09-19
 
@@ -87,6 +102,7 @@ First public build of CirqAvalonia — an electronic circuit analyzer and mixed-
 
 **501 tests** measure the solver against closed-form answers rather than recorded output.
 
-[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Harlock123/CIRQAvalonia/releases/tag/v0.1.0
