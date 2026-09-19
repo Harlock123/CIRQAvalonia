@@ -8,15 +8,30 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
-- **TL431 programmable shunt reference.** A zener whose voltage you choose: tie the reference to
-  the cathode for a fixed 2.5 V shunt, or feed it from a divider and it holds the cathode at
-  2.495 × (1 + R₁/R₂). It needs a milliamp or so to regulate, and reports being starved — sizing
-  the feed resistor so the load takes everything is the classic way to end up with a circuit that
-  almost works.
-- **74HC14 hex Schmitt-trigger inverter.** Two thresholds rather than one, so a rising input must
-  clear the upper before it counts as high and a falling one must drop past the lower. That is
-  what cleans up a slow edge, debounces a contact, and lets a single gate with an RC around it
-  free-run as an oscillator.
+## [0.8.0] - 2026-09-19
+
+**TL431 programmable shunt reference.** A zener whose voltage you choose. Tie its reference pin to
+its cathode and it is a fixed 2.5 V shunt; feed the reference from a divider off the cathode and it
+holds the cathode at 2.495 × (1 + R₁/R₂). That is why almost every switching supply has one — it
+is the adjustable part of the feedback loop, and usually the thing on the other side of the
+optocoupler.
+
+It needs a milliamp or so through it to regulate at all, and it reports being starved. Sizing the
+feed resistor so the load takes everything is the classic way to end up with a circuit that almost
+works.
+
+**74HC14 hex Schmitt-trigger inverter.** The package is the 7404's; the difference is entirely in
+how it reads an input. An ordinary gate has one threshold, so an input creeping slowly through it
+produces a burst of output chatter as noise carries the level back and forth. A Schmitt input has
+two: it will not call a rising input high until it clears the upper, nor a falling one low until it
+drops past the lower, and between them it remembers what it last decided.
+
+That gap is what makes this the part you reach for to clean up a slow edge, debounce a contact, or
+— with a resistor from output back to input and a capacitor to ground — build an oscillator out of
+a single gate. The thresholds are held as fractions of the supply, so they follow the rail down if
+you run it at 3.3 V.
+
+**729 tests** pass, measured against closed-form answers rather than recorded output.
 
 ## [0.7.0] - 2026-09-19
 
@@ -224,7 +239,8 @@ First public build of CirqAvalonia — an electronic circuit analyzer and mixed-
 
 **501 tests** measure the solver against closed-form answers rather than recorded output.
 
-[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.4.0...v0.5.0
