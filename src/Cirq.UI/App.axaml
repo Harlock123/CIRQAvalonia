@@ -1,0 +1,57 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:Cirq.UI.ViewModels"
+             x:Class="Cirq.UI.App"
+>
+
+  <Application.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <ResourceInclude Source="avares://Cirq.UI/Views/Themes.axaml" />
+      </ResourceDictionary.MergedDictionaries>
+    </ResourceDictionary>
+  </Application.Resources>
+
+  <Application.Styles>
+    <FluentTheme />
+    <StyleInclude Source="avares://Cirq.UI/Views/Styles.axaml" />
+  </Application.Styles>
+
+  <!-- Implicit templates: the inspector builds a heterogeneous list of parameter view models
+       and each one renders itself according to its type. -->
+  <Application.DataTemplates>
+
+    <DataTemplate DataType="vm:NumericParameterViewModel">
+      <Grid ColumnDefinitions="118,*" Margin="10,3">
+        <TextBlock Classes="label" Text="{Binding Label}" TextTrimming="CharacterEllipsis"
+                   ToolTip.Tip="{Binding Label}" />
+        <TextBox Grid.Column="1" Classes="parameter" Text="{Binding Text}"
+                 Classes.error="{Binding HasError}"
+                 ToolTip.Tip="Accepts engineering notation: 4k7, 100n, 2.2M, 10kOhm" />
+      </Grid>
+    </DataTemplate>
+
+    <DataTemplate DataType="vm:BooleanParameterViewModel">
+      <Grid ColumnDefinitions="118,*" Margin="10,3">
+        <TextBlock Classes="label" Text="{Binding Label}" TextTrimming="CharacterEllipsis" />
+        <ToggleSwitch Grid.Column="1" IsChecked="{Binding Value}" OnContent="" OffContent="" />
+      </Grid>
+    </DataTemplate>
+
+    <DataTemplate DataType="vm:OptionParameterViewModel">
+      <Grid ColumnDefinitions="118,*" Margin="10,3">
+        <TextBlock Classes="label" Text="{Binding Label}" TextTrimming="CharacterEllipsis" />
+        <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" FontSize="12"
+                  ItemsSource="{Binding Options}" SelectedItem="{Binding Selected}" />
+      </Grid>
+    </DataTemplate>
+
+    <DataTemplate DataType="vm:TextParameterViewModel">
+      <Grid ColumnDefinitions="118,*" Margin="10,3">
+        <TextBlock Classes="label" Text="{Binding Label}" TextTrimming="CharacterEllipsis" />
+        <TextBox Grid.Column="1" Classes="parameter" Text="{Binding Value}" />
+      </Grid>
+    </DataTemplate>
+
+  </Application.DataTemplates>
+</Application>

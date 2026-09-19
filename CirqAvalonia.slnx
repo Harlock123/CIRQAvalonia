@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Cirq.Components/Cirq.Components.csproj" />
+    <Project Path="src/Cirq.Core/Cirq.Core.csproj" />
+    <Project Path="src/Cirq.Engine/Cirq.Engine.csproj" />
+    <Project Path="src/Cirq.UI/Cirq.UI.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Cirq.Components.Tests/Cirq.Components.Tests.csproj" />
+    <Project Path="tests/Cirq.Engine.Tests/Cirq.Engine.Tests.csproj" />
+    <Project Path="tests/Cirq.UI.Tests/Cirq.UI.Tests.csproj" />
+  </Folder>
+</Solution>

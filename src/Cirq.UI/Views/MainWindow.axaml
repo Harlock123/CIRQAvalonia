@@ -1,0 +1,278 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:Cirq.UI.Controls"
+        xmlns:views="clr-namespace:Cirq.UI.Views"
+        xmlns:vm="clr-namespace:Cirq.UI.ViewModels"
+        x:Class="Cirq.UI.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="{Binding WindowTitle}"
+        Width="1600" Height="1000"
+        MinWidth="560" MinHeight="420"
+        Background="{DynamicResource AppBackground}">
+
+  <!-- The minimum size is kept genuinely small on purpose. A tiling window manager hands the
+       window whatever size it likes, and anything the layout cannot fit inside that hangs off the
+       right-hand edge where it cannot be reached. -->
+  <DockPanel>
+
+    <!-- ===== Menu bar ===== -->
+    <!-- Commands live here rather than on a toolbar. Three wrapped rows of buttons cost far more
+         vertical space than the canvas could spare, especially in a narrow window. -->
+    <Menu DockPanel.Dock="Top" Background="{DynamicResource PanelBackground}">
+
+      <MenuItem Header="_File">
+        <MenuItem Header="_New" InputGesture="Ctrl+N" Command="{Binding NewCircuitCommand}" />
+        <MenuItem Header="_Open..." InputGesture="Ctrl+O" Command="{Binding OpenCommand}" />
+        <Separator />
+        <MenuItem Header="_Save" InputGesture="Ctrl+S" Command="{Binding SaveCommand}" />
+        <MenuItem Header="Save _As..." InputGesture="Ctrl+Shift+S" Command="{Binding SaveAsCommand}" />
+        <Separator />
+        <MenuItem Header="_Examples" ItemsSource="{Binding ExampleCircuits}">
+          <MenuItem.ItemContainerTheme>
+            <ControlTheme TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}"
+                          x:DataType="vm:ExampleCircuit">
+              <Setter Property="Header" Value="{Binding Name}" />
+              <Setter Property="ToolTip.Tip" Value="{Binding Description}" />
+              <Setter Property="Command"
+                      Value="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).LoadExampleCommand}" />
+              <Setter Property="CommandParameter" Value="{Binding}" />
+            </ControlTheme>
+          </MenuItem.ItemContainerTheme>
+        </MenuItem>
+        <Separator />
+        <MenuItem Header="Se_ttings..." Command="{Binding ShowSettingsCommand}" />
+        <Separator />
+        <MenuItem Header="E_xit" Command="{Binding ExitCommand}" />
+      </MenuItem>
+
+      <MenuItem Header="_Edit">
+        <MenuItem Header="_Rotate" InputGesture="R" Command="{Binding RotateSelectionCommand}" />
+        <MenuItem Header="_Delete" InputGesture="Delete" Command="{Binding DeleteSelectionCommand}" />
+      </MenuItem>
+
+      <MenuItem Header="_Tools">
+        <MenuItem Header="_Select" InputGesture="V" ToggleType="Radio"
+                  IsChecked="{Binding IsSelectTool, Mode=TwoWay}" />
+        <MenuItem Header="_Wire" InputGesture="W" ToggleType="Radio"
+                  IsChecked="{Binding IsWireTool, Mode=TwoWay}" />
+        <MenuItem Header="_Probe" InputGesture="P" ToggleType="Radio"
+                  IsChecked="{Binding IsProbeTool, Mode=TwoWay}" />
+        <MenuItem Header="_Delete" ToggleType="Radio"
+                  IsChecked="{Binding IsDeleteTool, Mode=TwoWay}" />
+      </MenuItem>
+
+      <MenuItem Header="_View">
+        <MenuItem Header="Zoom to _Fit" InputGesture="F" Command="{Binding ZoomToFitCommand}" />
+        <Separator />
+        <MenuItem Header="Show _Grid" ToggleType="CheckBox" IsChecked="{Binding ShowGrid, Mode=TwoWay}" />
+        <MenuItem Header="_Snap to Grid" ToggleType="CheckBox" IsChecked="{Binding SnapToGrid, Mode=TwoWay}" />
+        <Separator />
+        <MenuItem Header="Component _Palette" InputGesture="F9" ToggleType="CheckBox"
+                  IsChecked="{Binding IsPaletteExpanded, Mode=TwoWay}" />
+        <MenuItem Header="P_roperties Panel" InputGesture="F10" ToggleType="CheckBox"
+                  IsChecked="{Binding IsInspectorExpanded, Mode=TwoWay}" />
+      </MenuItem>
+
+      <MenuItem Header="_Simulate">
+        <MenuItem Header="_Run / Pause" InputGesture="F5" Command="{Binding PlayPauseCommand}" />
+        <MenuItem Header="_Step" InputGesture="F6" Command="{Binding StepCommand}" />
+        <MenuItem Header="Re_set" InputGesture="F8" Command="{Binding ResetSimulationCommand}" />
+        <Separator />
+        <MenuItem Header="Spee_d" ItemsSource="{Binding SpeedOptions}">
+          <MenuItem.ItemContainerTheme>
+            <ControlTheme TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}"
+                          x:DataType="vm:SpeedOption">
+              <Setter Property="Header" Value="{Binding Label}" />
+              <Setter Property="ToggleType" Value="Radio" />
+              <Setter Property="IsChecked" Value="{Binding IsSelected}" />
+              <Setter Property="Command"
+                      Value="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).SetSpeedCommand}" />
+              <Setter Property="CommandParameter" Value="{Binding}" />
+            </ControlTheme>
+          </MenuItem.ItemContainerTheme>
+        </MenuItem>
+      </MenuItem>
+
+      <MenuItem Header="_Help">
+        <MenuItem Header="_Keyboard Shortcuts..." Command="{Binding ShowShortcutsCommand}" />
+      </MenuItem>
+    </Menu>
+
+    <!-- ===== Status bar ===== -->
+    <Border DockPanel.Dock="Bottom" Classes="panel" BorderThickness="0,1,0,0" Padding="10,4">
+      <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto">
+        <TextBlock Classes="label" Text="{Binding StatusMessage}" TextTrimming="CharacterEllipsis" />
+        <TextBlock Grid.Column="1" Classes="label" Margin="16,0"
+                   Text="{Binding Simulation.Status}" TextTrimming="CharacterEllipsis" MaxWidth="420" />
+        <TextBlock Grid.Column="2" Classes="value" Margin="16,0" Text="{Binding ActiveToolName}"
+                   ToolTip.Tip="Active tool" />
+        <TextBlock Grid.Column="3" Classes="label" Margin="16,0" Text="{Binding SpeedLabel}"
+                   ToolTip.Tip="Simulation speed" />
+        <TextBlock Grid.Column="4" Classes="value" Margin="16,0" Name="SimTimeLabel" />
+        <TextBlock Grid.Column="5" Classes="label" Margin="16,0" Name="RateLabel" />
+      </Grid>
+    </Border>
+
+    <!-- ===== Body ===== -->
+    <Grid>
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="{Binding PaletteColumnWidth}" />
+        <ColumnDefinition Width="{Binding PaletteSplitterWidth}" />
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="{Binding InspectorSplitterWidth}" />
+        <ColumnDefinition Width="{Binding InspectorColumnWidth}" />
+      </Grid.ColumnDefinitions>
+
+      <!-- Palette -->
+      <Border Grid.Column="0" Classes="panel" BorderThickness="0,0,1,0">
+       <Grid>
+
+        <!-- Collapsed rail: the only thing left at the edge, and the way back. -->
+        <Button Classes="rail" IsVisible="{Binding !IsPaletteExpanded}"
+                Command="{Binding TogglePaletteCommand}"
+                ToolTip.Tip="{Binding PaletteToggleHint}">
+          <StackPanel Orientation="Vertical" Spacing="10" HorizontalAlignment="Center">
+            <TextBlock Text="{Binding PaletteToggleGlyph}" Classes="chevron" />
+            <LayoutTransformControl>
+              <LayoutTransformControl.LayoutTransform>
+                <RotateTransform Angle="-90" />
+              </LayoutTransformControl.LayoutTransform>
+              <TextBlock Text="COMPONENTS" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource TextMuted}" />
+            </LayoutTransformControl>
+          </StackPanel>
+        </Button>
+
+        <DockPanel IsVisible="{Binding IsPaletteExpanded}">
+          <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto,Auto">
+            <TextBlock Classes="heading" Text="COMPONENTS" />
+            <Button Grid.Column="1" Classes="linkish" Content="All"
+                    Margin="0,8,2,0" Command="{Binding TogglePaletteGroupsCommand}"
+                    ToolTip.Tip="Expand or collapse every group" />
+            <Button Grid.Column="2" Classes="collapse" Margin="0,6,4,0"
+                    Content="{Binding PaletteToggleGlyph}"
+                    Command="{Binding TogglePaletteCommand}"
+                    ToolTip.Tip="{Binding PaletteToggleHint}" />
+          </Grid>
+          <ScrollViewer>
+            <ItemsControl ItemsSource="{Binding Palette}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:PaletteCategoryViewModel">
+                  <!-- Built from a toggle button rather than an Expander so the disclosure
+                       triangle can sit hard against the left edge, lining up down the panel. -->
+                  <StackPanel>
+                    <ToggleButton Classes="groupHeader" IsChecked="{Binding IsExpanded, Mode=TwoWay}">
+                      <Grid ColumnDefinitions="14,*,Auto">
+                        <TextBlock Text="{Binding Chevron}" FontSize="9" Foreground="{DynamicResource TextMuted}"
+                                   VerticalAlignment="Center" HorizontalAlignment="Left" />
+                        <TextBlock Grid.Column="1" Text="{Binding Name}" FontSize="11"
+                                   FontWeight="SemiBold" Foreground="{DynamicResource TextSecondary}"
+                                   VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Grid.Column="2" Text="{Binding Count}" FontSize="10"
+                                   Foreground="{DynamicResource TextFaint}" VerticalAlignment="Center" />
+                      </Grid>
+                    </ToggleButton>
+
+                    <ItemsControl ItemsSource="{Binding Items}" IsVisible="{Binding IsExpanded}"
+                                  Margin="0,1,0,4">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:PaletteItem">
+                          <Button Classes="palette" Content="{Binding Name}"
+                                  ToolTip.Tip="{Binding Description}"
+                                  Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).ChoosePaletteItemCommand}"
+                                  CommandParameter="{Binding}" />
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </StackPanel>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </DockPanel>
+       </Grid>
+      </Border>
+
+      <GridSplitter Grid.Column="1" Background="{DynamicResource SplitterBackground}" IsVisible="{Binding IsPaletteExpanded}" />
+
+      <!-- Canvas over scope -->
+      <Grid Grid.Column="2" RowDefinitions="*,4,300">
+        <controls:CircuitCanvas Grid.Row="0" Name="Canvas"
+                                Circuit="{Binding Circuit}"
+                                ActiveTool="{Binding ActiveTool}"
+                                SelectedComponent="{Binding SelectedComponent, Mode=TwoWay}"
+                                PendingItem="{Binding PendingItem, Mode=TwoWay}"
+                                ShowGrid="{Binding ShowGrid}"
+                                SnapToGrid="{Binding SnapToGrid}"
+                                GridSize="{Binding GridSize}" />
+
+        <GridSplitter Grid.Row="1" Background="{DynamicResource SplitterBackground}" />
+
+        <Border Grid.Row="2" Classes="panel" BorderThickness="0,1,0,0">
+          <views:ScopePanel DataContext="{Binding Scope}" />
+        </Border>
+      </Grid>
+
+      <GridSplitter Grid.Column="3" Background="{DynamicResource SplitterBackground}" IsVisible="{Binding IsInspectorExpanded}" />
+
+      <!-- Inspector -->
+      <Border Grid.Column="4" Classes="panel" BorderThickness="1,0,0,0">
+       <Grid>
+
+        <Button Classes="rail" IsVisible="{Binding !IsInspectorExpanded}"
+                Command="{Binding ToggleInspectorCommand}"
+                ToolTip.Tip="{Binding InspectorToggleHint}">
+          <StackPanel Orientation="Vertical" Spacing="10" HorizontalAlignment="Center">
+            <TextBlock Text="{Binding InspectorToggleGlyph}" Classes="chevron" />
+            <LayoutTransformControl>
+              <LayoutTransformControl.LayoutTransform>
+                <RotateTransform Angle="-90" />
+              </LayoutTransformControl.LayoutTransform>
+              <TextBlock Text="PROPERTIES" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource TextMuted}" />
+            </LayoutTransformControl>
+          </StackPanel>
+        </Button>
+
+        <DockPanel IsVisible="{Binding IsInspectorExpanded}">
+          <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="10,10,4,6">
+            <StackPanel>
+              <TextBlock Text="{Binding Inspector.Title}" FontSize="15" FontWeight="SemiBold"
+                         Foreground="{DynamicResource TextPrimary}" TextTrimming="CharacterEllipsis" />
+              <TextBlock Text="{Binding Inspector.Subtitle}" FontSize="12" Foreground="{DynamicResource TextMuted}"
+                         TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+            <Button Grid.Column="1" Classes="collapse" VerticalAlignment="Top"
+                    Content="{Binding InspectorToggleGlyph}"
+                    Command="{Binding ToggleInspectorCommand}"
+                    ToolTip.Tip="{Binding InspectorToggleHint}" />
+          </Grid>
+
+          <ScrollViewer DataContext="{Binding Inspector}">
+            <StackPanel>
+              <TextBlock Classes="heading" Text="PLACEMENT"
+                         IsVisible="{Binding Component, Converter={x:Static ObjectConverters.IsNotNull}}" />
+              <ItemsControl ItemsSource="{Binding Placement}" />
+
+              <TextBlock Classes="heading" Text="PARAMETERS"
+                         IsVisible="{Binding Component, Converter={x:Static ObjectConverters.IsNotNull}}" />
+              <ItemsControl ItemsSource="{Binding Parameters}" />
+
+              <TextBlock Classes="heading" Text="PINS"
+                         IsVisible="{Binding Component, Converter={x:Static ObjectConverters.IsNotNull}}" />
+              <ItemsControl ItemsSource="{Binding Terminals}" Margin="0,0,0,16">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:TerminalSummary">
+                    <Grid ColumnDefinitions="118,*" Margin="10,2">
+                      <TextBlock Classes="label" Text="{Binding Name}" />
+                      <TextBlock Grid.Column="1" FontSize="11" Foreground="{DynamicResource TextMuted}" Text="{Binding Role}" />
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+          </ScrollViewer>
+        </DockPanel>
+       </Grid>
+      </Border>
+    </Grid>
+  </DockPanel>
+</Window>

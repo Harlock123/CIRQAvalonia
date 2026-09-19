@@ -1,0 +1,50 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:Cirq.UI.ViewModels"
+        x:Class="Cirq.UI.Views.SettingsWindow"
+        x:DataType="vm:SettingsViewModel"
+        Title="Settings"
+        Width="460" SizeToContent="Height"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource PanelBackground}">
+
+  <StackPanel Margin="20" Spacing="16">
+
+    <TextBlock Text="Appearance" FontSize="15" FontWeight="SemiBold"
+               Foreground="{DynamicResource TextPrimary}" />
+
+    <StackPanel Spacing="6">
+      <TextBlock Text="Theme" Classes="label" />
+      <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding Choices}"
+                SelectedItem="{Binding SelectedTheme}">
+        <ComboBox.ItemTemplate>
+          <DataTemplate x:DataType="vm:ThemeChoice">
+            <StackPanel Margin="0,2">
+              <TextBlock Text="{Binding Name}" Foreground="{DynamicResource TextValue}" />
+              <TextBlock Text="{Binding Description}" FontSize="11"
+                         Foreground="{DynamicResource TextMuted}" />
+            </StackPanel>
+          </DataTemplate>
+        </ComboBox.ItemTemplate>
+      </ComboBox>
+
+      <TextBlock Text="{Binding SystemThemeNote}" FontSize="11"
+                 Foreground="{DynamicResource TextMuted}" TextWrapping="Wrap"
+                 IsVisible="{Binding SystemThemeNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+    </StackPanel>
+
+    <Border Height="1" Background="{DynamicResource PanelBorder}" />
+
+    <StackPanel Spacing="4">
+      <TextBlock Text="Changes apply immediately and are remembered between sessions."
+                 FontSize="11" Foreground="{DynamicResource TextMuted}" TextWrapping="Wrap" />
+      <TextBlock Text="{Binding SettingsLocation}" FontSize="10"
+                 Foreground="{DynamicResource TextFaint}" TextWrapping="Wrap"
+                 ToolTip.Tip="Where your preferences are stored" />
+    </StackPanel>
+
+    <Button Content="Close" HorizontalAlignment="Right" MinWidth="88" IsDefault="True"
+            Name="CloseButton" />
+  </StackPanel>
+</Window>

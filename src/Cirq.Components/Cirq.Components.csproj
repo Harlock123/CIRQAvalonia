@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../Cirq.Core/Cirq.Core.csproj" />
+    <ProjectReference Include="../Cirq.Engine/Cirq.Engine.csproj" />
+  </ItemGroup>
+</Project>

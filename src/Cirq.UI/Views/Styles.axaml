@@ -1,0 +1,164 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <Style Selector="Border.panel">
+    <Setter Property="Background" Value="{DynamicResource PanelBackground}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource PanelBorder}" />
+    <Setter Property="BorderThickness" Value="1" />
+  </Style>
+
+  <Style Selector="TextBlock.heading">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />
+    <Setter Property="Margin" Value="10,10,10,4" />
+  </Style>
+
+  <Style Selector="TextBlock.label">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Foreground" Value="{DynamicResource TextSecondary}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+
+  <Style Selector="TextBlock.value">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Foreground" Value="{DynamicResource TextValue}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+
+  <Style Selector="Button.palette">
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="HorizontalContentAlignment" Value="Left" />
+    <Setter Property="Padding" Value="14,3" />
+    <Setter Property="Margin" Value="0" />
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="CornerRadius" Value="3" />
+  </Style>
+
+  <!-- Palette group headers. A band very slightly lighter than the panel, so each group reads as
+       its own strip without turning the sidebar into a set of boxes. -->
+  <Style Selector="ToggleButton.groupHeader">
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    <Setter Property="Background" Value="{DynamicResource GroupHeaderBackground}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource GroupHeaderBorder}" />
+    <Setter Property="BorderThickness" Value="0,0,0,1" />
+    <Setter Property="CornerRadius" Value="0" />
+    <Setter Property="Padding" Value="8,5" />
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="Margin" Value="0,1,0,0" />
+    <Setter Property="Cursor" Value="Hand" />
+  </Style>
+
+  <Style Selector="ToggleButton.groupHeader:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource GroupHeaderHover}" />
+  </Style>
+
+  <!-- An open group is lifted a touch further so it is obvious which one is showing. -->
+  <Style Selector="ToggleButton.groupHeader:checked /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource GroupHeaderOpen}" />
+  </Style>
+
+  <Style Selector="ToggleButton.groupHeader:checked:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource GroupHeaderOpenHover}" />
+  </Style>
+
+  <!-- A quiet text button, used for the palette's expand-all affordance. -->
+  <Style Selector="Button.linkish">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Padding" Value="5,1" />
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="FontSize" Value="10" />
+    <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />
+  </Style>
+
+  <Style Selector="Button.linkish:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource HoverBackground}" />
+  </Style>
+
+  <!-- A collapsed side panel becomes a full-height rail: the whole strip is the button, so the
+       target is easy to hit even though it is only a couple of dozen pixels wide. -->
+  <Style Selector="Button.rail">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Padding" Value="0,10" />
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="VerticalAlignment" Value="Stretch" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Top" />
+    <Setter Property="CornerRadius" Value="0" />
+    <Setter Property="Cursor" Value="Hand" />
+  </Style>
+
+  <Style Selector="Button.rail:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource HoverBackground}" />
+  </Style>
+
+  <Style Selector="Button.rail TextBlock.chevron">
+    <Setter Property="Foreground" Value="{DynamicResource SymbolLabel}" />
+  </Style>
+
+  <!-- The chevron in an expanded panel's header. -->
+  <Style Selector="Button.collapse">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Padding" Value="6,2" />
+    <Setter Property="MinWidth" Value="0" />
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />
+    <Setter Property="Cursor" Value="Hand" />
+  </Style>
+
+  <Style Selector="Button.collapse:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource HoverBackground}" />
+  </Style>
+
+  <Style Selector="TextBlock.chevron">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+  </Style>
+
+  <!-- Toolbar groups keep their controls together when the bar wraps onto a second row. -->
+  <Style Selector="StackPanel.toolgroup">
+    <Setter Property="Margin" Value="0,2,14,2" />
+    <Setter Property="Spacing" Value="2" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+
+  <Style Selector="Button.palette:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource HoverBackground}" />
+  </Style>
+
+  <Style Selector="Button.toolbar">
+    <Setter Property="Padding" Value="10,5" />
+    <Setter Property="Margin" Value="2,0" />
+    <Setter Property="MinWidth" Value="0" />
+  </Style>
+
+  <Style Selector="ToggleButton.tool">
+    <Setter Property="Padding" Value="12,5" />
+    <Setter Property="Margin" Value="2,0" />
+  </Style>
+
+  <Style Selector="TextBox.parameter">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Padding" Value="6,3" />
+    <Setter Property="MinHeight" Value="26" />
+  </Style>
+
+  <Style Selector="TextBox.parameter.error">
+    <Setter Property="BorderBrush" Value="{DynamicResource TextError}" />
+    <Setter Property="BorderThickness" Value="1.5" />
+  </Style>
+
+  <Style Selector="Separator.vertical">
+    <Setter Property="Width" Value="1" />
+    <Setter Property="Height" Value="20" />
+    <Setter Property="Margin" Value="8,0" />
+    <Setter Property="Background" Value="{DynamicResource PanelBorder}" />
+  </Style>
+</Styles>

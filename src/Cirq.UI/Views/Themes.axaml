@@ -1,0 +1,138 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:services="clr-namespace:Cirq.UI.Services">
+
+  <!-- Semantic colours for the whole application. Everything that used to be a hard-coded hex
+       value now comes from here, which is what makes a light theme possible at all: the canvas and
+       the scope are drawn in code, so they read these same keys at runtime rather than carrying a
+       second, silently diverging palette of their own. -->
+
+  <ResourceDictionary.ThemeDictionaries>
+
+    <ResourceDictionary x:Key="Dark">
+      <SolidColorBrush x:Key="AppBackground" Color="#11151B" />
+      <SolidColorBrush x:Key="PanelBackground" Color="#1A1F27" />
+      <SolidColorBrush x:Key="PanelBorder" Color="#2A3340" />
+      <SolidColorBrush x:Key="SplitterBackground" Color="#202832" />
+
+      <SolidColorBrush x:Key="GroupHeaderBackground" Color="#232C38" />
+      <SolidColorBrush x:Key="GroupHeaderOpen" Color="#2A3441" />
+      <SolidColorBrush x:Key="GroupHeaderHover" Color="#2B3644" />
+      <SolidColorBrush x:Key="GroupHeaderOpenHover" Color="#313D4C" />
+      <SolidColorBrush x:Key="GroupHeaderBorder" Color="#2C3745" />
+      <SolidColorBrush x:Key="HoverBackground" Color="#26303C" />
+
+      <SolidColorBrush x:Key="TextPrimary" Color="#E4EDF6" />
+      <SolidColorBrush x:Key="TextValue" Color="#D7E2EE" />
+      <SolidColorBrush x:Key="TextSecondary" Color="#9FB0C2" />
+      <SolidColorBrush x:Key="TextMuted" Color="#7C8DA0" />
+      <SolidColorBrush x:Key="TextFaint" Color="#64748B" />
+      <SolidColorBrush x:Key="TextError" Color="#E05252" />
+
+      <SolidColorBrush x:Key="CanvasBackground" Color="#14181F" />
+      <SolidColorBrush x:Key="CanvasGridDot" Color="#4B5C73" />
+      <SolidColorBrush x:Key="CanvasGridMajor" Color="#657E94" />
+      <SolidColorBrush x:Key="SymbolStroke" Color="#D7E2EE" />
+      <SolidColorBrush x:Key="SymbolFill" Color="#1D2530" />
+      <SolidColorBrush x:Key="SymbolLabel" Color="#8FA3B8" />
+      <SolidColorBrush x:Key="SymbolValue" Color="#5FC9F8" />
+      <SolidColorBrush x:Key="SelectionStroke" Color="#FFB020" />
+      <SolidColorBrush x:Key="WireStroke" Color="#7FD58A" />
+      <SolidColorBrush x:Key="TerminalFill" Color="#758BA1" />
+      <SolidColorBrush x:Key="TerminalHover" Color="#FFD24A" />
+      <SolidColorBrush x:Key="SegmentUnlit" Color="#46282E36" />
+
+      <SolidColorBrush x:Key="PlotBackground" Color="#0E1116" />
+      <SolidColorBrush x:Key="PlotGrid" Color="#212833" />
+      <SolidColorBrush x:Key="PlotAxis" Color="#7C8DA0" />
+    </ResourceDictionary>
+
+    <ResourceDictionary x:Key="Light">
+      <SolidColorBrush x:Key="AppBackground" Color="#EDF0F4" />
+      <SolidColorBrush x:Key="PanelBackground" Color="#F6F8FA" />
+      <SolidColorBrush x:Key="PanelBorder" Color="#D0D7DE" />
+      <SolidColorBrush x:Key="SplitterBackground" Color="#DCE2E8" />
+
+      <SolidColorBrush x:Key="GroupHeaderBackground" Color="#E7ECF1" />
+      <SolidColorBrush x:Key="GroupHeaderOpen" Color="#DCE4EC" />
+      <SolidColorBrush x:Key="GroupHeaderHover" Color="#DFE6ED" />
+      <SolidColorBrush x:Key="GroupHeaderOpenHover" Color="#D2DCE6" />
+      <SolidColorBrush x:Key="GroupHeaderBorder" Color="#D0D7DE" />
+      <SolidColorBrush x:Key="HoverBackground" Color="#E2E8EF" />
+
+      <SolidColorBrush x:Key="TextPrimary" Color="#111820" />
+      <SolidColorBrush x:Key="TextValue" Color="#1F2933" />
+      <SolidColorBrush x:Key="TextSecondary" Color="#44515F" />
+      <SolidColorBrush x:Key="TextMuted" Color="#5C6B7C" />
+      <SolidColorBrush x:Key="TextFaint" Color="#7A8794" />
+      <SolidColorBrush x:Key="TextError" Color="#C0392B" />
+
+      <SolidColorBrush x:Key="CanvasBackground" Color="#FBFCFD" />
+      <SolidColorBrush x:Key="CanvasGridDot" Color="#8BA0B5" />
+      <SolidColorBrush x:Key="CanvasGridMajor" Color="#647C96" />
+      <SolidColorBrush x:Key="SymbolStroke" Color="#1F2933" />
+      <SolidColorBrush x:Key="SymbolFill" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="SymbolLabel" Color="#44515F" />
+      <SolidColorBrush x:Key="SymbolValue" Color="#0B6FA4" />
+      <SolidColorBrush x:Key="SelectionStroke" Color="#AE5F05" />
+      <SolidColorBrush x:Key="WireStroke" Color="#197637" />
+      <SolidColorBrush x:Key="TerminalFill" Color="#606F7F" />
+      <SolidColorBrush x:Key="TerminalHover" Color="#B45309" />
+      <SolidColorBrush x:Key="SegmentUnlit" Color="#3AB8C2CC" />
+
+      <SolidColorBrush x:Key="PlotBackground" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="PlotGrid" Color="#E2E8F0" />
+      <SolidColorBrush x:Key="PlotAxis" Color="#44515F" />
+    </ResourceDictionary>
+
+    <!-- High contrast. Keyed by x:Static because Avalonia's theme-variant type converter only
+         understands the two built-in names; a plain x:Key="HighContrast" would not bind. The
+         variant inherits from Dark, so the Fluent control chrome this file does not name still
+         resolves instead of coming back empty.
+
+         Every colour below is deliberate rather than inherited: pure black grounds with white
+         text (21:1) and the conventional high-contrast accents — yellow for selection, cyan for
+         values. Nothing here relies on a hue difference alone to carry meaning. -->
+    <ResourceDictionary x:Key="{x:Static services:AppThemes.HighContrast}">
+      <SolidColorBrush x:Key="AppBackground" Color="#000000" />
+      <SolidColorBrush x:Key="PanelBackground" Color="#000000" />
+      <SolidColorBrush x:Key="PanelBorder" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="SplitterBackground" Color="#FFFFFF" />
+
+      <!-- Group headers separate from the panel by lightness, since both are otherwise black. -->
+      <SolidColorBrush x:Key="GroupHeaderBackground" Color="#1C1C1C" />
+      <SolidColorBrush x:Key="GroupHeaderOpen" Color="#3D3D3D" />
+      <SolidColorBrush x:Key="GroupHeaderHover" Color="#2E2E2E" />
+      <SolidColorBrush x:Key="GroupHeaderOpenHover" Color="#525252" />
+      <SolidColorBrush x:Key="GroupHeaderBorder" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="HoverBackground" Color="#3D3D3D" />
+
+      <!-- The muted greys of the other themes are flattened towards white: dimming text to signal
+           "less important" is exactly what a high contrast theme exists to undo. -->
+      <SolidColorBrush x:Key="TextPrimary" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="TextValue" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="TextSecondary" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="TextMuted" Color="#E6E6E6" />
+      <SolidColorBrush x:Key="TextFaint" Color="#CCCCCC" />
+      <SolidColorBrush x:Key="TextError" Color="#FF8080" />
+
+      <SolidColorBrush x:Key="CanvasBackground" Color="#000000" />
+      <SolidColorBrush x:Key="CanvasGridDot" Color="#7D7D7D" />
+      <SolidColorBrush x:Key="CanvasGridMajor" Color="#9E9E9E" />
+      <SolidColorBrush x:Key="SymbolStroke" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="SymbolFill" Color="#000000" />
+      <SolidColorBrush x:Key="SymbolLabel" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="SymbolValue" Color="#1AEBFF" />
+      <SolidColorBrush x:Key="SelectionStroke" Color="#FFFF00" />
+      <SolidColorBrush x:Key="WireStroke" Color="#00FF6E" />
+      <SolidColorBrush x:Key="TerminalFill" Color="#CCCCCC" />
+      <SolidColorBrush x:Key="TerminalHover" Color="#FFFF00" />
+      <SolidColorBrush x:Key="SegmentUnlit" Color="#80333333" />
+
+      <SolidColorBrush x:Key="PlotBackground" Color="#000000" />
+      <SolidColorBrush x:Key="PlotGrid" Color="#5E5E5E" />
+      <SolidColorBrush x:Key="PlotAxis" Color="#FFFFFF" />
+    </ResourceDictionary>
+
+  </ResourceDictionary.ThemeDictionaries>
+</ResourceDictionary>

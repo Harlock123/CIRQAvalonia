@@ -1,0 +1,94 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:sp="clr-namespace:ScottPlot.Avalonia;assembly=ScottPlot.Avalonia"
+             xmlns:vm="clr-namespace:Cirq.UI.ViewModels"
+             x:Class="Cirq.UI.Views.ScopePanel"
+             x:DataType="vm:ScopeViewModel">
+
+  <Grid RowDefinitions="Auto,*" ColumnDefinitions="*,190">
+
+    <!-- Scope controls -->
+    <Border Grid.Row="0" Grid.ColumnSpan="2" Classes="panel" BorderThickness="0,0,0,1" Padding="8,5">
+      <!-- Two groups inside a WrapPanel rather than one long row: the full set of controls is
+           wider than the window even at fullscreen, and a plain StackPanel silently clipped the
+           right-hand end instead of giving way. -->
+      <WrapPanel Orientation="Horizontal">
+      <StackPanel Orientation="Horizontal" Spacing="4" Margin="0,0,8,0">
+        <TextBlock Classes="label" Text="Timebase" VerticalAlignment="Center" />
+        <Button Classes="toolbar" Content="&#x2212;" Command="{Binding ZoomTimeOutCommand}"
+                ToolTip.Tip="Slower timebase (more seconds per division)" />
+        <TextBlock Classes="value" Width="80" TextAlignment="Center"
+                   Text="{Binding TimebaseLabel}" />
+        <Button Classes="toolbar" Content="+" Command="{Binding ZoomTimeInCommand}"
+                ToolTip.Tip="Faster timebase" />
+
+        <Separator Classes="vertical" />
+
+        <TextBlock Classes="label" Text="Vertical" VerticalAlignment="Center" />
+        <Button Classes="toolbar" Content="&#x2212;" Command="{Binding ZoomVoltsOutCommand}" />
+        <TextBlock Classes="value" Width="80" TextAlignment="Center" Text="{Binding VoltsLabel}" />
+        <Button Classes="toolbar" Content="+" Command="{Binding ZoomVoltsInCommand}" />
+        <CheckBox FontSize="12" Content="Auto" IsChecked="{Binding AutoScaleVertical}"
+                  ToolTip.Tip="Keep the vertical range fitted to the traces. Using the +/- buttons turns this off." />
+
+      </StackPanel>
+
+      <StackPanel Orientation="Horizontal" Spacing="4">
+        <TextBlock Classes="label" Text="Layout" VerticalAlignment="Center" />
+        <ComboBox FontSize="12" MinWidth="100" SelectedItem="{Binding Layout}"
+                  ItemsSource="{Binding Source={x:Static vm:ScopeViewModel.LayoutOptions}}" />
+
+        <Separator Classes="vertical" />
+
+        <CheckBox FontSize="12" Content="AC couple" IsChecked="{Binding AcCoupleAll}"
+                  ToolTip.Tip="Subtract each trace's DC average before display" />
+        <CheckBox FontSize="12" Content="Auto-scroll" IsChecked="{Binding AutoScroll}" />
+
+        <Separator Classes="vertical" />
+
+        <Button Classes="toolbar" Content="Clear traces" Command="{Binding ClearTracesCommand}" />
+      </StackPanel>
+      </WrapPanel>
+    </Border>
+
+    <!-- Plot surface -->
+    <Border Grid.Row="1" Grid.Column="0" Background="{DynamicResource PlotBackground}">
+      <Grid>
+        <sp:AvaPlot Name="Plot" />
+        <TextBlock Name="EmptyHint" Classes="label"
+                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                   Text="Pick the Probe tool and click a terminal to add a trace"
+                   IsVisible="False" />
+      </Grid>
+    </Border>
+
+    <!-- Trace list -->
+    <Border Grid.Row="1" Grid.Column="1" Classes="panel" BorderThickness="1,0,0,0">
+      <DockPanel>
+        <TextBlock DockPanel.Dock="Top" Classes="heading" Text="TRACES" />
+        <ScrollViewer>
+          <ItemsControl ItemsSource="{Binding Probes}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Border Margin="6,2" Padding="6,4" CornerRadius="4" Background="{DynamicResource GroupHeaderBackground}">
+                  <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto">
+                    <CheckBox Grid.Row="0" Grid.Column="0" MinWidth="0" Margin="0,0,4,0"
+                              IsChecked="{Binding IsVisible}" />
+                    <TextBlock Grid.Row="0" Grid.Column="1" Classes="value" FontSize="12"
+                               Text="{Binding Label}" TextTrimming="CharacterEllipsis" />
+                    <Button Grid.Row="0" Grid.Column="2" Content="&#x2715;" FontSize="10"
+                            Padding="5,1" Background="Transparent"
+                            Command="{Binding $parent[ItemsControl].((vm:ScopeViewModel)DataContext).RemoveProbeCommand}"
+                            CommandParameter="{Binding}" />
+                    <TextBlock Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" FontSize="11"
+                               Foreground="{DynamicResource TextMuted}" Text="{Binding LastValue, StringFormat={}{0:0.###} V}" />
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </ScrollViewer>
+      </DockPanel>
+    </Border>
+  </Grid>
+</UserControl>
