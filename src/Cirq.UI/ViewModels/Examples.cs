@@ -36,6 +36,8 @@ public static class Examples
             LoadWindowDetector),
         new("Raspberry Pi GPIO", "Pi driving two LEDs and reading a button on an internal pull-up",
             LoadRaspberryPiGpio),
+        new("Linear Power Supply", "Mains secondary through a bridge and reservoir into a 7812",
+            LoadLinearPowerSupply),
     ];
 
     public static void LoadRcLowPass(MainWindowViewModel vm)
@@ -551,6 +553,71 @@ public static class Examples
         vm.Scope.VoltsPerDivision = 1.0;
         vm.Scope.AddProbe(signal.Output, "Signal");
         vm.Scope.AddProbe(out0, "In range");
+    }
+
+    /// <summary>
+    /// A complete linear supply: transformer secondary, bridge, reservoir capacitor, regulator.
+    /// <para>
+    /// The pair of probes is the point of the example. The reservoir rail sags and recharges twice
+    /// per mains cycle — that sawtooth is the ripple a capacitor alone cannot remove — while the
+    /// regulated rail beside it is flat. Each stage only works because the one before it left
+    /// enough headroom: the regulator needs its dropout voltage above 12 V at the *bottom* of the
+    /// ripple, not on average.
+    /// </para>
+    /// <para>
+    /// This is the one example that sets the simulation speed. At the usual 1/1000 a single 50 Hz
+    /// cycle would take fifty seconds of wall time and the reservoir would spend minutes charging,
+    /// so it asks for real time and the solver keeps up as best it can.
+    /// </para>
+    /// </summary>
+    public static void LoadLinearPowerSupply(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "12 V linear power supply";
+
+        // About 14 V RMS off the transformer: enough that the ripple troughs still clear the
+        // 7812's dropout, without wasting the headroom as heat in the regulator.
+        var secondary = Place(circuit, new FunctionGenerator
+        {
+            Shape = Waveform.Sine,
+            Frequency = 50,
+            AmplitudePeakToPeak = 40,
+            OutputResistance = 1.0,          // transformer winding resistance, and it tames the inrush
+        }, -420, 0);
+
+        var bridge = Place(circuit, new BridgeRectifier(), -240, 0);
+        var reservoir = Place(circuit, new ElectrolyticCapacitor(1000e-6) { VoltageRating = 35 }, -80, 80);
+        var regulator = Place(circuit, new VoltageRegulator(RegulatorModel.Lm7812), 90, -40);
+        var output = Place(circuit, new ElectrolyticCapacitor(10e-6) { VoltageRating = 25 }, 240, 80);
+        var load = Place(circuit, new Resistor(120), 360, 80);
+        var ground = Place(circuit, new Ground(), -240, 210);
+
+        reservoir.RotationDegrees = 90;
+        output.RotationDegrees = 90;
+        load.RotationDegrees = 90;
+
+        circuit.Connect(secondary.Output, bridge.Ac1);
+        circuit.Connect(secondary.Return, bridge.Ac2);
+        circuit.Connect(bridge.Negative, ground.Pin);
+
+        circuit.Connect(bridge.Positive, reservoir.A);
+        circuit.Connect(reservoir.B, ground.Pin);
+
+        circuit.Connect(bridge.Positive, regulator.Input);
+        circuit.Connect(regulator.Common, ground.Pin);
+
+        circuit.Connect(regulator.Output, output.A);
+        circuit.Connect(output.B, ground.Pin);
+        circuit.Connect(regulator.Output, load.A);
+        circuit.Connect(load.B, ground.Pin);
+
+        vm.Scope.TimebasePerDivision = 10e-3;
+        vm.Scope.VoltsPerDivision = 2.0;
+        vm.Scope.Layout = ScopeLayout.Unified;
+        vm.Scope.AddProbe(bridge.Positive, "Reservoir");
+        vm.Scope.AddProbe(regulator.Output, "Regulated");
+
+        vm.Simulation.SpeedFactor = 1.0;
     }
 
     /// <summary>

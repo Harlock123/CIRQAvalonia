@@ -13,6 +13,12 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
   output peak sits about 1.4 V below the input peak and ripples at twice the input frequency —
   the losses are the point. The electrolytic is polarised and carries real series resistance,
   which is what actually sets the ripple on a smoothing capacitor.
+- New example, **File > Examples > Linear Power Supply** — a mains secondary through a bridge and
+  reservoir into a 7812, probing the rippling reservoir rail against the flat regulated one.
+- **Fixed: a regulator starved of input drove its output negative.** The pass element is a
+  follower, so a positive part sits at zero rather than below it however little headroom it has.
+  The old behaviour made the output capacitor of a supply look reverse-biased while the reservoir
+  was still charging.
 - An electrolytic reports being connected backwards or run over its working voltage, and is ringed
   in red on the canvas. It has to be held backwards for a millisecond first, so a supply's startup
   transient does not accuse a correctly connected part.

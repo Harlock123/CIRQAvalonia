@@ -292,6 +292,87 @@ public class BridgeTests
     }
 }
 
+public class RegulatorOutputPolarityTests
+{
+    /// <summary>
+    /// A linear regulator's pass element is a follower: it sources current, it does not sink it.
+    /// Starved of input a positive part sits at zero, not below it. The model used to drive the
+    /// output to minus its dropout voltage, which made the output capacitor of a supply look
+    /// reverse-biased while the reservoir was still charging.
+    /// </summary>
+    [Theory]
+    [InlineData(0.0)]
+    [InlineData(1.0)]
+    [InlineData(3.0)]
+    public void APositiveRegulatorNeverPullsItsOutputBelowCommon(double inputVoltage)
+    {
+        var circuit = new Circuit();
+        var supply = circuit.Add(new DcVoltageSource(inputVoltage));
+        var gnd = circuit.Add(new Ground());
+        var reg = circuit.Add(new VoltageRegulator(RegulatorModel.Lm7812));
+        var load = circuit.Add(new Resistor(120));
+
+        circuit.Connect(supply.Negative, gnd.Pin);
+        circuit.Connect(supply.Positive, reg.Input);
+        circuit.Connect(reg.Common, gnd.Pin);
+        circuit.Connect(reg.Output, load.A);
+        circuit.Connect(load.B, gnd.Pin);
+
+        var sim = new CircuitSimulator(circuit);
+        sim.SolveOperatingPoint();
+
+        Assert.True(sim.NodeVoltage(reg.Output) > -0.1,
+            $"with {inputVoltage} V in, the output was driven to {sim.NodeVoltage(reg.Output):0.000} V");
+    }
+
+    /// <summary>The mirror of the same rule: a negative part cannot push its output above common.</summary>
+    [Theory]
+    [InlineData(0.0)]
+    [InlineData(-1.0)]
+    public void ANegativeRegulatorNeverPushesItsOutputAboveCommon(double inputVoltage)
+    {
+        var circuit = new Circuit();
+        var supply = circuit.Add(new DcVoltageSource(inputVoltage));
+        var gnd = circuit.Add(new Ground());
+        var reg = circuit.Add(new VoltageRegulator(RegulatorModel.Lm7905));
+        var load = circuit.Add(new Resistor(120));
+
+        circuit.Connect(supply.Negative, gnd.Pin);
+        circuit.Connect(supply.Positive, reg.Input);
+        circuit.Connect(reg.Common, gnd.Pin);
+        circuit.Connect(reg.Output, load.A);
+        circuit.Connect(load.B, gnd.Pin);
+
+        var sim = new CircuitSimulator(circuit);
+        sim.SolveOperatingPoint();
+
+        Assert.True(sim.NodeVoltage(reg.Output) < 0.1,
+            $"with {inputVoltage} V in, the output was driven to {sim.NodeVoltage(reg.Output):0.000} V");
+    }
+
+    [Fact]
+    public void WithFullHeadroomItStillRegulatesNormally()
+    {
+        // The floor must not disturb ordinary operation.
+        var circuit = new Circuit();
+        var supply = circuit.Add(new DcVoltageSource(20.0));
+        var gnd = circuit.Add(new Ground());
+        var reg = circuit.Add(new VoltageRegulator(RegulatorModel.Lm7812));
+        var load = circuit.Add(new Resistor(120));
+
+        circuit.Connect(supply.Negative, gnd.Pin);
+        circuit.Connect(supply.Positive, reg.Input);
+        circuit.Connect(reg.Common, gnd.Pin);
+        circuit.Connect(reg.Output, load.A);
+        circuit.Connect(load.B, gnd.Pin);
+
+        var sim = new CircuitSimulator(circuit);
+        sim.SolveOperatingPoint();
+
+        Assert.Equal(12.0, sim.NodeVoltage(reg.Output), 0.05);
+    }
+}
+
 /// <summary>
 /// The junction has thermal mass, so protection has to respond to sustained power rather than to
 /// an instant of it. Getting this wrong is not a cosmetic matter: an output capacitor draws tens

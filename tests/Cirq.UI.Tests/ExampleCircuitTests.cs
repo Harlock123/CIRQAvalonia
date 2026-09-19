@@ -1,6 +1,6 @@
+using Cirq.Components.Passive;
 using Cirq.Components.Nonlinear;
 using Cirq.Components.Boards;
-using Cirq.Components.Passive;
 using Cirq.UI.ViewModels;
 
 namespace Cirq.UI.Tests;
@@ -277,5 +277,89 @@ public class RaspberryPiExampleTests
 
         Assert.True(clockHigh - clockLow > 2.0, $"clock pin only moved {clockHigh - clockLow:0.00} V");
         Assert.True(patternHigh - patternLow > 2.0, $"pattern pin only moved {patternHigh - patternLow:0.00} V");
+    }
+}
+
+/// <summary>
+/// The supply example is the one circuit that chains all three power parts together, so it is
+/// worth checking it actually delivers rather than merely compiling.
+/// </summary>
+public class LinearPowerSupplyExampleTests
+{
+    private static (MainWindowViewModel Vm, VoltageRegulator Reg, BridgeRectifier Bridge) Load()
+    {
+        var vm = new MainWindowViewModel();
+        Examples.LoadLinearPowerSupply(vm);
+        vm.Simulation.InvalidateTopology();
+        Assert.True(vm.Simulation.Rebuild(), vm.Simulation.Status);
+        return (vm,
+            vm.Circuit.Components.OfType<VoltageRegulator>().Single(),
+            vm.Circuit.Components.OfType<BridgeRectifier>().Single());
+    }
+
+    [Fact]
+    public void ItSettlesAtTwelveVolts()
+    {
+        var (vm, reg, _) = Load();
+        using var _guard = vm;
+
+        vm.Simulation.Simulator!.Run(150e-3);
+
+        Assert.Equal(12.0, vm.Simulation.Simulator!.NodeVoltage(reg.Output), 0.2);
+        Assert.False(reg.IsInDropout);
+        Assert.False(reg.IsThermallyShutDown);
+    }
+
+    /// <summary>
+    /// The two probes have to actually show the contrast the example exists to demonstrate: a
+    /// sawtooth on the reservoir, a flat line on the regulated rail.
+    /// </summary>
+    [Fact]
+    public void TheReservoirRipplesAndTheRegulatedRailDoesNot()
+    {
+        var (vm, reg, bridge) = Load();
+        using var _guard = vm;
+
+        var simulator = vm.Simulation.Simulator!;
+        simulator.Run(150e-3);
+
+        double inLow = double.MaxValue, inHigh = double.MinValue;
+        double outLow = double.MaxValue, outHigh = double.MinValue;
+        simulator.TimePointAccepted += _ =>
+        {
+            var vin = simulator.NodeVoltage(bridge.Positive);
+            var vout = simulator.NodeVoltage(reg.Output);
+            inLow = Math.Min(inLow, vin); inHigh = Math.Max(inHigh, vin);
+            outLow = Math.Min(outLow, vout); outHigh = Math.Max(outHigh, vout);
+        };
+
+        simulator.Run(40e-3);
+
+        Assert.True(inHigh - inLow > 0.3, $"the reservoir only rippled {(inHigh - inLow) * 1000:0} mV");
+        Assert.True(outHigh - outLow < 0.05, $"the regulated rail rippled {(outHigh - outLow) * 1000:0} mV");
+    }
+
+    [Fact]
+    public void NoPartInTheExampleIsUsedOutsideItsRatings()
+    {
+        var (vm, reg, _) = Load();
+        using var _guard = vm;
+
+        vm.Simulation.Simulator!.Run(150e-3);
+
+        foreach (var capacitor in vm.Circuit.Components.OfType<ElectrolyticCapacitor>())
+            Assert.Empty(capacitor.Violations);
+
+        Assert.False(reg.IsThermallyShutDown);
+    }
+
+    [Fact]
+    public void ItAsksForRealTimeBecauseFiftyHertzIsUnwatchableAtTheDefaultSpeed()
+    {
+        var (vm, _, _) = Load();
+        using var _guard = vm;
+
+        // A 50 Hz cycle at 1/1000 would be fifty seconds of wall time.
+        Assert.Equal(1.0, vm.Simulation.SpeedFactor);
     }
 }

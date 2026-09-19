@@ -203,11 +203,11 @@ public partial class VoltageRegulator : CircuitComponent
         if (nominal < 0)
         {
             // Negative regulators clamp from the other side: mirror, solve, mirror back.
-            var (v, s) = SmoothMinimum(-nominal, -passThrough);
+            var (v, s) = Available(-nominal, -passThrough);
             return (-v, s);
         }
 
-        return SmoothMinimum(nominal, passThrough);
+        return Available(nominal, passThrough);
     }
 
     /// <summary>
@@ -234,6 +234,31 @@ public partial class VoltageRegulator : CircuitComponent
     /// Differentiable <c>min(a, b)</c> where only <paramref name="b"/> varies, returning the value
     /// and d/db. The hyperbola rounds the corner over <see cref="CornerSharpness"/> volts.
     /// </summary>
+    /// <summary>
+    /// What the regulator can actually hold: the nominal output, or whatever the input leaves
+    /// after the dropout, but never the wrong side of its own common pin.
+    /// <para>
+    /// The pass element is a follower — it can source current but not sink it — so a positive
+    /// regulator cannot pull its output below common however little headroom it has. Without the
+    /// floor, a part whose input was still rising drove its output to minus the dropout voltage,
+    /// which is not something a 78xx does, and made the output capacitor of a supply look
+    /// reverse-biased while the reservoir was charging.
+    /// </para>
+    /// </summary>
+    private static (double Value, double Slope) Available(double nominal, double passThrough)
+    {
+        var (floored, flooredSlope) = SmoothMaximum(0.0, passThrough);
+        var (value, slope) = SmoothMinimum(nominal, floored);
+        return (value, slope * flooredSlope);
+    }
+
+    /// <summary>The mirror of <see cref="SmoothMinimum"/>, with the slope taken in the same sense.</summary>
+    private static (double Value, double Slope) SmoothMaximum(double a, double b)
+    {
+        var (value, slope) = SmoothMinimum(-a, -b);
+        return (-value, slope);
+    }
+
     private static (double Value, double Slope) SmoothMinimum(double a, double b)
     {
         var diff = a - b;

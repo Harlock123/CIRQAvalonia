@@ -203,7 +203,7 @@ You should see a square wave and the exponential charge and discharge of the cap
 the RC time constant here is 10 kΩ × 100 nF = 1 ms, against a half-period of 1 ms, so the capacitor
 gets roughly two-thirds of the way each time.
 
-Everything above is also in **File > Examples**, along with fourteen other circuits.
+Everything above is also in **File > Examples**, along with fifteen other circuits.
 
 ---
 
@@ -244,6 +244,12 @@ An electrolytic reports being used outside its ratings, and is ringed in red on 
   has to be held backwards for a millisecond before it complains, so the startup transient of a
   supply coming up around it does not raise a false alarm.
 - **Over its working voltage**, which is the other number printed on the can.
+
+**File > Examples > Linear Power Supply** builds the whole chain — a 14 V secondary through a
+bridge into a 1000 µF reservoir into a 7812. The two probes are the point: the reservoir rail
+sags and recharges twice per mains cycle, and the regulated rail beside it is flat. It is the one
+example that sets the simulation speed, because a 50 Hz cycle at the usual 1/1000 would take fifty
+seconds of wall time.
 
 Give the regulator headroom. It needs its dropout voltage above the output *at the bottom of the
 ripple*, not on average — a supply that measures fine on a meter can still be dropping out on
