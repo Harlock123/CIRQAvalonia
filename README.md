@@ -1,5 +1,7 @@
 # CirqAvalonia
 
+[![Release](https://github.com/Harlock123/CIRQAvalonia/actions/workflows/release.yml/badge.svg)](https://github.com/Harlock123/CIRQAvalonia/actions/workflows/release.yml)
+
 An electronic circuit analyzer and mixed-signal simulator: a SPICE-style Modified Nodal Analysis
 solver for the analog side, an event-driven scheduler for the digital side, and an Avalonia
 schematic editor with a live oscilloscope on top.
@@ -50,6 +52,22 @@ Prebuilt binaries for every supported platform are on the
 Produces a self-contained single-file executable per platform in `dist/`, archived with the docs
 and a `SHA256SUMS`. All seven cross-build from any one machine, because the runtime packs come from
 NuGet.
+
+`./scripts/verify-artifacts.sh` then checks that each archive really holds a binary for the
+platform its name claims — a cross-build that targets the wrong architecture still exits 0 from
+`dotnet publish`, so the only way to know is to look at the binary.
+
+Releases are cut by [GitHub Actions](.github/workflows/release.yml), which runs the test suite,
+builds all seven targets in parallel, verifies each one, and publishes them to a release:
+
+```bash
+git tag v0.2.0 && git push origin v0.2.0
+```
+
+Or run the workflow by hand from the Actions tab with a version. The workflow calls the same two
+scripts, so CI and a developer's machine cannot drift apart. A version with a pre-release suffix
+(`0.2.0-beta.1`) is published as a prerelease, and re-running for an existing version replaces its
+assets rather than failing.
 
 | Target | Platform |
 | --- | --- |

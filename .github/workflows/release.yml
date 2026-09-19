@@ -1,0 +1,227 @@
+name: Release
+
+# Cuts a release for every v* tag, or on demand from the Actions tab.
+#
+#   git tag v0.2.0 && git push origin v0.2.0
+#
+# The seven platform builds run in parallel, each calling the same
+# scripts/publish-all.sh that is used locally — so the publish flags have one
+# definition and CI cannot quietly drift from a developer's machine.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build and release, without the leading v (e.g. 0.2.0)'
+        required: true
+        type: string
+
+# Least privilege by default; only the job that publishes gets write access.
+permissions:
+  contents: read
+
+env:
+  DOTNET_VERSION: '10.0.x'
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Resolve version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.resolve.outputs.version }}
+      prerelease: ${{ steps.resolve.outputs.prerelease }}
+    steps:
+      - id: resolve
+        # Context values arrive as environment variables rather than being interpolated
+        # into the script text, so a tag name can never be executed as shell.
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            version="$INPUT_VERSION"
+          else
+            version="${TAG_NAME#v}"
+          fi
+
+          # Fail here rather than after twenty minutes of building under a bad name.
+          if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+            echo "::error::'$version' is not a valid version (expected 1.2.3 or 1.2.3-beta.1)"
+            exit 1
+          fi
+
+          # Anything with a pre-release suffix is flagged so it does not become "Latest".
+          case "$version" in
+            *-*) prerelease=true ;;
+            *)   prerelease=false ;;
+          esac
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+          echo "Releasing $version (prerelease=$prerelease)"
+
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore
+        run: dotnet restore CirqAvalonia.slnx
+
+      - name: Build
+        run: dotnet build CirqAvalonia.slnx --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test CirqAvalonia.slnx --configuration Release --no-build --verbosity normal
+
+  build:
+    name: ${{ matrix.rid }}
+    needs: [prepare, test]
+    runs-on: ubuntu-latest
+    strategy:
+      # Build every target even if one fails, so a broken platform is reported alongside
+      # the six that worked instead of hiding them.
+      fail-fast: false
+      matrix:
+        rid:
+          - win-x64
+          - win-x86
+          - win-arm64
+          - osx-x64
+          - osx-arm64
+          - linux-x64
+          - linux-arm64
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Publish ${{ matrix.rid }}
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+          RID: ${{ matrix.rid }}
+        run: ./scripts/publish-all.sh "$VERSION" "$RID"
+
+      - name: Verify the binary is for the right platform
+        run: ./scripts/verify-artifacts.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pkg-${{ matrix.rid }}
+          # SHA256SUMS is left behind: each matrix job only knows its own archive, so the
+          # real checksum file is generated once over the complete set in the next job.
+          path: |
+            dist/*.zip
+            dist/*.tar.gz
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    name: Publish release
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: pkg-*
+          merge-multiple: true
+          path: dist
+
+      - name: Verify the complete set
+        run: |
+          set -euo pipefail
+          count=$(find dist -maxdepth 1 \( -name '*.zip' -o -name '*.tar.gz' \) | wc -l)
+          if [ "$count" -ne 7 ]; then
+            echo "::error::expected 7 archives, found $count"
+            ls -la dist
+            exit 1
+          fi
+          ./scripts/verify-artifacts.sh
+
+      - name: Checksums
+        run: cd dist && sha256sum ./*.zip ./*.tar.gz | sed 's|\./||' > SHA256SUMS && cat SHA256SUMS
+
+      - name: Release notes
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          set -euo pipefail
+          cat > notes.md <<EOF
+          ## Downloads
+
+          Every build is **self-contained**: the .NET runtime travels inside the executable, so
+          there is nothing to install first. Download, extract, run.
+
+          | Platform | Download |
+          | --- | --- |
+          | Windows, 64-bit (Intel/AMD) | \`cirqavalonia-$VERSION-win-x64.zip\` |
+          | Windows, 32-bit | \`cirqavalonia-$VERSION-win-x86.zip\` |
+          | Windows, ARM64 | \`cirqavalonia-$VERSION-win-arm64.zip\` |
+          | macOS, Apple Silicon (M-series) | \`cirqavalonia-$VERSION-osx-arm64.tar.gz\` |
+          | macOS, Intel | \`cirqavalonia-$VERSION-osx-x64.tar.gz\` |
+          | Linux, 64-bit (Intel/AMD) | \`cirqavalonia-$VERSION-linux-x64.tar.gz\` |
+          | Linux, ARM64 | \`cirqavalonia-$VERSION-linux-arm64.tar.gz\` |
+
+          \`SHA256SUMS\` covers every archive — verify with \`sha256sum -c SHA256SUMS\`.
+
+          **macOS:** these builds are not signed or notarized, so Gatekeeper quarantines them on
+          download. Each macOS archive includes \`MACOS-FIRST-RUN.txt\`; the short version is
+          \`xattr -d com.apple.quarantine CirqAvalonia\`.
+
+          **Linux/macOS:** mark it executable if your extractor dropped the bit —
+          \`chmod +x CirqAvalonia\`.
+
+          ---
+
+          Built by [this workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}).
+          Every archive was checked for the correct architecture, and the full test suite passed
+          before any of them were built.
+
+          See the [User Guide](${{ github.server_url }}/${{ github.repository }}/blob/main/docs/USER_GUIDE.md).
+          EOF
+          cat notes.md
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+          PRERELEASE: ${{ needs.prepare.outputs.prerelease }}
+        run: |
+          set -euo pipefail
+          flags=()
+          if [ "$PRERELEASE" = "true" ]; then flags+=(--prerelease); fi
+
+          # Re-running a release should update it rather than dying on "already exists".
+          if gh release view "v$VERSION" >/dev/null 2>&1; then
+            echo "v$VERSION exists — replacing its assets"
+            gh release upload "v$VERSION" dist/* --clobber
+            gh release edit "v$VERSION" --notes-file notes.md "${flags[@]}"
+          else
+            gh release create "v$VERSION" dist/* \
+              --title "CirqAvalonia $VERSION" \
+              --notes-file notes.md \
+              "${flags[@]}"
+          fi
+          echo "Published ${{ github.server_url }}/${{ github.repository }}/releases/tag/v$VERSION"
