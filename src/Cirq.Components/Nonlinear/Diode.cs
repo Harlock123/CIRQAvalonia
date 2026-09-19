@@ -2,6 +2,7 @@ using Cirq.Core.Primitives;
 using Cirq.Core.Simulation;
 using Cirq.Core.Topology;
 using CommunityToolkit.Mvvm.ComponentModel;
+using Cirq.Core.Probing;
 
 namespace Cirq.Components.Nonlinear;
 
@@ -13,7 +14,7 @@ namespace Cirq.Components.Nonlinear;
 /// exponential from overflowing when an early iterate overshoots.
 /// </para>
 /// </summary>
-public partial class Diode : TwoTerminalComponent
+public partial class Diode : TwoTerminalComponent, ICurrentReporting
 {
     /// <summary>Largest exponent evaluated before the model falls back to a linear extrapolation.</summary>
     private const double MaxExponent = 80.0;
@@ -61,6 +62,10 @@ public partial class Diode : TwoTerminalComponent
 
     /// <summary>Forward current at the converged solution, in amps.</summary>
     public double Current => _current;
+
+    /// <summary>Positive into the anode, which is the direction the device conducts.</summary>
+    public double TerminalCurrent(Terminal terminal, MnaSystem system, SimulationState state) =>
+        CurrentIntoPin(terminal, Current);
 
     /// <summary>True when the diode is carrying meaningful forward current.</summary>
     public bool IsConducting => _current > 1e-6;

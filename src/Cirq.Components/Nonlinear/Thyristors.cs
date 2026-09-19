@@ -2,6 +2,7 @@ using Cirq.Core.Primitives;
 using Cirq.Core.Simulation;
 using Cirq.Core.Topology;
 using CommunityToolkit.Mvvm.ComponentModel;
+using Cirq.Core.Probing;
 
 namespace Cirq.Components.Nonlinear;
 
@@ -21,7 +22,7 @@ namespace Cirq.Components.Nonlinear;
 /// flip mid-iteration would give the solver two answers to oscillate between.
 /// </para>
 /// </summary>
-public abstract partial class LatchingDevice : CircuitComponent
+public abstract partial class LatchingDevice : CircuitComponent, ICurrentReporting
 {
     /// <summary>Which way current was last flowing, so the forward drop opposes it correctly.</summary>
     private double _conductingSign = 1.0;
@@ -97,6 +98,13 @@ public abstract partial class LatchingDevice : CircuitComponent
         IsLatched = false;
         NotifyValueChanged();
     }
+
+    /// <summary>
+    /// The main path, positive into whichever terminal the device treats as its first. Subclasses
+    /// with a gate say so themselves — the gate current is the one that fired it.
+    /// </summary>
+    public virtual double TerminalCurrent(Terminal terminal, MnaSystem system, SimulationState state) =>
+        ReferenceEquals(terminal, Terminals[1]) ? -MainCurrent : MainCurrent;
 
     public override void ResetState()
     {
@@ -182,6 +190,9 @@ public partial class SiliconControlledRectifier : LatchingDevice
         if (across > 0 && (GateCurrent > GateTriggerCurrent || across > BreakoverVoltage)) Fire();
     }
 
+    public override double TerminalCurrent(Terminal terminal, MnaSystem system, SimulationState state) =>
+        ReferenceEquals(terminal, Gate) ? GateCurrent : base.TerminalCurrent(terminal, system, state);
+
     public override void ResetState()
     {
         base.ResetState();
@@ -263,6 +274,9 @@ public partial class Triac : LatchingDevice
         // Either polarity of gate drive fires it, and in either polarity of main voltage.
         if (Math.Abs(GateCurrent) > GateTriggerCurrent || Math.Abs(across) > BreakoverVoltage) Fire();
     }
+
+    public override double TerminalCurrent(Terminal terminal, MnaSystem system, SimulationState state) =>
+        ReferenceEquals(terminal, Gate) ? GateCurrent : base.TerminalCurrent(terminal, system, state);
 
     public override void ResetState()
     {

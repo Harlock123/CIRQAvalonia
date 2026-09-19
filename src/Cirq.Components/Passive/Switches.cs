@@ -2,6 +2,7 @@ using Cirq.Core.Primitives;
 using Cirq.Core.Simulation;
 using Cirq.Core.Topology;
 using CommunityToolkit.Mvvm.ComponentModel;
+using Cirq.Core.Probing;
 
 namespace Cirq.Components.Passive;
 
@@ -10,7 +11,7 @@ namespace Cirq.Components.Passive;
 /// an open one is a large resistance rather than a true break, which keeps the matrix
 /// well-conditioned without changing anything a user would notice.
 /// </summary>
-public abstract partial class MechanicalContact : CircuitComponent
+public abstract partial class MechanicalContact : CircuitComponent, ICurrentReporting
 {
     /// <summary>Resistance of a closed contact, in ohms.</summary>
     [ObservableProperty]
@@ -19,6 +20,17 @@ public abstract partial class MechanicalContact : CircuitComponent
     /// <summary>Resistance of an open contact, in ohms.</summary>
     [ObservableProperty]
     public partial double OpenResistance { get; set; } = 1e9;
+
+    /// <summary>Current through one contact, from <paramref name="a"/> to <paramref name="b"/>.</summary>
+    protected double ContactCurrent(MnaSystem system, Terminal a, Terminal b, bool closed) =>
+        (system.NodeVoltage(a) - system.NodeVoltage(b))
+        / Math.Max(closed ? ClosedResistance : OpenResistance, 1e-9);
+
+    /// <summary>
+    /// Abstract rather than a default of zero: a contact that silently reported no current would
+    /// be worse than one that refused to compile.
+    /// </summary>
+    public abstract double TerminalCurrent(Terminal terminal, MnaSystem system, SimulationState state);
 
     protected void StampContact(MnaSystem system, Terminal a, Terminal b, bool closed) =>
         system.StampConductance(
@@ -56,6 +68,12 @@ public partial class ToggleSwitch : MechanicalContact, IInteractiveComponent
 
     public override void StampMatrix(MnaSystem system, SimulationState state) =>
         StampContact(system, A, B, IsClosed);
+
+    public override double TerminalCurrent(Terminal terminal, MnaSystem system, SimulationState state)
+    {
+        var current = ContactCurrent(system, A, B, IsClosed);
+        return ReferenceEquals(terminal, B) ? -current : current;
+    }
 
     partial void OnIsClosedChanged(bool value) => NotifyValueChanged();
 }
@@ -101,6 +119,12 @@ public partial class PushButton : MechanicalContact, IInteractiveComponent
     public override void StampMatrix(MnaSystem system, SimulationState state) =>
         StampContact(system, A, B, IsConducting);
 
+    public override double TerminalCurrent(Terminal terminal, MnaSystem system, SimulationState state)
+    {
+        var current = ContactCurrent(system, A, B, IsConducting);
+        return ReferenceEquals(terminal, B) ? -current : current;
+    }
+
     partial void OnIsPressedChanged(bool value) => NotifyValueChanged();
 
     partial void OnIsNormallyOpenChanged(bool value) => NotifyValueChanged();
@@ -139,6 +163,18 @@ public partial class SpdtSwitch : MechanicalContact, IInteractiveComponent
     public string InteractionHint => IsThrownToB ? "Throw to A" : "Throw to B";
 
     public void Interact() => IsThrownToB = !IsThrownToB;
+
+    public override double TerminalCurrent(Terminal terminal, MnaSystem system, SimulationState state)
+    {
+        // Both paths are stamped at all times — the unselected one as a near-open — so both carry
+        // a current, and the common pin carries their sum rather than only the selected one.
+        var toA = ContactCurrent(system, Common, ThrowA, !IsThrownToB);
+        var toB = ContactCurrent(system, Common, ThrowB, IsThrownToB);
+
+        if (ReferenceEquals(terminal, ThrowA)) return -toA;
+        if (ReferenceEquals(terminal, ThrowB)) return -toB;
+        return toA + toB;
+    }
 
     public override void StampMatrix(MnaSystem system, SimulationState state)
     {

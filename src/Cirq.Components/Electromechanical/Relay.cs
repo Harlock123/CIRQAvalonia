@@ -2,6 +2,7 @@ using Cirq.Core.Primitives;
 using Cirq.Core.Simulation;
 using Cirq.Core.Topology;
 using CommunityToolkit.Mvvm.ComponentModel;
+using Cirq.Core.Probing;
 
 namespace Cirq.Components.Electromechanical;
 
@@ -18,7 +19,7 @@ namespace Cirq.Components.Electromechanical;
 /// current to close than to hold, so a coil drifting around its threshold does not chatter.
 /// </para>
 /// </summary>
-public partial class Relay : CircuitComponent
+public partial class Relay : CircuitComponent, ICurrentReporting
 {
     private double _previousCurrent;
     private double _previousVoltage;
@@ -183,6 +184,24 @@ public partial class Relay : CircuitComponent
             Operations++;
             NotifyValueChanged();
         }
+    }
+
+    /// <summary>
+    /// The coil and the contacts are separate circuits, so which pin was probed decides the
+    /// answer entirely. Falling back to the coil's branch current for a contact pin would report
+    /// a milliamp of drive as though it were the amps the contact is switching.
+    /// </summary>
+    public double TerminalCurrent(Terminal terminal, MnaSystem system, SimulationState state)
+    {
+        if (ReferenceEquals(terminal, CoilA)) return CoilCurrent;
+        if (ReferenceEquals(terminal, CoilB)) return -CoilCurrent;
+
+        var closed = IsEnergised ? NormallyOpen : NormallyClosed;
+        var through = (system.NodeVoltage(Common) - system.NodeVoltage(closed))
+                      / Math.Max(ClosedResistance, 1e-9);
+
+        if (ReferenceEquals(terminal, Common)) return through;
+        return ReferenceEquals(terminal, closed) ? -through : 0;
     }
 
     public override void ResetState()

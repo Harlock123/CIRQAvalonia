@@ -2,6 +2,7 @@ using Cirq.Core.Primitives;
 using Cirq.Core.Simulation;
 using Cirq.Core.Topology;
 using CommunityToolkit.Mvvm.ComponentModel;
+using Cirq.Core.Probing;
 
 namespace Cirq.Components.Nonlinear;
 
@@ -56,7 +57,7 @@ public sealed record BjtModel(
 /// output conductance, which is what sets a common-emitter stage's gain.
 /// </para>
 /// </summary>
-public partial class BipolarTransistor : CircuitComponent
+public partial class BipolarTransistor : CircuitComponent, ICurrentReporting
 {
     private double _vbe;
     private double _vbc;
@@ -214,6 +215,17 @@ public partial class BipolarTransistor : CircuitComponent
 
         var vce = system.NodeVoltage(Collector) - system.NodeVoltage(Emitter);
         CollectorCurrent = polarity * transport + earlyConductance * vce;
+    }
+
+    /// <summary>
+    /// Collector and base currents are tracked by the model; the emitter carries their sum, which
+    /// is Kirchhoff's law and also the one number a transistor stage is usually sized by.
+    /// </summary>
+    public double TerminalCurrent(Terminal terminal, MnaSystem system, SimulationState state)
+    {
+        if (ReferenceEquals(terminal, Collector)) return CollectorCurrent;
+        if (ReferenceEquals(terminal, Base)) return BaseCurrent;
+        return -(CollectorCurrent + BaseCurrent);
     }
 
     public override void ResetState()

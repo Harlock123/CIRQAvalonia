@@ -2,6 +2,7 @@ using Cirq.Core.Primitives;
 using Cirq.Core.Simulation;
 using Cirq.Core.Topology;
 using CommunityToolkit.Mvvm.ComponentModel;
+using Cirq.Core.Probing;
 
 namespace Cirq.Components.Nonlinear;
 
@@ -50,7 +51,7 @@ public sealed record JfetModel(
 /// diode it is.
 /// </para>
 /// </summary>
-public partial class JunctionFet : CircuitComponent
+public partial class JunctionFet : CircuitComponent, ICurrentReporting
 {
     private double _previousGateSource;
     private double _previousGateDrain;
@@ -237,6 +238,16 @@ public partial class JunctionFet : CircuitComponent
 
         GateCurrent = polarity * gateCurrent;
         IsGateForwardBiased = Math.Abs(GateCurrent) > 1e-6;
+    }
+
+    /// <summary>
+    /// Unlike a MOSFET the gate is a junction, so it has a current worth reporting — vanishing
+    /// while it is reverse-biased, and the whole story when it is not.
+    /// </summary>
+    public double TerminalCurrent(Terminal terminal, MnaSystem system, SimulationState state)
+    {
+        if (ReferenceEquals(terminal, Gate)) return GateCurrent;
+        return ReferenceEquals(terminal, Drain) ? DrainCurrent : -DrainCurrent;
     }
 
     public override void ResetState()

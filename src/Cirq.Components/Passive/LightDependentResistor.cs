@@ -2,6 +2,7 @@ using Cirq.Core.Simulation;
 using Cirq.Core.Topology;
 using Cirq.Core.Units;
 using CommunityToolkit.Mvvm.ComponentModel;
+using Cirq.Core.Probing;
 
 namespace Cirq.Components.Passive;
 
@@ -18,7 +19,7 @@ namespace Cirq.Components.Passive;
 /// light-sensing circuit can be exercised while the simulation runs.
 /// </para>
 /// </summary>
-public partial class LightDependentResistor : TwoTerminalComponent, IInteractiveComponent
+public partial class LightDependentResistor : TwoTerminalComponent, IInteractiveComponent, ICurrentReporting
 {
     /// <summary>Illuminance used for "covered", in lux — a dark room, not a sealed box.</summary>
     public const double CoveredIlluminance = 0.1;
@@ -71,6 +72,9 @@ public partial class LightDependentResistor : TwoTerminalComponent, IInteractive
 
     /// <summary>Current through the cell at the last solved point, in amps.</summary>
     public double Current { get; private set; }
+
+    public double TerminalCurrent(Terminal terminal, MnaSystem system, SimulationState state) =>
+        CurrentIntoPin(terminal, Current);
 
     /// <summary>True while the cell is lit rather than covered.</summary>
     public bool IsLit => Illuminance > (CoveredIlluminance + UncoveredIlluminance) / 2.0;

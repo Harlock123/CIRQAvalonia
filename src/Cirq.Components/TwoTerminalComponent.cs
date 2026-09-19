@@ -25,4 +25,11 @@ public abstract class TwoTerminalComponent : CircuitComponent
     /// <summary>Voltage across the device from <see cref="A"/> to <see cref="B"/> in the present solution.</summary>
     protected static double VoltageAcross(Cirq.Core.Simulation.MnaSystem system, Terminal plus, Terminal minus) =>
         system.NodeVoltage(plus) - system.NodeVoltage(minus);
+
+    /// <summary>
+    /// Turns a current measured from <see cref="A"/> to <see cref="B"/> into one flowing *into*
+    /// the probed pin, so clamping either end of a part reads equal and opposite, as on a bench.
+    /// </summary>
+    protected double CurrentIntoPin(Terminal terminal, double currentAToB) =>
+        ReferenceEquals(terminal, B) ? -currentAToB : currentAToB;
 }

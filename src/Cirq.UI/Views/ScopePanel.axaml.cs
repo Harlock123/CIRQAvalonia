@@ -101,6 +101,7 @@ public partial class ScopePanel : UserControl
         var plot = _plot.Plot;
         plot.Clear();
         StylePlot(plot, scale);
+        plot.Axes.Left.Label.Text = SharedAxisLabel(scope.Probes);
 
         var stacked = scope.Layout == ScopeLayout.Stacked;
 
@@ -194,7 +195,9 @@ public partial class ScopePanel : UserControl
             var plot = _plot.Multiplot.GetPlot(i);
             plot.Clear();
             StylePlot(plot, scale);
-            plot.Axes.Left.Label.Text = probes[i].Label;
+            plot.Axes.Left.Label.Text = probes[i].Unit.Length > 0
+                ? $"{probes[i].Label} ({probes[i].Unit})"
+                : probes[i].Label;
 
             // Only the bottom tile carries the time axis label.
             plot.Axes.Bottom.Label.Text = i == probes.Count - 1 ? $"Time ({scale.Unit})" : string.Empty;
@@ -290,9 +293,29 @@ public partial class ScopePanel : UserControl
         plot.Grid.MajorLineColor = GridColour;
         plot.Axes.Color(AxisColour);
         plot.Axes.Bottom.Label.Text = $"Time ({scale.Unit})";
-        plot.Axes.Left.Label.Text = "Volts";
         plot.Axes.Bottom.Label.FontSize = 11;
         plot.Axes.Left.Label.FontSize = 11;
+    }
+
+    /// <summary>
+    /// What to call the vertical axis when every trace shares it. Traces of different kinds can
+    /// be shown together — it is often the point, a current against the voltage driving it — so
+    /// the label names what is actually up there rather than claiming they are all volts.
+    /// </summary>
+    private static string SharedAxisLabel(IEnumerable<SignalProbe> probes)
+    {
+        var units = probes.Where(p => p.IsVisible && p.Unit.Length > 0)
+                          .Select(p => p.Unit)
+                          .Distinct()
+                          .OrderBy(u => u)
+                          .ToList();
+
+        return units.Count switch
+        {
+            0 => "Logic",
+            1 => units[0] == "A" ? "Amps" : "Volts",
+            _ => "Volts / Amps",
+        };
     }
 
     /// <summary>

@@ -1,6 +1,8 @@
 using Cirq.Core.Simulation;
 using Cirq.Core.Units;
 using CommunityToolkit.Mvvm.ComponentModel;
+using Cirq.Core.Probing;
+using Cirq.Core.Topology;
 
 namespace Cirq.Components.Passive;
 
@@ -15,7 +17,7 @@ namespace Cirq.Components.Passive;
 /// square of the overload beyond it.
 /// </para>
 /// </summary>
-public partial class Fuse : TwoTerminalComponent
+public partial class Fuse : TwoTerminalComponent, ICurrentReporting
 {
     public Fuse(double ratedCurrent = 1.0)
     {
@@ -56,6 +58,9 @@ public partial class Fuse : TwoTerminalComponent
 
     /// <summary>Current through the element at the last solved point, in amps.</summary>
     public double Current { get; private set; }
+
+    public double TerminalCurrent(Terminal terminal, MnaSystem system, SimulationState state) =>
+        CurrentIntoPin(terminal, Current);
 
     /// <summary>Largest current the element has carried, in amps.</summary>
     public double PeakCurrent { get; private set; }

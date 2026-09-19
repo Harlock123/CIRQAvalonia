@@ -1,6 +1,8 @@
 using Cirq.Core.Simulation;
 using Cirq.Core.Units;
 using CommunityToolkit.Mvvm.ComponentModel;
+using Cirq.Core.Probing;
+using Cirq.Core.Topology;
 
 namespace Cirq.Components.Passive;
 
@@ -8,7 +10,7 @@ namespace Cirq.Components.Passive;
 /// Capacitor discretised with a Norton companion model: <c>i = Geq·v + Ieq</c>, where the
 /// coefficients come from Trapezoidal or Backward-Euler integration of <c>i = C·dv/dt</c>.
 /// </summary>
-public partial class Capacitor : TwoTerminalComponent
+public partial class Capacitor : TwoTerminalComponent, ICurrentReporting
 {
     private double _previousVoltage;
     private double _previousCurrent;
@@ -116,6 +118,13 @@ public partial class Capacitor : TwoTerminalComponent
         _conductance = 0;
         _equivalentCurrent = 0;
     }
+
+    /// <summary>
+    /// The companion model's current, which the device already works out each step to carry the
+    /// charge forward. i = C dv/dt, sampled the way the integrator sampled it.
+    /// </summary>
+    public double TerminalCurrent(Terminal terminal, MnaSystem system, SimulationState state) =>
+        CurrentIntoPin(terminal, Current);
 
     partial void OnCapacitanceChanged(double value) => NotifyValueChanged();
 }

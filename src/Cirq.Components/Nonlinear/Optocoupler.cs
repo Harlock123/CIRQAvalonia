@@ -2,6 +2,7 @@ using Cirq.Core.Primitives;
 using Cirq.Core.Simulation;
 using Cirq.Core.Topology;
 using CommunityToolkit.Mvvm.ComponentModel;
+using Cirq.Core.Probing;
 
 namespace Cirq.Components.Nonlinear;
 
@@ -46,7 +47,7 @@ public sealed record OptocouplerModel(
 /// true derivative rather than converging on a lagged estimate.
 /// </para>
 /// </summary>
-public partial class Optocoupler : CircuitComponent
+public partial class Optocoupler : CircuitComponent, ICurrentReporting
 {
     private double _previousJunctionVoltage;
     private bool _limitedThisIteration;
@@ -171,6 +172,17 @@ public partial class Optocoupler : CircuitComponent
         var vce = system.NodeVoltage(Collector) - system.NodeVoltage(Emitter);
         var saturation = 1.0 - Math.Exp(-Math.Max(vce, 0.0) / Math.Max(Model.SaturationVoltage, 1e-3));
         CollectorCurrent = Model.CurrentTransferRatio * Math.Max(LedCurrent, 0.0) * saturation;
+    }
+
+    /// <summary>
+    /// Both sides at once, which is the point of probing one: the input current is what decides
+    /// the output current, and there is no electrical path between them to infer it from.
+    /// </summary>
+    public double TerminalCurrent(Terminal terminal, MnaSystem system, SimulationState state)
+    {
+        if (ReferenceEquals(terminal, Anode)) return LedCurrent;
+        if (ReferenceEquals(terminal, Cathode)) return -LedCurrent;
+        return ReferenceEquals(terminal, Collector) ? CollectorCurrent : -CollectorCurrent;
     }
 
     public override void ResetState()

@@ -2,6 +2,7 @@ using Cirq.Core.Simulation;
 using Cirq.Core.Topology;
 using Cirq.Core.Units;
 using CommunityToolkit.Mvvm.ComponentModel;
+using Cirq.Core.Probing;
 
 namespace Cirq.Components.Passive;
 
@@ -32,7 +33,7 @@ public enum ThermistorKind
 /// switch, so a temperature-sensing circuit can be exercised while the simulation runs.
 /// </para>
 /// </summary>
-public partial class Thermistor : TwoTerminalComponent, IInteractiveComponent
+public partial class Thermistor : TwoTerminalComponent, IInteractiveComponent, ICurrentReporting
 {
     /// <summary>Temperature used for "cold", in degrees Celsius.</summary>
     public const double ColdTemperature = 0.0;
@@ -95,6 +96,9 @@ public partial class Thermistor : TwoTerminalComponent, IInteractiveComponent
 
     /// <summary>Current through the bead at the last solved point, in amps.</summary>
     public double Current { get; private set; }
+
+    public double TerminalCurrent(Terminal terminal, MnaSystem system, SimulationState state) =>
+        CurrentIntoPin(terminal, Current);
 
     /// <summary>True while the bead is nearer the warm end of its toggle than the cold.</summary>
     public bool IsWarm => Temperature > (ColdTemperature + WarmTemperature) / 2.0;

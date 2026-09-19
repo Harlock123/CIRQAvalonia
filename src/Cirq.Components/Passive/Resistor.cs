@@ -1,11 +1,13 @@
 using Cirq.Core.Simulation;
 using Cirq.Core.Units;
 using CommunityToolkit.Mvvm.ComponentModel;
+using Cirq.Core.Probing;
+using Cirq.Core.Topology;
 
 namespace Cirq.Components.Passive;
 
 /// <summary>Ideal linear resistor.</summary>
-public partial class Resistor : TwoTerminalComponent
+public partial class Resistor : TwoTerminalComponent, ICurrentReporting
 {
     public Resistor(double resistance = 1e3)
     {
@@ -28,6 +30,10 @@ public partial class Resistor : TwoTerminalComponent
         var r = Math.Max(Resistance, 1e-9);
         system.StampConductance(system.Node(A), system.Node(B), 1.0 / r);
     }
+
+    /// <summary>Ohm's law, which is all a resistor's current has ever been.</summary>
+    public double TerminalCurrent(Terminal terminal, MnaSystem system, SimulationState state) =>
+        CurrentIntoPin(terminal, VoltageAcross(system, A, B) / Math.Max(Resistance, 1e-12));
 
     partial void OnResistanceChanged(double value) => NotifyValueChanged();
 }

@@ -1,4 +1,5 @@
 using Cirq.Core.Primitives;
+using Cirq.Core.Units;
 using Cirq.Core.Topology;
 using CommunityToolkit.Mvvm.ComponentModel;
 
@@ -39,6 +40,25 @@ public partial class SignalProbe : ObservableObject
     [ObservableProperty]
     public partial ProbeKind Kind { get; set; } = ProbeKind.Voltage;
 
+    /// <summary>The kinds offered in the scope's trace list.</summary>
+    public static IReadOnlyList<ProbeKind> KindOptions { get; } = Enum.GetValues<ProbeKind>();
+
+    /// <summary>Unit symbol for this probe's quantity — a logic trace has none.</summary>
+    public string Unit => Kind switch
+    {
+        ProbeKind.Voltage => "V",
+        ProbeKind.Current => "A",
+        _ => "",
+    };
+
+    /// <summary>
+    /// The numeric readout, in engineering notation. A current probe reading 0.00303 A is a
+    /// measurement nobody takes: it is 3.03 mA, and the prefix is most of the information.
+    /// </summary>
+    public string Reading => Kind == ProbeKind.Logic
+        ? LastValue switch { >= 0.75 => "1", <= 0.25 => "0", _ => "x" }
+        : SiPrefix.Format(LastValue, Unit);
+
     [ObservableProperty]
     public partial Color TraceColor { get; set; } = Color.Yellow;
 
@@ -68,6 +88,19 @@ public partial class SignalProbe : ObservableObject
     /// <summary>Most recent sampled value, used for the numeric readout.</summary>
     [ObservableProperty]
     public partial double LastValue { get; set; }
+
+    partial void OnLastValueChanged(double value) => OnPropertyChanged(nameof(Reading));
+
+    /// <summary>
+    /// Changing what a probe measures invalidates everything it has already recorded — amps and
+    /// volts do not belong on the same trace — so the history goes rather than being rescaled.
+    /// </summary>
+    partial void OnKindChanged(ProbeKind value)
+    {
+        ResetHistory();
+        OnPropertyChanged(nameof(Unit));
+        OnPropertyChanged(nameof(Reading));
+    }
 
     public void Record(double time, double value)
     {

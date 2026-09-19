@@ -2,6 +2,7 @@ using Cirq.Core.Primitives;
 using Cirq.Core.Simulation;
 using Cirq.Core.Topology;
 using CommunityToolkit.Mvvm.ComponentModel;
+using Cirq.Core.Probing;
 
 namespace Cirq.Components.Nonlinear;
 
@@ -56,7 +57,7 @@ public sealed record MosfetModel(
 /// way real silicon does rather than producing an unbounded spike. The gate draws no current.
 /// </para>
 /// </summary>
-public partial class Mosfet : CircuitComponent
+public partial class Mosfet : CircuitComponent, ICurrentReporting
 {
     /// <summary>Saturation current of the body diode.</summary>
     private const double BodyDiodeSaturationCurrent = 1e-14;
@@ -236,6 +237,13 @@ public partial class Mosfet : CircuitComponent
         var (id, _, _) = Evaluate(channelVgs, Math.Abs(Vds));
 
         DrainCurrent = polarity * (reversed ? -id : id);
+    }
+
+    /// <summary>An insulated gate draws nothing, so the channel current is all there is.</summary>
+    public double TerminalCurrent(Terminal terminal, MnaSystem system, SimulationState state)
+    {
+        if (ReferenceEquals(terminal, Gate)) return 0;
+        return ReferenceEquals(terminal, Drain) ? DrainCurrent : -DrainCurrent;
     }
 
     public override void ResetState()

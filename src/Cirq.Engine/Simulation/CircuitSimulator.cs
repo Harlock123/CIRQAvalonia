@@ -449,14 +449,15 @@ public sealed class CircuitSimulator
     {
         var owner = probe.TargetTerminal?.Owner;
         if (owner is null) return 0;
+
+        // A component that knows which pin was probed is asked first. The generic branch current
+        // is the fallback, and it cannot tell one pin from another — on a package with ten driven
+        // outputs there are ten branches and no way to say which was meant.
+        if (owner is ICurrentReporting reporting)
+            return reporting.TerminalCurrent(probe.TargetTerminal!, System, State);
+
         if (owner.VoltageSourceCount > 0) return System.BranchCurrent(owner);
-        if (owner is ICurrentReporting reporting) return reporting.TerminalCurrent(probe.TargetTerminal!, System, State);
         return 0;
     }
 }
 
-/// <summary>Implemented by components that can report the current flowing into one of their pins.</summary>
-public interface ICurrentReporting
-{
-    double TerminalCurrent(Terminal terminal, MnaSystem system, SimulationState state);
-}
