@@ -8,14 +8,11 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
-**Every screenshot in the README and the guide is retaken.** Eight of the nine dated from the
-first commit and showed an application with 73 components in 11 categories, before the electrolytic
-capacitor, the current-probe selector, the 40xx group and a good deal else. They now show what the
-application actually looks like.
+## [0.11.0] - 2026-09-19
 
-**The 4000-series palette group is now labelled "40xx Series"**, so it reads as a pair with the
-"74xx Series" group above it rather than as a differently-shaped name for the same kind of thing.
-The parts and their part numbers are unchanged; the palette screenshot is retaken.
+Undo and redo, which `Ctrl` `Z` had been silently declining to do since the first commit. The
+palette holds 119 components in 15 categories, and 921 tests measure them against closed-form
+answers.
 
 **Undo and redo.** `Ctrl` `Z` did nothing at all, because there was nothing behind it. There is
 now: placing, moving, rotating and deleting parts, wiring, probing and parameter edits all come
@@ -35,6 +32,15 @@ notifications as edits. Pressing Run on the lamp dimmer was enough to put an ast
 bar and a "discard changes?" prompt in front of anyone who then tried to close it. A change now
 only counts as an edit if it is a property the serializer would write to the file. Attaching a
 probe, which is saved and was not counted, now does.
+
+**The 4000-series palette group is now labelled "40xx Series"**, so it reads as a pair with the
+"74xx Series" group above it rather than as a differently-shaped name for the same kind of thing.
+The parts and their part numbers are unchanged; the palette screenshot is retaken.
+
+**Every screenshot in the README and the guide is retaken.** Eight of the nine dated from the
+first commit and showed an application with 73 components in 11 categories, before the electrolytic
+capacitor, the current-probe selector, the 40xx group and a good deal else. They now show what the
+application actually looks like.
 
 ## [0.10.0] - 2026-09-19
 
@@ -420,7 +426,8 @@ First public build of CirqAvalonia — an electronic circuit analyzer and mixed-
 
 **501 tests** measure the solver against closed-form answers rather than recorded output.
 
-[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.7.0...v0.8.0
