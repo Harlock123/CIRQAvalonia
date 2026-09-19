@@ -32,7 +32,7 @@ Core ← Engine ← Components ← UI, which keeps the whole engine headless-tes
 
 ```bash
 dotnet run --project src/Cirq.UI     # the editor
-dotnet test                          # 1051 tests
+dotnet test                          # 1084 tests
 ```
 
 Targets .NET 10. The UI uses Avalonia 12 and ScottPlot 5.1; those two versions are pinned
@@ -201,6 +201,10 @@ Tests measure the solver against closed-form answers rather than recorded output
 | Load cell | Rated output in millivolts per volt, proportional to load and to excitation both, and saying nothing at all when the bridge is not excited |
 | Rotary encoder | Two staggered pulses per detent, which contact moves first carrying the direction, and contacts that bounce on every edge unless told not to |
 | Charge pump | A negative rail from a positive one, following the input because nothing regulates, and sagging when the pump capacitor is too small for the load |
+| Centre-tapped transformer | The two halves swinging opposite ways about the tap, a full-wave output rippling at twice the line frequency, and one diode drop in the path rather than a bridge's two |
+| Inductor saturation | Ideal while the saturation current is left at zero, inductance halved at the stated current, and the current running away past the knee |
+| DS1307 | BCD encoding both ways, the time read back off the bus from the datasheet's registers, the clock advancing on its own between two reads, and the clock-halt bit stopping it |
+| HC-SR04 | 58 µs of echo per centimetre at three distances, silence until it is triggered, a trigger under ten microseconds ignored, and a 38 ms pulse rather than none when nothing is in range |
 | Crystal | Resonating within 0.1% of its rated frequency from the motional L and C alone, a motional inductance in henries, and a far larger response on resonance than beside it |
 | Microphone | Biasing part way down the rail, sound swinging the output and silence not, and being starved by too large a bias resistor |
 | Servo | Pulse width setting the angle at both ends of travel and the centre, taking time to travel there, going limp when the pulses stop, and reporting a pulse that drives it into its end stop |
@@ -312,9 +316,9 @@ toolbar used to show: active tool, simulation speed, elapsed time and solver rat
 `Help > Keyboard Shortcuts` lists everything below, and the
 [User Guide](docs/USER_GUIDE.md) walks through building a circuit from an empty canvas.
 
-The palette holds 137 components in 16 collapsible categories:
+The palette holds 140 components in 16 collapsible categories:
 
-![The component palette showing all fifteen categories with their counts — passive, switches, sources, semiconductors, transistors, LEDs and displays, power, analog ICs, logic gates, 74xx series, 40xx series, digital I/O, sensors and actuators, switching and isolation, and dev boards — with the Passive group open](docs/images/02-palette.png)
+![The component palette showing all sixteen categories with their counts — passive, switches, sources, semiconductors, transistors, LEDs and displays, power, analog ICs, logic gates, 74xx series, 40xx series, buses, digital I/O, sensors and actuators, switching and isolation, and dev boards — with the Passive group open](docs/images/02-palette.png)
 
 Selecting a component fills the properties panel. It is built by reflection, so a new component
 type gets a complete editor without any UI code:

@@ -1,6 +1,7 @@
 using Cirq.Components.Boards;
 using Cirq.Components.Buses;
 using Cirq.Components.Digital;
+using Cirq.Components.Electromechanical;
 using Cirq.Components.Nonlinear;
 using Cirq.Components.Ics;
 using Cirq.Components.Passive;
@@ -55,6 +56,12 @@ public static class Examples
         new("I2C EEPROM", "Three bytes written over two wires and read back again", LoadI2cEeprom),
         new("SPI Shift Register", "An SPI master clocking a byte into a 74595 and onto eight LEDs",
             LoadSpiShiftRegister),
+        new("Full-Wave Rectifier", "A centre-tapped secondary and two diodes — one drop, not a bridge's two",
+            LoadFullWaveRectifier),
+        new("I2C Clock", "A DS1307 read over two wires, its registers in BCD and moving on their own",
+            LoadI2cClock),
+        new("Ultrasonic Ranger", "An HC-SR04 triggered on a timer — the distance is the echo's width",
+            LoadUltrasonicRanger),
     ];
 
     public static void LoadRcLowPass(MainWindowViewModel vm)
@@ -1172,6 +1179,139 @@ public static class Examples
         vm.Scope.VoltsPerDivision = 1.0;
         vm.Scope.AddProbe(jfet.Gate, "In");
         vm.Scope.AddProbe(jfet.Drain, "Out");
+    }
+
+    public static void LoadFullWaveRectifier(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "Full-wave rectifier";
+
+        // A 1:1 transformer against a 40 V peak-to-peak supply gives about 14 V RMS on the whole
+        // secondary, so each half swings about ten volts either side of the tap.
+        var mains = Place(circuit, new FunctionGenerator
+        {
+            Shape = Waveform.Sine,
+            Frequency = 50,
+            AmplitudePeakToPeak = 40,
+        }, -440, 0);
+
+        var transformer = Place(circuit, new CentreTappedTransformer(1.0, 1.0, 0.999), -240, 0);
+        var upper = Place(circuit, new Diode(DiodeModel.D1N4001), -60, -120);
+        var lower = Place(circuit, new Diode(DiodeModel.D1N4001), -60, 120);
+        var reservoir = Place(circuit, new ElectrolyticCapacitor(470e-6) { VoltageRating = 35 }, 160, 140);
+        var load = Place(circuit, new Resistor(470), 340, 140);
+        var ground = Place(circuit, new Ground(), -240, 320);
+        var rail = Place(circuit, new Ground(), 250, 300);
+
+        reservoir.RotationDegrees = 90;
+        load.RotationDegrees = 90;
+
+        circuit.Connect(mains.Return, ground.Pin);
+        circuit.Connect(mains.Output, transformer.P1);
+        circuit.Connect(transformer.P2, ground.Pin);
+
+        // The tap is the zero volt line. Each end takes its turn at being the positive one, which
+        // is what makes two diodes enough.
+        circuit.Connect(transformer.CentreTap, ground.Pin);
+        circuit.Connect(transformer.S1, upper.Anode);
+        circuit.Connect(transformer.S2, lower.Anode);
+        circuit.Connect(upper.Cathode, reservoir.A);
+        circuit.Connect(lower.Cathode, reservoir.A);
+        circuit.Connect(reservoir.B, rail.Pin);
+        circuit.Connect(reservoir.A, load.A);
+        circuit.Connect(load.B, rail.Pin);
+
+        vm.Scope.TimebasePerDivision = 5e-3;
+        vm.Scope.VoltsPerDivision = 5.0;
+        vm.Scope.Layout = ScopeLayout.Unified;
+        vm.Scope.AddProbe(transformer.S1, "Half A");
+        vm.Scope.AddProbe(transformer.S2, "Half B");
+        vm.Scope.AddProbe(load.A, "Rectified");
+
+        vm.Simulation.SpeedFactor = 1.0;
+    }
+
+    public static void LoadI2cClock(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "I2C real-time clock";
+
+        var rail = Place(circuit, new DcVoltageSource(3.3), -420, 120);
+
+        // Point at register zero, then read three bytes: seconds, minutes and hours, all in BCD.
+        var master = Place(circuit, new I2cMaster
+        {
+            Transactions = "w 68 00; r 68 3",
+            ClockFrequency = 100e3,
+        }, -180, -40);
+
+        var clock = Place(circuit, new Ds1307 { StartHour = 11, StartMinute = 59, StartSecond = 50 },
+            220, -40);
+
+        var sdaPull = Place(circuit, new Resistor(4.7e3), 20, -180);
+        var sclPull = Place(circuit, new Resistor(4.7e3), 140, -180);
+
+        var gnd = Place(circuit, new Ground(), -420, 260);
+        var gnd2 = Place(circuit, new Ground(), 220, 160);
+
+        sdaPull.RotationDegrees = 90;
+        sclPull.RotationDegrees = 90;
+
+        circuit.Connect(rail.Negative, gnd.Pin);
+        circuit.Connect(master.Vcc, rail.Positive);
+        circuit.Connect(master.Gnd, gnd.Pin);
+        circuit.Connect(clock.Vcc, rail.Positive);
+        circuit.Connect(clock.Gnd, gnd2.Pin);
+
+        circuit.Connect(master.Sda, clock.Sda);
+        circuit.Connect(master.Scl, clock.Scl);
+
+        circuit.Connect(rail.Positive, sdaPull.A);
+        circuit.Connect(sdaPull.B, master.Sda);
+        circuit.Connect(rail.Positive, sclPull.A);
+        circuit.Connect(sclPull.B, master.Scl);
+
+        vm.Scope.TimebasePerDivision = 100e-6;
+        vm.Scope.VoltsPerDivision = 2.0;
+        vm.Scope.Layout = ScopeLayout.Tiled;
+        vm.Scope.AddProbe(master.Scl, "SCL");
+        vm.Scope.AddProbe(master.Sda, "SDA");
+    }
+
+    public static void LoadUltrasonicRanger(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "Ultrasonic ranger";
+
+        var rail = Place(circuit, new DcVoltageSource(5.0), -420, 60);
+
+        // A hundred pings a second, each trigger fifty microseconds wide — comfortably over the ten
+        // the part insists on, and far enough apart that a fifty centimetre echo of just under
+        // three milliseconds finishes well before the next one goes out.
+        var trigger = Place(circuit, new ClockSource(100) { DutyCycle = 0.005 }, -220, -80);
+        var ranger = Place(circuit, new UltrasonicRanger { DistanceCentimetres = 50 }, 160, 0);
+        var load = Place(circuit, new Resistor(10e3), 420, 120);
+        var gnd = Place(circuit, new Ground(), -420, 200);
+        var gnd2 = Place(circuit, new Ground(), 160, 260);
+
+        load.RotationDegrees = 90;
+
+        circuit.Connect(rail.Negative, gnd.Pin);
+        circuit.Connect(ranger.Vcc, rail.Positive);
+        circuit.Connect(ranger.Gnd, gnd2.Pin);
+        circuit.Connect(trigger.Out, ranger.Trigger);
+        circuit.Connect(ranger.Echo, load.A);
+        circuit.Connect(load.B, gnd2.Pin);
+
+        vm.Scope.TimebasePerDivision = 1e-3;
+        vm.Scope.VoltsPerDivision = 2.0;
+        vm.Scope.Layout = ScopeLayout.Tiled;
+        vm.Scope.AddProbe(ranger.Trigger, "TRIG");
+        vm.Scope.AddProbe(ranger.Echo, "ECHO");
+
+        // The interesting part is milliseconds wide, so the default thousandth of real time leaves
+        // you waiting a quarter of a minute between pings.
+        vm.Simulation.SpeedFactor = 0.01;
     }
 
     private static T Place<T>(Circuit circuit, T component, double x, double y) where T : CircuitComponent

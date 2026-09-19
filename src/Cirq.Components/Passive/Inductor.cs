@@ -30,6 +30,21 @@ public partial class Inductor : TwoTerminalComponent
     [ObservableProperty]
     public partial double? InitialCurrent { get; set; }
 
+    /// <summary>
+    /// Current at which the core has given up half the inductance, in amps. Zero — the default —
+    /// means an ideal inductor that never saturates, which is what every circuit built before this
+    /// existed assumes.
+    /// <para>
+    /// Saturation is the failure that destroys switching converters. The core stores flux until it
+    /// cannot store any more, and past that point the winding is just a piece of wire: the
+    /// inductance collapses, nothing is left to limit di/dt, and the current goes wherever the
+    /// supply will let it in the time the switch is still on. It does not announce itself on a
+    /// voltage trace — you have to be looking at the current.
+    /// </para>
+    /// </summary>
+    [ObservableProperty]
+    public partial double SaturationCurrent { get; set; }
+
     public override string ComponentType => "Inductor";
 
     public override string DesignatorPrefix => "L";
@@ -82,10 +97,40 @@ public partial class Inductor : TwoTerminalComponent
     /// Returns the companion inductance coefficient and the history term for the current step.
     /// Shared with <see cref="Transformer"/>, which stamps the same row shape.
     /// </summary>
+    /// <summary>
+    /// Inductance at the current the winding is presently carrying.
+    /// <para>
+    /// A fourth power rather than a square: a real core holds its inductance almost to the knee
+    /// and then loses it quickly, where a gentler law would sag from the start and make every
+    /// inductor behave slightly wrongly rather than one behave very wrongly at the right moment.
+    /// </para>
+    /// </summary>
+    public double EffectiveInductance
+    {
+        get
+        {
+            var nominal = Math.Max(Inductance, 1e-18);
+            if (SaturationCurrent <= 0) return nominal;
+
+            var ratio = Math.Abs(_previousCurrent) / SaturationCurrent;
+            return nominal / (1.0 + (ratio * ratio * ratio * ratio));
+        }
+    }
+
+    /// <summary>True when the core has lost a noticeable part of its inductance.</summary>
+    public bool IsSaturating =>
+        SaturationCurrent > 0 && Math.Abs(_previousCurrent) > SaturationCurrent * 0.75;
+
+    public virtual IReadOnlyList<string> Violations => IsSaturating
+        ? [$"carrying {SiPrefix.Format(Math.Abs(_previousCurrent), "A")} against a " +
+           $"{SiPrefix.Format(SaturationCurrent, "A")} saturation current — the core is giving up " +
+           "and the inductance with it, so there is less and less holding the current back"]
+        : [];
+
     internal (double Leq, double History) CompanionTerms(SimulationState state)
     {
         var h = state.TimeStep;
-        var l = Math.Max(Inductance, 1e-18);
+        var l = EffectiveInductance;
 
         if (state.EffectiveIntegration == IntegrationMethod.Trapezoidal)
         {

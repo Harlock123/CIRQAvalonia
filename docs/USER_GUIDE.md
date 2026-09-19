@@ -61,15 +61,15 @@ at the window edge; click the rail to bring it back.
 
 ## Placing components
 
-![The component palette showing all fifteen categories with their counts — passive, switches, sources, semiconductors, transistors, LEDs and displays, power, analog ICs, logic gates, 74xx series, 40xx series, digital I/O, sensors and actuators, switching and isolation, and dev boards — with the Passive group open](images/02-palette.png)
+![The component palette showing all sixteen categories with their counts — passive, switches, sources, semiconductors, transistors, LEDs and displays, power, analog ICs, logic gates, 74xx series, 40xx series, buses, digital I/O, sensors and actuators, switching and isolation, and dev boards — with the Passive group open](images/02-palette.png)
 
 Click a palette entry, then click the canvas. The part lands where you click, snapped to the grid.
 
-The palette holds **137 components in 16 categories**:
+The palette holds **140 components in 16 categories**:
 
 | Category | Count | Contents |
 | --- | --- | --- |
-| Passive | 7 | Resistor, capacitor, electrolytic capacitor, inductor, transformer, potentiometer, **crystal** — see [below](#crystals) |
+| Passive | 8 | Resistor, capacitor, electrolytic capacitor, inductor, transformer, **centre-tapped transformer**, potentiometer, **crystal** — see [below](#crystals) |
 | Switches | 4 | SPST, SPDT, push button, **8-way DIP switch** |
 | Sources | 6 | Ground, DC voltage, DC current, function generator, battery, **solar cell** — see [below](#batteries-and-panels) |
 | Semiconductors | 11 | 1N4148, 1N4001, Schottky, zeners, bridge rectifier, SCR, triac, diac, **TVS and varistor** — see [below](#surge-protection) |
@@ -80,9 +80,9 @@ The palette holds **137 components in 16 categories**:
 | Logic Gates | 7 | AND, OR, NAND, NOR, XOR, XNOR, NOT |
 | 74xx Series | 18 | Counters, decoders, flip-flops, shift registers (including the **74595**), multiplexers, Schmitt inverter |
 | 40xx Series | 14 | CMOS gates, counters, flip-flops, analog switches — see [below](#the-40xx-series) |
-| Buses | 4 | I2C master, EEPROM and port expander, SPI master — see [below](#i2c-and-spi) |
+| Buses | 5 | I2C master, EEPROM, port expander and **DS1307 clock**, SPI master — see [below](#i2c-and-spi) |
 | Digital I/O | 6 | Logic toggle, clock, indicators, rotary encoder, **oscillator module** |
-| Sensors & Actuators | 12 | DC motor, LDR, thermistors, buzzers, speaker, microphone, servo, stepper, **thermocouple and load cell** — see [below](#sensors-and-actuators) |
+| Sensors & Actuators | 13 | DC motor, LDR, thermistors, buzzers, speaker, microphone, servo, stepper, thermocouple, load cell, **HC-SR04 ranger** — see [below](#sensors-and-actuators) |
 | Switching & Isolation | 6 | Relay, fuses, optocouplers, **ULN2003** — see [below](#switching-and-isolation) |
 | Dev Boards | 4 | Raspberry Pi, Arduino Uno / Nano / Mega — see [below](#development-boards) |
 
@@ -314,6 +314,32 @@ falling one low until it drops past about 0.38 — and between them it remembers
 up a slow edge, debounces a contact, and lets a single gate with a resistor from output back to
 input and a capacitor to ground free-run as an oscillator.
 
+**Transformer (CT)** is the other way to rectify, and for fifty years it was the usual one. Its
+secondary has a tap at the middle; take that tap as your zero volt line and the two ends swing in
+opposite directions, so **two diodes give you full-wave rectification** instead of a bridge's four.
+The saving is not the two diodes — it is that the current only ever passes through one of them, so
+you lose one forward drop instead of two. At five volts that is most of a volt, which is why the
+arrangement outlived the bridge in low-voltage supplies. Rectify each half separately against the
+tap instead and you have a positive and a negative rail from one winding, which is where every
+±15 V op-amp supply comes from.
+
+The secondary is modelled as what it physically is — two windings in series sharing a core, each
+with a quarter of the whole inductance, all three coupled — so the tap is a real connection to the
+middle rather than an ideal half-voltage point, and loading one half unevenly pulls the other about
+the way it does in practice. The windings have resistance, because a winding is a long piece of
+thin wire; it is also what limits the inrush when the supply is first switched on.
+
+**File > Examples > Full-Wave Rectifier** wires one up with two 1N4001s. Both halves are on the
+scope against the rectified rail, and the rail sits one diode drop below the peaks rather than two.
+
+**Inductor saturation.** An inductor has a `SaturationCurrent`, and it is left at zero — meaning
+ideal — so nothing that worked before changes. Set it and the part behaves like iron: past the
+knee the core cannot take any more flux, the inductance collapses, and the current stops being
+limited by anything except resistance. That is the failure mode behind a switching supply that
+works on the bench and dies at full load, and behind an inductor that gets hot without the
+waveform ever looking wrong. It is worth setting on any inductor carrying real current, because a
+part that is ideal at ten amps is not telling you anything.
+
 Give the regulator headroom. It needs its dropout voltage above the output *at the bottom of the
 ripple*, not on average — a supply that measures fine on a meter can still be dropping out on
 every trough.
@@ -365,6 +391,25 @@ its own oscillator behind the element and DC is exactly what it wants.
 
 A passive element sounds at whatever it is fed, and the frequency shown is measured from the drive
 rather than assumed.
+
+**Ultrasonic Ranger** is the HC-SR04, and the whole part is a lesson in one idea: **the distance is
+in the width of a pulse, and nowhere else**. Give TRIG at least ten microseconds high, and about
+450 µs later ECHO goes up and stays up while the chirp is out and back — **58 microseconds per
+centimetre**, which is simply the speed of sound over a round trip. Nothing on the wire tells you
+the distance; your code has to time an edge, which is why driving one from an interrupt is a
+different exercise from reading a sensor over a bus.
+
+Both of its awkward behaviours are modelled, because both catch people:
+
+- A trigger pulse shorter than ten microseconds is **ignored entirely**, so a sloppy `digitalWrite`
+  pair that happens to take eight gets you nothing at all rather than a wrong answer.
+- With nothing in range it does not stay quiet — it gives a **38 millisecond pulse** and gives up.
+  Code with no timeout reads that as about six metres, which is why a ranger pointed at the sky
+  reports something absurd instead of hanging.
+
+Double-click it to move the target between `DistanceCentimetres` and `AlternateDistance` while the
+simulation runs, and watch the echo pulse change width. **File > Examples > Ultrasonic Ranger**
+has one pinged a hundred times a second with both pins on the scope.
 
 ---
 
@@ -699,13 +744,28 @@ two wires, and the chip on the back of every "I2C LCD" backpack. The expander's 
 quasi-bidirectional: writing a one releases the pin to a weak pull-up rather than driving it high,
 which is why these sink an LED nicely and barely source anything.
 
+A **DS1307 real-time clock** sits on the bus as well, and it is the one that behaves like a sensor
+rather than a memory: its registers change whether you talk to it or not, so reading it twice gives
+two answers. That is what a device bus is actually for.
+
+Its registers are **binary-coded decimal**, which is the thing that catches everyone. A seconds
+register holding `0x59` means fifty-nine, not eighty-nine — each nibble is one decimal digit. It is
+modelled rather than quietly converted, so the conversion your driver has to do is the conversion
+you have to do here. Reading it is the usual two-step: write the register number, then read from
+it, which is `w 68 00; r 68 3` for seconds, minutes and hours.
+
+Register zero also carries the **clock halt** bit at the top, and a new part comes up with it set
+and the clock stopped — which is why a first-time DS1307 famously "does not work" until something
+writes to it. `ClockHalted` is that bit. `TimeScale` is not a real register: simulated time passes
+in milliseconds, so the clock is wound on a thousand times by default to make it visibly move.
+
 **SPI** is the opposite trade: no addressing, no acknowledgement, push-pull rather than open drain,
 and a select pin for every device. Faster and far simpler to decode, at the cost of a pin per chip.
 Its master takes a list of hex bytes, one transfer per line, and clocks them out most significant
 bit first with data set while the clock is low — mode zero, which is what nearly everything expects.
 
-**File > Examples > I2C EEPROM** and **SPI Shift Register** are both wired up, with the bus lines
-on the scope.
+**File > Examples > I2C EEPROM**, **I2C Clock** and **SPI Shift Register** are all wired up, with
+the bus lines on the scope.
 
 ---
 

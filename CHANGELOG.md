@@ -8,6 +8,45 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+Four parts that all come down to the same thing: what a component does when you push it past where
+the datasheet's headline number applies. The palette holds 140 components in 16 categories, and
+1084 tests measure them against closed-form answers.
+
+**Centre-tapped transformer.** The other way to rectify, and for fifty years the usual one. Take
+the tap as your zero volt line and the two ends swing opposite ways, so two diodes do full-wave
+rectification — and the current only ever passes through one of them, so you lose one forward drop
+instead of a bridge's two. At five volts that is most of a volt. Rectify each half separately
+against the tap instead and one winding gives you a positive and a negative rail, which is where
+every ±15 V op-amp supply comes from.
+
+It is modelled as what it physically is: two secondary windings in series sharing a core, each a
+quarter of the whole inductance, all three mutually coupled. So the tap is a real connection to the
+middle rather than an ideal half-voltage point, and loading one half unevenly pulls the other about
+the way it does on the bench. The windings have resistance — a winding is a long piece of thin
+wire, ideal ones are a dead short at DC, and it is what limits the inrush at switch-on.
+
+**Inductor saturation.** An inductor now has a `SaturationCurrent`, left at zero — meaning ideal —
+so nothing that already worked changes. Set it and the part behaves like iron: past the knee the
+core takes no more flux, the inductance collapses, and the current stops being limited by anything
+but resistance. That is the failure mode behind a switching supply that is fine on the bench and
+dies at full load, and behind an inductor that gets hot while the waveform still looks right.
+
+**DS1307 real-time clock** on the I2C bus, and unlike the EEPROM beside it this one has something
+of its own to say: its registers move whether you talk to it or not, so two reads a moment apart
+give two answers. Its registers are **binary-coded decimal** — `0x59` means fifty-nine — which is
+modelled rather than quietly converted, because that conversion is the thing that catches everyone.
+Register zero carries the clock-halt bit, and a new part comes up with it set and the clock
+stopped, which is why a first-time DS1307 famously does nothing until something writes to it.
+
+**HC-SR04 ultrasonic ranger**, which is one idea end to end: the distance is in the width of a
+pulse and nowhere else — 58 µs per centimetre, out and back. Both of its awkward behaviours are
+here too. A trigger shorter than ten microseconds is ignored outright, so a sloppy pulse gets you
+nothing rather than a wrong answer; and with nothing in range it does not stay quiet but gives a
+38 ms pulse and gives up, which is why a ranger pointed at the sky reports about six metres instead
+of hanging. Double-click it to move the target while the simulation runs.
+
+Three examples: **Full-Wave Rectifier**, **I2C Clock** and **Ultrasonic Ranger**.
+
 ## [0.15.0] - 2026-09-19
 
 I2C and SPI, which the development boards have wanted since they were added, along with the

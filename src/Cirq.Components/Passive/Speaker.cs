@@ -56,11 +56,12 @@ public partial class Speaker : Inductor
     /// <summary>True while enough is going through it to hear.</summary>
     public bool IsSounding => AveragePower > PowerRating * 1e-3;
 
-    public IReadOnlyList<string> Violations => AveragePower > PowerRating
-        ? [$"taking {SiPrefix.Format(AveragePower, "W")} against a " +
+    public override IReadOnlyList<string> Violations => AveragePower > PowerRating
+        ? [.. base.Violations,
+           $"taking {SiPrefix.Format(AveragePower, "W")} against a " +
            $"{SiPrefix.Format(PowerRating, "W")} rating — the coil is a heater and this one is " +
            "being asked to run hot"]
-        : [];
+        : base.Violations;
 
     public override void CommitTimeStep(MnaSystem system, SimulationState state)
     {

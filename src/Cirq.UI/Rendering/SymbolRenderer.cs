@@ -46,6 +46,7 @@ public static class SymbolRenderer
             case Microphone mic: DrawMicrophone(context, pen, zoom, mic); break;
             case Servo servo: DrawServo(context, pen, zoom, servo); break;
             case StepperMotor stepper: DrawStepper(context, pen, zoom, stepper); break;
+            case UltrasonicRanger sonar: DrawUltrasonicRanger(context, pen, zoom, sonar); break;
             case Battery battery: DrawBattery(context, pen, zoom, battery); break;
             case TransientSuppressor tvs: DrawTvs(context, pen, zoom, tvs); break;
             case Varistor varistor: DrawVaristor(context, pen, zoom, varistor); break;
@@ -55,6 +56,7 @@ public static class SymbolRenderer
             case Capacitor: DrawCapacitor(context, pen); break;
             case Inductor: DrawInductor(context, pen); break;
             case Transformer: DrawTransformer(context, pen, thin); break;
+            case CentreTappedTransformer: DrawCentreTappedTransformer(context, pen, thin); break;
             case Potentiometer: DrawPotentiometer(context, pen); break;
             case Ground: DrawGround(context, pen); break;
             case DcVoltageSource: DrawVoltageSource(context, pen, zoom); break;
@@ -463,6 +465,49 @@ public static class SymbolRenderer
     /// A battery: alternating long and short plates, the oldest symbol in electronics. Two cells
     /// drawn rather than one, which is how a pack is conventionally shown.
     /// </summary>
+    /// <summary>
+    /// An HC-SR04: the little board with its pair of transducers, one sending and one listening.
+    /// The chirp is drawn while the echo pin is up, which is the only time the part is saying
+    /// anything.
+    /// </summary>
+    private static void DrawUltrasonicRanger(
+        DrawingContext context, IPen pen, double zoom, UltrasonicRanger sonar)
+    {
+        context.DrawRectangle(CanvasTheme.SymbolFill, pen, new RoundedRect(new Rect(-30, -40, 92, 80), 4));
+
+        foreach (var terminal in sonar.Terminals)
+        {
+            var at = terminal.CanvasOffset;
+            context.DrawLine(pen, new Point(at.X, at.Y), new Point(-30, at.Y));
+
+            if (zoom > 0.55)
+            {
+                DrawCenteredText(context, terminal.Name,
+                    new Point(-46, at.Y - 1), 8, zoom, CanvasTheme.LabelBrush);
+            }
+        }
+
+        // The two cans, side by side as they are on the board. The transmitter lights while it is
+        // chirping, which is the only time the part is saying anything.
+        var live = sonar.IsEchoing ? CanvasTheme.ValueBrush : null;
+
+        context.DrawEllipse(live, pen, new Point(2, -8), 15, 15);
+        context.DrawEllipse(null, pen, new Point(34, -8), 15, 15);
+
+        if (zoom <= 0.4) return;
+
+        // Wavefronts going out, while there is an echo to have come back from.
+        if (sonar.IsEchoing)
+        {
+            var wave = CanvasTheme.Pen(CanvasTheme.ValueBrush, 1.4, zoom);
+            for (var i = 1; i <= 3; i++)
+                context.DrawEllipse(null, wave, new Point(62, -8), 5 * i, 11 * i);
+        }
+
+        DrawCenteredText(context, sonar.IsInRange ? "SR04" : "----",
+            new Point(18, 24), 8, zoom, CanvasTheme.LabelBrush);
+    }
+
     private static void DrawBattery(DrawingContext context, IPen pen, double zoom, Battery battery)
     {
         context.DrawLine(pen, new Point(-30, 0), new Point(-14, 0));
@@ -1197,6 +1242,33 @@ public static class SymbolRenderer
         context.DrawGeometry(null, pen, geometry);
     }
 
+    /// <summary>
+    /// A centre-tapped transformer: one primary against a secondary drawn as the two windings it
+    /// physically is, with the tap coming off the joint between them.
+    /// </summary>
+    private static void DrawCentreTappedTransformer(DrawingContext context, IPen pen, IPen thin)
+    {
+        DrawWinding(context, pen, -14, -24, 48);
+
+        // The secondary as two halves, so the tap is visibly the middle of a winding rather than
+        // a third terminal hung off an ideal one.
+        DrawWinding(context, pen, 14, -32, 32);
+        DrawWinding(context, pen, 14, 0, 32);
+
+        // Core.
+        context.DrawLine(thin, new Point(-3, -34), new Point(-3, 34));
+        context.DrawLine(thin, new Point(3, -34), new Point(3, 34));
+
+        context.DrawLine(pen, new Point(-30, -24), new Point(-14, -24));
+        context.DrawLine(pen, new Point(-30, 24), new Point(-14, 24));
+        context.DrawLine(pen, new Point(30, -32), new Point(14, -32));
+        context.DrawLine(pen, new Point(30, 32), new Point(14, 32));
+
+        // The tap itself, off the joint.
+        context.DrawLine(pen, new Point(14, 0), new Point(30, 0));
+        context.DrawEllipse(pen.Brush, pen, new Point(14, 0), 2.5, 2.5);
+    }
+
     private static void DrawPotentiometer(DrawingContext context, IPen pen)
     {
         context.DrawLine(pen, new Point(-30, 20), new Point(-18, 20));
@@ -1622,6 +1694,10 @@ public static class SymbolRenderer
         // A servo's case and a stepper's body are both 30 either side of centre, which is exactly
         // where the default puts the captions.
         Servo or StepperMotor => 44.0,
+
+        // The ranger's board reaches 40 either side, the centre-tapped secondary 32.
+        UltrasonicRanger => 54.0,
+        CentreTappedTransformer => 48.0,
 
         // The bridge diamond reaches 26, the charge pump's package 38, the controller's 52.
         LoadCell => 40.0,
