@@ -8,29 +8,11 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
-**Zoom to fit now fits.** It measured the extents from the component centres and added a fixed
-margin, which was ample for a resistor and nowhere near enough for a 40-pin board — a Mega's symbol
-is some eight hundred units tall, so fitting to its centre left most of the part off screen, in the
-one case where fitting matters most. It now measures what is actually drawn, captions included, and
-takes wire waypoints into account so a circuit routed around an obstacle is not clipped either.
+## [0.9.0] - 2026-09-19
 
-**Zoom in and out**, on the View menu and on `Ctrl` `+` / `Ctrl` `-`. The numeric keypad's `+` and
-`-` work as well, since typing an actual `+` means holding shift on most layouts. The wheel still
-zooms about the pointer; the menu and keyboard zoom about the middle of the view.
-
-**Six new examples**, for the parts added over the last few releases: **Lamp Dimmer** (triac and
-diac phase control, firing once per half cycle and turning itself off at every zero crossing),
-**SCR Latch** (press the button and it stays on — only interrupting the anode puts it out), **LED
-Chaser** (a 4017 walking ten LEDs), **4060 Timer** (a chip clocking itself from one resistor and one
-capacitor), **Staircase Generator** (a 4040 addressing a 4051 across a resistor ladder) and **JFET
-Amplifier**.
-
-**Fixed: the JFET's two regions did not meet.** Channel-length modulation was applied to the
-saturation branch only, so the drain current stepped about three percent as the device crossed
-`vds = overdrive`. A discontinuity is the one thing Newton cannot walk down, and the JFET amplifier
-found it: with the source bypass capacitor still charging the stage sits in triode, and the solver
-hunted either side of the boundary until it gave up. Current, transconductance and output
-conductance now all meet at the boundary, as they already did in the MOSFET model.
+Twenty new components — the thyristor family, JFETs, and a 4000-series CMOS group of its own —
+six examples built out of them, and a zoom to fit that finally fits. The palette now holds 112
+parts in 15 categories, and 865 tests measure them against closed-form answers.
 
 **Thyristors: SCR, triac and diac.** Everything else in the library follows its input; these parts
 remember. An SCR fires on a gate pulse and the gate then has no further say at all — it conducts
@@ -94,6 +76,30 @@ These are CMOS, not TTL. A 4000-series input on a 5 V rail wants 3.5 V before it
 74xx output only guarantees 3.4 V, so driving one directly from the other is a circuit that works
 in one place and not the other. They are also an order of magnitude slower — about 90 ns a gate at
 5 V against 11 ns for the TTL equivalents.
+
+**Zoom to fit now fits.** It measured the extents from the component centres and added a fixed
+margin, which was ample for a resistor and nowhere near enough for a 40-pin board — a Mega's symbol
+is some eight hundred units tall, so fitting to its centre left most of the part off screen, in the
+one case where fitting matters most. It now measures what is actually drawn, captions included, and
+takes wire waypoints into account so a circuit routed around an obstacle is not clipped either.
+
+**Zoom in and out**, on the View menu and on `Ctrl` `+` / `Ctrl` `-`. The numeric keypad's `+` and
+`-` work as well, since typing an actual `+` means holding shift on most layouts. The wheel still
+zooms about the pointer; the menu and keyboard zoom about the middle of the view.
+
+**Six new examples**, for the parts added over the last few releases: **Lamp Dimmer** (triac and
+diac phase control, firing once per half cycle and turning itself off at every zero crossing),
+**SCR Latch** (press the button and it stays on — only interrupting the anode puts it out), **LED
+Chaser** (a 4017 walking ten LEDs), **4060 Timer** (a chip clocking itself from one resistor and one
+capacitor), **Staircase Generator** (a 4040 addressing a 4051 across a resistor ladder) and **JFET
+Amplifier**.
+
+**Fixed: the JFET's two regions did not meet.** Channel-length modulation was applied to the
+saturation branch only, so the drain current stepped about three percent as the device crossed
+`vds = overdrive`. A discontinuity is the one thing Newton cannot walk down, and the JFET amplifier
+found it: with the source bypass capacitor still charging the stage sits in triode, and the solver
+hunted either side of the boundary until it gave up. Current, transconductance and output
+conductance now all meet at the boundary, as they already did in the MOSFET model.
 
 ## [0.8.0] - 2026-09-19
 
@@ -326,7 +332,8 @@ First public build of CirqAvalonia — an electronic circuit analyzer and mixed-
 
 **501 tests** measure the solver against closed-form answers rather than recorded output.
 
-[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.5.0...v0.6.0
