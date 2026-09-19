@@ -8,9 +8,17 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
-- Parts you can operate by double-clicking — switches, buttons, logic toggles, LDRs, thermistors —
-  are now ringed with a small dot on the canvas, so which ones those are no longer depends on
-  having read the palette description. **View > Mark Interactive Parts** turns the rings off.
+## [0.7.0] - 2026-09-19
+
+**Parts you can operate are now marked as such.** Switches, push buttons, logic toggles, LDRs and
+thermistors all respond to a double-click on the canvas, but nothing on the canvas said so — the
+only place it was written down was the palette description you had already scrolled past, and the
+status-bar hint needs you to hover the very thing you did not know was interactive.
+
+Each now carries a small ringed dot beside its designator. It is on by default, because discovery
+is the point; **View > Mark Interactive Parts** turns it off once it has served its purpose.
+
+**709 tests** pass, measured against closed-form answers rather than recorded output.
 
 ## [0.6.0] - 2026-09-19
 
@@ -206,7 +214,8 @@ First public build of CirqAvalonia — an electronic circuit analyzer and mixed-
 
 **501 tests** measure the solver against closed-form answers rather than recorded output.
 
-[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.3.0...v0.4.0
