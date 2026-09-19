@@ -14,8 +14,32 @@ namespace Cirq.UI.Views;
 /// the ScottPlot surface, so the render rate is decoupled from the solver: the engine can be
 /// taking millions of time points per second while this repaints at a steady 25 FPS.
 /// </summary>
-public partial class ScopePanel : UserControl
+public partial class ScopePanel : UserControl, Cirq.UI.Services.IScopeSource
 {
+    /// <summary>
+    /// Nothing to export until a probe is attached and visible. Checked rather than assumed,
+    /// because exporting an empty plot is a worse answer than saying there is nothing there.
+    /// </summary>
+    public bool HasTraces =>
+        _plot is not null && DataContext is ScopeViewModel scope && scope.Probes.Any(p => p.IsVisible);
+
+    /// <summary>
+    /// Draws the scope exactly as it stands into whatever canvas the exporter hands over — a
+    /// bitmap, an SVG document or a PDF page. ScottPlot draws on Skia too, so the traces come out
+    /// as curves in the vector formats rather than as a picture of curves.
+    /// </summary>
+    public void Render(SkiaSharp.SKCanvas canvas, SkiaSharp.SKRect area)
+    {
+        if (_plot is null) return;
+
+        var depth = canvas.Save();
+
+        canvas.Translate(area.Left, area.Top);
+        _plot.Multiplot.Render(canvas, new PixelRect(area.Width, area.Height));
+
+        canvas.RestoreToCount(depth);
+    }
+
     /// <summary>
     /// Plot colours come from the active theme rather than being fixed, so the scope follows a
     /// light/dark switch along with the rest of the window.

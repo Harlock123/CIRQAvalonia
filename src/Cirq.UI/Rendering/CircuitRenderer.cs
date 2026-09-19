@@ -239,8 +239,33 @@ public static class CircuitRenderer
             }
         }
 
+        // Probes hang up and to the right of the terminal they are clipped to, and their labels
+        // reach further still. Left out, a probe on the rightmost node had its name sliced off by
+        // the edge of the exported page.
+        foreach (var probe in circuit.Probes)
+        {
+            if (probe.TargetTerminal is null) continue;
+
+            var at = probe.TargetTerminal.AbsolutePosition;
+            var box = new Rect(at.X - 6, at.Y - ProbeRise, ProbeReach, ProbeRise + 8);
+
+            bounds = any ? bounds.Union(box) : box;
+            any = true;
+        }
+
         return any ? bounds : default;
     }
+
+    /// <summary>How far a probe's pennant and label reach to the right of the probed terminal.</summary>
+    /// <remarks>
+    /// The mast leans 6 right, the label is centred 30 beyond that, and the widest label anyone
+    /// is likely to type takes the rest. Measuring the text properly would mean asking a font
+    /// system that an export running headless may not have, for a few units of margin.
+    /// </remarks>
+    private const double ProbeReach = 130.0;
+
+    /// <summary>How far the pennant stands above the terminal.</summary>
+    private const double ProbeRise = 30.0;
 
     /// <summary>A single component's footprint, symbol and captions together.</summary>
     public static Rect VisualBounds(CircuitComponent component) =>

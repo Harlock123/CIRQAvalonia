@@ -8,9 +8,24 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**Export.** `File > Export...`, or `Ctrl+E`, writes the schematic and the oscilloscope traces out
+as **PNG, JPEG, BMP, SVG or PDF**. Choose the schematic, the traces, or both — and when both,
+either one file with the schematic above the traces, or a file each plus a combined PDF with the
+schematic on page one and the scope on page two.
+
+SVG and PDF are **true vector**, not a bitmap in a wrapper: the schematic scales to any size, opens
+in Inkscape for editing, and its captions stay real text rather than becoming outlines. That works
+because the renderer no longer draws onto Avalonia directly. It draws against an interface, and one
+implementation puts the ink on screen while the other puts it in a file — so an export is produced
+by exactly the code that draws the editor and cannot quietly fall behind it.
+
+The frame follows the circuit rather than the window: whatever the view is scrolled to, an export
+holds the whole thing at its natural size with a margin, captions and probe labels included. The
+editing aids stay behind — no dot grid, no terminal dots, no hover highlighting.
+
 Four parts that all come down to the same thing: what a component does when you push it past where
 the datasheet's headline number applies. The palette holds 140 components in 16 categories, and
-1084 tests measure them against closed-form answers.
+1105 tests measure them against closed-form answers.
 
 **Centre-tapped transformer.** The other way to rectify, and for fifty years the usual one. Take
 the tap as your zero volt line and the two ends swing opposite ways, so two diodes do full-wave

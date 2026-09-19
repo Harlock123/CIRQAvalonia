@@ -289,6 +289,34 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         await WriteToAsync(path);
     }
 
+    /// <summary>
+    /// Draws the scope for an export. Set by the window once the panel exists, because the plot
+    /// belongs to a control and a view model has no business reaching for one.
+    /// </summary>
+    public IScopeSource? ScopeSource { get; set; }
+
+    [RelayCommand]
+    private async Task ExportAsync()
+    {
+        if (FileDialogs is null) return;
+
+        var request = await FileDialogs.PickExportAsync(DocumentName, ScopeSource?.HasTraces == true);
+        if (request is null) return;
+
+        try
+        {
+            var written = CircuitExporter.Export(Circuit, ScopeSource, request.Path, request.Options);
+
+            StatusMessage = written.Count == 1
+                ? $"Exported {Path.GetFileName(written[0])}"
+                : $"Exported {written.Count} files to {Path.GetDirectoryName(written[0])}";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            await FileDialogs.ReportAsync("Export failed", ex.Message);
+        }
+    }
+
     /// <summary>Writes the circuit to a path and adopts it as the current file.</summary>
     public async Task<bool> WriteToAsync(string path)
     {

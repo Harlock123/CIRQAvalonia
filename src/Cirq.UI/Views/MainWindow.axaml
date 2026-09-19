@@ -27,6 +27,9 @@
         <MenuItem Header="_Save" InputGesture="Ctrl+S" Command="{Binding SaveCommand}" />
         <MenuItem Header="Save _As..." InputGesture="Ctrl+Shift+S" Command="{Binding SaveAsCommand}" />
         <Separator />
+        <MenuItem Header="_Export..." InputGesture="Ctrl+E" Command="{Binding ExportCommand}"
+                  ToolTip.Tip="Write the schematic and the traces out as PNG, JPEG, BMP, SVG or PDF" />
+        <Separator />
         <MenuItem Header="_Examples" ItemsSource="{Binding ExampleCircuits}">
           <MenuItem.ItemContainerTheme>
             <ControlTheme TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}"
@@ -226,7 +229,7 @@
         <GridSplitter Grid.Row="1" Background="{DynamicResource SplitterBackground}" />
 
         <Border Grid.Row="2" Classes="panel" BorderThickness="0,1,0,0">
-          <views:ScopePanel DataContext="{Binding Scope}" />
+          <views:ScopePanel Name="Scope" DataContext="{Binding Scope}" />
         </Border>
       </Grid>
 

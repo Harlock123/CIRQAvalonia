@@ -15,6 +15,9 @@
     <PackageVersion Include="Avalonia.Fonts.Inter" Version="$(AvaloniaVersion)" />
         <PackageVersion Include="Avalonia.Skia" Version="$(AvaloniaVersion)" />
     <PackageVersion Include="ScottPlot.Avalonia" Version="5.1.59" />
+    <!-- Already in the tree underneath Avalonia and ScottPlot; referenced explicitly because the
+         exporter draws on it directly, and pinned to the version both of those agree on. -->
+    <PackageVersion Include="SkiaSharp" Version="3.119.0" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
     <PackageVersion Include="xunit" Version="2.9.2" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="2.8.2" />

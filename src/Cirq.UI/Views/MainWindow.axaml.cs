@@ -43,6 +43,9 @@ public partial class MainWindow : Window
         // The view model asks for files through this rather than reaching for a window itself.
         viewModel.FileDialogs = new StorageProviderFileDialogs(this);
 
+        // The scope's plot lives in its panel, so the export is given a way to reach it.
+        viewModel.ScopeSource = this.FindControl<ScopePanel>("Scope");
+
         WireUpCanvas(viewModel);
         WireUpMenu(viewModel);
 
@@ -151,6 +154,10 @@ public partial class MainWindow : Window
                     return;
                 case Key.Y:
                     _viewModel?.RedoCommand.Execute(null);
+                    e.Handled = true;
+                    return;
+                case Key.E:
+                    _viewModel?.ExportCommand.Execute(null);
                     e.Handled = true;
                     return;
             }

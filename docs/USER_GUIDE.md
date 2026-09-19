@@ -21,9 +21,10 @@ the [README](../README.md), and what changed between releases is in the
 9. [Digital and mixed-signal circuits](#digital-and-mixed-signal-circuits)
 10. [Development boards](#development-boards)
 11. [Saving and loading](#saving-and-loading)
-12. [Appearance](#appearance)
-13. [Keyboard reference](#keyboard-reference)
-14. [When a circuit will not simulate](#when-a-circuit-will-not-simulate)
+12. [Exporting](#exporting)
+13. [Appearance](#appearance)
+14. [Keyboard reference](#keyboard-reference)
+15. [When a circuit will not simulate](#when-a-circuit-will-not-simulate)
 
 ---
 
@@ -1037,6 +1038,46 @@ the file you already had.
 
 ---
 
+## Exporting
+
+`File > Export...`, or `Ctrl+E`, writes the schematic and the traces out as a picture. It asks
+three things.
+
+**What to export** — the schematic, the oscilloscope traces, or both. Traces are only offered when
+there is something on the scope; exporting an empty plot is a worse answer than being told there is
+nothing there.
+
+**How, when you asked for both** — one file with the schematic above the traces, or a file each
+*plus* a combined PDF holding the schematic on page one and the scope on page two. The second is
+the one to pick when you want the pieces separately and something to hand someone as well.
+
+**Which format:**
+
+| Format | What it is for |
+| --- | --- |
+| **SVG** | Vector. Scales to any size, and opens in Inkscape or Illustrator for editing. Captions come out as real text, so they stay searchable and selectable rather than becoming outlines |
+| **PDF** | Vector too, for documents and printing. The combined export is a proper two-page document |
+| **PNG** | The general-purpose image. Pick a resolution — 1× is screen size, 2× is crisp, 3× is large |
+| **JPEG** | Smaller and lossy. Poor at line art, which a schematic is entirely made of, so prefer PNG unless something insists on JPEG |
+| **BMP** | Uncompressed, for the tools that still want it |
+
+**Transparent background** drops the paper colour so the drawing can go on top of something else.
+It is not offered for JPEG, which has no transparency to give.
+
+Two things worth knowing:
+
+- **The frame follows the circuit, not the window.** Whatever the view is scrolled to or zoomed at,
+  an export contains the whole circuit at its natural size with a margin — captions, wire waypoints
+  and probe labels included. You do not have to arrange the view before exporting.
+- **The editing aids stay behind.** No dot grid, no terminal dots, no hover highlighting, and by
+  default none of the rings that mark double-clickable parts. Those are the editor talking to you
+  rather than part of the circuit.
+
+The colours are the ones on screen, so an export made in the dark theme is dark. Switch to the
+light theme first (`File > Settings`) if it is going into a document.
+
+---
+
 ## Appearance
 
 **File > Settings** opens preferences.
@@ -1089,6 +1130,7 @@ Also available in the app at **Help > Keyboard Shortcuts**.
 | `F9` / `F10` | Collapse the palette / the properties panel |
 | View menu | **Mark Interactive Parts** rings everything you can double-click |
 | `Ctrl+N` / `Ctrl+O` / `Ctrl+S` / `Ctrl+Shift+S` | New / open / save / save as |
+| `Ctrl+E` | Export the schematic or the traces as PNG, JPEG, BMP, SVG or PDF |
 
 ---
 

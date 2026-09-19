@@ -40,6 +40,21 @@ internal sealed class FakeFileDialogs : ICircuitFileDialogs
         Reports.Add((title, message));
         return Task.CompletedTask;
     }
+
+    /// <summary>What the export dialog will answer; null stands for the user cancelling.</summary>
+    public ExportRequest? ExportRequest { get; set; }
+
+    public int ExportPrompts { get; private set; }
+
+    public bool LastExportOfferedTraces { get; private set; }
+
+    public Task<ExportRequest?> PickExportAsync(string suggestedFileName, bool hasTraces)
+    {
+        ExportPrompts++;
+        LastSuggestedName = suggestedFileName;
+        LastExportOfferedTraces = hasTraces;
+        return Task.FromResult(ExportRequest);
+    }
 }
 
 public class FileCommandTests : IDisposable
