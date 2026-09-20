@@ -8,6 +8,11 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-09-19
+
+A small one: the application can now tell you what it is. The palette holds 140 components in
+16 categories, and 1125 tests measure them against closed-form answers.
+
 **Help > About.** What version this is, what it is built on, and what it is running under —
 Avalonia, ScottPlot, SkiaSharp and CommunityToolkit.Mvvm with their versions and licences, the
 .NET and operating system versions, and how many components and examples are in the build.
@@ -626,7 +631,8 @@ First public build of CirqAvalonia — an electronic circuit analyzer and mixed-
 
 **501 tests** measure the solver against closed-form answers rather than recorded output.
 
-[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.16.0...HEAD
+[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.17.0...HEAD
+[0.17.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.13.0...v0.14.0
