@@ -148,6 +148,12 @@ public static class Examples
                 LoadVaractorTuning),
         ]),
 
+        new("Displays",
+        [
+            new("Character LCD", "An Arduino driving an HD44780 in four-bit mode — the whole initialisation dance",
+                LoadCharacterLcd),
+        ]),
+
         new("Development Boards",
         [
             new("Raspberry Pi GPIO", "Pi driving two LEDs and reading a button on an internal pull-up",
@@ -2420,6 +2426,166 @@ public static class Examples
         vm.Scope.VoltsPerDivision = 0.2;
         vm.Scope.AddProbe(inductor.A, "Tank");
         vm.Scope.AddProbe(varactor.Cathode, "Bias");
+    }
+
+    /// <summary>
+    /// An Arduino writing two lines to an HD44780, over the six wires everybody uses.
+    /// <para>
+    /// There is no processor here to run a library, so the whole exchange is a pattern played on
+    /// six pins — which turns out to be the best way to see what a library like LiquidCrystal
+    /// actually does, because none of it is hidden. The initialisation dance is there in full: the
+    /// eight-bit function set that switches the controller to four bits, then four commands and
+    /// the characters, every byte of them sent as two nibbles with a pulse of E to latch each one.
+    /// </para>
+    /// <para>
+    /// The pins are the ones from the Arduino tutorial everybody has run —
+    /// <c>LiquidCrystal lcd(12, 11, 5, 4, 3, 2)</c> — so the wiring here is the wiring on the
+    /// breadboard in front of whoever is reading it.
+    /// </para>
+    /// <para>
+    /// Watch for the thing about these modules that catches everybody: the second line is not the
+    /// continuation of the first, it is a <b>separate address</b>. Getting to it is a command,
+    /// 0x80 | 0x40, and without it the text simply runs off the end of line one into memory nobody
+    /// can see.
+    /// </para>
+    /// </summary>
+    public static void LoadCharacterLcd(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "HD44780 character LCD";
+
+        var board = Place(circuit, new ArduinoUnoBoard(), -460, 0);
+        var lcd = Place(circuit, new CharacterLcd(), 320, -80);
+
+        // The contrast divider a real module needs. Not modelled electrically — the pin does
+        // nothing here — but leaving it off a schematic is how people end up with a display that
+        // is powered, working, and showing two rows of blank boxes.
+        var contrast = Place(circuit, new Potentiometer(10e3, 0.3), 120, 380);
+
+        // And the backlight, which is an LED behind the glass like any other.
+        var backlight = Place(circuit, new Resistor(220), 640, 380);
+
+        var gnd = Place(circuit, new Ground(), -460, 380);
+        var gnd2 = Place(circuit, new Ground(), 120, 520);
+        var gnd3 = Place(circuit, new Ground(), 380, 200);
+        var gnd4 = Place(circuit, new Ground(), 800, 520);
+
+        backlight.RotationDegrees = 90;
+
+        board.Pins = LcdDriveScript();
+
+        circuit.Connect(board.GroundPins[0], gnd.Pin);
+
+        // Power for the module off the board's own 5 V pin.
+        circuit.Connect(board.Pin("5V"), lcd.Vcc);
+        circuit.Connect(lcd.Gnd, gnd3.Pin);
+
+        // Write only: the busy flag is what RW is for, and nothing here polls it.
+        circuit.Connect(lcd.ReadWrite, gnd3.Pin);
+
+        circuit.Connect(board.Pin("5V"), contrast.B);
+        circuit.Connect(contrast.A, gnd2.Pin);
+        circuit.Connect(contrast.Wiper, lcd.Contrast);
+
+        circuit.Connect(board.Pin("5V"), backlight.A);
+        circuit.Connect(backlight.B, lcd.Backlight);
+        circuit.Connect(lcd.BacklightCathode, gnd4.Pin);
+
+        // LiquidCrystal lcd(12, 11, 5, 4, 3, 2): RS, E, then D4 to D7.
+        circuit.Connect(board.Pin("D12"), lcd.RegisterSelect);
+        circuit.Connect(board.Pin("D11"), lcd.Enable);
+        circuit.Connect(board.Pin("D5"), lcd.Data[4]);
+        circuit.Connect(board.Pin("D4"), lcd.Data[5]);
+        circuit.Connect(board.Pin("D3"), lcd.Data[6]);
+        circuit.Connect(board.Pin("D2"), lcd.Data[7]);
+
+        vm.Scope.TimebasePerDivision = 5e-3;
+        vm.Scope.VoltsPerDivision = 2.0;
+        vm.Scope.Layout = ScopeLayout.Tiled;
+        vm.Scope.AddProbe(board.Pin("D11"), "E");
+        vm.Scope.AddProbe(board.Pin("D12"), "RS");
+        vm.Scope.AddProbe(board.Pin("D5"), "D4");
+    }
+
+    /// <summary>
+    /// Builds the six pin patterns that write the display.
+    /// <para>
+    /// Written out rather than hand-typed as six strings of a hundred and thirty characters,
+    /// which would be unreadable and unmaintainable in equal measure. Each latch becomes two
+    /// steps: the data is set up and E goes high, then E falls and the controller takes what is
+    /// on the pins — because an HD44780 latches on the <b>falling</b> edge, not the level.
+    /// </para>
+    /// </summary>
+    private static string LcdDriveScript()
+    {
+        // Each entry is one latch: whether RS is high, and the nibble on D4-D7.
+        List<(bool Data, int Nibble)> latches = [];
+
+        void Command(int value)
+        {
+            latches.Add((false, (value >> 4) & 0x0F));
+            latches.Add((false, value & 0x0F));
+        }
+
+        void Text(string text)
+        {
+            foreach (var c in text)
+            {
+                latches.Add((true, (c >> 4) & 0x0F));
+                latches.Add((true, c & 0x0F));
+            }
+        }
+
+        // The one eight-bit latch: a function set asking for four-bit working. Only the high
+        // nibble reaches the controller, because D0-D3 are not wired — which is exactly why this
+        // works on real hardware too.
+        latches.Add((false, 0x2));
+
+        Command(0x28);      // function set: four bits, two lines, 5x8 characters
+        Command(0x0C);      // display on, cursor off
+        Command(0x06);      // entry mode: move right after each character
+        Command(0x01);      // clear
+
+        Text("CIRQ LCD DEMO");
+
+        // Line two is a separate address, not a continuation. This is the command that gets there.
+        Command(0x80 | 0x40);
+
+        Text("HD44780 4-BIT");
+
+        var rs = new System.Text.StringBuilder();
+        var enable = new System.Text.StringBuilder();
+        var data = new System.Text.StringBuilder[4];
+
+        for (var i = 0; i < 4; i++) data[i] = new System.Text.StringBuilder();
+
+        foreach (var (isData, nibble) in latches)
+        {
+            // Two steps per latch, with everything but E held across both.
+            for (var step = 0; step < 2; step++)
+            {
+                rs.Append(isData ? '1' : '0');
+                enable.Append(step == 0 ? '1' : '0');
+
+                for (var bit = 0; bit < 4; bit++)
+                    data[bit].Append(((nibble >> bit) & 1) != 0 ? '1' : '0');
+            }
+        }
+
+        // "once" rather than "seq": a looping pattern would run the initialisation again, and the
+        // second time round the eight-bit function set would be read as half of a four-bit byte
+        // and put every nibble after it out of step.
+        const string rate = "once@2kHz:";
+
+        return string.Join("; ",
+        [
+            $"D12={rate}{rs}",
+            $"D11={rate}{enable}",
+            $"D5={rate}{data[0]}",
+            $"D4={rate}{data[1]}",
+            $"D3={rate}{data[2]}",
+            $"D2={rate}{data[3]}",
+        ]);
     }
 
     private static T Place<T>(Circuit circuit, T component, double x, double y) where T : CircuitComponent

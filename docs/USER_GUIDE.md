@@ -349,11 +349,11 @@ gets roughly two-thirds of the way each time.
 
 ### The example browser
 
-Everything above is also in **File > Examples...** (`Ctrl+Shift+E`), along with forty-four others.
+Everything above is also in **File > Examples...** (`Ctrl+Shift+E`), along with forty-five others.
 
 They are grouped the way the component palette is — Fundamentals, Analog, Power Supplies, Switching
 & Motors, Digital Logic, Timers & Oscillators, Buses & Interfaces, Sensors, Signal Integrity & RF,
-Development Boards — with a description of whichever one is selected beside the list, and a search
+Displays, Development Boards — with a description of whichever one is selected beside the list, and a search
 box across all three of the name, the description and the group. So looking for `I2C` finds the
 four bus examples, and looking for `hysteresis` finds the comparator circuit whose name you have
 forgotten. Double-click to open, or select and press Enter.
@@ -1303,6 +1303,18 @@ Two things catch people, and both behave here as they do on a real module. **Lin
 address, not a continuation**: running off the end of line one does not wrap onto it, you have to
 set the cursor to 0x40. And **reading is not modelled** — tie RW low. The busy flag is what RW is
 for, and virtually all driver code waits a fixed time instead of polling it.
+
+**File > Examples > Character LCD** drives one from an Arduino on the six pins everybody uses —
+`LiquidCrystal lcd(12, 11, 5, 4, 3, 2)`, so the wiring is the wiring on the breadboard. There is no
+processor to run a library, so the whole exchange is a pattern played on six pins, which turns out
+to be the best way to see what a library like that actually *does*: nothing is hidden. The
+eight-bit function set that switches the controller to four bits is there, then four commands and
+the characters, every byte sent as two nibbles with a pulse of E to latch each one. Put the scope
+on E and RS and watch the bytes go by.
+
+The example writes both lines, so the 0x80 | 0x40 that gets to the second one is in it too — take
+that command out and the second string runs off the end of line one into memory nobody can see,
+which is the fault in its natural habitat.
 
 ---
 

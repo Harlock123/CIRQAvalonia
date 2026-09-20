@@ -499,4 +499,49 @@ public class NewExampleTests
         Assert.True(high > low * 1.5,
             $"the knob should move the tuning, not from {low / 1e6:0.0} MHz to {high / 1e6:0.0} MHz");
     }
+
+    /// <summary>
+    /// The LCD example writes both lines, which means the whole exchange worked: the eight-bit
+    /// function set that switches the controller to four bits, four commands, twenty-six nibble
+    /// pairs of text, and a latch on every falling edge of E. Any of that out of step and what
+    /// comes out is not the text.
+    /// </summary>
+    [Fact]
+    public void TheLcdExampleWritesBothLines()
+    {
+        using var vm = Load("Character LCD");
+
+        var lcd = vm.Circuit.Components.OfType<CharacterLcd>().Single();
+
+        vm.Simulation.Simulator!.Run(0.2);
+
+        Assert.True(lcd.IsFourBitMode, "the eight-bit function set should have switched it to four");
+        Assert.True(lcd.DisplayOn, "and the display-on command should have turned it on");
+
+        Assert.Equal("CIRQ LCD DEMO", lcd.Line(0).TrimEnd());
+        Assert.Equal("HD44780 4-BIT", lcd.Line(1).TrimEnd());
+    }
+
+    /// <summary>
+    /// And the second line was reached by addressing it rather than by running off the end of the
+    /// first — which is the single most surprising thing about these modules, and the reason the
+    /// example sends 0x80 | 0x40 between the two strings.
+    /// </summary>
+    [Fact]
+    public void AndGetsToTheSecondLineByAddressingIt()
+    {
+        using var vm = Load("Character LCD");
+
+        var lcd = vm.Circuit.Components.OfType<CharacterLcd>().Single();
+
+        vm.Simulation.Simulator!.Run(0.2);
+
+        var (line, column) = lcd.Cursor;
+
+        Assert.Equal(1, line);
+        Assert.Equal("HD44780 4-BIT".Length, column);
+
+        // Line one holds only what was written to it: nothing spilled over.
+        Assert.Equal(13, lcd.Line(0).TrimEnd().Length);
+    }
 }
