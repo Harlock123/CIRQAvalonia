@@ -1517,25 +1517,66 @@ public static class SymbolRenderer
 
     private static void DrawLed(ISymbolCanvas context, IPen pen, Led led)
     {
-        DrawDiode(context, pen);
+        var emitted = led.EmittedColor;
+        var colour = CanvasTheme.Emitted(Color.FromRgb(emitted.R, emitted.G, emitted.B));
+        var lit = CanvasTheme.Emission(led.Brightness);
 
-        // Emission arrows, brightened by how hard the LED is being driven.
-        var colour = led.EmittedColor;
-        var alpha = (byte)Math.Clamp(60 + led.Brightness * 195, 0, 255);
-        var glow = new SolidColorBrush(Color.FromArgb(alpha, colour.R, colour.G, colour.B));
-        var glowPen = new Pen(glow, pen.Thickness);
+        // The glow, as two overlapping washes rather than one flat disc: light has no edge, and a
+        // single circle behind the symbol reads as a coloured sticker stuck to it.
+        if (lit > 0)
+        {
+            context.DrawEllipse(Wash(colour, 0.18 * lit), null, new Point(0, 0), 32, 32);
+            context.DrawEllipse(Wash(colour, 0.34 * lit), null, new Point(0, 0), 21, 21);
+        }
 
-        if (led.Brightness > 0.02)
-            context.DrawEllipse(new SolidColorBrush(Color.FromArgb((byte)(alpha / 3), colour.R, colour.G, colour.B)),
-                null, new Point(0, 0), 20, 20);
+        context.DrawLine(pen, new Point(-30, 0), new Point(-8, 0));
+        context.DrawLine(pen, new Point(8, 0), new Point(30, 0));
 
+        // The body takes the light too, and this is what makes a lit LED obvious at a glance. The
+        // triangle is the largest mark in the symbol; leaving it the same dark shape whether the
+        // part is conducting or not meant the whole difference between on and off was a faint wash
+        // behind it and two arrows a few pixels long.
+        //
+        // Its outline takes the light as well, in a deeper shade. At the size a symbol is actually
+        // drawn on screen the stroke covers a good part of so small a triangle, so leaving it the
+        // ordinary symbol colour washed the fill straight back out again.
+        var body = new SolidColorBrush(Blend(SymbolColour, colour, lit));
+        var edge = lit > 0 ? new Pen(new SolidColorBrush(Deepen(colour)), pen.Thickness) : pen;
+
+        context.DrawGeometry(body, edge,
+            SymbolPath.Polyline([new Point(-8, -11), new Point(8, 0), new Point(-8, 11)], true));
+
+        context.DrawLine(pen, new Point(8, -11), new Point(8, 11));
+
+        // Emission arrows. In the symbol colour when the LED is off — they are what says this is an
+        // LED rather than a diode, so they cannot simply fade away — and in the emitted colour,
+        // slightly thicker, when it is on.
+        DrawEmissionArrows(context,
+            lit > 0 ? new Pen(new SolidColorBrush(colour), pen.Thickness + 0.5) : pen);
+    }
+
+    /// <summary>A deeper shade of an emitted colour, for the edge of something lit by it.</summary>
+    private static Color Deepen(Color colour) =>
+        Color.FromRgb((byte)(colour.R * 0.55), (byte)(colour.G * 0.55), (byte)(colour.B * 0.55));
+
+    private static void DrawEmissionArrows(ISymbolCanvas context, IPen pen)
+    {
         for (var i = 0; i < 2; i++)
         {
-            var offset = i * 8 - 4;
-            context.DrawLine(glowPen, new Point(offset, -14), new Point(offset + 7, -22));
-            context.DrawLine(glowPen, new Point(offset + 7, -22), new Point(offset + 3, -20));
+            var offset = (i * 8) - 4;
+            context.DrawLine(pen, new Point(offset, -14), new Point(offset + 7, -22));
+            context.DrawLine(pen, new Point(offset + 7, -22), new Point(offset + 3, -20));
         }
     }
+
+    /// <summary>The emitted colour at a fraction of full opacity, for glows and washes.</summary>
+    private static IBrush Wash(Color colour, double opacity) =>
+        new SolidColorBrush(Color.FromArgb(
+            (byte)Math.Clamp(opacity * 255, 0, 255), colour.R, colour.G, colour.B));
+
+    /// <summary>The theme's symbol stroke as a colour, for blending against.</summary>
+    private static Color SymbolColour =>
+        CanvasTheme.SymbolBrush is ISolidColorBrush solid ? solid.Color : Colors.Black;
 
     private static void DrawRegulator(ISymbolCanvas context, IPen pen, double zoom, VoltageRegulator regulator)
     {
@@ -1739,8 +1780,12 @@ public static class SymbolRenderer
         }
 
         var colour = display.EmittedColor;
-        var lit = Color.FromRgb(colour.R, colour.G, colour.B);
-        var dark = Color.FromArgb(70, 40, 46, 54);
+        var lit = CanvasTheme.Emitted(Color.FromRgb(colour.R, colour.G, colour.B));
+
+        // From the theme rather than written in here. The hard-coded value this replaces was the
+        // dark theme's, so on a light canvas the unlit segments were drawn in a colour meant to
+        // sit on a dark one.
+        var dark = CanvasTheme.SegmentUnlit;
 
         // Classic segment placement: a across the top, g through the middle, d along the bottom.
         const double halfWidth = 22.0;
@@ -1755,29 +1800,44 @@ public static class SymbolRenderer
         DrawSegment(context, display, 6, Horizontal(0, 0, 44), lit, dark);
 
         // Decimal point.
-        var dpBrightness = display.SegmentBrightness[7];
-        var dpBrush = new SolidColorBrush(Blend(dark, lit, dpBrightness));
-        context.DrawEllipse(dpBrush, null, new Point(34, 50), 5, 5);
+        var dp = CanvasTheme.Emission(display.SegmentBrightness[7]);
+
+        if (dp > 0)
+            context.DrawEllipse(Wash(lit, 0.3 * dp), null, new Point(34, 50), 8, 8);
+
+        context.DrawEllipse(new SolidColorBrush(Blend(dark, lit, dp)), null, new Point(34, 50), 5, 5);
     }
 
     private static void DrawSegment(
         ISymbolCanvas context, SevenSegmentDisplay display, int index,
         Point[] shape, Color lit, Color dark)
     {
-        var brightness = display.SegmentBrightness[index];
-        var brush = new SolidColorBrush(Blend(dark, lit, brightness));
-        context.DrawGeometry(brush, null, SymbolPath.Polyline(shape, true));
+        var glowing = CanvasTheme.Emission(display.SegmentBrightness[index]);
+        var path = SymbolPath.Polyline(shape, true);
+
+        // A lit element bleeds a little past its own edge, which is what a real display does and
+        // what separates a segment that is on from one that is merely a slightly different grey.
+        if (glowing > 0)
+            context.DrawGeometry(null, new Pen(Wash(lit, 0.3 * glowing), 5.0), path);
+
+        context.DrawGeometry(new SolidColorBrush(Blend(dark, lit, glowing)), null, path);
     }
 
-    /// <summary>Mixes between the unlit and lit colours, with a floor so segments stay visible.</summary>
+    /// <summary>
+    /// Mixes between the unlit and lit colours. Opacity arrives faster than the hue does: a
+    /// half-transparent red on a white sheet washes out to pink, where a dim LED should read as a
+    /// darker red, so anything lit at all is drawn nearly solid and the colour carries how hard.
+    /// </summary>
     private static Color Blend(Color dark, Color lit, double amount)
     {
         var t = Math.Clamp(amount, 0, 1);
+        var opacity = Math.Clamp(t * 2.5, 0, 1);
+
         return Color.FromArgb(
-            (byte)(dark.A + (255 - dark.A) * t),
-            (byte)(dark.R + (lit.R - dark.R) * t),
-            (byte)(dark.G + (lit.G - dark.G) * t),
-            (byte)(dark.B + (lit.B - dark.B) * t));
+            (byte)(dark.A + ((255 - dark.A) * opacity)),
+            (byte)(dark.R + ((lit.R - dark.R) * t)),
+            (byte)(dark.G + ((lit.G - dark.G) * t)),
+            (byte)(dark.B + ((lit.B - dark.B) * t)));
     }
 
     /// <summary>A horizontal segment as a stretched hexagon, the shape a real digit uses.</summary>

@@ -75,6 +75,69 @@ public static class CanvasTheme
     /// <summary>Colour of an unlit seven-segment element, which differs between light and dark.</summary>
     public static Color SegmentUnlit => Current.SegmentUnlit;
 
+    /// <summary>
+    /// How strongly something emitting should be drawn, given how hard it is being driven.
+    /// <para>
+    /// Deliberately not the drive itself. An LED at a tenth of its rated current is plainly,
+    /// unmistakably on — nobody looking at the breadboard would call it off — but a tenth of the
+    /// way from the unlit colour to the lit one is a smudge you have to go looking for. What a
+    /// schematic has to answer first is whether the thing is on at all, and only then how hard.
+    /// So anything actually conducting starts half way to full intensity and the rest of the
+    /// range separates dim from bright: the ordering stays honest without spending most of the
+    /// contrast on currents too small to see.
+    /// </para>
+    /// </summary>
+    public static double Emission(double brightness)
+    {
+        var driven = Math.Clamp(brightness, 0, 1);
+
+        return driven < 0.02 ? 0.0 : 0.5 + (0.5 * driven);
+    }
+
+    /// <summary>The emitted colour of a lit part, adjusted for the canvas it is being drawn on.</summary>
+    public static Color Emitted(Color colour) =>
+        VisibleAgainst(colour, BackgroundBrush is ISolidColorBrush solid ? solid.Color : Colors.White);
+
+    /// <summary>
+    /// An emitted colour, pushed away from the background until it can actually be seen against it.
+    /// <para>
+    /// A white LED on a light sheet is the case that forces this. Drawn faithfully it is very
+    /// nearly the colour of the paper, so a lit one looks like an empty outline — which is to say
+    /// like a part that is off, the opposite of what it is trying to show. The same happens to a
+    /// deep blue on the dark theme.
+    /// </para>
+    /// <para>
+    /// Nudging it is not much of a lie: a white LED is a blue die behind a phosphor and photographs
+    /// distinctly warm, and nobody consults a schematic for the exact hue of the light. Colours
+    /// that already stand out are left exactly as they are.
+    /// </para>
+    /// </summary>
+    public static Color VisibleAgainst(Color colour, Color canvas)
+    {
+        const double wanted = 0.32;
+
+        var sheet = Luminance(canvas);
+        var own = Luminance(colour);
+        var gap = Math.Abs(own - sheet);
+
+        if (gap >= wanted) return colour;
+
+        // Away from the background: darker on a light canvas, lighter on a dark one.
+        var toward = sheet > 0.5 ? 0.0 : 1.0;
+        var reach = Math.Abs(toward - own);
+        var t = reach < 1e-6 ? 1.0 : Math.Clamp((wanted - gap) / reach, 0, 1);
+        var end = (byte)(toward * 255);
+
+        return Color.FromRgb(
+            (byte)(colour.R + ((end - colour.R) * t)),
+            (byte)(colour.G + ((end - colour.G) * t)),
+            (byte)(colour.B + ((end - colour.B) * t)));
+    }
+
+    /// <summary>Rough relative luminance, enough to tell light from dark.</summary>
+    private static double Luminance(Color colour) =>
+        ((0.2126 * colour.R) + (0.7152 * colour.G) + (0.0722 * colour.B)) / 255.0;
+
     /// <summary>Radius in screen pixels within which a terminal responds to the pointer.</summary>
     public const double TerminalHitRadius = 10.0;
 
