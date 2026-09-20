@@ -343,6 +343,20 @@ being squeezed onto a volts axis:
 
 ![The 555 astable example running, with the capacitor and output waveforms on the oscilloscope](docs/images/04-scope.png)
 
+A real circuit's controls are on its front panel, not scattered across its schematic. The
+**CONTROLS** panel gathers every switch, potentiometer, light level, temperature, magnet and target
+distance in the circuit into one place, and they work **while the simulation runs** — move a wiper
+and the next time point is solved with the new value:
+
+![The editor running the motor reversing example, with a CONTROLS panel at the bottom right listing SW1, SW2 and SW3 as toggle switches](docs/images/14-controls.png)
+
+Switches become toggles and ranges become sliders showing the value and its unit. Ranges spanning
+several decades are laid out logarithmically, because a linear slider from a dark room to direct
+sun puts everything a circuit responds to in the first half-millimetre of travel. What appears is
+decided by the components rather than the interface: a property marked `[Operable]` becomes a
+control, so a part added later gets one without any of this being touched. The panel and the canvas
+stay in step — double-clicking a part on the schematic still works it, and the panel follows.
+
 `Ctrl+E` writes the schematic and the traces out as **PNG, JPEG, BMP, SVG or PDF** — the schematic,
 the scope, or both on one sheet, optionally with a parts list. SVG and PDF are true vector rather
 than a bitmap in a wrapper, because the export is drawn by the same renderer that draws the editor
