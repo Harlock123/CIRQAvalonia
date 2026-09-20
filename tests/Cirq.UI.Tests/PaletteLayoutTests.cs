@@ -9,13 +9,43 @@ namespace Cirq.UI.Tests;
 public class PaletteLayoutTests
 {
     [Fact]
-    public void PaletteIsGroupedWithOnlyTheFirstCategoryOpen()
+    public void PaletteStartsWithEveryCategoryClosed()
     {
         using var vm = new MainWindowViewModel();
 
-        Assert.Equal(ComponentCatalog.Categories.Count, vm.Palette.Count);
-        Assert.True(vm.Palette[0].IsExpanded);
-        Assert.All(vm.Palette.Skip(1), c => Assert.False(c.IsExpanded));
+        // All sixteen headings on screen at once, rather than one group's worth of parts and the
+        // rest below the fold.
+        Assert.All(vm.Palette, c => Assert.False(c.IsExpanded));
+    }
+
+    /// <summary>
+    /// Opening one closes the last, so the headings stay on screen however many you go through.
+    /// </summary>
+    [Fact]
+    public void OpeningACategoryClosesTheOneThatWasOpen()
+    {
+        using var vm = new MainWindowViewModel();
+
+        vm.Palette[2].IsExpanded = true;
+        Assert.Single(vm.Palette, c => c.IsExpanded);
+
+        vm.Palette[5].IsExpanded = true;
+
+        Assert.False(vm.Palette[2].IsExpanded);
+        Assert.True(vm.Palette[5].IsExpanded);
+        Assert.Single(vm.Palette, c => c.IsExpanded);
+    }
+
+    /// <summary>And closing the open one leaves them all closed rather than opening another.</summary>
+    [Fact]
+    public void ClosingTheOpenCategoryLeavesThemAllClosed()
+    {
+        using var vm = new MainWindowViewModel();
+
+        vm.Palette[1].IsExpanded = true;
+        vm.Palette[1].IsExpanded = false;
+
+        Assert.All(vm.Palette, c => Assert.False(c.IsExpanded));
     }
 
     [Fact]

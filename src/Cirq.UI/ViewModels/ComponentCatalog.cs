@@ -25,7 +25,7 @@ public sealed record PaletteCategory(string Name, IReadOnlyList<PaletteItem> Ite
 /// A palette category together with its expanded state. The state lives here rather than on the
 /// shared <see cref="PaletteCategory"/> records so two windows do not fight over it.
 /// </summary>
-public sealed partial class PaletteCategoryViewModel : ObservableObject
+public sealed partial class PaletteCategoryViewModel : ObservableObject, IExpandableGroup
 {
     public PaletteCategoryViewModel(PaletteCategory category, bool isExpanded)
     {

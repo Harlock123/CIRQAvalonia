@@ -64,6 +64,78 @@ public class ExampleBrowserTests
         Assert.True(browser.Groups[0].Items[0].IsSelected);
     }
 
+    /// <summary>
+    /// Twelve groups' worth of examples will not fit on one screen, so none of them opens until
+    /// somebody asks — which puts every heading in view instead of one group's contents.
+    /// </summary>
+    [Fact]
+    public void ItOpensWithEveryGroupClosed()
+    {
+        var browser = new ExampleBrowserViewModel();
+
+        Assert.All(browser.Groups, g => Assert.False(g.IsExpanded));
+    }
+
+    /// <summary>And opening one closes the last, so the headings never scroll away.</summary>
+    [Fact]
+    public void OpeningAGroupClosesTheOneThatWasOpen()
+    {
+        var browser = new ExampleBrowserViewModel();
+
+        browser.Groups[1].IsExpanded = true;
+        Assert.Single(browser.Groups, g => g.IsExpanded);
+
+        browser.Groups[4].IsExpanded = true;
+
+        Assert.False(browser.Groups[1].IsExpanded);
+        Assert.True(browser.Groups[4].IsExpanded);
+        Assert.Single(browser.Groups, g => g.IsExpanded);
+    }
+
+    /// <summary>
+    /// A search is the exception, and has to be: a match folded away inside a closed group is the
+    /// same as no match at all.
+    /// </summary>
+    [Fact]
+    public void ASearchOpensEveryGroupItMatched()
+    {
+        var browser = new ExampleBrowserViewModel { Search = "e" };
+
+        Assert.True(browser.Groups.Count > 1, "this search was meant to match several groups");
+        Assert.All(browser.Groups, g => Assert.True(g.IsExpanded));
+    }
+
+    /// <summary>And clearing it closes them again rather than leaving twelve groups open.</summary>
+    [Fact]
+    public void AndClearingItClosesThemAgain()
+    {
+        var browser = new ExampleBrowserViewModel { Search = "e" };
+
+        browser.Search = string.Empty;
+
+        Assert.All(browser.Groups, g => Assert.False(g.IsExpanded));
+    }
+
+    /// <summary>
+    /// The group left open survives a search and comes back with it, because the search rebuilds
+    /// the list from scratch and the state is matched up by name.
+    /// </summary>
+    [Fact]
+    public void TheOpenGroupIsStillOpenAfterASearchIsCleared()
+    {
+        var browser = new ExampleBrowserViewModel();
+        var name = browser.Groups[3].Name;
+
+        browser.Groups[3].IsExpanded = true;
+
+        browser.Search = "zzzz";
+        browser.Search = string.Empty;
+
+        var group = browser.Groups.Single(g => g.Name == name);
+        Assert.True(group.IsExpanded);
+        Assert.Single(browser.Groups, g => g.IsExpanded);
+    }
+
     [Fact]
     public void SearchingNarrowsItToWhatMatches()
     {

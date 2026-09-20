@@ -32,7 +32,7 @@ Core ← Engine ← Components ← UI, which keeps the whole engine headless-tes
 
 ```bash
 dotnet run --project src/Cirq.UI     # the editor
-dotnet test                          # 1882 tests
+dotnet test                          # 1889 tests
 ```
 
 Targets .NET 10. The UI uses Avalonia 12 and ScottPlot 5.1; those two versions are pinned
@@ -247,7 +247,7 @@ Tests measure the solver against closed-form answers rather than recorded output
 | Export | Every format writes a file worth opening; a PNG at the size of the circuit and a raster scale that only multiplies pixels; a hand-written BMP header that agrees with its own pixel count; an SVG made of shapes rather than an embedded image; a PDF that starts and ends as one, with two pages when the traces get their own; framing that follows the circuit rather than the view; and a scope that clears the canvas being unable to wipe the schematic above it |
 | Files | Every component type round-trips with its parameters, pins, wires, waypoints and probes; a reloaded circuit solves to the same answer; damaged, unknown and newer-format files are handled without losing the open circuit |
 | Settings | Theme round-trips across a restart, corrupt and newer-format preference files fall back to defaults, opening the dialog writes nothing, choosing a theme saves immediately |
-| UI | Background transport, probe decimation, reflection-built inspector, dirty tracking, every example compiles, runs, saves and reopens |
+| UI | Background transport, probe decimation, reflection-built inspector, dirty tracking, every example compiles, runs, saves and reopens, and both grouped lists opening one group at a time — starting closed, the open one closing as the next opens, bulk toggles exempt, and a search opening everything it matched and restoring the open group when cleared |
 | Copy and paste | A duplicate carrying every parameter including the model on an op-amp and the input count on a gate, its own designator and identity, a clipboard that survives the original being edited or deleted, repeated pastes cascading rather than stacking, an undoable paste, and every one of the 164 palette parts surviving the round trip |
 | Box selection | A part caught only when wholly inside the box and not when clipped, captions excluded from the test, a group copying with the wires between its members and without the ones leaving it, the copy keeping its shape, two pastes giving two separately wired groups, and a copied divider solving to the same midpoint voltage as the original |
 | Example browser | Every example filed under exactly one group and no group left empty or enormous, the flattened list carrying the group each came from, opening with something already described, searching narrowing to what matches across name, description and group, a search opening whatever it matched, an empty result saying so, selecting one row unmarking the rest, and opening and cancelling each closing with and without a choice |

@@ -64,7 +64,7 @@ at the window edge; click the rail to bring it back.
 
 ## Placing components
 
-![The component palette showing all sixteen categories with their counts — passive, switches, sources, semiconductors, transistors, LEDs and displays, power, analog ICs, logic gates, 74xx series, 40xx series, buses, digital I/O, sensors and actuators, switching and isolation, and dev boards — with the Passive group open](images/02-palette.png)
+![The component palette showing all sixteen categories with their counts — passive, switches, sources, semiconductors, transistors, LEDs and displays, power, analog ICs, logic gates, 74xx series, 40xx series, buses, digital I/O, sensors and actuators, switching and isolation, and dev boards — every one of them closed, so all sixteen headings fit on screen at once](images/02-palette.png)
 
 Click a palette entry, then click the canvas. The part lands where you click, snapped to the grid.
 
@@ -89,7 +89,13 @@ The palette holds **164 components in 16 categories**:
 | Switching & Isolation | 8 | Relay, fuses, optocouplers, ULN2003, H-bridge, **MOSFET gate driver** — see [below](#driving-a-mosfet-gate) |
 | Dev Boards | 4 | Raspberry Pi, Arduino Uno / Nano / Mega — see [below](#development-boards) |
 
-Click a category header to open or close it. **All** in the palette header toggles every group at
+Click a category header to open it — and whichever was open closes, so **one category is open at a
+time**. Four groups opened independently is already more than the sidebar is tall, and then
+reaching the fifth means scrolling past the ones you have finished with. Kept to one, every heading
+and its count stays in view and the palette is something to look down rather than scroll through.
+All of them start closed.
+
+**All** in the palette header is the way out of that, and toggles every group at
 once — useful when you are hunting for a part and do not remember which group it is in.
 
 Switches, push buttons and logic toggles are operated by **double-clicking them on the canvas**,

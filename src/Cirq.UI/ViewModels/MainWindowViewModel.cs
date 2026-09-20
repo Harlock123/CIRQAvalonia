@@ -20,6 +20,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         Scope = new ScopeViewModel(Circuit);
         Inspector = new InspectorViewModel();
 
+        _paletteAccordion.Track(Palette);
+
         Scope.SamplingChanged += (_, _) => ApplyScopeSampling();
         Inspector.ParameterChanged += (_, structural) =>
         {
@@ -69,11 +71,14 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     public ControlPanelViewModel ControlPanel { get; }
 
     /// <summary>
-    /// Palette groups, each collapsible. Only the first opens on startup so the sidebar stays
+    /// Palette groups, each collapsible. They all start closed so every heading is on screen at
     /// short; the rest are one click away.
     /// </summary>
     public IReadOnlyList<PaletteCategoryViewModel> Palette { get; } =
-        [.. ComponentCatalog.Categories.Select((c, i) => new PaletteCategoryViewModel(c, isExpanded: i == 0))];
+        [.. ComponentCatalog.Categories.Select(c => new PaletteCategoryViewModel(c, isExpanded: false))];
+
+    /// <summary>Keeps one palette group open at a time.</summary>
+    private readonly Accordion _paletteAccordion = new();
 
 
     [ObservableProperty]
@@ -885,13 +890,12 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void ChoosePaletteItem(PaletteItem? item) => PendingItem = item;
 
-    /// <summary>Opens every palette group, or closes them all when they are already open.</summary>
+    /// <summary>
+    /// Opens every palette group, or closes them all when they are already open — the way out of
+    /// the one-at-a-time rule for anyone who would rather scroll one long list.
+    /// </summary>
     [RelayCommand]
-    private void TogglePaletteGroups()
-    {
-        var expand = Palette.Any(c => !c.IsExpanded);
-        foreach (var category in Palette) category.IsExpanded = expand;
-    }
+    private void TogglePaletteGroups() => _paletteAccordion.SetAll(Palette.Any(c => !c.IsExpanded));
 
     [RelayCommand]
     private void SetIntegration(string method)

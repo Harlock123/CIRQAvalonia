@@ -27,7 +27,7 @@ public sealed partial class ExampleRowViewModel : ObservableObject
 }
 
 /// <summary>One group in the browser, with the open/closed state the dialog keeps for it.</summary>
-public sealed partial class ExampleGroupViewModel : ObservableObject
+public sealed partial class ExampleGroupViewModel : ObservableObject, IExpandableGroup
 {
     public ExampleGroupViewModel(string name, IReadOnlyList<ExampleRowViewModel> items, bool isExpanded)
     {
@@ -144,17 +144,40 @@ public sealed partial class ExampleBrowserViewModel : ObservableObject
         RequestClose?.Invoke(this, EventArgs.Empty);
     }
 
+    /// <summary>Keeps one group open at a time.</summary>
+    private readonly Accordion _accordion = new();
+
+    /// <summary>
+    /// The group the person had open, remembered across searches. It cannot be read off the list
+    /// while a search is running, because a search opens all of them and that is the search's
+    /// doing rather than theirs.
+    /// </summary>
+    private string? _openGroup;
+
+    private bool _wasSearching;
+
     partial void OnSearchChanged(string value) => Rebuild();
 
     /// <summary>
-    /// Rebuilds the visible groups for the current search. A search opens every group that still
-    /// has something in it, because leaving a match folded away inside a closed group is the same
-    /// as not matching at all.
+    /// Rebuilds the visible groups for the current search.
+    /// <para>
+    /// Groups open one at a time, and start closed, so the twelve headings are all on screen when
+    /// the dialog opens rather than one group filling it. A <b>search is the exception</b>: it
+    /// opens every group that still has something in it, because leaving a match folded away
+    /// inside a closed group is the same as not matching at all. Searching is filtering rather
+    /// than opening a group, so the one-at-a-time rule does not apply to it — and clearing the
+    /// search closes everything again.
+    /// </para>
     /// </summary>
     private void Rebuild()
     {
-        var previous = Groups.ToDictionary(g => g.Name, g => g.IsExpanded);
         var term = Search.Trim();
+        var searching = term.Length > 0;
+
+        // Only believe what is on screen when the person put it there.
+        if (!_wasSearching) _openGroup = Groups.FirstOrDefault(g => g.IsExpanded)?.Name;
+
+        _wasSearching = searching;
 
         Groups.Clear();
 
@@ -171,10 +194,15 @@ public sealed partial class ExampleBrowserViewModel : ObservableObject
             IReadOnlyList<ExampleRowViewModel> items =
                 [.. matching.Select(e => new ExampleRowViewModel(e with { Category = category.Name }))];
 
-            var expanded = term.Length > 0 || !previous.TryGetValue(category.Name, out var was) || was;
+            // Open while searching; otherwise only the one that was open, which is none of them
+            // until somebody opens one.
+            var expanded = searching || category.Name == _openGroup;
 
             Groups.Add(new ExampleGroupViewModel(category.Name, items, expanded));
         }
+
+        // The groups are new objects each time round, so the accordion is pointed at the new ones.
+        _accordion.Track(Groups);
 
         // Keep the selection if it survived the search; otherwise take the first thing on offer,
         // so the description pane is never blank next to a list that has entries in it.
