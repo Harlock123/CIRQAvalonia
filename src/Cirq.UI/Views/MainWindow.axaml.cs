@@ -79,6 +79,7 @@ public partial class MainWindow : Window
     {
         viewModel.RequestRotateSelection += (_, _) => _canvas?.RotateSelection();
         viewModel.RequestDeleteSelection += (_, _) => _canvas?.DeleteSelection();
+        viewModel.RequestSelect += (_, component) => _canvas?.BringIntoView(component);
         viewModel.RequestClose += (_, _) => Close();
         viewModel.RequestSettings += async (_, _) => await ShowSettingsAsync();
         viewModel.RequestAbout += async (_, _) => await ShowAboutAsync();
@@ -195,6 +196,14 @@ public partial class MainWindow : Window
                     return;
                 case Key.E:
                     _viewModel?.ExportCommand.Execute(null);
+                    e.Handled = true;
+                    return;
+                case Key.C:
+                    _viewModel?.CopySelectionCommand.Execute(null);
+                    e.Handled = true;
+                    return;
+                case Key.V:
+                    _viewModel?.PasteCommand.Execute(null);
                     e.Handled = true;
                     return;
             }

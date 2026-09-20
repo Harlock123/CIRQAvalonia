@@ -66,6 +66,47 @@ public static class CircuitSerializer
             ReadConstruction(record, "InputCount", 2)),
     };
 
+    /// <summary>
+    /// An independent copy of one component: same type, same parameters, same place and rotation,
+    /// and nothing shared with the original.
+    /// <para>
+    /// It goes out through the save path and back in through the load path rather than copying
+    /// fields, and that is deliberate. Those two already know which properties define a component,
+    /// which ones need a value at construction time to shape the pins, and how a model reference
+    /// is written down — and they are exercised by every example in the test suite. A second
+    /// implementation of "what a component is" would be a second thing to keep up to date, and the
+    /// copy would quietly start losing whichever property the newer one forgot.
+    /// </para>
+    /// <para>
+    /// The copy comes back with <b>no name</b> and a new identity, so adding it to a circuit gives
+    /// it the next free designator instead of a second R4.
+    /// </para>
+    /// </summary>
+    /// <param name="component">What to copy.</param>
+    /// <param name="warnings">Collects anything that did not survive the round trip, if given.</param>
+    public static CircuitComponent Clone(CircuitComponent component, ICollection<string>? warnings = null)
+    {
+        ArgumentNullException.ThrowIfNull(component);
+
+        var collected = warnings ?? [];
+        var record = ToRecord(component);
+
+        var copy = TryCreate(record, collected)
+            ?? throw new CircuitFormatException($"Cannot copy '{component.Name}' ({record.Type}).");
+
+        copy.X = record.X;
+        copy.Y = record.Y;
+        copy.RotationDegrees = record.Rotation;
+
+        ApplyParameters(copy, record, collected);
+
+        // Left blank on purpose: Circuit.Add hands out the next designator, which is what makes a
+        // pasted part R5 rather than a duplicate of the R4 it came from.
+        copy.Name = string.Empty;
+
+        return copy;
+    }
+
     // ---- writing ---------------------------------------------------------
 
     public static CircuitDocument ToDocument(Circuit circuit)
@@ -213,7 +254,7 @@ public static class CircuitSerializer
 
         foreach (var record in document.Components)
         {
-            var component = TryCreate(record, result);
+            var component = TryCreate(record, result.Warnings);
             if (component is null) continue;
 
             component.Name = record.Name;
@@ -221,7 +262,7 @@ public static class CircuitSerializer
             component.Y = record.Y;
             component.RotationDegrees = record.Rotation;
 
-            ApplyParameters(component, record, result);
+            ApplyParameters(component, record, result.Warnings);
 
             // Preserve the saved identity so wires and probes can find it again.
             var placed = CloneWithId(component, record.Id);
@@ -231,8 +272,8 @@ public static class CircuitSerializer
 
         foreach (var record in document.Wires)
         {
-            var from = Resolve(record.From, byId, result);
-            var to = Resolve(record.To, byId, result);
+            var from = Resolve(record.From, byId, result.Warnings);
+            var to = Resolve(record.To, byId, result.Warnings);
             if (from is null || to is null) continue;
 
             var wire = new WireSegment { SourceTerminal = from, TargetTerminal = to };
@@ -242,7 +283,7 @@ public static class CircuitSerializer
 
         foreach (var record in document.Probes)
         {
-            var terminal = Resolve(record.Target, byId, result);
+            var terminal = Resolve(record.Target, byId, result.Warnings);
             if (terminal is null) continue;
 
             var probe = new SignalProbe
@@ -261,7 +302,7 @@ public static class CircuitSerializer
         return result;
     }
 
-    private static CircuitComponent? TryCreate(ComponentRecord record, CircuitLoadResult result)
+    private static CircuitComponent? TryCreate(ComponentRecord record, ICollection<string> warnings)
     {
         if (CustomFactories.TryGetValue(record.Type, out var factory))
         {
@@ -271,7 +312,7 @@ public static class CircuitSerializer
             }
             catch (Exception ex)
             {
-                result.Warnings.Add($"Could not rebuild '{record.Name}' ({record.Type}): {ex.Message}");
+                warnings.Add($"Could not rebuild '{record.Name}' ({record.Type}): {ex.Message}");
                 return null;
             }
         }
@@ -279,7 +320,7 @@ public static class CircuitSerializer
         var type = KnownComponentTypes.Value.GetValueOrDefault(record.Type);
         if (type is null)
         {
-            result.Warnings.Add(
+            warnings.Add(
                 $"Skipped '{record.Name}': this build has no component type called '{record.Type}'.");
             return null;
         }
@@ -290,7 +331,7 @@ public static class CircuitSerializer
         }
         catch (Exception ex)
         {
-            result.Warnings.Add($"Could not create '{record.Name}' ({record.Type}): {ex.Message}");
+            warnings.Add($"Could not create '{record.Name}' ({record.Type}): {ex.Message}");
             return null;
         }
     }
@@ -312,7 +353,7 @@ public static class CircuitSerializer
     }
 
     private static void ApplyParameters(
-        CircuitComponent component, ComponentRecord record, CircuitLoadResult result)
+        CircuitComponent component, ComponentRecord record, ICollection<string> warnings)
     {
         var properties = ComponentReflection.EditableProperties(component.GetType())
             .ToDictionary(p => p.Name, StringComparer.Ordinal);
@@ -323,20 +364,20 @@ public static class CircuitSerializer
 
             try
             {
-                var value = DeserializeValue(property, element, component, result, record.Name);
+                var value = DeserializeValue(property, element, component, warnings, record.Name);
                 if (value is not null || Nullable.GetUnderlyingType(property.PropertyType) is not null)
                     property.SetValue(component, value);
             }
             catch (Exception ex)
             {
-                result.Warnings.Add($"'{record.Name}': could not restore {name} ({ex.Message}).");
+                warnings.Add($"'{record.Name}': could not restore {name} ({ex.Message}).");
             }
         }
     }
 
     private static object? DeserializeValue(
         PropertyInfo property, JsonElement element, CircuitComponent component,
-        CircuitLoadResult result, string componentName)
+        ICollection<string> warnings, string componentName)
     {
         var declared = property.PropertyType;
         var target = Nullable.GetUnderlyingType(declared) ?? declared;
@@ -352,7 +393,7 @@ public static class CircuitSerializer
 
             if (match is not null) return match;
 
-            result.Warnings.Add(
+            warnings.Add(
                 $"'{componentName}': model '{wanted}' is not in this build's library, keeping the default.");
             return property.GetValue(component);
         }
@@ -382,18 +423,19 @@ public static class CircuitSerializer
     }
 
     private static Terminal? Resolve(
-        TerminalReference reference, IReadOnlyDictionary<Guid, CircuitComponent> byId, CircuitLoadResult result)
+        TerminalReference reference, IReadOnlyDictionary<Guid, CircuitComponent> byId,
+        ICollection<string> warnings)
     {
         if (!byId.TryGetValue(reference.Component, out var component))
         {
-            result.Warnings.Add($"Dropped a connection to a component that is not in the file.");
+            warnings.Add($"Dropped a connection to a component that is not in the file.");
             return null;
         }
 
         var terminal = component.Terminals.FirstOrDefault(t => t.Id == reference.Terminal);
         if (terminal is null)
         {
-            result.Warnings.Add(
+            warnings.Add(
                 $"Dropped a connection: '{component.Name}' has no pin '{reference.Terminal}'.");
         }
 

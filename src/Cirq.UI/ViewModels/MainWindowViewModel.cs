@@ -405,6 +405,9 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     /// <summary>Raised when the selection should be deleted.</summary>
     public event EventHandler? RequestDeleteSelection;
 
+    /// <summary>Raised when the pasted component should be selected on the canvas.</summary>
+    public event EventHandler<CircuitComponent>? RequestSelect;
+
     /// <summary>Raised when the window should close.</summary>
     public event EventHandler? RequestClose;
 
@@ -482,6 +485,54 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
     [RelayCommand]
     private void DeleteSelection() => RequestDeleteSelection?.Invoke(this, EventArgs.Empty);
+
+    /// <summary>The clipboard, which holds one part between a copy and a paste.</summary>
+    public ComponentClipboard Clipboard { get; } = new();
+
+    /// <summary>What the Edit menu's paste entry says, so it names what is waiting.</summary>
+    public string PasteMenuText =>
+        Clipboard.HasContent ? $"_Paste {Clipboard.HeldDescription}" : "_Paste";
+
+    [RelayCommand]
+    private void CopySelection()
+    {
+        if (SelectedComponent is not { } component)
+        {
+            StatusMessage = "Nothing selected to copy.";
+            return;
+        }
+
+        Clipboard.Copy(component);
+
+        OnPropertyChanged(nameof(PasteMenuText));
+        CopySelectionCommand.NotifyCanExecuteChanged();
+        PasteCommand.NotifyCanExecuteChanged();
+
+        StatusMessage = $"Copied {component.Name}";
+    }
+
+    [RelayCommand(CanExecute = nameof(CanPaste))]
+    private void Paste()
+    {
+        List<string> warnings = [];
+
+        if (Clipboard.PasteInto(Circuit, warnings) is not { } copy)
+        {
+            StatusMessage = "Nothing on the clipboard.";
+            return;
+        }
+
+        // Selecting it is the point of pasting it: the copy lands offset from the original and is
+        // almost always about to be dragged somewhere.
+        SelectedComponent = copy;
+        RequestSelect?.Invoke(this, copy);
+
+        StatusMessage = warnings.Count == 0
+            ? $"Pasted {copy.Name}"
+            : $"Pasted {copy.Name} — {warnings[0]}";
+    }
+
+    private bool CanPaste() => Clipboard.HasContent;
 
     [RelayCommand]
     private void ZoomToFit() => RequestZoomToFit?.Invoke(this, EventArgs.Empty);

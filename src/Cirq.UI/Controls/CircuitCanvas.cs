@@ -820,6 +820,17 @@ public class CircuitCanvas : Control
     }
 
     /// <summary>Deletes the selected component, or the selected wire when no component is selected.</summary>
+    /// <summary>
+    /// Shows a component that has just appeared — a pasted copy — and makes it the selection so
+    /// it can be dragged straight away.
+    /// </summary>
+    public void BringIntoView(CircuitComponent component)
+    {
+        SelectedComponent = component;
+        TopologyChanged?.Invoke(this, EventArgs.Empty);
+        InvalidateVisual();
+    }
+
     public void DeleteSelection()
     {
         var circuit = Circuit;
@@ -844,6 +855,14 @@ public class CircuitCanvas : Control
 
     protected override void OnKeyDown(KeyEventArgs e)
     {
+        // The accelerators go first. V on its own picks the Select tool, so Ctrl+V has to be
+        // taken out of the way before the plain letters are looked at.
+        if (e.KeyModifiers.HasFlag(KeyModifiers.Control))
+        {
+            base.OnKeyDown(e);
+            return;
+        }
+
         switch (e.Key)
         {
             case Key.Space:

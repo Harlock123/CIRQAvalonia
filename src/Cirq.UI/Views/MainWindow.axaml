@@ -45,6 +45,9 @@
         <MenuItem Header="{Binding History.RedoMenuText}" InputGesture="Ctrl+Y" Command="{Binding RedoCommand}"
                   IsEnabled="{Binding History.CanRedo}" />
         <Separator />
+        <MenuItem Header="_Copy" InputGesture="Ctrl+C" Command="{Binding CopySelectionCommand}" />
+        <MenuItem Header="{Binding PasteMenuText}" InputGesture="Ctrl+V" Command="{Binding PasteCommand}" />
+        <Separator />
         <MenuItem Header="_Rotate" InputGesture="R" Command="{Binding RotateSelectionCommand}" />
         <MenuItem Header="_Delete" InputGesture="Delete" Command="{Binding DeleteSelectionCommand}" />
       </MenuItem>

@@ -100,12 +100,30 @@ Anything you can operate is ringed with a small dot beside its designator, so yo
 remember which parts those are. Turn the rings off with **View > Mark Interactive Parts** once
 they have served their purpose.
 
+### Copying a part
+
+Select a part and press `Ctrl` `C`, then `Ctrl` `V`: a duplicate appears a little down and to the
+right, already selected and ready to drag where you want it. It is a **new part**, with its own
+designator — copy `R4` and you get `R5` — and every value carried across, including the ones that
+are easy to forget about: the model on an op-amp, the number of inputs on a gate, the waveform and
+duty cycle on a generator. Eight identical current-limiting resistors is now eight keystrokes
+rather than eight trips to the palette and eight visits to the properties panel.
+
+Two details are worth knowing. The copy is taken **when you press `Ctrl` `C`**, not when you paste:
+change the original afterwards, or delete it, and what comes out of the clipboard is still what you
+copied. And **each paste lands further along** than the last, so pressing `Ctrl` `V` four times
+gives you four parts spread down the canvas rather than four stacked on the same spot with only the
+top one reachable.
+
+Wires are not copied, because one part has no wires of its own — what it had were connections to
+other parts, and those cannot mean anything on a duplicate. The copy arrives unconnected.
+
 Everything you do to the schematic can be taken back with `Ctrl` `Z`, and put back with `Ctrl` `Y`
 (or `Ctrl` `Shift` `Z`). The Edit menu names what it is about to reverse — **Undo Add Resistor**,
 **Undo Move Capacitor** — so you are not guessing at what the last thing was.
 
-Undo covers edits to the document: placing, moving, rotating and deleting parts, wiring, attaching
-probes, and changing values in the properties panel. A drag across the canvas costs one step rather
+Undo covers edits to the document: placing, moving, rotating and deleting parts, pasting copies of
+them, wiring, attaching probes, and changing values in the properties panel. A drag across the canvas costs one step rather
 than one per pixel travelled. Opening a file or loading an example starts a fresh history, since
 there is nothing sensible to step back into.
 
@@ -2492,6 +2510,7 @@ Also available in the app at **Help > Keyboard Shortcuts**.
 | `W` | Wire tool |
 | `P` | Probe tool |
 | `R` | Rotate selection |
+| `Ctrl` `C` / `Ctrl` `V` | Copy the selected part / paste a duplicate |
 | `Ctrl` `Z` / `Ctrl` `Y` | Undo / redo (`Ctrl` `Shift` `Z` redoes as well) |
 | `Delete` | Delete selection |
 | `Ctrl` `+` / `Ctrl` `-` | Zoom in / out (the numeric keypad's `+` and `-` work too) |
