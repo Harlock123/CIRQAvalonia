@@ -91,6 +91,9 @@
         <MenuItem Header="_Step" InputGesture="F6" Command="{Binding StepCommand}" />
         <MenuItem Header="Re_set" InputGesture="F8" Command="{Binding ResetSimulationCommand}" />
         <Separator />
+        <MenuItem Header="_Frequency Response..." InputGesture="F7"
+                  Command="{Binding ShowFrequencyResponseCommand}" />
+        <Separator />
         <MenuItem Header="Spee_d" ItemsSource="{Binding SpeedOptions}">
           <MenuItem.ItemContainerTheme>
             <ControlTheme TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}"

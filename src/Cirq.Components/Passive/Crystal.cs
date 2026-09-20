@@ -134,8 +134,11 @@ public partial class Crystal : TwoTerminalComponent, ICurrentReporting
         if (!state.IsTransient)
         {
             // At DC the motional arm is a capacitor, so nothing flows. Constraining the branch to
-            // zero keeps its row occupied rather than leaving the matrix singular.
-            system.Add(branch, branch, 1.0);
+            // zero keeps its row occupied rather than leaving the matrix singular. In a frequency
+            // sweep the arm is an impedance like any other and StampAc writes the row itself, so
+            // the constraint would be fighting it.
+            if (state.IsBiasPoint) system.Add(branch, branch, 1.0);
+
             return;
         }
 
@@ -159,6 +162,33 @@ public partial class Crystal : TwoTerminalComponent, ICurrentReporting
         system.Add(branch, nb, -1.0);
         system.Add(branch, branch, -impedance);
         system.AddRhs(branch, history);
+    }
+
+    /// <summary>
+    /// The motional arm as one impedance, which is what it is and what makes the two resonances
+    /// fall out on their own: series resonance where jωL and 1/jωC cancel and the arm is just its
+    /// resistance, parallel resonance a little above it where the arm and the holder capacitance
+    /// cancel each other instead.
+    /// </summary>
+    public override void StampAc(AcSystem system, SimulationState state)
+    {
+        var na = system.Node(A);
+        var nb = system.Node(B);
+        var branch = system.Branch(this);
+
+        system.StampCapacitance(na, nb, Math.Max(Model.ShuntCapacitance, 1e-18));
+
+        var w = Math.Max(state.AngularFrequency, 1e-9);
+        var l = MotionalInductance;
+        var c = Math.Max(Model.MotionalCapacitance, 1e-18);
+
+        var impedance = new System.Numerics.Complex(
+            Math.Max(Model.SeriesResistance, 0.0), (w * l) - (1.0 / (w * c)));
+
+        // v_a - v_b - Z·i = 0
+        system.Add(branch, na, 1.0);
+        system.Add(branch, nb, -1.0);
+        system.Add(branch, branch, -impedance);
     }
 
     /// <summary>The holder capacitance, straight across the part and in parallel with everything.</summary>

@@ -84,6 +84,12 @@ public static class Examples
             LoadReedSwitchBounce),
         new("Motion Light", "A PIR holding a lamp on long after you stop moving",
             LoadMotionLight),
+        new("Phase-Locked Loop", "A 4046 dragging its oscillator onto an incoming signal and holding it",
+            LoadPhaseLockedLoop),
+        new("Amplitude Modulation", "A carrier multiplied by an audio tone — which is what AM is",
+            LoadAmplitudeModulation),
+        new("Current Sensing", "An INA219 watching a load from the high side of the rail",
+            LoadCurrentSensing),
     ];
 
     public static void LoadRcLowPass(MainWindowViewModel vm)
@@ -1916,6 +1922,193 @@ public static class Examples
         vm.Scope.TimebasePerDivision = 1.0;
         vm.Scope.VoltsPerDivision = 1.0;
         vm.Scope.AddProbe(pir.Output, "PIR out");
+    }
+
+    /// <summary>
+    /// A 4046 closed round an RC loop filter. Watch the control voltage climb as the loop hunts
+    /// for the signal and then go flat once it has it — that flat line is lock, and everything a
+    /// PLL is for happens after it.
+    /// </summary>
+    public static void LoadPhaseLockedLoop(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "4046 phase-locked loop";
+
+        var supply = Place(circuit, new DcVoltageSource(5.0), -560, 220);
+
+        var signal = Place(circuit, new FunctionGenerator(Waveform.Square, 30e3, 5.0)
+        {
+            DcOffset = 2.5, EdgeTime = 20e-9,
+        }, -560, -120);
+
+        var pll = Place(circuit, new Ic4046
+        {
+            TimingCapacitance = 1e-9,
+            SeriesResistance = 10e3,
+            UsesComparatorTwo = true,
+        }, -180, 0);
+
+        // The loop filter, which is the part that is yours to choose and the part that decides
+        // whether the thing works.
+        var filter = Place(circuit, new Resistor(10e3), 180, -140);
+        var hold = Place(circuit, new Capacitor(100e-9), 340, 40);
+
+        // Somewhere for the control pin to sit while the comparator is in its third state. Very
+        // large, or it would discharge the filter between corrections and drag the loop down.
+        var bias = Place(circuit, new Resistor(100e6), 500, 40);
+
+        var gnd = Place(circuit, new Ground(), -560, 360);
+        var gnd2 = Place(circuit, new Ground(), -180, 220);
+        var gnd3 = Place(circuit, new Ground(), 340, 220);
+        var gnd4 = Place(circuit, new Ground(), 500, 220);
+
+        hold.RotationDegrees = 90;
+        bias.RotationDegrees = 90;
+
+        circuit.Connect(supply.Negative, gnd.Pin);
+        circuit.Connect(signal.Return, gnd.Pin);
+        circuit.Connect(pll.Vcc, supply.Positive);
+        circuit.Connect(pll.Gnd, gnd2.Pin);
+        circuit.Connect(pll.Inhibit, gnd2.Pin);
+
+        circuit.Connect(signal.Output, pll.SignalInput);
+
+        // The VCO fed back to the comparator, which is what closes the loop.
+        circuit.Connect(pll.VcoOut, pll.ComparatorInput);
+
+        circuit.Connect(pll.ComparatorII, filter.A);
+        circuit.Connect(filter.B, pll.ControlVoltage);
+        circuit.Connect(pll.ControlVoltage, hold.A);
+        circuit.Connect(hold.B, gnd3.Pin);
+        circuit.Connect(pll.ControlVoltage, bias.A);
+        circuit.Connect(bias.B, gnd4.Pin);
+
+        vm.Scope.TimebasePerDivision = 2e-3;
+        vm.Scope.VoltsPerDivision = 2.0;
+        vm.Scope.Layout = ScopeLayout.Tiled;
+        vm.Scope.AddProbe(pll.ControlVoltage, "Control");
+        vm.Scope.AddProbe(pll.VcoOut, "VCO");
+        vm.Scope.AddProbe(pll.SignalInput, "Signal");
+    }
+
+    /// <summary>
+    /// A carrier multiplied by a tone. The output's envelope is the tone, which is not something
+    /// done to the carrier — it is what multiplying them means.
+    /// </summary>
+    public static void LoadAmplitudeModulation(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "Amplitude modulation";
+
+        var pos = Place(circuit, new DcVoltageSource(15.0), -540, 240);
+        var neg = Place(circuit, new DcVoltageSource(15.0), -540, 400);
+
+        var carrier = Place(circuit, new FunctionGenerator(Waveform.Sine, 100e3, 20.0), -540, -160);
+
+        // Offset so the modulation never crosses zero: through zero the carrier would invert,
+        // which is a different thing again and not what a broadcast transmitter does.
+        var tone = Place(circuit, new FunctionGenerator(Waveform.Sine, 2e3, 10.0) { DcOffset = 6.0 }, -540, 40);
+
+        var u = Place(circuit, new AnalogMultiplier(), -120, -40);
+        var load = Place(circuit, new Resistor(100e3), 200, 60);
+
+        var gnd = Place(circuit, new Ground(), -540, 540);
+        var gnd2 = Place(circuit, new Ground(), -120, 220);
+        var gnd3 = Place(circuit, new Ground(), 200, 240);
+
+        load.RotationDegrees = 90;
+
+        circuit.Connect(pos.Negative, gnd.Pin);
+        circuit.Connect(neg.Positive, gnd.Pin);
+        circuit.Connect(carrier.Return, gnd.Pin);
+        circuit.Connect(tone.Return, gnd.Pin);
+
+        circuit.Connect(u.PositiveSupply, pos.Positive);
+        circuit.Connect(u.NegativeSupply, neg.Negative);
+        circuit.Connect(u.X1, carrier.Output);
+        circuit.Connect(u.X2, gnd2.Pin);
+        circuit.Connect(u.Y1, tone.Output);
+        circuit.Connect(u.Y2, gnd2.Pin);
+        circuit.Connect(u.Z, gnd2.Pin);
+        circuit.Connect(u.Output, load.A);
+        circuit.Connect(load.B, gnd3.Pin);
+
+        vm.Scope.TimebasePerDivision = 100e-6;
+        vm.Scope.VoltsPerDivision = 5.0;
+        vm.Scope.AddProbe(tone.Output, "Modulation");
+        vm.Scope.AddProbe(u.Output, "Modulated");
+    }
+
+    /// <summary>
+    /// An INA219 in the high side of a rail, with a switch to change the load while it watches.
+    /// The point of high-side sensing is what is <i>not</i> in the circuit: nothing between the
+    /// load and ground, so every other measurement still means what it says.
+    /// </summary>
+    public static void LoadCurrentSensing(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "High-side current sensing";
+
+        var rail = Place(circuit, new DcVoltageSource(12.0), -560, 180);
+        var logic = Place(circuit, new DcVoltageSource(3.3), -560, 380);
+
+        var sensor = Place(circuit, new Ina219 { ShuntResistance = 0.1 }, -180, 0);
+
+        var load = Place(circuit, new Resistor(100.0), 180, 100);
+        var extra = Place(circuit, new Resistor(47.0), 360, 100);
+        var switchIn = Place(circuit, new ToggleSwitch(), 360, -60);
+
+        var master = Place(circuit, new I2cMaster
+        {
+            Transactions = "w 40 01; r 40 2",
+            ClockFrequency = 400e3,
+            StartDelay = 1e-3,
+        }, 140, -320);
+
+        var sdaPull = Place(circuit, new Resistor(4.7e3), -40, -460);
+        var sclPull = Place(circuit, new Resistor(4.7e3), 60, -460);
+
+        var gnd = Place(circuit, new Ground(), -560, 520);
+        var gnd2 = Place(circuit, new Ground(), -180, 200);
+        var gnd3 = Place(circuit, new Ground(), 180, 280);
+        var gnd4 = Place(circuit, new Ground(), 360, 280);
+        var gnd5 = Place(circuit, new Ground(), 140, -180);
+
+        load.RotationDegrees = 90;
+        extra.RotationDegrees = 90;
+        switchIn.RotationDegrees = 90;
+        sdaPull.RotationDegrees = 90;
+        sclPull.RotationDegrees = 90;
+
+        circuit.Connect(rail.Negative, gnd.Pin);
+        circuit.Connect(logic.Negative, gnd.Pin);
+
+        // It runs from the logic rail and measures a different one, which is the whole idea.
+        circuit.Connect(sensor.Vcc, logic.Positive);
+        circuit.Connect(sensor.Gnd, gnd2.Pin);
+
+        circuit.Connect(rail.Positive, sensor.ShuntPlus);
+        circuit.Connect(sensor.ShuntMinus, load.A);
+        circuit.Connect(load.B, gnd3.Pin);
+
+        // A second load on a switch, so the reading can be made to change while it runs.
+        circuit.Connect(sensor.ShuntMinus, switchIn.A);
+        circuit.Connect(switchIn.B, extra.A);
+        circuit.Connect(extra.B, gnd4.Pin);
+
+        circuit.Connect(master.Vcc, logic.Positive);
+        circuit.Connect(master.Gnd, gnd5.Pin);
+        circuit.Connect(master.Sda, sensor.Sda);
+        circuit.Connect(master.Scl, sensor.Scl);
+        circuit.Connect(sdaPull.A, logic.Positive);
+        circuit.Connect(sdaPull.B, sensor.Sda);
+        circuit.Connect(sclPull.A, logic.Positive);
+        circuit.Connect(sclPull.B, sensor.Scl);
+
+        vm.Scope.TimebasePerDivision = 500e-6;
+        vm.Scope.VoltsPerDivision = 5.0;
+        vm.Scope.AddProbe(sensor.ShuntMinus, "Load");
+        vm.Scope.AddProbe(sensor.Sda, "SDA");
     }
 
     private static T Place<T>(Circuit circuit, T component, double x, double y) where T : CircuitComponent

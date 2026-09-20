@@ -1,4 +1,5 @@
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Styling;
 
@@ -97,6 +98,28 @@ public static class ThemeManager
 
         return Brushes.Magenta;
     }
+
+    /// <summary>
+    /// A semantic brush resolved against one control's variant rather than the application's.
+    /// <para>
+    /// These are not always the same answer. A desktop can report its preference per top-level —
+    /// which is what happens here — so a window may already be showing dark while
+    /// <see cref="Application.ActualThemeVariant"/> still says light. Anything painted from the
+    /// application's answer then comes out the wrong colour on an otherwise correct window, which
+    /// is what put a white plot inside a dark one.
+    /// </para>
+    /// </summary>
+    public static IBrush BrushFor(Control element, string key)
+    {
+        if (element.TryGetResource(key, element.ActualThemeVariant, out var value) && value is IBrush brush)
+            return brush;
+
+        return Brush(key);
+    }
+
+    /// <summary>The colour behind that brush.</summary>
+    public static Color ColorFor(Control element, string key) =>
+        BrushFor(element, key) is ISolidColorBrush solid ? solid.Color : Colors.Magenta;
 
     /// <summary>The colour behind a semantic brush, for the places that need a colour directly.</summary>
     public static Color Color(string key) =>

@@ -71,7 +71,11 @@ public partial class Inductor : TwoTerminalComponent
             // Under "use initial conditions" the inductor starts at its initial current (zero
             // unless stated), so a supply applied at t=0 is a genuine step. Without it the bias
             // point treats the inductor as the short circuit it is at DC.
-            var initial = InitialCurrent ?? (state.Settings.UseInitialConditions ? 0.0 : null);
+            // Only at the bias point: a frequency sweep has no starting current, and pinning one
+            // would open-circuit the inductor at every frequency.
+            var initial = state.IsBiasPoint
+                ? InitialCurrent ?? (state.Settings.UseInitialConditions ? 0.0 : null)
+                : null;
 
             if (initial is { } i0)
             {
@@ -92,6 +96,13 @@ public partial class Inductor : TwoTerminalComponent
         system.Add(branch, branch, -leq);
         system.AddRhs(branch, history);
     }
+
+    /// <summary>
+    /// The DC stamp already put <c>v_a − v_b − Rs·i = 0</c> on the branch, so all the frequency
+    /// does is add the reactance to the resistance already sitting there.
+    /// </summary>
+    public override void StampAc(AcSystem system, SimulationState state) =>
+        system.AddInductance(system.Branch(this), EffectiveInductance);
 
     /// <summary>
     /// Returns the companion inductance coefficient and the history term for the current step.

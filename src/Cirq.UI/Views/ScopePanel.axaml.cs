@@ -44,15 +44,20 @@ public partial class ScopePanel : UserControl, Cirq.UI.Services.IScopeSource
     /// Plot colours come from the active theme rather than being fixed, so the scope follows a
     /// light/dark switch along with the rest of the window.
     /// </summary>
-    private static Color PlotBackground => FromTheme("PlotBackground");
+    private Color PlotBackground => FromTheme("PlotBackground");
 
-    private static Color GridColour => FromTheme("PlotGrid");
+    private Color GridColour => FromTheme("PlotGrid");
 
-    private static Color AxisColour => FromTheme("PlotAxis");
+    private Color AxisColour => FromTheme("PlotAxis");
 
-    private static Color FromTheme(string key)
+    /// <summary>
+    /// Resolved against this panel rather than the application. The two are not always the same
+    /// answer — see <see cref="Cirq.UI.Services.ThemeManager.BrushFor"/> — and taking the
+    /// application's put a white plot inside a dark window.
+    /// </summary>
+    private Color FromTheme(string key)
     {
-        var colour = Cirq.UI.Services.ThemeManager.Color(key);
+        var colour = Cirq.UI.Services.ThemeManager.ColorFor(this, key);
         return Color.FromARGB(unchecked((uint)(
             (colour.A << 24) | (colour.R << 16) | (colour.G << 8) | colour.B)));
     }
@@ -301,7 +306,7 @@ public partial class ScopePanel : UserControl, Cirq.UI.Services.IScopeSource
     /// traces it is labelling. Dark and slightly transparent keeps it readable without hiding the
     /// waveform underneath.
     /// </summary>
-    private static void StyleLegend(Legend legend)
+    private void StyleLegend(Legend legend)
     {
         legend.BackgroundColor = PlotBackground.WithAlpha(0.82);
         legend.FontColor = FromTheme("TextValue");
@@ -310,7 +315,7 @@ public partial class ScopePanel : UserControl, Cirq.UI.Services.IScopeSource
         legend.FontSize = 11;
     }
 
-    private static void StylePlot(Plot plot, TimeScale scale)
+    private void StylePlot(Plot plot, TimeScale scale)
     {
         plot.FigureBackground.Color = PlotBackground;
         plot.DataBackground.Color = PlotBackground;

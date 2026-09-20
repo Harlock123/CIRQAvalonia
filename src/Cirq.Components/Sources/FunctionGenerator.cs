@@ -159,9 +159,29 @@ public partial class FunctionGenerator : TwoTerminalComponent, IBreakpointSource
         return double.IsInfinity(best) ? null : best;
     }
 
+    /// <summary>
+    /// How hard it drives a frequency sweep, in volts. One by default, unlike the supplies: this
+    /// is the signal source, so a sweep with nothing else configured measures the circuit's
+    /// response to it and the numbers come out as a plain gain.
+    /// </summary>
+    [ObservableProperty]
+    public partial double AcMagnitude { get; set; } = 1.0;
+
+    /// <summary>Phase of that excitation, in degrees.</summary>
+    [ObservableProperty]
+    public partial double AcPhaseDegrees { get; set; }
+
     public override void StampMatrix(MnaSystem system, SimulationState state) =>
         system.StampTheveninSource(
             system.Branch(this), system.Node(A), system.Node(B), ValueAt(state.Time), OutputResistance);
+
+    /// <summary>
+    /// The shape, the frequency and the offset all mean nothing here: a sweep asks what the
+    /// circuit does to a small sine at each frequency in turn, so all the generator contributes
+    /// is how large that sine is.
+    /// </summary>
+    public override void StampAc(AcSystem system, SimulationState state) =>
+        system.AddRhs(system.Branch(this), AcSystem.Phasor(AcMagnitude, AcPhaseDegrees));
 
     partial void OnShapeChanged(Waveform value) => NotifyValueChanged();
 

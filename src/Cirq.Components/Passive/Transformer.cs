@@ -112,6 +112,21 @@ public partial class Transformer : CircuitComponent
         system.AddRhs(b2, h2);
     }
 
+    /// <summary>
+    /// Both windings and the coupling between them. The DC stamp has already shorted each branch
+    /// and put its winding resistance on the diagonal, so this adds the reactance to each and the
+    /// mutual term that makes it a transformer rather than two unrelated inductors.
+    /// </summary>
+    public override void StampAc(AcSystem system, SimulationState state)
+    {
+        var b1 = system.Branch(this, 0);
+        var b2 = system.Branch(this, 1);
+
+        system.AddInductance(b1, Math.Max(PrimaryInductance, 1e-18));
+        system.AddInductance(b2, Math.Max(SecondaryInductance, 1e-18));
+        system.AddMutualInductance(b1, b2, MutualInductance);
+    }
+
     public override void CommitTimeStep(MnaSystem system, SimulationState state)
     {
         _i1Prev = system.BranchCurrent(this, 0);

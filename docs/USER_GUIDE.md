@@ -68,7 +68,7 @@ at the window edge; click the rail to bring it back.
 
 Click a palette entry, then click the canvas. The part lands where you click, snapped to the grid.
 
-The palette holds **158 components in 16 categories**:
+The palette holds **161 components in 16 categories**:
 
 | Category | Count | Contents |
 | --- | --- | --- |
@@ -79,11 +79,11 @@ The palette holds **158 components in 16 categories**:
 | Transistors | 10 | NPN and PNP bipolars, N- and P-channel MOSFETs, **three JFETs** — see [below](#jfets) |
 | LEDs & Displays | 9 | Six LED colours, seven-segment displays, **HD44780 character LCD** — see [below](#the-character-lcd) |
 | Power | 10 | Fixed and adjustable regulators, TL431 shunt reference, ICL7660 charge pump, MC34063 switching controller, **TP4056 lithium charger** — see [below](#charging-a-lithium-cell) |
-| Analog ICs | 11 | LM741, TL081, LM358, **MCP6002** rail-to-rail, NE555, LM311, LM339, LM386 audio amp and INA126 instrumentation amp — see [below](#how-close-to-the-rails) |
+| Analog ICs | 12 | LM741, TL081, LM358, MCP6002 rail-to-rail, NE555, LM311, LM339, LM386 audio amp, INA126 instrumentation amp and an **AD633 analog multiplier** — see [below](#multiplying-two-voltages) |
 | Logic Gates | 7 | AND, OR, NAND, NOR, XOR, XNOR, NOT |
 | 74xx Series | 18 | Counters, decoders, flip-flops, shift registers (including the **74595**), multiplexers, Schmitt inverter |
-| 40xx Series | 14 | CMOS gates, counters, flip-flops, analog switches — see [below](#the-40xx-series) |
-| Buses | 12 | I2C master, EEPROM, port expander, DS1307 clock, ADS1115 ADC and **MCP4725 DAC**, SPI master, **1-Wire master and DS18B20 thermometer**, serial terminal and device, level shifter — see [below](#i2c-and-spi) |
+| 40xx Series | 15 | CMOS gates, counters, flip-flops, analog switches and a **4046 phase-locked loop** — see [below](#phase-locked-loops) |
+| Buses | 13 | I2C master, EEPROM, port expander, DS1307 clock, ADS1115 ADC, MCP4725 DAC and **INA219 current sensor**, SPI master, 1-Wire master and DS18B20 thermometer, serial terminal and device, level shifter — see [below](#i2c-and-spi) |
 | Digital I/O | 6 | Logic toggle, clock, indicators, rotary encoder, **oscillator module** |
 | Sensors & Actuators | 17 | DC motor, LDR, thermistors, buzzers, speaker, microphone, servo, stepper, thermocouple, load cell, HC-SR04 ranger, Hall switch, phototransistor, **reed switch** and **PIR motion sensor** — see [below](#sensors-and-actuators) |
 | Switching & Isolation | 8 | Relay, fuses, optocouplers, ULN2003, H-bridge, **MOSFET gate driver** — see [below](#driving-a-mosfet-gate) |
@@ -214,6 +214,65 @@ to remove the probe entirely.
 
 **Auto** is on by default and is the setting most people want: change a source's amplitude and the
 waveform stays on screen instead of running off the top.
+
+---
+
+## Frequency response
+
+The oscilloscope answers "what does this circuit do over time". **Simulate > Frequency Response**
+(F7) answers the other question: what does it do to a **sine at each frequency**, from one end of a
+span to the other. It is the second way of looking at a circuit, and a great many things that are
+tedious to establish in the time domain are one picture here.
+
+Put a probe where you want the answer, open the window, and it sweeps. The traces are your probes,
+so nothing else has to be set up. Magnitude in decibels goes on top, phase in degrees below, and
+frequency runs logarithmically across both — which is what a Bode plot is, and what every
+datasheet's response curve is drawn on.
+
+The line under the plot does the arithmetic most people open the window for: where each trace has
+fallen 3 dB from its own maximum, which is the number a filter is specified by.
+
+Things worth doing with it:
+
+- **Where a filter turns over.** Sweep the RC low-pass example and read 159 Hz off the status line.
+  Change the capacitor and it moves, without having to run a transient at each frequency and
+  squint at the amplitude.
+- **How much gain an amplifier has left.** An op-amp's gain-bandwidth product is a single number on
+  a datasheet and a whole plot here: a gain of ten from a 1 MHz part is flat to about 90 kHz and
+  falls away past it. Note that it is the product over the **noise gain**, so ten times gain turns
+  over at a megahertz over eleven, not over ten — which is the sort of distinction a plot settles
+  in a second.
+- **What a ferrite bead actually does.** Its impedance curve is the picture its datasheet prints,
+  and sweeping one is the quickest way to see that "600 Ω" is true at exactly one frequency.
+- **Resonances you did not put there.** An unterminated stub of transmission line looks like a
+  short circuit at its quarter-wave frequency. That is nearly impossible to find by stepping a
+  generator and obvious the moment it is plotted.
+
+### What it is, and what it is not
+
+The sweep linearises the whole circuit about its **bias point**: every diode, transistor and
+amplifier is replaced by its slope at the operating point it settled at. That is what makes the
+answer exact — a capacitor at one frequency *is* an admittance of jωC, with no integration error
+and no time step anywhere in the calculation — and it is also the whole of the limitation.
+
+A small-signal answer says **nothing at all** about what a circuit does when the signal is large.
+No clipping, no slew limiting, no distortion, no oscillation starting up. An amplifier that will
+tear a waveform apart at two volts in has a perfectly respectable Bode plot. When the question is
+about size rather than frequency, the oscilloscope is the instrument.
+
+And the circuit has to have a bias point at all: something that will not settle has nothing to
+linearise about, and the window says so rather than drawing a plot of nonsense.
+
+### Which source drives the sweep
+
+A **function generator** drives it, with an AC magnitude of one volt by default — so a response
+comes back as a plain gain and needs no setting up. Its shape, frequency and offset mean nothing
+here; a sweep asks about a small sine at each frequency in turn.
+
+Supplies do **not** drive it. A DC source, a battery, a regulator: to a small signal those are
+short circuits, which is what they are in any hand analysis too, and they simply hold their node
+still. If you want a supply to inject a ripple — to ask how well something rejects it — give that
+source an `AcMagnitude` and it will.
 
 ---
 
@@ -833,6 +892,90 @@ modelled.
 
 ---
 
+## Phase-locked loops
+
+A **4046** is a voltage-controlled oscillator, two phase comparators, and nothing else. Everything
+interesting about a PLL happens *outside* the package, in the loop filter you have to add — which
+is why the part has a reputation for being difficult and why it is so satisfying once it is not.
+
+What it does is easy to say. The VCO runs at whatever its control voltage asks for. A phase
+comparator looks at the VCO against the incoming signal and puts out an error. The filter turns
+that error into the next control voltage. Close that loop and the VCO is dragged onto the input —
+not merely to the same frequency but to the same **phase**, which is what makes it different from
+an oscillator you tune by hand.
+
+**File > Examples > Phase-Locked Loop** is that circuit. Watch the control voltage climb while the
+loop hunts, and then go flat. The flat line is lock.
+
+### Lock range and capture range
+
+Two numbers people conflate, and they are genuinely different.
+
+**Lock range** is how far the input can drift while the loop is *already locked* and still be
+followed. It is set by how far the VCO can go — R1 and C1 — and it is wide.
+
+**Capture range** is how close the input has to be before the loop can grab it *from cold*. It is
+set by the loop filter, and it can be far narrower.
+
+A PLL that holds a signal perfectly once locked and refuses to lock onto the same signal from a
+standing start is not faulty. It is being asked to capture from outside its capture range, and the
+answer is a different filter rather than a better chip. Try it: in the example, switch to
+comparator I and drop the signal 15 kHz away from where the VCO idles. It never finds it. Walk the
+same signal up in three kilohertz steps and it holds every one of them.
+
+### Which comparator
+
+That difference is a property of the **comparator**, not of PLLs in general, and choosing between
+the two is the one design decision the chip itself forces on you.
+
+| | Comparator I (pin 2) | Comparator II (pin 13) |
+| --- | --- | --- |
+| What it is | An exclusive-OR | Edge-triggered, three-state |
+| Locks at | 90° | 0° |
+| Capture range | Narrower than the lock range | The same as the lock range |
+| Noisy input | Copes well | Upset by extra edges |
+| Harmonics | Will happily lock onto one | Cannot be fooled |
+| When locked | Still putting out a square wave, so the filter has ripple to remove | Lets go of its output entirely — no ripple at all |
+| Telling you | Nothing | Pin 1, which is the only lock indication there is |
+
+Comparator II is a phase-*frequency* detector: it knows which of the two is faster, not merely how
+far apart they are, which is why it pulls in from anywhere in the VCO's range. That is usually what
+you want, and the reason pin 1 exists is that a comparator sitting silently in its third state
+looks exactly like one that has lost the signal altogether.
+
+One more setting worth knowing: **R2**, the offset resistor on pin 12, puts a floor under the VCO.
+Leave it out — the default — and the oscillator stops dead at zero volts in, which is why a loop
+that has lost lock can take so long to find its way back up.
+
+---
+
+## Multiplying two voltages
+
+An **AD633** takes two differential inputs and gives you their product:
+
+> W = (X1 − X2)(Y1 − Y2) / 10 V + Z
+
+The ten volts in the denominator is what makes the part usable, and it is the first surprise:
+two inputs at 5 V give **2.5 V** out, not 25. Without the divisor, full scale in would ask for a
+hundred volts and the part would spend its life against a rail.
+
+One chip, and a remarkable number of jobs — all of which are the same job read differently:
+
+- **Amplitude modulation.** Carrier into X, audio into Y, and the output is one multiplied by the
+  other. That is what AM *is*, rather than something done to a carrier.
+  **File > Examples > Amplitude Modulation** is exactly that, with the envelope on the scope.
+- **Mixing.** Two sines multiplied give their sum and difference and nothing else, which is every
+  superheterodyne receiver ever built.
+- **Squaring, and from it true RMS.** Tie X to Y, average the output and take the root.
+- **A voltage-controlled amplifier.** Signal into X, gain into Y.
+- **A phase detector.** Multiply two signals of the same frequency and the average of the product
+  is the cosine of the angle between them.
+
+The Z input adds straight through to the output, which is what lets one of these sum as well as
+multiply.
+
+---
+
 ## Driving a motor both ways
 
 A single transistor can only turn a motor *on*. Running it backwards means being able to put the
@@ -1166,6 +1309,30 @@ w 60 60 80 00    ; command write to the register and the EEPROM
 **File > Examples > DAC and ADC** closes the loop: the DAC's code is a slider in the CONTROLS
 panel, a follower carries it into a load the DAC could not have driven, and the ADS1115 measures
 what actually came out. Move the slider and watch both numbers follow.
+
+### Measuring current where it matters: the INA219
+
+Measuring current is easy in the wrong place. Put the shunt in the **ground return** and any
+ordinary amplifier can read the voltage across it — but the load's ground is then not ground any
+more, and every other measurement in the circuit is off by whatever the shunt is dropping.
+
+**High-side** sensing keeps the load's ground where it belongs, and costs you an amplifier that can
+read a few millivolts of difference while both of its inputs sit up near the supply. That is what
+an INA219 is, and it reports the current, the voltage on the load, and the product of the two.
+
+Which is where the trap is, and it is the reason the part is here. A current-sense amplifier has a
+**common-mode range**, and it is not the same thing as its supply. This one runs from 3.3 V and
+watches a rail anywhere up to **26 V** — that is the whole point of it — but a 30 V rail is outside
+the range, and what you get then is not a reading with an error in it. It is a number with nothing
+behind it, arriving over the bus looking exactly like a measurement. The part flags it, because
+nothing else would.
+
+The shunt itself is a compromise you have to make rather than a detail. Larger gives a better
+reading and wastes more: 0.1 Ω at an amp is a tenth of a volt gone and a tenth of a watt as heat,
+which on a 3.3 V rail is a great deal to spend on knowing.
+
+**File > Examples > Current Sensing** has one watching a 12 V load, with a second load on a switch
+so the reading can be made to change while it runs.
 
 ---
 
@@ -1769,6 +1936,7 @@ Also available in the app at **Help > Keyboard Shortcuts**.
 | Middle-drag / space-drag | Pan |
 | Double-click | Operate a switch, push button or logic toggle |
 | `F5` / `F6` / `F8` | Run-pause / step / reset |
+| `F7` | Frequency response |
 | `F9` / `F10` | Collapse the palette / the properties panel |
 | View menu | **Mark Interactive Parts** rings everything you can double-click |
 | `Ctrl+N` / `Ctrl+O` / `Ctrl+S` / `Ctrl+Shift+S` | New / open / save / save as |

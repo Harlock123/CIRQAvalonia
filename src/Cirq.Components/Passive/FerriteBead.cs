@@ -218,6 +218,20 @@ public partial class FerriteBead : TwoTerminalComponent, ICurrentReporting
         }
     }
 
+    /// <summary>
+    /// The two reactive parts of the parallel RLC, which between them are the whole of why a bead
+    /// has a band: the inductance decides where the impedance starts rising and the capacitance
+    /// decides where it gives up.
+    /// </summary>
+    public override void StampAc(AcSystem system, SimulationState state)
+    {
+        var mid = system.InternalNode(this);
+        var nb = system.Node(B);
+
+        system.StampCapacitance(mid, nb, Math.Max(Capacitance, 1e-18));
+        system.AddInductance(system.Branch(this), Math.Max(Inductance, 1e-18));
+    }
+
     public override void CommitTimeStep(MnaSystem system, SimulationState state)
     {
         var mid = system.InternalNode(this);

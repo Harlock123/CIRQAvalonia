@@ -1,4 +1,6 @@
 using Cirq.Components.Buses;
+using Cirq.Components.Ics;
+using Cirq.Components.Sources;
 using Cirq.Components.Digital;
 using Cirq.Components.Electromechanical;
 using Cirq.Components.Nonlinear;
@@ -240,5 +242,80 @@ public class NewExampleTests
         // Well past the four second hold.
         sim.Run(5.0);
         Assert.False(pir.IsTriggered, "and out again once the hold ran out");
+    }
+
+    /// <summary>The loop closes and the VCO ends up on the signal, which is the whole example.</summary>
+    [Fact]
+    public void ThePllExampleLocksOntoItsSignal()
+    {
+        using var vm = Load("Phase-Locked Loop");
+
+        var pll = vm.Circuit.Components.OfType<Ic4046>().Single();
+        var signal = vm.Circuit.Components.OfType<FunctionGenerator>().Single();
+
+        vm.Simulation.Simulator!.Run(20e-3);
+
+        Assert.Equal(signal.Frequency, pll.VcoFrequency, signal.Frequency * 0.05);
+        Assert.True(pll.IsLocked, "and it should say so");
+    }
+
+    /// <summary>
+    /// The envelope follows the tone. Measured at the modulation's peak and its trough, because
+    /// that difference is what "modulated" means.
+    /// </summary>
+    [Fact]
+    public void TheModulationExampleHasAnEnvelope()
+    {
+        using var vm = Load("Amplitude Modulation");
+
+        var multiplier = vm.Circuit.Components.OfType<AnalogMultiplier>().Single();
+        var sim = vm.Simulation.Simulator!;
+
+        double PeakBetween(double from, double until)
+        {
+            while (sim.Time < from) sim.Step();
+
+            var highest = 0.0;
+            while (sim.Time < until)
+            {
+                sim.Step();
+                highest = Math.Max(highest, Math.Abs(sim.NodeVoltage(multiplier.Output)));
+            }
+
+            return highest;
+        }
+
+        // A 2 kHz tone peaks at 125 µs and troughs at 375 µs.
+        var atPeak = PeakBetween(110e-6, 140e-6);
+        var atTrough = PeakBetween(360e-6, 390e-6);
+
+        Assert.True(atPeak > atTrough * 2.0,
+            $"the envelope should follow the tone: {atPeak:0.00} V against {atTrough:0.00} V");
+    }
+
+    /// <summary>
+    /// The sensor reads the load, and switching the second load in makes the reading change —
+    /// which is the thing to watch while it runs.
+    /// </summary>
+    [Fact]
+    public void TheCurrentSensingExampleFollowsTheLoad()
+    {
+        using var vm = Load("Current Sensing");
+
+        var sensor = vm.Circuit.Components.OfType<Ina219>().Single();
+        var extra = vm.Circuit.Components.OfType<ToggleSwitch>().Single();
+
+        vm.Simulation.Simulator!.Run(5e-3);
+
+        // 12 V across 100 Ω, less the shunt's own tenth of an ohm.
+        Assert.Equal(0.1199, sensor.Current, 0.002);
+        Assert.False(sensor.IsOutOfCommonModeRange);
+
+        extra.IsClosed = true;
+        Assert.True(vm.Simulation.Rebuild(), vm.Simulation.Status);
+        vm.Simulation.Simulator!.Run(5e-3);
+
+        // 100 Ω and 47 Ω in parallel is 32 Ω, so a good deal more.
+        Assert.True(sensor.Current > 0.35, $"switching the second load in should show, not {sensor.Current:0.000} A");
     }
 }

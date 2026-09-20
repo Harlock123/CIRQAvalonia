@@ -120,6 +120,13 @@ public partial class Relay : CircuitComponent, ICurrentReporting
     }
 
     /// <summary>
+    /// The coil's inductance. The contacts are resistances and the DC stamp has them already; all
+    /// a frequency sweep adds is what the winding does to the current driving it.
+    /// </summary>
+    public override void StampAc(AcSystem system, SimulationState state) =>
+        system.AddInductance(system.Branch(this), Math.Max(CoilInductance, 1e-18));
+
+    /// <summary>
     /// The coil, stamped as <see cref="Passive.Inductor"/> does: a branch carrying the current,
     /// with the trapezoidal companion and the winding resistance in the same row.
     /// </summary>

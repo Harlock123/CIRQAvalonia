@@ -375,6 +375,9 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     /// <summary>Raised when the About dialog should be shown.</summary>
     public event EventHandler? RequestAbout;
 
+    /// <summary>Raised when the frequency-response window should be opened.</summary>
+    public event EventHandler? RequestFrequencyResponse;
+
     [RelayCommand]
     private void ShowSettings() => RequestSettings?.Invoke(this, EventArgs.Empty);
 
@@ -522,6 +525,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         Simulation
           F5           Run or pause
           F6           Single step
+          F7           Frequency response
           F8           Reset
 
         File
@@ -543,6 +547,14 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
     [RelayCommand]
     private void ShowAbout() => RequestAbout?.Invoke(this, EventArgs.Empty);
+
+    /// <summary>
+    /// Opens the frequency-response window, which sweeps the circuit as it stands. It runs its own
+    /// solve from the bias point rather than borrowing the transport's, so it can be opened while
+    /// a transient is running without disturbing it.
+    /// </summary>
+    [RelayCommand]
+    private void ShowFrequencyResponse() => RequestFrequencyResponse?.Invoke(this, EventArgs.Empty);
 
     partial void OnSelectedComponentChanged(CircuitComponent? value) => Inspector.Component = value;
 

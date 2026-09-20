@@ -1,0 +1,52 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:sp="clr-namespace:ScottPlot.Avalonia;assembly=ScottPlot.Avalonia"
+        xmlns:vm="clr-namespace:Cirq.UI.ViewModels"
+        x:Class="Cirq.UI.Views.FrequencyResponseWindow"
+        x:DataType="vm:FrequencyResponseViewModel"
+        Title="Frequency Response"
+        Width="880" Height="620"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource PanelBackground}">
+
+  <DockPanel>
+
+    <!-- What to sweep. Kept to the three numbers that matter; everything else about a sweep is
+         decided by the circuit on the canvas. -->
+    <Border DockPanel.Dock="Top" Padding="14,12"
+            Background="{DynamicResource PanelBackground}"
+            BorderBrush="{DynamicResource PanelBorder}" BorderThickness="0,0,0,1">
+      <StackPanel Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
+
+        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+          <TextBlock Text="From" VerticalAlignment="Center" />
+          <TextBox Width="92" Text="{Binding StartHz, Mode=TwoWay}" />
+          <TextBlock Text="Hz" VerticalAlignment="Center" Opacity="0.7" />
+        </StackPanel>
+
+        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+          <TextBlock Text="to" VerticalAlignment="Center" />
+          <TextBox Width="92" Text="{Binding StopHz, Mode=TwoWay}" />
+          <TextBlock Text="Hz" VerticalAlignment="Center" Opacity="0.7" />
+        </StackPanel>
+
+        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+          <TextBlock Text="Points / decade" VerticalAlignment="Center" />
+          <TextBox Width="58" Text="{Binding PointsPerDecade, Mode=TwoWay}" />
+        </StackPanel>
+
+        <Button Content="Sweep" Command="{Binding RunCommand}" IsEnabled="{Binding !IsBusy}"
+                Padding="18,5" />
+      </StackPanel>
+    </Border>
+
+    <!-- The line of arithmetic off the curves, which is what most people open this for. -->
+    <Border DockPanel.Dock="Bottom" Padding="14,9"
+            BorderBrush="{DynamicResource PanelBorder}" BorderThickness="0,1,0,0">
+      <TextBlock Text="{Binding Status}" TextWrapping="Wrap" Opacity="0.85" />
+    </Border>
+
+    <sp:AvaPlot Name="Plot" />
+
+  </DockPanel>
+</Window>

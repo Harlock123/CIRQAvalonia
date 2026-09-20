@@ -93,6 +93,9 @@ public partial class ElectrolyticCapacitor : Capacitor
         }
     }
 
+    protected override (int Positive, int Negative) AcCapacitanceNodes(AcSystem system) =>
+        (system.InternalNode(this), system.Node(B));
+
     protected override (int Positive, int Negative) CapacitanceNodes(MnaSystem system) =>
         (system.Node(A), system.InternalNode(this));
 

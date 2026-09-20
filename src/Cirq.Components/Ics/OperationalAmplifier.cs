@@ -249,6 +249,15 @@ public partial class OperationalAmplifier : CircuitComponent
     private static double Sigmoid(double u) =>
         u > 30 ? 1.0 : u < -30 ? 0.0 : 1.0 / (1.0 + Math.Exp(-u));
 
+    /// <summary>
+    /// The compensation capacitor, and with it the whole of the amplifier's frequency response.
+    /// Working into R1 it sets the dominant pole, and the gain falls from there at twenty decibels
+    /// a decade until it reaches one — which is the gain-bandwidth product, arriving out of the
+    /// model rather than being asserted by it.
+    /// </summary>
+    public override void StampAc(AcSystem system, SimulationState state) =>
+        system.StampCapacitance(system.InternalNode(this), -1, Model.CompensationCapacitance);
+
     public override void CommitTimeStep(MnaSystem system, SimulationState state)
     {
         var gain = system.InternalNode(this);

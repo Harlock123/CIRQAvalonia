@@ -195,6 +195,29 @@ public partial class CentreTappedTransformer : CircuitComponent
         }
     }
 
+    /// <summary>
+    /// Three windings, each coupled to both of the others. The DC stamp has already shorted every
+    /// branch and put its resistance on the diagonal; this adds each self reactance and every
+    /// mutual term.
+    /// </summary>
+    public override void StampAc(AcSystem system, SimulationState state)
+    {
+        var l = Inductances;
+        var k = Math.Clamp(Coupling, 0, 1);
+
+        for (var i = 0; i < Windings; i++)
+        {
+            system.AddInductance(system.Branch(this, i), l[i]);
+
+            // Each unordered pair once: AddMutualInductance writes both sides of it.
+            for (var j = i + 1; j < Windings; j++)
+            {
+                system.AddMutualInductance(
+                    system.Branch(this, i), system.Branch(this, j), k * Math.Sqrt(l[i] * l[j]));
+            }
+        }
+    }
+
     public override void CommitTimeStep(MnaSystem system, SimulationState state)
     {
         var ct = system.NodeVoltage(CentreTap);

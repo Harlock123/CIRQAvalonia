@@ -32,6 +32,25 @@ public partial class DcCurrentSource : TwoTerminalComponent
 
     public override string ValueLabel => SiPrefix.Format(Current, "A");
 
+    /// <summary>
+    /// How hard it drives a frequency sweep, in amps — nothing to do with its DC current, which a
+    /// small signal does not see.
+    /// </summary>
+    [ObservableProperty]
+    public partial double AcMagnitude { get; set; }
+
+    /// <summary>Phase of that excitation, in degrees.</summary>
+    [ObservableProperty]
+    public partial double AcPhaseDegrees { get; set; }
+
+    public override void StampAc(AcSystem system, SimulationState state)
+    {
+        var phasor = AcSystem.Phasor(AcMagnitude, AcPhaseDegrees);
+
+        system.AddRhs(system.Node(A), phasor);
+        system.AddRhs(system.Node(B), -phasor);
+    }
+
     public override void StampMatrix(MnaSystem system, SimulationState state)
     {
         var na = system.Node(A);

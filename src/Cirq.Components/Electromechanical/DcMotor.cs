@@ -154,6 +154,14 @@ public partial class DcMotor : TwoTerminalComponent
         }
     }
 
+    /// <summary>
+    /// The armature inductance. The back-EMF is a mechanical quantity carried between time steps,
+    /// so a small-signal solve sees the winding and nothing else — which is the right answer for
+    /// an impedance sweep and no answer at all about how the motor responds to a torque.
+    /// </summary>
+    public override void StampAc(AcSystem system, SimulationState state) =>
+        system.AddInductance(system.Branch(this), Math.Max(ArmatureInductance, 1e-18));
+
     public override void CommitTimeStep(MnaSystem system, SimulationState state)
     {
         Current = system.BranchCurrent(this);

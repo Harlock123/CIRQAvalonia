@@ -1,3 +1,4 @@
+using System.Numerics;
 using Cirq.Core.Primitives;
 using Cirq.Core.Simulation;
 using Cirq.Core.Topology;
@@ -154,6 +155,10 @@ public partial class TransmissionLine : CircuitComponent, IBreakpointSource
         var near = system.Branch(this, 0);
         var far = system.Branch(this, 1);
 
+        // A frequency sweep does not want the DC short: at one frequency a line has an exact
+        // closed form, and StampAc writes it.
+        if (state.Mode == AnalysisMode.SmallSignal) return;
+
         if (!state.IsTransient)
         {
             // At DC a line is a pair of wires, so each conductor is simply shorted end to end.
@@ -178,6 +183,54 @@ public partial class TransmissionLine : CircuitComponent, IBreakpointSource
 
         system.StampTheveninSource(near, a1, b1, fromFar, z0);
         system.StampTheveninSource(far, a2, b2, fromNear, z0);
+    }
+
+    /// <summary>
+    /// The line at one frequency, exactly — no history, no interpolation and no time step, because
+    /// a delay in the frequency domain is a phase shift and nothing more.
+    /// <para>
+    /// The two Bergeron equations become <c>v₁ − Z₀·i₁ = (v₂ + Z₀·i₂)·e^(−jωT)</c> and its mirror,
+    /// so the whole of what the line does to a signal — the delay, the reflections, the quarter-
+    /// wave resonances that make an unterminated stub look like a short — falls out of two rows.
+    /// </para>
+    /// </summary>
+    public override void StampAc(AcSystem system, SimulationState state)
+    {
+        var a1 = system.Node(NearPlus);
+        var b1 = system.Node(NearMinus);
+        var a2 = system.Node(FarPlus);
+        var b2 = system.Node(FarMinus);
+
+        var near = system.Branch(this, 0);
+        var far = system.Branch(this, 1);
+
+        var z0 = new Complex(Math.Max(CharacteristicImpedance, 1e-6), 0);
+
+        // What a wave is multiplied by in crossing the line: the loss, and a phase shift of one
+        // delay's worth.
+        var travel = Transmission * Complex.Exp(new Complex(0, -state.AngularFrequency * Delay));
+
+        // The branch currents flow into the line at each port, as they do in the transient form.
+        system.Add(a1, near, 1.0);
+        system.Add(b1, near, -1.0);
+        system.Add(a2, far, 1.0);
+        system.Add(b2, far, -1.0);
+
+        // v1 - Z0·i1 - (v2 + Z0·i2)·travel = 0
+        system.Add(near, a1, 1.0);
+        system.Add(near, b1, -1.0);
+        system.Add(near, near, -z0);
+        system.Add(near, a2, -travel);
+        system.Add(near, b2, travel);
+        system.Add(near, far, -z0 * travel);
+
+        // and the same the other way round.
+        system.Add(far, a2, 1.0);
+        system.Add(far, b2, -1.0);
+        system.Add(far, far, -z0);
+        system.Add(far, a1, -travel);
+        system.Add(far, b1, travel);
+        system.Add(far, near, -z0 * travel);
     }
 
     /// <summary>

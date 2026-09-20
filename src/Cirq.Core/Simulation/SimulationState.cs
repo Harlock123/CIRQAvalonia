@@ -50,6 +50,23 @@ public sealed class SimulationState
 
     public bool IsTransient => Mode == AnalysisMode.Transient;
 
+    /// <summary>
+    /// True during the bias-point solve proper.
+    /// <para>
+    /// Not the same as "not transient", which is the test components used before there was a
+    /// third mode: the small-signal solve is also not transient, but an initial condition applies
+    /// to the bias point and to nothing else — pinning a capacitor to its starting voltage during
+    /// a frequency sweep would short it out at every frequency.
+    /// </para>
+    /// </summary>
+    public bool IsBiasPoint => Mode == AnalysisMode.DcOperatingPoint;
+
+    /// <summary>
+    /// Angular frequency the small-signal solve is at, in radians per second. Zero in the other
+    /// two modes, where it means nothing.
+    /// </summary>
+    public double AngularFrequency { get; internal set; }
+
     internal void Reset()
     {
         Time = 0;

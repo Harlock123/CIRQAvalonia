@@ -63,9 +63,13 @@ public partial class Capacitor : TwoTerminalComponent, ICurrentReporting
         if (!state.IsTransient)
         {
             // Bias point: a capacitor is an open circuit, unless an initial condition pins it.
+            // Not in a frequency sweep, though — pinning it there would short it out at every
+            // frequency, which is the opposite of what a capacitor does.
             // Under "use initial conditions" every capacitor without an explicit value starts
             // discharged, which is what makes a source applied at t=0 a true step.
-            var initial = InitialVoltage ?? (state.Settings.UseInitialConditions ? 0.0 : null);
+            var initial = state.IsBiasPoint
+                ? InitialVoltage ?? (state.Settings.UseInitialConditions ? 0.0 : null)
+                : null;
 
             if (initial is { } vic)
             {
@@ -94,6 +98,18 @@ public partial class Capacitor : TwoTerminalComponent, ICurrentReporting
 
         system.StampNorton(na, nb, _conductance, _equivalentCurrent);
     }
+
+    /// <summary>A capacitor at one frequency is an admittance of jωC, and nothing else.</summary>
+    public override void StampAc(AcSystem system, SimulationState state)
+    {
+        var (na, nb) = AcCapacitanceNodes(system);
+
+        system.StampCapacitance(na, nb, Math.Max(Capacitance, 0.0));
+    }
+
+    /// <summary>Which nodes the capacitance sits between, for the small-signal stamp.</summary>
+    protected virtual (int Positive, int Negative) AcCapacitanceNodes(AcSystem system) =>
+        (system.Node(A), system.Node(B));
 
     public override void CommitTimeStep(MnaSystem system, SimulationState state)
     {

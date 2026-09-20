@@ -72,6 +72,24 @@ public abstract partial class CircuitComponent : ObservableObject
     public abstract void StampMatrix(MnaSystem system, SimulationState state);
 
     /// <summary>
+    /// Contributes whatever the DC stamp cannot express to a small-signal frequency solve:
+    /// reactance, and AC excitation.
+    /// <para>
+    /// Most components need nothing here, and that is the point of the arrangement. A sweep first
+    /// stamps every component's ordinary <see cref="StampMatrix"/> into a real matrix at the bias
+    /// point — which for a resistor is its conductance, and for a diode or a transistor is exactly
+    /// the small-signal slope it linearised to — and folds that into the complex one. What is
+    /// left over is only what a real number cannot hold.
+    /// </para>
+    /// <para>
+    /// So a capacitor adds jωC, an inductor adds jωL to the branch diagonal its DC stamp already
+    /// put a resistance on, and a source adds whatever AC magnitude it was given. Everything else
+    /// inherits the empty implementation and is correct.
+    /// </para>
+    /// </summary>
+    public virtual void StampAc(AcSystem system, SimulationState state) { }
+
+    /// <summary>
     /// Number of auxiliary branch-current unknowns this component needs (ideal voltage sources,
     /// inductors, and controlled voltage sources each need one).
     /// </summary>

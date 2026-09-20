@@ -39,6 +39,7 @@ public static class SymbolRenderer
             case ReedSwitch reed: DrawReedSwitch(context, pen, zoom, reed); break;
             case PirSensor pir: DrawPirSensor(context, pen, zoom, pir); break;
             case GateDriver driver: DrawGateDriver(context, pen, zoom, driver); break;
+            case AnalogMultiplier multiplier: DrawMultiplier(context, pen, zoom, multiplier); break;
             case FerriteBead: DrawFerriteBead(context, pen); break;
             case TransmissionLine line: DrawTransmissionLine(context, pen, zoom, line); break;
             case Ds18b20 sensor: DrawPackage(context, pen, zoom, sensor, "DS18B20"); break;
@@ -1562,6 +1563,34 @@ public static class SymbolRenderer
             lit > 0 ? new Pen(new SolidColorBrush(colour), pen.Thickness + 0.5) : pen);
     }
 
+    /// <summary>
+    /// An analog multiplier: the triangle every analog block is drawn as, with the times sign that
+    /// says which one it is.
+    /// </summary>
+    private static void DrawMultiplier(
+        ISymbolCanvas context, IPen pen, double zoom, AnalogMultiplier multiplier)
+    {
+        foreach (var terminal in multiplier.Terminals)
+        {
+            var at = new Point(terminal.CanvasOffset.X, terminal.CanvasOffset.Y);
+            var inner = new Point(Math.Clamp(at.X, -30, 30), Math.Clamp(at.Y, -30, 30));
+
+            context.DrawLine(pen, at, inner);
+        }
+
+        var body = SymbolPath.Polyline([new Point(-30, -40), new Point(30, 0), new Point(-30, 40)], true);
+        context.DrawGeometry(CanvasTheme.SymbolFill, pen, body);
+
+        if (zoom <= 0.45) return;
+
+        DrawCenteredText(context, "\u00D7", new Point(-12, -1), 14, zoom, CanvasTheme.LabelBrush);
+
+        // Lit when the answer has stopped being the product, which is the one failure the symbol
+        // can usefully show.
+        if (multiplier.IsClipping)
+            context.DrawEllipse(CanvasTheme.ErrorBrush, null, new Point(-12, 22), 3.5, 3.5);
+    }
+
     /// <summary>A deeper shade of an emitted colour, for the edge of something lit by it.</summary>
     private static Color Deepen(Color colour) =>
         Color.FromRgb((byte)(colour.R * 0.55), (byte)(colour.G * 0.55), (byte)(colour.B * 0.55));
@@ -2095,6 +2124,7 @@ public static class SymbolRenderer
         TransmissionLine => 62.0,
         ReedSwitch => 34.0,
         Ds18b20 or OneWireMaster => 56.0,
+        AnalogMultiplier => 52.0,
 
         // The leads reach 30, so the default offset puts the caption on top of one.
         Phototransistor => 44.0,

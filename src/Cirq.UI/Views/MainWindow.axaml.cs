@@ -82,6 +82,7 @@ public partial class MainWindow : Window
         viewModel.RequestClose += (_, _) => Close();
         viewModel.RequestSettings += async (_, _) => await ShowSettingsAsync();
         viewModel.RequestAbout += async (_, _) => await ShowAboutAsync();
+        viewModel.RequestFrequencyResponse += async (_, _) => await ShowFrequencyResponseAsync();
 
         // Code-drawn surfaces cannot bind to a resource, so they are told to repaint.
         ThemeManager.ThemeChanged += (_, _) => Dispatcher.UIThread.Post(() =>
@@ -105,6 +106,18 @@ public partial class MainWindow : Window
     private async Task ShowAboutAsync()
     {
         var dialog = new AboutWindow { DataContext = new AboutViewModel() };
+        await dialog.ShowDialog(this);
+    }
+
+    private async Task ShowFrequencyResponseAsync()
+    {
+        if (_viewModel is null) return;
+
+        var dialog = new FrequencyResponseWindow
+        {
+            DataContext = new FrequencyResponseViewModel(_viewModel.Circuit),
+        };
+
         await dialog.ShowDialog(this);
     }
 
