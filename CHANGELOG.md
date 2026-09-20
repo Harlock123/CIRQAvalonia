@@ -8,6 +8,77 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-09-20
+
+Eight new parts, one of which needed the solver to remember more than one step. The palette holds
+158 components in 16 categories, 39 worked examples, and 1610 tests measure them against
+closed-form answers.
+
+**Transmission lines.** Every connection in this program was instantaneous until now — change a
+voltage at one end of a wire and it is that voltage at the other end in the same instant — and that
+is the assumption that fails first as things get faster. A line carries a *wave* instead: about
+five nanoseconds a metre, and for that long it looks to whatever is driving it like a plain 50 Ω
+resistor, whatever is connected at the far end, because nothing about the far end has reached the
+driver yet.
+
+Then the wave arrives, and what it finds decides how much comes back. An open end sends all of it
+back the same way up, so the far end briefly sits at *twice* the incident voltage. A short sends it
+back inverted. A matched load absorbs it and that is the end of the story. Then the reflection
+travels home, meets the source impedance, and some of it turns round again — which is the staircase
+on the scope that looks like a broken driver and is nothing of the kind.
+
+**File > Examples > Reflections** puts the terminator on a switch, so you can close it from the
+CONTROLS panel while it runs and watch the ringing disappear. It explains the overshoot on a fast
+logic edge into a long trace, why a series resistor at the *driver* quietens a line that a resistor
+at the far end could not, and why a 10 cm track is a wire at 1 MHz and a component at 500 MHz.
+
+**A 1-Wire bus, and a DS18B20 on it.** The odd bus: no clock, and on most parts no second wire
+either, so a bit cannot be a level sampled on an edge — it is a **pulse width**. Six microseconds
+down is a one, sixty is a zero, half a millisecond is a reset.
+
+All three of the DS18B20's famous traps are modelled rather than described. **Eighty-five degrees
+means "no reading"** — the scratchpad powers up holding exactly 85.0 °C and keeps it until a
+conversion has actually finished, which is the most reported fault with this part and is not a
+fault. **A conversion takes most of a second** at twelve bits, and nine bits is ninety milliseconds
+at a sixteenth of the precision. And **parasitic power browns out**: converting needs a milliamp
+and a half that no ordinary pull-up can pass, so the line sags and the reading stays at 85 with
+nothing anywhere saying why. The part draws the current, so the sag and the failure are real.
+
+**An MCP4725 DAC**, which closes the loop the ADS1115 opened. The library could digitise a voltage
+but not produce one, so the only way out of the digital world was a pin at the rail or at ground.
+Its code is a live control, and the example runs it through a follower into a load the DAC could
+not have driven — because it cannot drive anything, which is the first thing that disappoints
+people about it.
+
+**A ferrite bead**, and the half of it nobody is told. It is not an inductor: at low frequencies it
+is a piece of wire, in its band it is a resistor that turns noise into heat, and above that its own
+stray capacitance shorts it out. So the number on the datasheet is the impedance at *one
+frequency*, and the same bead is under thirty ohms at a megahertz. It follows that a bead only
+damps ringing **inside its band** — put one in front of a hundred nanofarads and the pair resonate
+where the bead is still an inductor, so it rings exactly as an ordinary inductor would and "just
+fit a bead" has achieved nothing.
+
+**A MOSFET gate driver**, for the arithmetic: a gate is tens of nanofarads, 50 nF to 10 V in 50 ns
+is ten amps, and a logic pin has twenty milliamps. Slow switching is where the heat comes from — a
+MOSFET is cheap on and cheap off and expensive in between. It also takes the gate to **its own
+supply** rather than the logic rail, which a faster pin could not fix. The example is the
+comparison in one schematic: one clock, two identical MOSFETs, one gate off the pin and one through
+the driver.
+
+**A reed switch**, which answers the same question as the Hall sensor and has almost nothing else
+in common with it. It is a contact rather than a semiconductor: no supply at all, either pole, and
+it will switch mains. What it has against it is that it **bounces** — so one magnet passing clocks
+a counter five times, which is what debouncing is for and what the Hall switch beside it does not
+do.
+
+**A PIR motion sensor**, whose whole character is what it does after the movement stops. It holds
+its output high for seconds to minutes, so it is not reporting what is happening now but that
+something happened recently. And the retrigger jumper is the difference between a light that stays
+on while you are there and one that goes out while you are standing under it.
+
+**Seven new examples**, one per part, each asserted in the test suite against the thing it exists
+to show rather than merely against running.
+
 ## [0.23.0] - 2026-09-20
 
 A lit LED that looks lit. The palette holds 150 components in 16 categories, and 1499 tests measure
@@ -863,7 +934,8 @@ First public build of CirqAvalonia — an electronic circuit analyzer and mixed-
 
 **501 tests** measure the solver against closed-form answers rather than recorded output.
 
-[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.23.0...HEAD
+[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.24.0...HEAD
+[0.24.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.23.0...v0.24.0
 [0.23.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.22.0...v0.23.0
 [0.22.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.21.0...v0.22.0
 [0.21.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.20.0...v0.21.0
