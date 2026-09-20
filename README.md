@@ -32,7 +32,7 @@ Core ← Engine ← Components ← UI, which keeps the whole engine headless-tes
 
 ```bash
 dotnet run --project src/Cirq.UI     # the editor
-dotnet test                          # 1499 tests
+dotnet test                          # 1587 tests
 ```
 
 Targets .NET 10. The UI uses Avalonia 12 and ScottPlot 5.1; those two versions are pinned
@@ -197,6 +197,13 @@ Tests measure the solver against closed-form answers rather than recorded output
 | Output swing | A rail-to-rail part reaching within a whisker of both supplies, an LM358 reaching the bottom one but not the top, an LM741 reaching neither, all three agreeing halfway up, and a 741 unable to put out one volt on a single five volt supply. Plus a matrix of every headroom pair against every supply arrangement, since a symmetric part on a split supply hides the cases that matter |
 | Live controls | Building the panel changing nothing and raising no change events, working a control moving its component and reporting it, the panel following a part worked from the canvas without reporting that as an edit, a range becoming a slider and a six-decade one becoming a logarithmic slider, a whole-number property being written a whole number, and the panel following parts placed and removed |
 | H-bridge | Driving forward and reverse with the current reversing too, both inputs the same braking with nothing across the motor, disabling coasting rather than braking, the interlock stopping shoot-through and its absence making a short across the supply, unwired inputs reading low, and the body diodes clamping an inductive kick |
+| Transmission line | A matched source seeing half its voltage until the far end answers, an open end doubling the wave and a short inverting it, a matched load absorbing it completely, a stiff driver into an unterminated line giving a staircase, and a series resistor at the source stopping the ringing — every figure from the textbook reflection coefficient rather than from a previous run |
+| 1-Wire | A presence pulse answering a reset, a temperature arriving over a single wire as pulse widths, 85 °C coming back when the conversion was skipped or cut short, a function command without a ROM command being ignored, resolution trading precision for conversion time, the Dallas CRC against a known scratchpad, parasitic power browning out on an ordinary pull-up and working on a strong one, and a hundred metres of cable returning rubbish where two metres does not |
+| I2C DAC | Code over full scale times the supply, full scale following the supply because there is no reference, a load pulling the output down and an op-amp follower restoring it, both write forms and their different bit alignments, only the EEPROM write surviving a power cycle, and the ADC beside it reading back what the DAC put out |
+| Ferrite bead | A wire at DC, the datasheet impedance being true only at the datasheet frequency, falling away above its band, reactance dominating below the band and resistance inside it — and the consequence: it rings exactly like an inductor against a large capacitor and damps only where the ringing is in its band |
+| Gate driver | Switching a gate orders of magnitude faster than a logic pin, moving the gate charge in charge over current, taking the gate to its own supply rather than the logic rail, a logic pin unable to reach the gate voltage at all, sinking harder than it sources, and refusing to drive below its lockout voltage |
+| Reed switch | A magnet of either pole closing it with no supply at all, holding between the two thresholds, a burst of edges on closing that a Hall switch does not produce, and opening cleanly because there is nothing to rebound off |
+| PIR sensor | Ignoring everything while it warms up, triggering on movement and holding long after it stops, retriggerable restarting the hold where single-shot gives up, and driving both ways rather than needing a pull-up |
 | Li-ion charger | Constant current well below full, the current tapering as the cell approaches its float voltage and stopping at it, no headroom meaning no charge, the dissipation being exactly what the input does not put in the cell, and termination latching rather than cycling |
 | I2C ADC | A voltage on a node read back over two wires as the same number, the gain setting pinning at full scale rather than complaining and pushing further past it changing nothing, a wider range fitting what the narrow one clipped, reading faster than it converts returning the previous answer, differential measuring the difference, and the configuration register written and read back |
 | Hall sensor | A field strong enough pulling the output down, the pull-up having it otherwise, hysteresis holding the same field either way depending on which way it was approached, the wrong pole ignored by a unipolar part and answered by an omnipolar one, and a missing pull-up reported rather than silently useless |
@@ -330,7 +337,7 @@ toolbar used to show: active tool, simulation speed, elapsed time and solver rat
 `Help > Keyboard Shortcuts` lists everything below, and the
 [User Guide](docs/USER_GUIDE.md) walks through building a circuit from an empty canvas.
 
-The palette holds 150 components in 16 collapsible categories:
+The palette holds 158 components in 16 collapsible categories:
 
 ![The component palette showing all sixteen categories with their counts — passive, switches, sources, semiconductors, transistors, LEDs and displays, power, analog ICs, logic gates, 74xx series, 40xx series, buses, digital I/O, sensors and actuators, switching and isolation, and dev boards — with the Passive group open](docs/images/02-palette.png)
 

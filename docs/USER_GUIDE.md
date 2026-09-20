@@ -68,11 +68,11 @@ at the window edge; click the rail to bring it back.
 
 Click a palette entry, then click the canvas. The part lands where you click, snapped to the grid.
 
-The palette holds **150 components in 16 categories**:
+The palette holds **158 components in 16 categories**:
 
 | Category | Count | Contents |
 | --- | --- | --- |
-| Passive | 8 | Resistor, capacitor, electrolytic capacitor, inductor, transformer, **centre-tapped transformer**, potentiometer, **crystal** — see [below](#crystals) |
+| Passive | 10 | Resistor, capacitor, electrolytic capacitor, inductor, transformer, centre-tapped transformer, potentiometer, crystal, **ferrite bead** and **transmission line** — see [below](#transmission-lines-and-why-a-wire-stops-being-a-wire) |
 | Switches | 4 | SPST, SPDT, push button, **8-way DIP switch** |
 | Sources | 7 | Ground, DC voltage, DC current, function generator, battery, solar cell, **noise source** — see [below](#noise-and-why-hysteresis-exists) |
 | Semiconductors | 11 | 1N4148, 1N4001, Schottky, zeners, bridge rectifier, SCR, triac, diac, **TVS and varistor** — see [below](#surge-protection) |
@@ -83,10 +83,10 @@ The palette holds **150 components in 16 categories**:
 | Logic Gates | 7 | AND, OR, NAND, NOR, XOR, XNOR, NOT |
 | 74xx Series | 18 | Counters, decoders, flip-flops, shift registers (including the **74595**), multiplexers, Schmitt inverter |
 | 40xx Series | 14 | CMOS gates, counters, flip-flops, analog switches — see [below](#the-40xx-series) |
-| Buses | 9 | I2C master, EEPROM, port expander, DS1307 clock and **ADS1115 ADC**, SPI master, serial terminal and device, level shifter — see [below](#i2c-and-spi) |
+| Buses | 12 | I2C master, EEPROM, port expander, DS1307 clock, ADS1115 ADC and **MCP4725 DAC**, SPI master, **1-Wire master and DS18B20 thermometer**, serial terminal and device, level shifter — see [below](#i2c-and-spi) |
 | Digital I/O | 6 | Logic toggle, clock, indicators, rotary encoder, **oscillator module** |
-| Sensors & Actuators | 15 | DC motor, LDR, thermistors, buzzers, speaker, microphone, servo, stepper, thermocouple, load cell, HC-SR04 ranger, **Hall switch and phototransistor** — see [below](#sensors-and-actuators) |
-| Switching & Isolation | 7 | Relay, fuses, optocouplers, ULN2003, **H-bridge** — see [below](#switching-and-isolation) |
+| Sensors & Actuators | 17 | DC motor, LDR, thermistors, buzzers, speaker, microphone, servo, stepper, thermocouple, load cell, HC-SR04 ranger, Hall switch, phototransistor, **reed switch** and **PIR motion sensor** — see [below](#sensors-and-actuators) |
+| Switching & Isolation | 8 | Relay, fuses, optocouplers, ULN2003, H-bridge, **MOSFET gate driver** — see [below](#driving-a-mosfet-gate) |
 | Dev Boards | 4 | Raspberry Pi, Arduino Uno / Nano / Mega — see [below](#development-boards) |
 
 Click a category header to open or close it. **All** in the palette header toggles every group at
@@ -484,6 +484,184 @@ Both of its awkward behaviours are modelled, because both catch people:
 Double-click it to move the target between `DistanceCentimetres` and `AlternateDistance` while the
 simulation runs, and watch the echo pulse change width. **File > Examples > Ultrasonic Ranger**
 has one pinged a hundred times a second with both pins on the scope.
+
+### Two ways to notice a magnet
+
+The **Hall sensor** and the **reed switch** answer the same question and have almost nothing else
+in common, which is why both are here.
+
+A reed switch is two springy ferrous blades in a glass tube that pull together when a magnet comes
+near. What it has over the Hall switch is that it is a **contact**, not a semiconductor: it needs no
+supply at all, draws nothing when idle, passes current either way round, and will switch mains if
+asked. Every door and window sensor in every alarm system is one of these, sitting on a long cable
+with nothing but the switch at the far end — which a part needing three wires and a pull-up could
+not do. It also answers to **either pole**, because the blades are ferrous rather than magnetised,
+where most Hall switches ignore one of them entirely.
+
+What it has against it is everything mechanical. It is slow, hundreds of microseconds rather than a
+few. It wears out. And it **bounces**: the blades snap together, spring apart and snap back several
+times over the first half millisecond. Wire one to a pull-up, put the scope on it, and bring a
+magnet up — a single magnet passing produces a burst of edges. Feed that into a counter and you
+count five; feed it into an interrupt and you get five interrupts. That is what debouncing is for,
+and it is the difference you can see between this part and the Hall switch beside it, which does
+not bounce at all. Opening does not bounce either, in the model as in life: there is nothing for
+the blades to rebound off.
+
+### PIR motion sensors
+
+The white plastic dome on every security light. **Passive** infrared, which is the first thing to
+get straight — it emits nothing. Behind the lens is an element that notices the infrared a warm
+body gives off, and the segmented lens chops the scene into stripes so that something moving across
+it sweeps warmth from one segment to the next. That is what it detects: not heat, and certainly not
+presence, but **change** in heat across its field of view. Which is why it will not see somebody
+standing still, and why it triggers on a radiator coming on.
+
+Two behaviours matter when you wire one up, and both are here.
+
+**It holds its output high long after the movement stops** — seconds to minutes, set by a trimmer
+on a real board and by `Hold` here. It is not reporting what is happening now; it is reporting that
+something happened recently, and anything sampling the pin and believing it is seeing the present
+will be wrong for the whole of the hold time.
+
+**Retriggering is a jumper, and the wrong setting is maddening.** Retriggerable restarts the hold on
+every fresh movement, so the output stays high while somebody keeps moving. Single-shot does not:
+the output drops at the end of the hold whatever is going on, then blanks for a moment before it
+can fire again — so the light goes out while you are still standing under it. Both settings are in
+the CONTROLS panel; turn `Movement` on and off and watch the difference.
+
+And when power is first applied it needs a **warm-up** of some tens of seconds, during which a real
+one produces nonsense and this one simply refuses to trigger. That is enough to explain a sensor
+that seems dead for the first minute.
+
+---
+
+## Transmission lines, and why a wire stops being a wire
+
+Every other connection in this program is instantaneous. Change a voltage at one end of a wire and
+it is that voltage at the other end in the same instant, because a wire is a wire. That assumption
+is the first one to fail as things get faster, and it fails in a way nothing in a schematic hints
+at.
+
+What a length of cable or a track on a board really does is carry a **wave**. Launch a step into
+one end and it travels at some fraction of the speed of light, arriving later — about **five
+nanoseconds per metre** in ordinary coax or in a board track, which is the rule of thumb worth
+remembering. While the wave is in flight the line looks to whatever is driving it like a plain
+resistor of Z₀ ohms — fifty for instrument coax, seventy-five for video, around a hundred for a
+differential pair — **whatever is connected at the far end**, because nothing about the far end has
+reached the driver yet.
+
+Then the wave arrives, and what it finds there decides how much of it comes **back**:
+
+| Far end | What returns |
+| --- | --- |
+| Matched to Z₀ | Nothing. The wave is absorbed and that is the end of it |
+| Open circuit | All of it, the same way up — so the far end briefly sits at **twice** the incident voltage |
+| Short circuit | All of it, inverted |
+| Anything else | (Z<sub>L</sub> − Z₀) / (Z<sub>L</sub> + Z₀) of it |
+
+And then the reflection travels home, meets whatever the source impedance is, and some of *that*
+turns round again.
+
+Place a **Transmission Line** from the Passive group, drive it from a function generator with an
+output resistance, and put probes on both ends. With a metre of line and an edge of a nanosecond:
+
+1. **Set the source resistance to 50 Ω and leave the far end open.** The near end sits at *half*
+   the generator's voltage for the first five nanoseconds — the commonest surprise on a bench, and
+   nothing is wrong. At 5 ns the far end jumps to the full voltage, twice what arrived. At 10 ns
+   the near end catches up, and everything is still: a matched source absorbs the reflection, so
+   there is no second round.
+2. **Drop the source resistance to 5 Ω.** Now the reflection bounces off the driver as well, and
+   the far end climbs to its final voltage in a **staircase**, a step every ten nanoseconds. On a
+   scope this looks like a broken driver and is nothing of the kind.
+3. **Put 50 Ω across the far end instead.** One clean edge, arriving late, and nothing comes back.
+   That is what termination is for.
+
+The third case is also where the cure people reach for turns out to be in the wrong place. A series
+resistor at the **driver**, chosen to make the source impedance match the line, quietens a line
+that a resistor at the far end could not — because it absorbs the reflection coming home rather
+than preventing the one going out. It is why series termination is a single resistor next to the
+chip and costs nothing in DC current.
+
+The practical question is only ever whether the delay matters compared with your edges. Ten
+centimetres of track is 500 picoseconds. At 1 MHz that is nothing and the track is a wire. At 500
+MHz it is a quarter of a cycle and the track is a component.
+
+Two settings shape it: **Velocity Factor** is how fast the wave goes as a fraction of the speed of
+light — about two thirds for solid coax and for a board track — and **Loss** is the one-way
+attenuation in decibels, which is zero by default and is what makes a long line's ringing die away
+rather than going on for ever.
+
+One thing to know about simulating them: a line **cannot be stepped over**. If the solver took a
+step longer than the delay it would step past the whole of the behaviour, so the component asks the
+engine for time points of its own, a fraction of the delay apart. A short line therefore makes the
+whole simulation take small steps, which is in the nature of the thing rather than a setting to
+tune.
+
+---
+
+## Ferrite beads
+
+The part on every supply rail that almost nobody can describe. It is drawn like an inductor and it
+is not being used as one.
+
+An inductor **stores** energy and gives it back. That is what makes an LC filter ring, and it is
+why putting an ordinary inductor in a supply rail to quieten it can make things worse: the
+inductance and the decoupling capacitor after it form a resonant circuit, and noise at that
+frequency comes out **larger** than it went in.
+
+A bead is lossy on purpose. At low frequencies it is a piece of wire — tens of milliohms, and the
+supply current goes through it without noticing. As the frequency climbs, the ferrite begins to
+absorb rather than store, and somewhere near a hundred megahertz the thing is essentially a
+resistor of a hundred ohms or more, turning the noise into heat instead of handing it back. Climb
+further and the winding's own stray capacitance shorts it out, so the impedance falls away again.
+
+Which is the first thing to take from it: **a bead has a band, and outside that band it is not
+there**. The number on the datasheet — "600 Ω" — is the impedance at *one frequency*, conventionally
+100 MHz, and not a property of the part at any other. The same bead is under thirty ohms at a
+megahertz. Choosing one by that headline figure, for noise nowhere near 100 MHz, is the usual way
+of fitting a bead that does nothing.
+
+The second thing follows from it, and is worth trying in the simulator because it is genuinely
+surprising: **a bead only damps ringing that is inside its band.** Put one in front of a hundred
+nanofarads and the pair resonate at a few hundred kilohertz, where the bead is still an inductor
+and contributes no loss at all — so it rings exactly as an ordinary inductor would, and "just fit
+a bead" has achieved nothing. Put the same bead in front of the few picofarads of a fast logic
+input, where the ringing is up near its peak, and the overshoot goes away.
+
+Its settings are the two numbers a datasheet gives — the **peak impedance** and the **frequency**
+it happens at — plus a **sharpness** for how broad the peak is and the **DC resistance** of the
+wire through it, which is what decides how much voltage it drops at an amp or two.
+
+---
+
+## Driving a MOSFET gate
+
+A gate is a **capacitor**. Tens of nanofarads, once the Miller effect is counted, and switching the
+transistor means moving all of that charge. The arithmetic is the whole of why gate drivers exist:
+50 nF taken to 10 V in 50 ns needs **ten amps**. A microcontroller pin manages twenty milliamps, so
+driving a power FET straight from one does not fail — it just takes five hundred times longer.
+
+And slow switching is where the heat comes from. A MOSFET is cheap to keep on, because
+R<sub>DS(on)</sub> is milliohms, and cheap to keep off, because nothing flows. It is expensive
+*in between*, passing most of the current with most of the voltage across it, which for those
+microseconds is a hundred times the power it dissipates the rest of the time. Switch slowly at
+100 kHz and the transistor spends a fifth of its life in that state; it will be too hot to touch,
+and nothing in the schematic will say why.
+
+Place a **Gate Driver** from Switching & Isolation between the logic and the gate and the picture
+changes twice over:
+
+- **Speed.** Charge over current: 47 nF to ten volts is 470 nanocoulombs, and two amps moves that
+  in about 235 nanoseconds. Put a capacitor on the driver's output to stand in for the gate, probe
+  it, and compare the edge with and without the driver in the way.
+- **Voltage.** The gate goes to the **driver's** supply, not the logic rail. A FET whose
+  on-resistance is specified at 10 V does not get there on 3.3 V — it is not off, and not properly
+  on either, which is the worst place for it to be. A logic pin cannot take the gate above its own
+  rail at all, however fast it is.
+
+It sinks harder than it sources, as real drivers do, because getting a FET *off* in a hurry is what
+keeps a half-bridge from shooting through. And it has an **under-voltage lockout**: run it from too
+little supply and it says so rather than quietly half-driving the gate.
 
 ---
 
@@ -938,6 +1116,38 @@ real part powers up single-shot and differential, and does nothing at all until 
 **File > Examples > Light Meter** puts the whole chain together — light into a phototransistor,
 current into a resistor, volts into the ADC, and a number over two wires.
 
+### Going the other way: the MCP4725
+
+The **ADS1115** turns a voltage into a number. The **MCP4725** turns one back into a voltage, and
+with both of them a circuit can close a loop — read a sensor, decide something, drive an analog
+stage with the answer. Without a DAC the only way out of the digital world is a pin that is either
+at the rail or at ground.
+
+Two bytes over the bus set it: the top four bits are the power-down setting and the remaining
+twelve are the code, zero to 4095. Three things about it are worth knowing before it disappoints
+you.
+
+**Its output is its supply.** There is no reference pin: full scale is VDD, whatever VDD happens to
+be. Run it from the same slightly-sagging 5 V rail as everything else and every voltage it produces
+sags with it. Fine for a control voltage, useless as a measurement standard — and the opposite of
+the ADS1115 beside it, which has a proper internal reference.
+
+**It cannot drive anything.** The output is a resistor divider behind a small buffer, good for
+microamps. Hang two kilohms on it and you get two thirds of the voltage you asked for. An op-amp
+follower from the Analog ICs group restores it, which is exactly what a buffer is for — try it both
+ways and watch the number move.
+
+**It remembers.** A write can go to the register, which is lost at power-off, or to the on-board
+EEPROM, which is not, so the part can come up at a chosen voltage rather than at zero. That is the
+difference between command `0x40` and command `0x60`, and getting it wrong is how a board powers up
+with its output somewhere surprising.
+
+```
+w 60 08 00       ; fast write: half scale, no command byte
+w 60 40 80 00    ; command write to the register only
+w 60 60 80 00    ; command write to the register and the EEPROM
+```
+
 ---
 
 ## UART, the bus with no clock
@@ -983,6 +1193,69 @@ Three things worth knowing:
 **File > Examples > Serial Link** has a terminal talking to a module every five milliseconds, both
 lines on the scope. Change one end's baud rate while it runs and watch the other end start
 reporting framing errors.
+
+---
+
+## 1-Wire, the bus with no clock and no second wire
+
+The odd one of the three buses here, and the reason is in the name. I²C has two wires and SPI has
+four; this has one, plus a ground — and on a great many parts that one wire carries the power as
+well. What a bit *is*, therefore, cannot be a level sampled on a clock edge, because there is no
+edge to sample on. **It is a pulse width.**
+
+Every exchange is the master pulling the line down and letting go of it again, and the length of
+the pull is the message:
+
+| The master holds it down for | Meaning |
+| --- | --- |
+| About 6 µs | A one |
+| About 60 µs | A zero |
+| At least 480 µs | Reset — and every device on the line answers by pulling it down itself |
+| A brief tug, then lets go | A read slot: whether the line comes back up is the device's answer |
+
+Like I²C it is open drain, so **it needs a pull-up** — 4.7 kΩ is the value everybody uses — and
+without one nothing works at all rather than working badly.
+
+Place a **1-Wire Master** and a **1-Wire Thermometer** (a DS18B20), wire the pull-up, and the
+master plays a written list the same way the I²C one does:
+
+```
+reset          ; the reset pulse, and listen for the presence answer
+w CC 44        ; skip addressing, then start a conversion
+d 750000       ; wait, in microseconds — a conversion takes most of a second
+reset
+w CC BE        ; skip addressing, then read the scratchpad
+r 9            ; nine bytes back
+```
+
+The first two bytes that come back are the temperature in sixteenths of a degree. Double-click the
+sensor to put a hand round it and read it again.
+
+### The DS18B20's three traps
+
+**Eighty-five degrees means "no reading".** The scratchpad powers up holding 0x0550, which is
+exactly 85.0 °C, and keeps it until a conversion has actually finished. A reading of 85 has not
+found a hot room: the conversion never happened, or the scratchpad was read before it was done. It
+is the single most reported fault with this part and it is not a fault. Shorten the `d 750000` to
+`d 1000` and watch it happen.
+
+**A conversion takes most of a second.** Three quarters of it at twelve-bit resolution, and the
+part says nothing while it works. Drop to nine bits and it is ninety milliseconds, at a sixteenth
+of the precision — which is the trade that decides whether a string of ten sensors can be read once
+a second.
+
+**Parasitic power has a sharp edge.** Ground the supply pin and the part runs off the data line,
+charging a capacitor inside it while the line is idle. That works for everything except converting,
+which needs a milliamp and a half — far more than a 4.7 kΩ pull-up can pass. The line sags, the
+chip browns out part way through, and the scratchpad still holds 85, with nothing anywhere saying
+why. The model draws the current, so the sag is real: wire the sensor's VDD to ground and watch the
+reading refuse to change.
+
+And the reason the bus is fussier than the other two: **the timing is the data.** An I²C bus that
+is a little slow still works, because the clock comes with the data. Here, too weak a pull-up on
+too much cable rounds the rising edges, a one starts to look like a zero, and the bus does not
+degrade — it returns nonsense. Put a capacitor across the line to stand in for a long run of cable
+and watch the point at which it stops working.
 
 ---
 

@@ -36,6 +36,13 @@ public static class SymbolRenderer
             case I2cDevice bus: DrawPackage(context, pen, zoom, bus, bus.ComponentType); break;
             case UartPort uart: DrawPackage(context, pen, zoom, uart, uart.ComponentType); break;
             case HallSensor hall: DrawHallSensor(context, pen, zoom, hall); break;
+            case ReedSwitch reed: DrawReedSwitch(context, pen, zoom, reed); break;
+            case PirSensor pir: DrawPirSensor(context, pen, zoom, pir); break;
+            case GateDriver driver: DrawGateDriver(context, pen, zoom, driver); break;
+            case FerriteBead: DrawFerriteBead(context, pen); break;
+            case TransmissionLine line: DrawTransmissionLine(context, pen, zoom, line); break;
+            case Ds18b20 sensor: DrawPackage(context, pen, zoom, sensor, "DS18B20"); break;
+            case OneWireMaster master: DrawPackage(context, pen, zoom, master, master.ComponentType); break;
             case HBridge bridge: DrawHBridge(context, pen, zoom, bridge); break;
             case LithiumCharger charger: DrawPackage(context, pen, zoom, charger, "Li-ION"); break;
             case Phototransistor photo: DrawPhototransistor(context, pen, zoom, photo); break;
@@ -1578,6 +1585,151 @@ public static class SymbolRenderer
     private static Color SymbolColour =>
         CanvasTheme.SymbolBrush is ISolidColorBrush solid ? solid.Color : Colors.Black;
 
+    /// <summary>
+    /// A ferrite bead: the inductor symbol with the bead itself drawn over it, because that is
+    /// what the part is — a coil of one turn with a lump of ferrite round it. Hatched rather than
+    /// filled, which is how a lossy magnetic part is marked on a schematic.
+    /// </summary>
+    private static void DrawFerriteBead(ISymbolCanvas context, IPen pen)
+    {
+        context.DrawLine(pen, new Point(-30, 0), new Point(-16, 0));
+        context.DrawLine(pen, new Point(16, 0), new Point(30, 0));
+
+        // The winding underneath, as the inductor's humps.
+        var winding = new SymbolPath();
+        using (var ctx = winding.Open())
+        {
+            ctx.BeginFigure(new Point(-16, 0), false);
+
+            for (var i = 0; i < 4; i++)
+                ctx.ArcTo(new Point(-16 + ((i + 1) * 8), 0), new Size(4, 4), 0, false, SweepDirection.Clockwise);
+
+            ctx.EndFigure(false);
+        }
+
+        context.DrawGeometry(null, pen, winding);
+
+        // The bead: a body over the winding, with the hatching that marks it as lossy.
+        var body = new Rect(-16, -9, 32, 18);
+        context.DrawRectangle(null, pen, new RoundedRect(body, 2));
+
+        for (var i = -1; i <= 1; i++)
+            context.DrawLine(pen, new Point((i * 9) - 4, 9), new Point((i * 9) + 4, -9));
+    }
+
+    /// <summary>
+    /// A transmission line, drawn as the coax it usually is: an inner conductor running the length
+    /// of it inside a screen, rather than as the plain box other tools use. The point of the
+    /// component is that the two ends are not the same place, and a symbol you can see a length in
+    /// says that better than a rectangle does.
+    /// </summary>
+    private static void DrawTransmissionLine(
+        ISymbolCanvas context, IPen pen, double zoom, TransmissionLine line)
+    {
+        context.DrawRectangle(CanvasTheme.SymbolFill, pen, new RoundedRect(new Rect(-38, -16, 76, 32), 16));
+
+        // The inner conductor, end to end.
+        context.DrawLine(pen, new Point(-50, -15), new Point(-38, -15));
+        context.DrawLine(pen, new Point(-38, -15), new Point(-30, -8));
+        context.DrawLine(pen, new Point(-30, -8), new Point(30, -8));
+        context.DrawLine(pen, new Point(30, -8), new Point(38, -15));
+        context.DrawLine(pen, new Point(38, -15), new Point(50, -15));
+
+        // And the screen, which is the return.
+        context.DrawLine(pen, new Point(-50, 15), new Point(-38, 15));
+        context.DrawLine(pen, new Point(38, 15), new Point(50, 15));
+
+        if (zoom > 0.5)
+        {
+            DrawCenteredText(context, $"{line.CharacteristicImpedance:0}Ω",
+                new Point(0, 6), 8, zoom, CanvasTheme.LabelBrush);
+        }
+    }
+
+    /// <summary>
+    /// A reed switch: the blades overlapping inside the glass capsule they are sealed in. Drawn
+    /// closed or open as it actually is, bounce and all, because watching it chatter is the point
+    /// of having one.
+    /// </summary>
+    private static void DrawReedSwitch(ISymbolCanvas context, IPen pen, double zoom, ReedSwitch reed)
+    {
+        context.DrawLine(pen, new Point(-30, 0), new Point(-20, 0));
+        context.DrawLine(pen, new Point(20, 0), new Point(30, 0));
+
+        // The capsule.
+        context.DrawRectangle(CanvasTheme.SymbolFill, pen, new RoundedRect(new Rect(-20, -10, 40, 20), 10));
+
+        // The blades. One is fixed and the other springs away from it, so the gap is visible at a
+        // glance — which matters here, because watching it open and shut is the point.
+        context.DrawLine(pen, new Point(-20, 0), new Point(2, 0));
+        context.DrawLine(pen, new Point(20, 0), reed.IsClosed ? new Point(-2, 0) : new Point(-2, -7));
+
+        if (zoom <= 0.4) return;
+
+        // The field arriving, lit once the blades have pulled together.
+        var field = CanvasTheme.Pen(
+            reed.IsOperated ? CanvasTheme.ValueBrush : CanvasTheme.LabelBrush, 1.2, zoom);
+
+        for (var i = -1; i <= 1; i++)
+            context.DrawLine(field, new Point(i * 10, -22), new Point(i * 10, -13));
+    }
+
+    /// <summary>
+    /// A PIR sensor: the package with the lens dome that is the only part of one you ever see.
+    /// The dome fills in while it is triggered.
+    /// </summary>
+    private static void DrawPirSensor(ISymbolCanvas context, IPen pen, double zoom, PirSensor pir)
+    {
+        context.DrawRectangle(CanvasTheme.SymbolFill, pen, new RoundedRect(new Rect(-20, -8, 40, 30), 3));
+
+        context.DrawLine(pen, new Point(-30, -30), new Point(-20, -30));
+        context.DrawLine(pen, new Point(-20, -30), new Point(-20, -8));
+        context.DrawLine(pen, new Point(-30, 30), new Point(-20, 30));
+        context.DrawLine(pen, new Point(-20, 30), new Point(-20, 22));
+        context.DrawLine(pen, new Point(20, 0), new Point(30, 0));
+
+        // The lens, which is what a PIR looks like from any distance at all.
+        var lens = pir.IsTriggered ? CanvasTheme.ValueBrush : CanvasTheme.SymbolFill;
+
+        var dome = new SymbolPath();
+        using (var ctx = dome.Open())
+        {
+            ctx.BeginFigure(new Point(-16, -8), true);
+            ctx.ArcTo(new Point(16, -8), new Size(16, 16), 0, false, SweepDirection.Clockwise);
+            ctx.EndFigure(true);
+        }
+
+        context.DrawGeometry(lens, pen, dome);
+
+        if (zoom > 0.5)
+            DrawCenteredText(context, "PIR", new Point(0, 10), 8, zoom, CanvasTheme.LabelBrush);
+    }
+
+    /// <summary>
+    /// A gate driver: a buffer triangle, because that is what it is — the same logic function as
+    /// a piece of wire, and all of the part is in how hard it does it.
+    /// </summary>
+    private static void DrawGateDriver(ISymbolCanvas context, IPen pen, double zoom, GateDriver driver)
+    {
+        context.DrawLine(pen, new Point(-40, 0), new Point(-20, 0));
+        context.DrawLine(pen, new Point(20, 0), new Point(40, 0));
+        context.DrawLine(pen, new Point(0, -30), new Point(0, -18));
+        context.DrawLine(pen, new Point(0, 30), new Point(0, 18));
+
+        var body = SymbolPath.Polyline([new Point(-20, -22), new Point(20, 0), new Point(-20, 22)], true);
+        context.DrawGeometry(CanvasTheme.SymbolFill, pen, body);
+
+        if (driver.IsInverting)
+            context.DrawEllipse(CanvasTheme.SymbolFill, pen, new Point(24, 0), 4, 4);
+
+        // The rail it swings the gate to, which is the half of the part a triangle cannot say.
+        if (zoom > 0.5)
+        {
+            DrawCenteredText(context, $"{driver.SupplyVoltage:0.#}V",
+                new Point(-6, 0), 8, zoom, CanvasTheme.LabelBrush);
+        }
+    }
+
     private static void DrawRegulator(ISymbolCanvas context, IPen pen, double zoom, VoltageRegulator regulator)
     {
         context.DrawLine(pen, new Point(-40, 0), new Point(-26, 0));
@@ -1936,6 +2088,13 @@ public static class SymbolRenderer
         HBridge => 62.0,
         LithiumCharger => 50.0,
         HallSensor => 42.0,
+        PirSensor => 42.0,
+        GateDriver => 42.0,
+
+        // The screen reaches 50 either side and the caption sits under the body.
+        TransmissionLine => 62.0,
+        ReedSwitch => 34.0,
+        Ds18b20 or OneWireMaster => 56.0,
 
         // The leads reach 30, so the default offset puts the caption on top of one.
         Phototransistor => 44.0,
