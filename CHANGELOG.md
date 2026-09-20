@@ -8,6 +8,68 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+## [0.25.0] - 2026-09-20
+
+A second way of looking at a circuit. The palette holds 161 components in 16 categories, 42 worked
+examples, and 1671 tests measure them against closed-form answers.
+
+**The simulator can now sweep frequency.** Until this release it could find a bias point and step
+through time, and that was all. **Simulate > Frequency Response** (F7) answers the other question a
+circuit gets asked: what does it do to a sine at *each frequency*, from one end of a span to the
+other. Magnitude and phase against a logarithmic axis — a Bode plot, which is what every
+datasheet's response curve is drawn on — with the −3 dB corner worked out underneath.
+
+Put a probe where you want the answer and open the window. The traces are your probes, so nothing
+else needs setting up, and it sweeps its own solve from the bias point, so it can be opened while a
+transient is running without disturbing it.
+
+A great many things that are tedious to establish by stepping a generator are one picture here:
+
+- **Where a filter turns over.** The RC example reads 159 Hz off the status line.
+- **How much gain an amplifier has left.** A gain of ten from a 1 MHz op-amp is flat to about
+  90 kHz — the product over the *noise* gain, so 1 MHz over eleven rather than over ten, which is
+  the sort of distinction a plot settles in a second.
+- **What a ferrite bead really does**, which is the impedance curve its datasheet prints, and the
+  quickest way to see that "600 Ω" is true at exactly one frequency.
+- **Resonances nobody put there.** An unterminated stub of transmission line looks like a dead
+  short at its quarter-wave frequency. That is obvious in a sweep and very nearly impossible to
+  find in the time domain.
+
+The answer is exact in a way a measured one is not: at one frequency a capacitor *is* an admittance
+of jωC, so there is no integration error and no time step anywhere in the calculation. It is also
+strictly **small-signal** — everything non-linear is replaced by its slope at the bias point — so
+it says nothing at all about clipping, slew limiting or distortion. For questions about size rather
+than frequency, the oscilloscope is still the instrument.
+
+**A CD4046 phase-locked loop.** A VCO, two phase comparators, and nothing else: everything
+interesting about a PLL happens outside the package, in the loop filter you have to add. It is the
+part that makes **lock range** and **capture range** two genuinely different numbers — how far the
+input may drift once locked, against how close it has to be before the loop can grab it from cold.
+A PLL that holds a signal perfectly and refuses to lock onto the same signal from a standing start
+is not faulty, and this shows why. The two comparators differ in exactly that way: the
+phase-frequency detector pulls in from anywhere in range, while the exclusive-OR only captures what
+is already close.
+
+**An AD633 analog multiplier.** W = (X1−X2)(Y1−Y2)/10 + Z, and the ten volts is the first surprise:
+two inputs at 5 V give 2.5 V, not 25. One line, read differently, is amplitude modulation (a
+carrier multiplied by a tone, which is what AM *is* rather than something done to a carrier),
+mixing, squaring, true RMS, a voltage-controlled amplifier, and a phase detector.
+
+**An INA219 current sensor.** A shunt in the **high side** of a rail, so the load's ground stays
+where it belongs and every other measurement in the circuit still means what it says. And with it
+the limit that makes a current-sense amplifier different from any other: a **common-mode range**
+that is not the same thing as its supply. This one runs from 3.3 V and watches a rail up to 26 V —
+that is the point of it — but past that it still returns a number over the bus, and that number is
+not a measurement. It says so, because nothing else would.
+
+**Fixed:** the oscilloscope resolved its plot colours against the application's theme variant
+rather than its own. The two disagree until the desktop reports its preference, and the scope only
+escaped it because it repaints twenty times a second and corrects itself on the way past.
+
+**Three new examples** — a PLL locking onto a signal, a carrier with an envelope on it, and a
+current sensor following a load switched in while it runs — each asserted in the test suite against
+the thing it is there to show.
+
 ## [0.24.0] - 2026-09-20
 
 Eight new parts, one of which needed the solver to remember more than one step. The palette holds
@@ -934,7 +996,8 @@ First public build of CirqAvalonia — an electronic circuit analyzer and mixed-
 
 **501 tests** measure the solver against closed-form answers rather than recorded output.
 
-[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.24.0...HEAD
+[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.25.0...HEAD
+[0.25.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.24.0...v0.25.0
 [0.24.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.23.0...v0.24.0
 [0.23.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.22.0...v0.23.0
 [0.22.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.21.0...v0.22.0
