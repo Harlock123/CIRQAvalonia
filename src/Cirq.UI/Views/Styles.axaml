@@ -129,6 +129,31 @@
     <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
 
+  <!-- Rows in the example browser: a palette button that can also show which one is selected. -->
+  <Style Selector="ToggleButton.exampleRow">
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="HorizontalContentAlignment" Value="Left" />
+    <Setter Property="Padding" Value="18,5" />
+    <Setter Property="Margin" Value="0,1,0,0" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+  </Style>
+
+  <Style Selector="ToggleButton.exampleRow:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource GroupHeaderHover}" />
+  </Style>
+
+  <Style Selector="ToggleButton.exampleRow:checked /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource SelectionStroke}" />
+    <Setter Property="Foreground" Value="{DynamicResource CanvasBackground}" />
+  </Style>
+
+  <Style Selector="ToggleButton.exampleRow:checked:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource SelectionStroke}" />
+  </Style>
+
   <Style Selector="Button.palette:pointerover /template/ ContentPresenter">
     <Setter Property="Background" Value="{DynamicResource HoverBackground}" />
   </Style>

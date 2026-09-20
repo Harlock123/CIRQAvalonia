@@ -12,7 +12,16 @@ using Cirq.Core.Topology;
 namespace Cirq.UI.ViewModels;
 
 /// <summary>A ready-made circuit offered from the Examples menu.</summary>
-public sealed record ExampleCircuit(string Name, string Description, Action<MainWindowViewModel> Build);
+public sealed record ExampleCircuit(string Name, string Description, Action<MainWindowViewModel> Build)
+{
+    /// <summary>Which group it is filed under, filled in when the groups are flattened.</summary>
+    public string Category { get; init; } = string.Empty;
+}
+
+/// <summary>A named group of examples, as the palette has for components.</summary>
+/// <param name="Name">The heading.</param>
+/// <param name="Items">What is in it.</param>
+public sealed record ExampleCategory(string Name, IReadOnlyList<ExampleCircuit> Items);
 
 /// <summary>
 /// Pre-wired circuits that exercise each part of the engine, so the application has something
@@ -20,83 +29,135 @@ public sealed record ExampleCircuit(string Name, string Description, Action<Main
 /// </summary>
 public static class Examples
 {
-    public static IReadOnlyList<ExampleCircuit> All { get; } =
+    /// <summary>
+    /// Every example, grouped the way the palette groups components.
+    /// <para>
+    /// There are enough of these now that a flat list was the wrong shape: a menu of forty-odd
+    /// entries is something to be got through rather than something to browse, and it gets worse
+    /// with each one added. Grouping them costs a category name per example and makes the set
+    /// searchable instead.
+    /// </para>
+    /// </summary>
+    public static IReadOnlyList<ExampleCategory> Categories { get; } =
     [
-        new("RC Low-Pass", "Step response of a first-order filter", LoadRcLowPass),
-        new("555 Astable", "Free-running multivibrator at about 480 Hz", Load555Astable),
-        new("Inverting Amplifier", "LM741 with a gain of -10", LoadInvertingAmplifier),
-        new("Half-Wave Rectifier", "Diode and smoothing capacitor", LoadRectifier),
-        new("Regulated Supply", "7805 holding 5 V from a 12 V rail", LoadRegulatedSupply),
-        new("NAND Latch", "Cross-coupled 7400 gates", LoadNandLatch),
-        new("Decade Counter", "7490 counting in BCD", LoadDecadeCounter),
-        new("Ring Oscillator", "Three inverters with unequal delays", LoadRingOscillator),
-        new("Digit Counter", "7490 into a 7447 driving a seven-segment display", LoadDigitCounter),
-        new("Transistor Switch", "NPN driving an LED from a push button", LoadTransistorSwitch),
-        new("MOSFET Driver", "Logic-level MOSFET switching an inductive load", LoadMosfetDriver),
-        new("Comparator Trigger", "LM311 squaring up a sine wave", LoadComparatorTrigger),
-        new("Running Light", "74164 shift register walking a bit across eight LEDs", LoadRunningLight),
-        new("Window Detector", "LM339 outputs wired together to flag an out-of-range voltage",
-            LoadWindowDetector),
-        new("Raspberry Pi GPIO", "Pi driving two LEDs and reading a button on an internal pull-up",
-            LoadRaspberryPiGpio),
-        new("Linear Power Supply", "Mains secondary through a bridge and reservoir into a 7812",
-            LoadLinearPowerSupply),
-        new("Lamp Dimmer", "Triac and diac phase control — move the firing angle and the lamp dims",
-            LoadLampDimmer),
-        new("SCR Latch", "A push button fires it and only interrupting the anode turns it off",
-            LoadScrLatch),
-        new("LED Chaser", "4017 walking a lit output along ten LEDs", LoadLedChaser),
-        new("4060 Timer", "A 4060 clocking itself from one resistor and one capacitor",
-            Load4060Timer),
-        new("Staircase Generator", "4040 addressing a 4051 to step through a resistor ladder",
-            LoadStaircase),
-        new("JFET Amplifier", "2N3819 common-source stage with self-bias", LoadJfetAmplifier),
-        new("Buck Converter", "MC34063 stepping 12 V down to 5 V without turning the difference into heat",
-            LoadBuckConverter),
-        new("I2C EEPROM", "Three bytes written over two wires and read back again", LoadI2cEeprom),
-        new("SPI Shift Register", "An SPI master clocking a byte into a 74595 and onto eight LEDs",
-            LoadSpiShiftRegister),
-        new("Full-Wave Rectifier", "A centre-tapped secondary and two diodes — one drop, not a bridge's two",
-            LoadFullWaveRectifier),
-        new("I2C Clock", "A DS1307 read over two wires, its registers in BCD and moving on their own",
-            LoadI2cClock),
-        new("Ultrasonic Ranger", "An HC-SR04 triggered on a timer — the distance is the echo's width",
-            LoadUltrasonicRanger),
-        new("Serial Link", "A UART talking to a module — change one baud rate and watch it break",
-            LoadSerialLink),
-        new("Light Meter", "A phototransistor into an I2C ADC — light, to current, to volts, to a number",
-            LoadLightMeter),
-        new("Motor Reversing", "An H-bridge running a motor both ways — forward, brake, reverse, coast",
-            LoadMotorReversing),
-        new("Noise and Hysteresis", "A comparator chattering on a noisy ramp — add hysteresis and it stops",
-            LoadNoiseAndHysteresis),
-        new("Reflections", "A fast edge down a metre of coax — close SW1 to terminate it and the ringing stops",
-            LoadReflections),
-        new("Ferrite Bead", "Two hundred megahertz of rubbish on a rail, and the bead that turns it into heat",
-            LoadFerriteBead),
-        new("Gate Driver", "The same clock into two MOSFETs, one straight from the pin and one through a driver",
-            LoadGateDriver),
-        new("1-Wire Thermometer", "A DS18B20 read over a single wire — reset, convert, wait, read",
-            LoadOneWireThermometer),
-        new("DAC and ADC", "A voltage made by one chip and measured by another — move the Code slider",
-            LoadDacAndAdc),
-        new("Reed Switch Bounce", "One magnet passing, counted several times — which is what debouncing is for",
-            LoadReedSwitchBounce),
-        new("Motion Light", "A PIR holding a lamp on long after you stop moving",
-            LoadMotionLight),
-        new("Phase-Locked Loop", "A 4046 dragging its oscillator onto an incoming signal and holding it",
-            LoadPhaseLockedLoop),
-        new("Amplitude Modulation", "A carrier multiplied by an audio tone — which is what AM is",
-            LoadAmplitudeModulation),
-        new("Current Sensing", "An INA219 watching a load from the high side of the rail",
-            LoadCurrentSensing),
-        new("Adjustable Supply", "Transformer, bridge, reservoir and a 7805 made adjustable — turn RV1 and watch it move",
-            LoadAdjustableSupply),
-        new("RS-485 Link", "Two transceivers down fifty metres of cable — open SW1 and watch it ring",
-            LoadRs485Link),
-        new("Varactor Tuning", "An LC tank tuned by a voltage — move RV1 and sweep it in Frequency Response",
-            LoadVaractorTuning),
+        new("Fundamentals",
+        [
+            new("RC Low-Pass", "Step response of a first-order filter", LoadRcLowPass),
+            new("Transistor Switch", "NPN driving an LED from a push button", LoadTransistorSwitch),
+            new("MOSFET Driver", "Logic-level MOSFET switching an inductive load", LoadMosfetDriver),
+        ]),
+
+        new("Analog",
+        [
+            new("Inverting Amplifier", "LM741 with a gain of -10", LoadInvertingAmplifier),
+            new("Comparator Trigger", "LM311 squaring up a sine wave", LoadComparatorTrigger),
+            new("Window Detector", "LM339 outputs wired together to flag an out-of-range voltage",
+                LoadWindowDetector),
+            new("JFET Amplifier", "2N3819 common-source stage with self-bias", LoadJfetAmplifier),
+            new("Noise and Hysteresis", "A comparator chattering on a noisy ramp — add hysteresis and it stops",
+                LoadNoiseAndHysteresis),
+        ]),
+
+        new("Power Supplies",
+        [
+            new("Half-Wave Rectifier", "Diode and smoothing capacitor", LoadRectifier),
+            new("Full-Wave Rectifier", "A centre-tapped secondary and two diodes — one drop, not a bridge's two",
+                LoadFullWaveRectifier),
+            new("Regulated Supply", "7805 holding 5 V from a 12 V rail", LoadRegulatedSupply),
+            new("Linear Power Supply", "Mains secondary through a bridge and reservoir into a 7812",
+                LoadLinearPowerSupply),
+            new("Adjustable Supply", "Transformer, bridge, reservoir and a 7805 made adjustable — turn RV1 and watch it move",
+                LoadAdjustableSupply),
+            new("Buck Converter", "MC34063 stepping 12 V down to 5 V without turning the difference into heat",
+                LoadBuckConverter),
+        ]),
+
+        new("Switching & Motors",
+        [
+            new("Gate Driver", "The same clock into two MOSFETs, one straight from the pin and one through a driver",
+                LoadGateDriver),
+            new("SCR Latch", "A push button fires it and only interrupting the anode turns it off",
+                LoadScrLatch),
+            new("Lamp Dimmer", "Triac and diac phase control — move the firing angle and the lamp dims",
+                LoadLampDimmer),
+            new("Motor Reversing", "An H-bridge running a motor both ways — forward, brake, reverse, coast",
+                LoadMotorReversing),
+        ]),
+
+        new("Digital Logic",
+        [
+            new("NAND Latch", "Cross-coupled 7400 gates", LoadNandLatch),
+            new("Decade Counter", "7490 counting in BCD", LoadDecadeCounter),
+            new("Digit Counter", "7490 into a 7447 driving a seven-segment display", LoadDigitCounter),
+            new("Running Light", "74164 shift register walking a bit across eight LEDs", LoadRunningLight),
+            new("LED Chaser", "4017 walking a lit output along ten LEDs", LoadLedChaser),
+            new("Staircase Generator", "4040 addressing a 4051 to step through a resistor ladder",
+                LoadStaircase),
+            new("Ring Oscillator", "Three inverters with unequal delays", LoadRingOscillator),
+        ]),
+
+        new("Timers & Oscillators",
+        [
+            new("555 Astable", "Free-running multivibrator at about 480 Hz", Load555Astable),
+            new("4060 Timer", "A 4060 clocking itself from one resistor and one capacitor",
+                Load4060Timer),
+            new("Phase-Locked Loop", "A 4046 dragging its oscillator onto an incoming signal and holding it",
+                LoadPhaseLockedLoop),
+        ]),
+
+        new("Buses & Interfaces",
+        [
+            new("I2C EEPROM", "Three bytes written over two wires and read back again", LoadI2cEeprom),
+            new("I2C Clock", "A DS1307 read over two wires, its registers in BCD and moving on their own",
+                LoadI2cClock),
+            new("SPI Shift Register", "An SPI master clocking a byte into a 74595 and onto eight LEDs",
+                LoadSpiShiftRegister),
+            new("Serial Link", "A UART talking to a module — change one baud rate and watch it break",
+                LoadSerialLink),
+            new("1-Wire Thermometer", "A DS18B20 read over a single wire — reset, convert, wait, read",
+                LoadOneWireThermometer),
+            new("DAC and ADC", "A voltage made by one chip and measured by another — move the Code slider",
+                LoadDacAndAdc),
+            new("Current Sensing", "An INA219 watching a load from the high side of the rail",
+                LoadCurrentSensing),
+            new("RS-485 Link", "Two transceivers down fifty metres of cable — open SW1 and watch it ring",
+                LoadRs485Link),
+        ]),
+
+        new("Sensors",
+        [
+            new("Ultrasonic Ranger", "An HC-SR04 triggered on a timer — the distance is the echo's width",
+                LoadUltrasonicRanger),
+            new("Light Meter", "A phototransistor into an I2C ADC — light, to current, to volts, to a number",
+                LoadLightMeter),
+            new("Reed Switch Bounce", "One magnet passing, counted several times — which is what debouncing is for",
+                LoadReedSwitchBounce),
+            new("Motion Light", "A PIR holding a lamp on long after you stop moving",
+                LoadMotionLight),
+        ]),
+
+        new("Signal Integrity & RF",
+        [
+            new("Reflections", "A fast edge down a metre of coax — close SW1 to terminate it and the ringing stops",
+                LoadReflections),
+            new("Ferrite Bead", "Two hundred megahertz of rubbish on a rail, and the bead that turns it into heat",
+                LoadFerriteBead),
+            new("Amplitude Modulation", "A carrier multiplied by an audio tone — which is what AM is",
+                LoadAmplitudeModulation),
+            new("Varactor Tuning", "An LC tank tuned by a voltage — move RV1 and sweep it in Frequency Response",
+                LoadVaractorTuning),
+        ]),
+
+        new("Development Boards",
+        [
+            new("Raspberry Pi GPIO", "Pi driving two LEDs and reading a button on an internal pull-up",
+                LoadRaspberryPiGpio),
+        ]),
     ];
+
+    /// <summary>Every example, flattened — the order the groups above put them in.</summary>
+    public static IReadOnlyList<ExampleCircuit> All { get; } =
+        [.. Categories.SelectMany(c => c.Items.Select(e => e with { Category = c.Name }))];
 
     public static void LoadRcLowPass(MainWindowViewModel vm)
     {

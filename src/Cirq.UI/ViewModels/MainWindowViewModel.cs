@@ -74,7 +74,6 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     public IReadOnlyList<PaletteCategoryViewModel> Palette { get; } =
         [.. ComponentCatalog.Categories.Select((c, i) => new PaletteCategoryViewModel(c, isExpanded: i == 0))];
 
-    public IReadOnlyList<ExampleCircuit> ExampleCircuits { get; } = Examples.All;
 
     [ObservableProperty]
     public partial EditorTool ActiveTool { get; set; } = EditorTool.Select;
@@ -378,6 +377,9 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     /// <summary>Raised when the frequency-response window should be opened.</summary>
     public event EventHandler? RequestFrequencyResponse;
 
+    /// <summary>Raised when the example browser should be opened.</summary>
+    public event EventHandler? RequestExamples;
+
     [RelayCommand]
     private void ShowSettings() => RequestSettings?.Invoke(this, EventArgs.Empty);
 
@@ -530,6 +532,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
         File
           Ctrl+N       New circuit
+          Ctrl+Shift+E Browse examples
           Ctrl+O       Open
           Ctrl+S       Save
           Ctrl+Shift+S Save as
@@ -555,6 +558,13 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     /// </summary>
     [RelayCommand]
     private void ShowFrequencyResponse() => RequestFrequencyResponse?.Invoke(this, EventArgs.Empty);
+
+    /// <summary>
+    /// Opens the example browser. The examples used to be a submenu, which worked while there
+    /// were a dozen of them and had become a list to scroll past by the time there were forty.
+    /// </summary>
+    [RelayCommand]
+    private void ShowExamples() => RequestExamples?.Invoke(this, EventArgs.Empty);
 
     partial void OnSelectedComponentChanged(CircuitComponent? value) => Inspector.Component = value;
 

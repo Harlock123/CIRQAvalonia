@@ -32,7 +32,7 @@ Core ← Engine ← Components ← UI, which keeps the whole engine headless-tes
 
 ```bash
 dotnet run --project src/Cirq.UI     # the editor
-dotnet test                          # 1719 tests
+dotnet test                          # 1733 tests
 ```
 
 Targets .NET 10. The UI uses Avalonia 12 and ScottPlot 5.1; those two versions are pinned
@@ -248,6 +248,7 @@ Tests measure the solver against closed-form answers rather than recorded output
 | Files | Every component type round-trips with its parameters, pins, wires, waypoints and probes; a reloaded circuit solves to the same answer; damaged, unknown and newer-format files are handled without losing the open circuit |
 | Settings | Theme round-trips across a restart, corrupt and newer-format preference files fall back to defaults, opening the dialog writes nothing, choosing a theme saves immediately |
 | UI | Background transport, probe decimation, reflection-built inspector, dirty tracking, every example compiles, runs, saves and reopens |
+| Example browser | Every example filed under exactly one group and no group left empty or enormous, the flattened list carrying the group each came from, opening with something already described, searching narrowing to what matches across name, description and group, a search opening whatever it matched, an empty result saying so, selecting one row unmarking the rest, and opening and cancelling each closing with and without a choice |
 | Shipped examples | Each one run for real and asserted against the thing it exists to show — an RS-485 link carrying data down fifty metres and ringing once its terminator is switched out, a varactor-tuned tank whose resonance follows its knob, an adjustable 7805 supply tracking its potentiometer across five settings and rejecting the ripple on the rail below it, the PLL locking onto its signal, the modulated carrier having an envelope, the current sensor following a load switched in while it runs, the reflections example doubling at the far end and going quiet when the terminator is switched in, the bead cutting the noise on the rail, the driven gate reaching twelve volts where the one off the logic pin cannot, the DS18B20 returning the temperature it was set to with a valid CRC, the DAC coming back round through the ADC, one magnet counted several times, and the PIR holding its lamp on after the movement stops |
 
 ## Development boards
@@ -369,6 +370,12 @@ frequency *is* an admittance of jωC, so there is no integration error anywhere 
 makes it exact in a way that measuring the same thing by stepping a generator is not. It is also
 strictly small-signal: it says nothing about clipping, slew limiting or distortion, and the
 oscilloscope remains the instrument for those.
+
+Forty-five worked circuits ship with it, grouped and searchable in **File > Examples...** rather
+than piled into a submenu — Fundamentals, Analog, Power Supplies, Switching & Motors, Digital
+Logic, Timers & Oscillators, Buses & Interfaces, Sensors, Signal Integrity & RF and Development
+Boards. Each one is run by the test suite and asserted against the thing it exists to show, so a
+broken example fails a build rather than a user.
 
 A real circuit's controls are on its front panel, not scattered across its schematic. The
 **CONTROLS** panel gathers every switch, potentiometer, light level, temperature, magnet and target

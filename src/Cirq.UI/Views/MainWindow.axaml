@@ -30,18 +30,9 @@
         <MenuItem Header="_Export..." InputGesture="Ctrl+E" Command="{Binding ExportCommand}"
                   ToolTip.Tip="Write the schematic and the traces out as PNG, JPEG, BMP, SVG or PDF" />
         <Separator />
-        <MenuItem Header="_Examples" ItemsSource="{Binding ExampleCircuits}">
-          <MenuItem.ItemContainerTheme>
-            <ControlTheme TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}"
-                          x:DataType="vm:ExampleCircuit">
-              <Setter Property="Header" Value="{Binding Name}" />
-              <Setter Property="ToolTip.Tip" Value="{Binding Description}" />
-              <Setter Property="Command"
-                      Value="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).LoadExampleCommand}" />
-              <Setter Property="CommandParameter" Value="{Binding}" />
-            </ControlTheme>
-          </MenuItem.ItemContainerTheme>
-        </MenuItem>
+        <MenuItem Header="_Examples..." InputGesture="Ctrl+Shift+E"
+                  Command="{Binding ShowExamplesCommand}"
+                  ToolTip.Tip="Browse the example circuits by group" />
         <Separator />
         <MenuItem Header="Se_ttings..." Command="{Binding ShowSettingsCommand}" />
         <Separator />

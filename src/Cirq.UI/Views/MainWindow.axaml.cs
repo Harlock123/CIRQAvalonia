@@ -83,6 +83,7 @@ public partial class MainWindow : Window
         viewModel.RequestSettings += async (_, _) => await ShowSettingsAsync();
         viewModel.RequestAbout += async (_, _) => await ShowAboutAsync();
         viewModel.RequestFrequencyResponse += async (_, _) => await ShowFrequencyResponseAsync();
+        viewModel.RequestExamples += async (_, _) => await ShowExamplesAsync();
 
         // Code-drawn surfaces cannot bind to a resource, so they are told to repaint.
         ThemeManager.ThemeChanged += (_, _) => Dispatcher.UIThread.Post(() =>
@@ -107,6 +108,18 @@ public partial class MainWindow : Window
     {
         var dialog = new AboutWindow { DataContext = new AboutViewModel() };
         await dialog.ShowDialog(this);
+    }
+
+    private async Task ShowExamplesAsync()
+    {
+        if (_viewModel is null) return;
+
+        var browser = new ExampleBrowserViewModel();
+        var dialog = new ExampleBrowserWindow { DataContext = browser };
+
+        await dialog.ShowDialog(this);
+
+        if (browser.Chosen is { } example) _viewModel.LoadExampleCommand.Execute(example);
     }
 
     private async Task ShowFrequencyResponseAsync()

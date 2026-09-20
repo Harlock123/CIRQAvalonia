@@ -347,11 +347,19 @@ You should see a square wave and the exponential charge and discharge of the cap
 the RC time constant here is 10 kΩ × 100 nF = 1 ms, against a half-period of 1 ms, so the capacitor
 gets roughly two-thirds of the way each time.
 
-Everything above is also in **File > Examples**, along with twenty-four other circuits. Six of them
-exercise the newer parts: **Lamp Dimmer** (triac and diac phase control), **SCR Latch** (a thyristor
-that stays on after you let go of the button), **LED Chaser** (a 4017), **4060 Timer** (a chip
-clocking itself from one resistor and one capacitor), **Staircase Generator** (a 4040 addressing a
-4051) and **JFET Amplifier**.
+### The example browser
+
+Everything above is also in **File > Examples...** (`Ctrl+Shift+E`), along with forty-four others.
+
+They are grouped the way the component palette is — Fundamentals, Analog, Power Supplies, Switching
+& Motors, Digital Logic, Timers & Oscillators, Buses & Interfaces, Sensors, Signal Integrity & RF,
+Development Boards — with a description of whichever one is selected beside the list, and a search
+box across all three of the name, the description and the group. So looking for `I2C` finds the
+four bus examples, and looking for `hysteresis` finds the comparator circuit whose name you have
+forgotten. Double-click to open, or select and press Enter.
+
+Opening one replaces whatever is on the canvas, so save first if there is anything there worth
+keeping.
 
 ---
 
@@ -2085,6 +2093,7 @@ Also available in the app at **Help > Keyboard Shortcuts**.
 | View menu | **Mark Interactive Parts** rings everything you can double-click |
 | `Ctrl+N` / `Ctrl+O` / `Ctrl+S` / `Ctrl+Shift+S` | New / open / save / save as |
 | `Ctrl+E` | Export the schematic or the traces as PNG, JPEG, BMP, SVG or PDF |
+| `Ctrl+Shift+E` | Browse the example circuits |
 | `Help > About` | Version, and the libraries this is built on — with a button that copies the lot |
 
 ---
