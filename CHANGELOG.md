@@ -8,6 +8,12 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-09-19
+
+Three ways of getting the physical world into a circuit, and one of getting the circuit back out
+of it. The palette holds 146 components in 16 categories, and 1189 tests measure them against
+closed-form answers.
+
 **An ADC on the I²C bus.** Everything else on that bus dealt in bytes that were already digital —
 memory, pins, the time. The **ADS1115** reaches back into the circuit it is sitting in and reports
 what the voltage on a node really is, which is the point of putting a converter on a bus at all.
@@ -695,7 +701,8 @@ First public build of CirqAvalonia — an electronic circuit analyzer and mixed-
 
 **501 tests** measure the solver against closed-form answers rather than recorded output.
 
-[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.18.0...HEAD
+[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.19.0...HEAD
+[0.19.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.15.0...v0.16.0
