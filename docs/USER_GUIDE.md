@@ -84,7 +84,7 @@ The palette holds **164 components in 16 categories**:
 | 74xx Series | 18 | Counters, decoders, flip-flops, shift registers (including the **74595**), multiplexers, Schmitt inverter |
 | 40xx Series | 15 | CMOS gates, counters, flip-flops, analog switches and a **4046 phase-locked loop** — see [below](#phase-locked-loops) |
 | Buses | 14 | I2C master, EEPROM, port expander, DS1307 clock, ADS1115 ADC, MCP4725 DAC and INA219 current sensor, SPI master, 1-Wire master and DS18B20 thermometer, serial terminal and device, **RS-485 transceiver**, level shifter — see [below](#rs-485-signalling-by-difference) |
-| Digital I/O | 6 | Logic toggle, clock, indicators, rotary encoder, **oscillator module** |
+| Digital I/O | 6 | Logic toggle, clock, rotary encoder, oscillator module, **ADC and DAC bridges** — see [below](#between-the-analog-solver-and-the-logic-engine) |
 | Sensors & Actuators | 17 | DC motor, LDR, thermistors, buzzers, speaker, microphone, servo, stepper, thermocouple, load cell, HC-SR04 ranger, Hall switch, phototransistor, **reed switch** and **PIR motion sensor** — see [below](#sensors-and-actuators) |
 | Switching & Isolation | 8 | Relay, fuses, optocouplers, ULN2003, H-bridge, **MOSFET gate driver** — see [below](#driving-a-mosfet-gate) |
 | Dev Boards | 4 | Raspberry Pi, Arduino Uno / Nano / Mega — see [below](#development-boards) |
@@ -349,7 +349,7 @@ gets roughly two-thirds of the way each time.
 
 ### The example browser
 
-Everything above is also in **File > Examples...** (`Ctrl+Shift+E`), along with sixty-one others.
+Everything above is also in **File > Examples...** (`Ctrl+Shift+E`), along with sixty-seven others.
 
 They are grouped the way the component palette is — Fundamentals, Analog, Power Supplies, Switching
 & Motors, Digital Logic, Timers & Oscillators, Buses & Interfaces, Sensors, Signal Integrity & RF,
@@ -499,6 +499,22 @@ an LDR is normally read with a comparator against a divider rather than measured
 Double-click it on the canvas to cover and uncover it, the same as operating a switch, so a
 light-sensing circuit can be exercised while the simulation runs.
 
+**File > Examples > Night Light** is that comparator-against-a-divider, except the divider is a
+**TL431** — and the reason is worth a moment. A threshold made from two resistors is a fixed
+*fraction* of the supply, so it moves when the supply does: run the same circuit off a battery and
+the light level it switches at drifts as the battery goes flat. The shunt reference holds 2.495 V
+whatever is above it. Drop the rail from 5 V to 4 V in the inspector and watch the reference not
+move.
+
+The feed resistor is a kilohm rather than the 2.2 kΩ that looks sufficient at five volts, and that
+is the same story from the other end: at four volts a 2.2 kΩ leaves the TL431 under its milliamp
+and it stops regulating. Size it for the bottom of the supply, not the top.
+
+There is an **SPDT switch** in the lamp's return path, throwing between the comparator's output and
+ground, which is the auto/manual override every real one of these has. The lamp is wired from the
+rail down to the switch, so what does the switching is a connection to ground — which is all an
+open-collector output can offer.
+
 **Thermistor** comes in both flavours. An NTC follows the Beta equation, `R = R₂₅·exp(B·(1/T −
 1/T₂₅))` with the temperatures in kelvin — the real curve, and steeply non-linear: a 10 kΩ B3950
 bead reads 33 kΩ at freezing and 2.5 kΩ at 60 °C. Treating that as a straight line is the usual
@@ -608,6 +624,16 @@ panel and watch the count move several places. That is what debouncing is for,
 and it is the difference you can see between this part and the Hall switch beside it, which does
 not bounce at all. Opening does not bounce either, in the model as in life: there is nothing for
 the blades to rebound off.
+
+**File > Examples > Hall Counter** is the other half of that comparison, built the same way: a Hall
+switch with a pull-up, clocking a 4040. Drag **Field** in the CONTROLS panel up past 20 mT and back
+to zero — one pass, one count, every time. Do it four times and the counter has advanced four
+places, where the reed switch beside it would have given some larger number nobody chose.
+
+It is an **open-drain** output like almost every Hall switch sold, so the 10 kΩ is not optional:
+take it out and the part says so rather than quietly reading low. And the two thresholds are what
+make the count clean — 20 mT to operate and 10 mT to release, so a magnet lingering at fifteen has
+already been decided about.
 
 ### PIR motion sensors
 
@@ -1015,6 +1041,20 @@ The switched pins carry whatever you put on them — audio, a sensor divider, a 
 control pin only decides whether the path exists. Neither switched pin is an input or an output,
 which is what *bilateral* means. A closed switch is some tens of ohms rather than a short, so
 feeding a low-impedance load through one loses real signal.
+
+**File > Examples > Analog Switch** has four generators at four frequencies, one into each channel,
+all four far sides tied to one node, and a **DIP switch** on the control pins. Close one section
+and that generator arrives at the common node within about three millivolts of itself — eighty ohms
+of switch against a hundred kilohms of load is a rounding error, which is the right way to use one.
+
+Now close a second section. The two generators are wired directly together through a hundred and
+sixty ohms, and the common node departs from either of them by the better part of a volt: what
+comes out is neither source, and no amount of looking at one generator explains it. That is the
+mistake four independent switches allow and the 4051 below cannot make.
+
+Each control pin has a 100 kΩ holding it down when its DIP section is open. A CMOS control input
+left floating decides for itself, and a switch that opens and closes according to what the board
+picked up is worse than one that is simply stuck.
 
 **4051** — the 4066 with an address decoder in front of it: three address pins pick one of eight
 channels and connect it to the common pin, leaving the other seven open. The path is bilateral
@@ -1823,6 +1863,35 @@ voltages at once.
 
 ---
 
+## Between the analog solver and the logic engine
+
+Two parts sit on the boundary itself, and they are worth knowing about because the boundary is
+real: logic in this simulator is event-driven and analog is solved, and something has to translate.
+
+**ADC Bridge** watches an analog node and drives a clean logic level from it. **DAC Bridge** does
+the reverse — a logic input, an analog output at whatever two voltages you name, through a source
+resistance. Between them they let a digital subcircuit read something analog and drive something
+analog without a converter chip in the way, which is what you want when the converter is not the
+thing you are studying.
+
+The ADC bridge has **two thresholds**, and that is the part worth understanding rather than
+accepting. A single threshold is fine for a signal that crosses it decisively. It falls apart on a
+slow one: near the threshold a few millivolts of noise decides the answer, so the output changes
+several times where the signal crossed once, and everything downstream counts all of them. Set
+`ThresholdHigh` and `ThresholdLow` apart and the input has to commit before the output follows.
+Turn `UseHysteresis` off and it is a plain comparator again.
+
+**File > Examples > Analog and Logic** is both parts and that failure. A 200 Hz triangle with sixty
+millivolts of noise on it goes into the ADC bridge, the logic comes out, and the DAC bridge turns
+it back into an analog signal at 0 to 3.3 V — a different pair of voltages from the ones that went
+in, which is the point of the second part. The scope is tiled so all three are readable at once.
+
+With hysteresis the output changes four or five times across the window, which is how many times
+the ramp actually crossed. Turn it off in the inspector and it changes about twenty. Nothing about
+the input changed; the only difference is whether the threshold moved out of the way behind it.
+
+---
+
 ## Noise, and why hysteresis exists
 
 Every circuit in this guide so far has been perfectly clean, and that is the one way in which none
@@ -2035,6 +2104,22 @@ do not know how hot the hot one is. That is what *cold junction compensation* me
 cold junction temperature is a property here rather than an assumption. Double-click the junction
 to heat it.
 
+**File > Examples > Thermocouple** is the K-type into an INA126 at a gain of a hundred, with the
+reference pin lifted to a quarter of the supply so the output has somewhere to sit at zero
+difference. At 300 °C the junction produces **11.3 mV** — two hundred and seventy-five degrees at
+forty-one microvolts each — and the amplifier turns that into 1.13 V above its reference.
+
+The compensation problem is visible rather than described. Leave the hot end at 300 °C and raise
+**Cold Junction Temperature** to 50: the voltage falls, the reading falls with it, and nothing
+about the thing being measured has changed. The part reports `UncompensatedTemperature` for exactly
+this — the temperature you would infer from the voltage alone, which is short by whatever the cold
+end is at.
+
+The gain is a hundred and not more because the choice is a range: a hundred puts 300 °C in the
+middle of the supply and runs out around 700, and a thermocouple that reads to its full twelve
+hundred degrees cannot also resolve the first fifty. That trade is the design, not a limitation of
+the model.
+
 **Load cell** — four strain gauges in a Wheatstone bridge, which is how nearly everything that
 weighs things works. Two gauges stretch under load and two compress, so the bridge goes out of
 balance by a fraction of a percent. It is stamped as the four resistors it actually is, so the
@@ -2062,6 +2147,16 @@ frequency rather than the pulse length makes a servo behave strangely. It moves 
 so a commanded jump takes time to arrive, and it goes limp when the pulses stop rather than
 snapping back. A pulse outside the range is reported, because a real servo drives against its end
 stop and stalls there.
+
+**File > Examples > Servo Sweep** is one servo and one generator, and the generator is set up as a
+servo signal: fifty hertz, and a duty cycle that works out to a millisecond and a half. Drag
+**Duty** in the CONTROLS panel — 0.05 is 1 ms and one end of the travel, 0.075 is 1.5 ms and the
+centre, 0.10 is 2 ms and the other end.
+
+Then do the thing the paragraph above warns about: leave Duty alone and change **Frequency**
+instead. The pulses arrive at a different rate and the servo does not move, because the width has
+not changed. Push the frequency high enough that twenty milliseconds no longer fits a pulse and it
+stops making sense entirely.
 
 **Stepper motor** — four-phase unipolar, the sort the ULN2003 exists to drive. It has no idea where
 it is. Energise the coils in order and the rotor follows one step at a time; reverse the order and

@@ -1,4 +1,5 @@
 using Cirq.Components.Boards;
+using Cirq.Components.Bridges;
 using Cirq.Components.Buses;
 using Cirq.Components.Digital;
 using Cirq.Components.Electromechanical;
@@ -44,6 +45,8 @@ public static class Examples
         [
             new("RC Low-Pass", "Step response of a first-order filter", LoadRcLowPass),
             new("Transistor Switch", "NPN driving an LED from a push button", LoadTransistorSwitch),
+            new("Analog and Logic", "The two parts that live on the boundary, and why one has two thresholds",
+                LoadAnalogBoundary),
             new("MOSFET Driver", "Logic-level MOSFET switching an inductive load", LoadMosfetDriver),
         ]),
 
@@ -56,6 +59,8 @@ public static class Examples
             new("JFET Amplifier", "2N3819 common-source stage with self-bias", LoadJfetAmplifier),
             new("Rail to Rail", "The same follower three times — an LM741, an LM358 and an MCP6002 on one 5 V supply",
                 LoadRailToRail),
+            new("Analog Switch", "A 4066 picking one of four sources — and what closing two does",
+                LoadAnalogSwitch),
             new("Noise and Hysteresis", "A comparator chattering on a noisy ramp — add hysteresis and it stops",
                 LoadNoiseAndHysteresis),
         ]),
@@ -94,6 +99,8 @@ public static class Examples
                 LoadLampDimmer),
             new("Relay Driver", "Logic to a coil through an optocoupler and a Darlington array",
                 LoadRelayDriver),
+            new("Servo Sweep", "The angle is the width of the pulse — turn Duty and watch it move",
+                LoadServoSweep),
             new("Stepper Motor", "A 4017 walking four windings through a ULN2003",
                 LoadStepper),
             new("Motor Reversing", "An H-bridge running a motor both ways — forward, brake, reverse, coast",
@@ -160,6 +167,12 @@ public static class Examples
                 LoadRotaryEncoder),
             new("Thermostat", "An NTC, a comparator and the feedback resistor that stops it chattering",
                 LoadThermostat),
+            new("Night Light", "An LDR against a TL431 reference, with a switch to override it",
+                LoadNightLight),
+            new("Thermocouple", "Microvolts per degree into an INA126 — and it measures a difference",
+                LoadThermocouple),
+            new("Hall Counter", "A Hall switch counting a magnet, cleanly, where a contact could not",
+                LoadHallCounter),
         ]),
 
         new("Signal Integrity & RF",
@@ -3590,6 +3603,334 @@ public static class Examples
         vm.Scope.TimebasePerDivision = 10e-3;
         vm.Scope.VoltsPerDivision = 2.0;
         vm.Scope.Layout = ScopeLayout.Tiled;
+    }
+
+    /// <summary>
+    /// A lamp that turns itself on when it gets dark, with a proper reference rather than half the
+    /// supply — and a switch to override it, because every real one has that too.
+    /// </summary>
+    public static void LoadNightLight(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "Light-operated switch";
+
+        var supply = Place(circuit, new DcVoltageSource(5.0), -640, 220);
+
+        var sensor = Place(circuit, new LightDependentResistor { Illuminance = 500 }, -400, -140);
+        var lower = Place(circuit, new Resistor(10e3), -400, 40);
+
+        // A TL431 rather than another divider. A divider's threshold moves with the supply; this
+        // one does not, which is the difference between a light switch and a battery meter.
+        // A kilohm, so the shunt still has its milliamp with the rail down at four volts. Sized
+        // by what is left at the bottom of the supply rather than by what flows at the top is the
+        // classic way to get a reference that works on the bench and starves on batteries.
+        var feed = Place(circuit, new Resistor(1e3), -180, -200);
+        var reference = Place(circuit, new ShuntReference(), -180, -40);
+
+        var comparator = Place(circuit, new Comparator(ComparatorModel.Lm311), 80, -80);
+        var pullUp = Place(circuit, new Resistor(4.7e3), 300, -220);
+        var limiter = Place(circuit, new Resistor(330), 480, -80);
+        var lamp = Place(circuit, Led.OfColour("Yellow"), 620, -80);
+        var mode = Place(circuit, new SpdtSwitch(), 620, 140);
+
+        var gnd = Place(circuit, new Ground(), -640, 380);
+        var gnd2 = Place(circuit, new Ground(), -400, 180);
+        var gnd3 = Place(circuit, new Ground(), -180, 120);
+        var gnd4 = Place(circuit, new Ground(), 80, 100);
+        var gnd5 = Place(circuit, new Ground(), 760, 300);
+
+        sensor.RotationDegrees = 90;
+        lower.RotationDegrees = 90;
+        feed.RotationDegrees = 90;
+        limiter.RotationDegrees = 90;
+        lamp.RotationDegrees = 90;
+        pullUp.RotationDegrees = 90;
+
+        circuit.Connect(supply.Negative, gnd.Pin);
+
+        // Light makes the LDR conduct, so this node rises with the light on it.
+        circuit.Connect(sensor.A, supply.Positive);
+        circuit.Connect(sensor.B, lower.A);
+        circuit.Connect(lower.B, gnd2.Pin);
+
+        // Reference pin tied to the cathode makes it a fixed 2.5 V shunt.
+        circuit.Connect(feed.A, supply.Positive);
+        circuit.Connect(feed.B, reference.Cathode);
+        circuit.Connect(reference.Reference, reference.Cathode);
+        circuit.Connect(reference.Anode, gnd3.Pin);
+
+        circuit.Connect(comparator.PositiveSupply, supply.Positive);
+        circuit.Connect(comparator.NegativeSupply, gnd4.Pin);
+        // Dark pulls the sensing node down, so it goes to the inverting input: below the
+        // reference the output lets go, and the lamp's cathode has nowhere to sink to.
+        // The other way round gives a lamp that comes on in daylight.
+        circuit.Connect(comparator.NonInverting, sensor.B);
+        circuit.Connect(comparator.Inverting, reference.Cathode);
+
+        circuit.Connect(pullUp.A, supply.Positive);
+        circuit.Connect(pullUp.B, comparator.Output);
+
+        // The lamp hangs off the rail and is switched at its cathode end, which is what an
+        // open-collector output can do.
+        circuit.Connect(limiter.A, supply.Positive);
+        circuit.Connect(limiter.B, lamp.Anode);
+        circuit.Connect(lamp.Cathode, mode.Common);
+
+        // Auto on one throw, permanently on at the other.
+        circuit.Connect(mode.ThrowA, comparator.Output);
+        circuit.Connect(mode.ThrowB, gnd5.Pin);
+
+        vm.Scope.TimebasePerDivision = 10e-3;
+        vm.Scope.VoltsPerDivision = 1.0;
+        vm.Scope.AddProbe(sensor.B, "Light");
+        vm.Scope.AddProbe(reference.Cathode, "Reference");
+        vm.Scope.AddProbe(lamp.Cathode, "Lamp");
+    }
+
+    /// <summary>
+    /// Microvolts per degree out of two wires, and the thing every thermocouple circuit has to
+    /// deal with: it measures a difference, not a temperature.
+    /// </summary>
+    public static void LoadThermocouple(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "Thermocouple and cold junction";
+
+        var supply = Place(circuit, new DcVoltageSource(5.0), -560, 160);
+        var probe = Place(circuit, new Thermocouple(ThermocoupleType.K) { Temperature = 300.0 },
+            -300, -80);
+        // A hundred, not more: the gain is chosen for the range you want, and a thermocouple that
+        // reads to its full twelve hundred degrees cannot also resolve the first fifty.
+        var amplifier = Place(circuit, new Ina126 { DifferentialGain = 100 }, 100, -60);
+
+        var referenceTop = Place(circuit, new Resistor(15e3), 40, 220);
+        var referenceBottom = Place(circuit, new Resistor(5e3), 40, 360);
+
+        var gnd = Place(circuit, new Ground(), -560, 320);
+        var gnd2 = Place(circuit, new Ground(), -300, 120);
+        var gnd3 = Place(circuit, new Ground(), 40, 480);
+
+        probe.RotationDegrees = 90;
+        referenceTop.RotationDegrees = 90;
+        referenceBottom.RotationDegrees = 90;
+
+        circuit.Connect(supply.Negative, gnd.Pin);
+
+        circuit.Connect(probe.B, gnd2.Pin);
+        circuit.Connect(amplifier.InPlus, probe.A);
+        circuit.Connect(amplifier.InMinus, probe.B);
+
+        circuit.Connect(amplifier.PositiveSupply, supply.Positive);
+        circuit.Connect(amplifier.NegativeSupply, gnd.Pin);
+
+        // The reference the output is measured from, set above the bottom rail so the amplifier
+        // has room to sit at zero degrees of difference.
+        circuit.Connect(referenceTop.A, supply.Positive);
+        circuit.Connect(referenceTop.B, referenceBottom.A);
+        circuit.Connect(referenceBottom.B, gnd3.Pin);
+        circuit.Connect(referenceTop.B, amplifier.Reference);
+
+        vm.Scope.TimebasePerDivision = 1e-3;
+        vm.Scope.VoltsPerDivision = 1.0;
+        vm.Scope.AddProbe(probe.A, "Junction");
+        vm.Scope.AddProbe(amplifier.Output, "Amplified");
+    }
+
+    /// <summary>
+    /// A servo, where the angle is in the width of a pulse and nothing else — not its height, not
+    /// its rate, not the average.
+    /// </summary>
+    public static void LoadServoSweep(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "Pulse width and a servo";
+
+        var supply = Place(circuit, new DcVoltageSource(5.0), -520, 160);
+
+        // Fifty hertz, and a duty cycle that works out at a millisecond and a half — the middle
+        // of the travel. The Duty control is the joystick.
+        var pulses = Place(circuit, new FunctionGenerator(Waveform.Square, 50.0, 5.0)
+        {
+            DcOffset = 2.5,
+            DutyCycle = 0.075,
+        }, -520, -140);
+
+        var servo = Place(circuit, new Servo(), -80, -60);
+
+        var gnd = Place(circuit, new Ground(), -520, 320);
+        var gnd2 = Place(circuit, new Ground(), -520, 20);
+        var gnd3 = Place(circuit, new Ground(), -80, 160);
+
+        circuit.Connect(supply.Negative, gnd.Pin);
+        circuit.Connect(pulses.Return, gnd2.Pin);
+
+        circuit.Connect(servo.Supply, supply.Positive);
+        circuit.Connect(servo.Ground, gnd3.Pin);
+        circuit.Connect(servo.Signal, pulses.Output);
+
+        vm.Scope.TimebasePerDivision = 5e-3;
+        vm.Scope.VoltsPerDivision = 1.0;
+        vm.Scope.AddProbe(pulses.Output, "Pulses");
+    }
+
+    /// <summary>
+    /// A Hall switch counting a magnet, and the two thresholds that let it do so cleanly where a
+    /// mechanical contact cannot.
+    /// </summary>
+    public static void LoadHallCounter(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "Counting with a Hall switch";
+
+        var supply = Place(circuit, new DcVoltageSource(5.0), -520, 180);
+        var sensor = Place(circuit, new HallSensor { FluxDensity = 0.0 }, -260, -60);
+
+        // Open drain, like almost every Hall switch sold: it pulls down and lets go.
+        var pullUp = Place(circuit, new Resistor(10e3), -40, -220);
+
+        var counter = Place(circuit, new Ic4040(), 180, -60);
+        var limiter = Place(circuit, new Resistor(330), 480, 40);
+        var lamp = Place(circuit, Led.OfColour("Blue"), 620, 40);
+
+        var gnd = Place(circuit, new Ground(), -520, 340);
+        var gnd2 = Place(circuit, new Ground(), -260, 160);
+        var gnd3 = Place(circuit, new Ground(), 180, 220);
+        var gnd4 = Place(circuit, new Ground(), 620, 200);
+
+        pullUp.RotationDegrees = 90;
+        limiter.RotationDegrees = 90;
+        lamp.RotationDegrees = 90;
+
+        circuit.Connect(supply.Negative, gnd.Pin);
+        circuit.Connect(sensor.Vcc, supply.Positive);
+        circuit.Connect(sensor.Gnd, gnd2.Pin);
+
+        circuit.Connect(pullUp.A, supply.Positive);
+        circuit.Connect(pullUp.B, sensor.Output);
+
+        circuit.Connect(counter.Vcc, supply.Positive);
+        circuit.Connect(counter.Gnd, gnd3.Pin);
+        circuit.Connect(counter.Reset, gnd3.Pin);
+        circuit.Connect(counter.Clock, sensor.Output);
+
+        circuit.Connect(limiter.A, counter.Outputs[0]);
+        circuit.Connect(limiter.B, lamp.Anode);
+        circuit.Connect(lamp.Cathode, gnd4.Pin);
+
+        vm.Scope.TimebasePerDivision = 20e-3;
+        vm.Scope.VoltsPerDivision = 1.0;
+        vm.Scope.AddProbe(sensor.Output, "Hall");
+        vm.Scope.AddProbe(counter.Outputs[0], "Count / 2");
+    }
+
+    /// <summary>
+    /// Four analog switches and eight ways to get them wrong. The one worth seeing is what happens
+    /// when two of them are closed together.
+    /// </summary>
+    public static void LoadAnalogSwitch(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "A 4066 selecting between sources";
+
+        var supply = Place(circuit, new DcVoltageSource(5.0), -680, 300);
+        var switches = Place(circuit, new Ic4066(), 40, 0);
+        var selector = Place(circuit, new DipSwitch { Position1 = true }, -260, 260);
+
+        var gnd = Place(circuit, new Ground(), -680, 460);
+        var gnd2 = Place(circuit, new Ground(), 40, 240);
+        var gnd3 = Place(circuit, new Ground(), 420, 300);
+
+        circuit.Connect(supply.Negative, gnd.Pin);
+        circuit.Connect(switches.Vcc, supply.Positive);
+        circuit.Connect(switches.Gnd, gnd2.Pin);
+
+        // Four sources at four frequencies, so which one is getting through is obvious.
+        var sources = new[] { 500.0, 1e3, 2e3, 4e3 };
+
+        for (var i = 0; i < 4; i++)
+        {
+            var source = Place(circuit, new FunctionGenerator(Waveform.Sine, sources[i], 2.0)
+            {
+                DcOffset = 2.5,
+            }, -680, -320 + (i * 160));
+
+            var sourceGround = Place(circuit, new Ground(), -560, -240 + (i * 160));
+
+            circuit.Connect(source.Return, sourceGround.Pin);
+
+            var (a, b) = switches.Switch(i);
+            circuit.Connect(source.Output, a);
+
+            // Every switch's far side lands on the same node — the first one's B pin is that
+            // node, so it is already there.
+            if (i > 0) circuit.Connect(b, switches.Switch(0).B);
+
+            // Each control pin comes off the rail through one section of the DIP switch, with a
+            // resistor holding it down when the section is open — a CMOS control input left
+            // floating decides for itself.
+            var (dipA, dipB) = selector.Section(i);
+            var hold = Place(circuit, new Resistor(100e3), -120, 180 + (i * 80));
+
+            circuit.Connect(dipA, supply.Positive);
+            circuit.Connect(dipB, switches.Control(i));
+            circuit.Connect(hold.A, switches.Control(i));
+            circuit.Connect(hold.B, gnd2.Pin);
+        }
+
+        // The common node, loaded high so the switch resistance is a rounding error rather than a
+        // divider. Through a hundred ohms it would not be.
+        var load = Place(circuit, new Resistor(100e3), 420, 120);
+        load.RotationDegrees = 90;
+
+        circuit.Connect(switches.Switch(0).B, load.A);
+        circuit.Connect(load.B, gnd3.Pin);
+
+        vm.Scope.TimebasePerDivision = 500e-6;
+        vm.Scope.VoltsPerDivision = 1.0;
+        vm.Scope.AddProbe(switches.Switch(0).B, "Selected");
+    }
+
+    /// <summary>
+    /// The two parts that sit on the line between the analog solver and the logic engine, doing
+    /// the only two jobs there are to do there.
+    /// </summary>
+    public static void LoadAnalogBoundary(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "Crossing between analog and logic";
+
+        // A slow ramp is the hard case: it spends a long time near the threshold, which is exactly
+        // where a few millivolts of noise decides the answer.
+        var ramp = Place(circuit, new FunctionGenerator(Waveform.Triangle, 200.0, 4.0)
+        {
+            DcOffset = 2.0,
+        }, -640, -80);
+
+        var noise = Place(circuit, new NoiseSource { RmsVoltage = 60e-3 }, -420, -80);
+
+        var toLogic = Place(circuit, new AdcBridge(), -120, -80);
+        var toAnalog = Place(circuit, new DacBridge { AnalogHigh = 3.3 }, 180, -80);
+        var load = Place(circuit, new Resistor(10e3), 420, 40);
+
+        var gnd = Place(circuit, new Ground(), -640, 120);
+        var gnd2 = Place(circuit, new Ground(), 420, 200);
+
+        load.RotationDegrees = 90;
+
+        circuit.Connect(ramp.Return, gnd.Pin);
+        circuit.Connect(ramp.Output, noise.A);
+        circuit.Connect(noise.B, toLogic.AnalogIn);
+
+        circuit.Connect(toLogic.DigitalOut, toAnalog.DigitalIn);
+        circuit.Connect(toAnalog.AnalogOut, load.A);
+        circuit.Connect(load.B, gnd2.Pin);
+
+        vm.Scope.TimebasePerDivision = 1e-3;
+        vm.Scope.VoltsPerDivision = 1.0;
+        vm.Scope.Layout = ScopeLayout.Tiled;
+        vm.Scope.AddProbe(toLogic.AnalogIn, "Noisy ramp");
+        vm.Scope.AddProbe(toLogic.DigitalOut, "As logic");
+        vm.Scope.AddProbe(toAnalog.AnalogOut, "Back to analog");
     }
 
     private static T Place<T>(Circuit circuit, T component, double x, double y) where T : CircuitComponent
