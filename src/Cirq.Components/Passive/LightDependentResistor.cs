@@ -34,6 +34,7 @@ public partial class LightDependentResistor : TwoTerminalComponent, IInteractive
 
     /// <summary>Light falling on the cell, in lux.</summary>
     [ObservableProperty]
+    [Operable("Light", Minimum = 0.1, Maximum = 1e5, Unit = "lx", IsLogarithmic = true)]
     public partial double Illuminance { get; set; }
 
     /// <summary>Resistance at 10 lux, in ohms — the figure datasheets quote.</summary>

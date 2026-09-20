@@ -44,14 +44,14 @@ public partial class DipSwitch : MechanicalContact
     /// <summary>The two pins of one section, indexed from 0.</summary>
     public (Terminal A, Terminal B) Section(int index) => (_a[index], _b[index]);
 
-    [ObservableProperty] public partial bool Position1 { get; set; }
-    [ObservableProperty] public partial bool Position2 { get; set; }
-    [ObservableProperty] public partial bool Position3 { get; set; }
-    [ObservableProperty] public partial bool Position4 { get; set; }
-    [ObservableProperty] public partial bool Position5 { get; set; }
-    [ObservableProperty] public partial bool Position6 { get; set; }
-    [ObservableProperty] public partial bool Position7 { get; set; }
-    [ObservableProperty] public partial bool Position8 { get; set; }
+    [ObservableProperty] [Operable("1")] public partial bool Position1 { get; set; }
+    [ObservableProperty] [Operable("2")] public partial bool Position2 { get; set; }
+    [ObservableProperty] [Operable("3")] public partial bool Position3 { get; set; }
+    [ObservableProperty] [Operable("4")] public partial bool Position4 { get; set; }
+    [ObservableProperty] [Operable("5")] public partial bool Position5 { get; set; }
+    [ObservableProperty] [Operable("6")] public partial bool Position6 { get; set; }
+    [ObservableProperty] [Operable("7")] public partial bool Position7 { get; set; }
+    [ObservableProperty] [Operable("8")] public partial bool Position8 { get; set; }
 
     public override string ComponentType => "DIP Switch";
 

@@ -59,6 +59,7 @@ public partial class Thermocouple : TwoTerminalComponent, IInteractiveComponent
 
     /// <summary>Temperature of the measuring junction, in °C.</summary>
     [ObservableProperty]
+    [Operable("Temperature", Minimum = -50, Maximum = 1200, Unit = "°C")]
     public partial double Temperature { get; set; } = 25.0;
 
     /// <summary>

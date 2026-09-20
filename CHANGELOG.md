@@ -8,6 +8,26 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**A front panel for the circuit.** Every switch, potentiometer, light level, temperature, magnet
+and target distance in a circuit is now gathered into a **CONTROLS** panel under the properties
+panel — and they can be worked while the simulation runs. Move a wiper and the next time point is
+solved with the new value; nothing has to be stopped or restarted.
+
+Until now, operating a running circuit meant finding the part on the canvas and double-clicking it.
+That is fine for one switch and hopeless for a board with eight, and it could only ever toggle
+between two values rather than set one. A potentiometer had no way to be turned at all while the
+circuit ran.
+
+Switches become toggles and ranges become sliders, showing the value and its unit. Ranges spanning
+several decades — light, most obviously — are laid out logarithmically, because a linear slider
+from a dark room to direct sun puts everything a circuit responds to in the first half-millimetre
+of travel. The panel and the canvas stay in step: double-clicking a part still works it, and the
+panel follows.
+
+What appears is decided by the components rather than by the interface: a property marked
+`[Operable]` becomes a control, so a part added later gets one by saying so on the property and
+nothing in the UI changes.
+
 **H-bridge.** There was a DC motor in the palette and no way to run it backwards, which is most of
 what anyone does with one. Four switches in an H, two inputs and an enable, and all four input
 combinations behave as they should — including the two people get wrong. **Both inputs the same is

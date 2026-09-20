@@ -26,6 +26,17 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             RequestRedraw?.Invoke(this, EventArgs.Empty);
         };
 
+        ControlPanel = new ControlPanelViewModel(Circuit);
+        ControlPanel.ControlChanged += (_, structural) =>
+        {
+            // Exactly what the inspector does when a parameter is edited: a value can be picked up
+            // on the next time point, but a change of shape means the engine has to rebuild.
+            if (structural) Simulation.InvalidateTopology();
+
+            IsModified = true;
+            RequestRedraw?.Invoke(this, EventArgs.Empty);
+        };
+
         Circuit.Components.CollectionChanged += OnCircuitChanged;
         Circuit.Wires.CollectionChanged += OnCircuitChanged;
 
@@ -52,6 +63,9 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     public ScopeViewModel Scope { get; }
 
     public InspectorViewModel Inspector { get; }
+
+    /// <summary>The circuit's controls, gathered into one panel so they can be worked while it runs.</summary>
+    public ControlPanelViewModel ControlPanel { get; }
 
     /// <summary>
     /// Palette groups, each collapsible. Only the first opens on startup so the sidebar stays
@@ -762,5 +776,9 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
     public string IntegrationName => Simulation.Settings.Integration.ToString();
 
-    public void Dispose() => Simulation.Dispose();
+    public void Dispose()
+    {
+        ControlPanel.Dispose();
+        Simulation.Dispose();
+    }
 }

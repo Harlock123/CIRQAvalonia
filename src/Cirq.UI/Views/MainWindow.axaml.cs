@@ -126,6 +126,10 @@ public partial class MainWindow : Window
 
         _canvas?.InvalidateVisual();
 
+        // The parts can be worked from the canvas too — double-clicking a switch still flips it —
+        // so the panel follows the components rather than assuming it is the only thing moving them.
+        _viewModel.ControlPanel.Refresh();
+
         var simTime = this.FindControl<TextBlock>("SimTimeLabel");
         if (simTime is not null)
             simTime.Text = $"t = {Cirq.Core.Units.SiPrefix.Format(_viewModel.Simulation.SimulationTime, "s")}";

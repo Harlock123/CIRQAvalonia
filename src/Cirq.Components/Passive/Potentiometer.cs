@@ -36,6 +36,7 @@ public partial class Potentiometer : CircuitComponent
 
     /// <summary>Wiper tap ratio, clamped to [0, 1].</summary>
     [ObservableProperty]
+    [Operable("Wiper", Minimum = 0, Maximum = 1)]
     public partial double Position { get; set; }
 
     /// <summary>When true the track is logarithmic (audio taper) rather than linear.</summary>

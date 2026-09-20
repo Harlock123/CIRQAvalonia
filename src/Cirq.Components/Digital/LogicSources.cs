@@ -21,6 +21,7 @@ public partial class LogicToggle : DigitalComponent
     public Terminal Out { get; }
 
     [ObservableProperty]
+    [Operable("Level")]
     public partial bool State { get; set; }
 
     public override string ComponentType => "Logic Toggle";

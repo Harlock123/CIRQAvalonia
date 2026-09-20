@@ -74,6 +74,7 @@ public partial class RotaryEncoder : CircuitComponent, IInteractiveComponent
 
     /// <summary>Detents turned since the start, negative the other way.</summary>
     [ObservableProperty]
+    [Operable("Detent", Minimum = -50, Maximum = 50)]
     public partial int Detent { get; set; }
 
     public override string ComponentType => "Rotary Encoder";

@@ -32,7 +32,7 @@ Core ← Engine ← Components ← UI, which keeps the whole engine headless-tes
 
 ```bash
 dotnet run --project src/Cirq.UI     # the editor
-dotnet test                          # 1216 tests
+dotnet test                          # 1229 tests
 ```
 
 Targets .NET 10. The UI uses Avalonia 12 and ScottPlot 5.1; those two versions are pinned
@@ -192,6 +192,7 @@ Tests measure the solver against closed-form answers rather than recorded output
 | MOSFET | Square-law saturation current, triode switching, zero gate current, reverse conduction, body diode |
 | JFET | Full I_DSS at zero gate drive, square law across the range, pinch-off, vanishing gate current, P-channel mirroring |
 | Thyristors | SCR blocking and firing, staying on after the gate drive goes away, dropping out when the anode current is interrupted, reverse blocking; triac firing on both half cycles and turning itself off at every zero crossing; diac breakover in either polarity |
+| Live controls | Building the panel changing nothing and raising no change events, working a control moving its component and reporting it, the panel following a part worked from the canvas without reporting that as an edit, a range becoming a slider and a six-decade one becoming a logarithmic slider, a whole-number property being written a whole number, and the panel following parts placed and removed |
 | H-bridge | Driving forward and reverse with the current reversing too, both inputs the same braking with nothing across the motor, disabling coasting rather than braking, the interlock stopping shoot-through and its absence making a short across the supply, unwired inputs reading low, and the body diodes clamping an inductive kick |
 | Li-ion charger | Constant current well below full, the current tapering as the cell approaches its float voltage and stopping at it, no headroom meaning no charge, the dissipation being exactly what the input does not put in the cell, and termination latching rather than cycling |
 | I2C ADC | A voltage on a node read back over two wires as the same number, the gain setting pinning at full scale rather than complaining and pushing further past it changing nothing, a wider range fitting what the narrow one clipped, reading faster than it converts returning the previous answer, differential measuring the difference, and the configuration register written and read back |
@@ -366,6 +367,7 @@ the whole thing at its natural size. The editing aids — dot grid, terminal dot
 | Export | `Ctrl+E` writes the schematic and the traces out as PNG, JPEG, BMP, SVG or PDF, optionally with a grouped parts list. SVG and PDF are true vector, drawn by the same code that draws the screen. The frame follows the circuit rather than the view |
 | About | `Help > About` reports the version and the libraries it is built on, read from the loaded assemblies rather than a hand-kept list, with a button that copies the lot for a bug report |
 | Transport | `F5` run/pause, `F6` single step, `F8` reset |
+| Controls | Every switch, potentiometer, light level, temperature and magnet in the circuit is gathered into a **CONTROLS** panel under the properties panel, and can be worked while the simulation runs. A part declares a control by marking the property `[Operable]`, so a new component gets one without the UI being edited |
 | Interactive | Switches, buttons, logic toggles, LDRs and thermistors are operated by double-clicking them. They are ringed with a small dot so you can tell which parts those are; **View > Mark Interactive Parts** turns the rings off |
 | Panels | `F9` collapses the palette to the left, `F10` the properties panel to the right — or click the chevron in either panel's header. A collapsed panel leaves a labelled rail at the edge; click it to bring the panel back. Palette groups also collapse individually (`All` toggles every group) |
 

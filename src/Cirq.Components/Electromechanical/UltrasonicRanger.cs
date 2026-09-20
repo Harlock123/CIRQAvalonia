@@ -67,6 +67,7 @@ public sealed partial class UltrasonicRanger : DigitalComponent, IInteractiveCom
 
     /// <summary>How far away whatever it is looking at is, in centimetres.</summary>
     [ObservableProperty]
+    [Operable("Distance", Minimum = 0, Maximum = 450, Unit = "cm")]
     public partial double DistanceCentimetres { get; set; } = 50.0;
 
     /// <summary>Beyond this it reports nothing there. A real one manages about four metres.</summary>

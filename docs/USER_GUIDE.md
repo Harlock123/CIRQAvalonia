@@ -13,19 +13,20 @@ the [README](../README.md), and what changed between releases is in the
 1. [Running it](#running-it)
 2. [The window](#the-window)
 3. [Placing components](#placing-components)
-4. [Wiring](#wiring)
-5. [Setting values](#setting-values)
-6. [Probes and the oscilloscope](#probes-and-the-oscilloscope)
-7. [Running a simulation](#running-a-simulation)
-8. [Worked example: an RC low-pass](#worked-example-an-rc-low-pass)
-9. [Digital and mixed-signal circuits](#digital-and-mixed-signal-circuits)
-10. [Development boards](#development-boards)
-11. [Saving and loading](#saving-and-loading)
-12. [Exporting](#exporting)
-13. [Appearance](#appearance)
-14. [What version is this](#what-version-is-this)
-15. [Keyboard reference](#keyboard-reference)
-16. [When a circuit will not simulate](#when-a-circuit-will-not-simulate)
+4. [Working a running circuit](#working-a-running-circuit)
+5. [Wiring](#wiring)
+6. [Setting values](#setting-values)
+7. [Probes and the oscilloscope](#probes-and-the-oscilloscope)
+8. [Running a simulation](#running-a-simulation)
+9. [Worked example: an RC low-pass](#worked-example-an-rc-low-pass)
+10. [Digital and mixed-signal circuits](#digital-and-mixed-signal-circuits)
+11. [Development boards](#development-boards)
+12. [Saving and loading](#saving-and-loading)
+13. [Exporting](#exporting)
+14. [Appearance](#appearance)
+15. [What version is this](#what-version-is-this)
+16. [Keyboard reference](#keyboard-reference)
+17. [When a circuit will not simulate](#when-a-circuit-will-not-simulate)
 
 ---
 
@@ -51,7 +52,7 @@ Five regions, and they stay put:
 | **Menu bar** | Every command. File, Edit, Tools, View, Simulate, Help |
 | **Components** (left) | The parts palette, grouped into collapsible categories |
 | **Canvas** (centre) | The schematic. Pan, zoom, place, wire, probe |
-| **Properties** (right) | Parameters of whatever is selected |
+| **Properties** (right) | Parameters of whatever is selected, with the circuit's **controls** beneath |
 | **Scope** (bottom) | Timebase and vertical controls, the plot, and the trace list |
 | **Status bar** | Active tool, node and unknown counts, speed, and elapsed simulation time |
 
@@ -111,6 +112,38 @@ there is nothing sensible to step back into.
 What it does not cover is **operating** the circuit — double-clicking a switch, or pressing Run.
 Those are things you do *to* a running circuit rather than edits to the drawing, and having them
 fill the undo history would push your actual edits out of reach.
+
+---
+
+## Working a running circuit
+
+A real circuit's controls are on its front panel, not scattered across its schematic. The
+**CONTROLS** panel, under the properties panel on the right, gathers every one of them into a
+single place — and they work while the simulation is running.
+
+![The editor running the motor reversing example, with a CONTROLS panel at the bottom right listing SW1, SW2 and SW3 as toggle switches](images/14-controls.png)
+
+Switches, push buttons and logic toggles appear as toggles. Anything with a range — a
+potentiometer's wiper, a thermistor's temperature, the light on an LDR or a phototransistor, a
+magnet at a Hall sensor, the distance to an ultrasonic target — appears as a slider showing its
+current value. Move one and the next time point is solved with the new value; nothing has to be
+stopped or restarted.
+
+A few things worth knowing:
+
+- **The panel and the canvas stay in step.** Double-clicking a switch on the canvas still flips it,
+  and the panel follows. It is a second way to reach the same parts, not a separate set of them.
+- **Wide ranges are logarithmic.** Light spans six decades from a dark room to direct sun, and a
+  slider laid out linearly across that would put everything a circuit responds to in the first
+  half-millimetre of travel.
+- **A part with several controls names each one** — a DIP switch reads `SW2 · 1` through
+  `SW2 · 8`, while a lone switch just reads `SW1`.
+- **The panel is not there when there is nothing to operate.** A circuit of resistors and sources
+  shows no controls section at all rather than an empty box.
+
+What appears is decided by the components themselves. A property marked `[Operable]` becomes a
+control, which means a part added later gets one by saying so on the property rather than by
+anything in the interface being changed.
 
 ---
 

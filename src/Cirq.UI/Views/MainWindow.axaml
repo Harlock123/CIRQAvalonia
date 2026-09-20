@@ -256,7 +256,8 @@
           </StackPanel>
         </Button>
 
-        <DockPanel IsVisible="{Binding IsInspectorExpanded}">
+        <Grid IsVisible="{Binding IsInspectorExpanded}" RowDefinitions="*,4,Auto">
+        <DockPanel Grid.Row="0">
           <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="10,10,4,6">
             <StackPanel>
               <TextBlock Text="{Binding Inspector.Title}" FontSize="15" FontWeight="SemiBold"
@@ -295,6 +296,30 @@
             </StackPanel>
           </ScrollViewer>
         </DockPanel>
+
+        <GridSplitter Grid.Row="1" Background="{DynamicResource SplitterBackground}"
+                      IsVisible="{Binding !ControlPanel.IsEmpty}" />
+
+        <!-- The circuit's front panel: every control in it, in one place, working while it runs.
+             Hidden entirely when there is nothing to operate rather than sitting there empty. -->
+        <Border Grid.Row="2" BorderBrush="{DynamicResource PanelBorder}" BorderThickness="0,1,0,0"
+                MinHeight="120" MaxHeight="360"
+                IsVisible="{Binding !ControlPanel.IsEmpty}">
+          <DockPanel>
+            <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="10,8,10,4">
+              <TextBlock Text="CONTROLS" FontSize="10" FontWeight="SemiBold"
+                         Foreground="{DynamicResource TextMuted}" VerticalAlignment="Center" />
+              <TextBlock Grid.Column="1" FontSize="10" Foreground="{DynamicResource TextFaint}"
+                         VerticalAlignment="Center"
+                         Text="{Binding ControlPanel.Controls.Count, StringFormat='{}{0} in circuit'}" />
+            </Grid>
+
+            <ScrollViewer>
+              <ItemsControl ItemsSource="{Binding ControlPanel.Controls}" Margin="0,0,0,8" />
+            </ScrollViewer>
+          </DockPanel>
+        </Border>
+        </Grid>
        </Grid>
       </Border>
     </Grid>

@@ -54,6 +54,7 @@ public partial class ToggleSwitch : MechanicalContact, IInteractiveComponent
     public Terminal B { get; }
 
     [ObservableProperty]
+    [Operable("Closed")]
     public partial bool IsClosed { get; set; }
 
     public override string ComponentType => "Switch (SPST)";
@@ -97,6 +98,7 @@ public partial class PushButton : MechanicalContact, IInteractiveComponent
     public Terminal B { get; }
 
     [ObservableProperty]
+    [Operable("Pressed")]
     public partial bool IsPressed { get; set; }
 
     /// <summary>A normally-open button conducts only while pressed; normally-closed is the reverse.</summary>
@@ -152,6 +154,7 @@ public partial class SpdtSwitch : MechanicalContact, IInteractiveComponent
 
     /// <summary>False selects throw A, true selects throw B.</summary>
     [ObservableProperty]
+    [Operable("Thrown to B")]
     public partial bool IsThrownToB { get; set; }
 
     public override string ComponentType => "Switch (SPDT)";

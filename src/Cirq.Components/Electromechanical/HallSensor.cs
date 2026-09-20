@@ -57,6 +57,7 @@ public sealed partial class HallSensor : DigitalComponent, IInteractiveComponent
     /// the one it ignores.
     /// </summary>
     [ObservableProperty]
+    [Operable("Field", Minimum = -60, Maximum = 60, Unit = "mT")]
     public partial double FluxDensity { get; set; }
 
     /// <summary>What the field swings to when you double-click it — a magnet brought up close.</summary>

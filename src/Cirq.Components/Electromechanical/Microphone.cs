@@ -52,6 +52,7 @@ public partial class Microphone : TwoTerminalComponent, IInteractiveComponent, I
 
     /// <summary>Whether there is currently a sound at it. Double-click the capsule to change.</summary>
     [ObservableProperty]
+    [Operable("Sound")]
     public partial bool IsHearingSound { get; set; } = true;
 
     /// <summary>Voltage the internal JFET needs across it before it works at all.</summary>

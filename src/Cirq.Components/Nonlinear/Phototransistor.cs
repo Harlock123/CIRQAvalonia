@@ -47,6 +47,7 @@ public partial class Phototransistor : CircuitComponent, IInteractiveComponent, 
     /// outdoors is ten thousand, and direct sun a hundred thousand.
     /// </summary>
     [ObservableProperty]
+    [Operable("Light", Minimum = 0.1, Maximum = 1e5, Unit = "lx", IsLogarithmic = true)]
     public partial double Illuminance { get; set; } = 300.0;
 
     /// <summary>What it swings to when you double-click it.</summary>

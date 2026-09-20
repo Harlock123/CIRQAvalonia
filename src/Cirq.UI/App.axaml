@@ -34,7 +34,11 @@
     <DataTemplate DataType="vm:BooleanParameterViewModel">
       <Grid ColumnDefinitions="118,*" Margin="10,3">
         <TextBlock Classes="label" Text="{Binding Label}" TextTrimming="CharacterEllipsis" />
-        <ToggleSwitch Grid.Column="1" IsChecked="{Binding Value}" OnContent="" OffContent="" />
+        <!-- The mode is explicit. Left implicit, the freshly realised toggle pushed its own
+             default back into the source before it read from it, silently clearing the property
+             it was supposed to be showing. -->
+        <ToggleSwitch Grid.Column="1" IsChecked="{Binding Value, Mode=TwoWay}"
+                      OnContent="" OffContent="" />
       </Grid>
     </DataTemplate>
 
@@ -44,6 +48,33 @@
         <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" FontSize="12"
                   ItemsSource="{Binding Options}" SelectedItem="{Binding Selected}" />
       </Grid>
+    </DataTemplate>
+
+    <!-- Live controls. A switch is a toggle and a range is a slider; the label carries the
+         designator so a panel of eight of them says which part each one belongs to. -->
+    <DataTemplate DataType="vm:ToggleControlViewModel">
+      <Grid ColumnDefinitions="*,Auto" Margin="10,4">
+        <StackPanel VerticalAlignment="Center">
+          <TextBlock Text="{Binding Title}" FontSize="12" Foreground="{DynamicResource TextPrimary}"
+                     TextTrimming="CharacterEllipsis" />
+          <TextBlock Text="{Binding Subtitle}" FontSize="10"
+                     Foreground="{DynamicResource TextMuted}" TextTrimming="CharacterEllipsis" />
+        </StackPanel>
+        <ToggleSwitch Grid.Column="1" IsChecked="{Binding Value, Mode=TwoWay}"
+                      OnContent="" OffContent="" VerticalAlignment="Center" />
+      </Grid>
+    </DataTemplate>
+
+    <DataTemplate DataType="vm:SliderControlViewModel">
+      <StackPanel Margin="10,4">
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBlock Text="{Binding Title}" FontSize="12" Foreground="{DynamicResource TextPrimary}"
+                     TextTrimming="CharacterEllipsis" />
+          <TextBlock Grid.Column="1" Text="{Binding Display}" FontSize="12"
+                     Foreground="{DynamicResource TextValue}" />
+        </Grid>
+        <Slider Minimum="0" Maximum="1" Value="{Binding Position}" Margin="0,-2,0,-6" />
+      </StackPanel>
     </DataTemplate>
 
     <DataTemplate DataType="vm:TextParameterViewModel">

@@ -55,6 +55,7 @@ public partial class Thermistor : TwoTerminalComponent, IInteractiveComponent, I
 
     /// <summary>Temperature of the bead, in degrees Celsius.</summary>
     [ObservableProperty]
+    [Operable("Temperature", Minimum = -40, Maximum = 150, Unit = "°C")]
     public partial double Temperature { get; set; } = 25.0;
 
     /// <summary>Resistance at 25 °C, in ohms — the figure a part is sold by.</summary>

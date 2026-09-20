@@ -42,6 +42,7 @@ public partial class SolarCell : TwoTerminalComponent, IInteractiveComponent, IC
 
     /// <summary>How brightly lit it is, from nought in the dark to one in full sun.</summary>
     [ObservableProperty]
+    [Operable("Sun", Minimum = 0, Maximum = 1.2)]
     public partial double Illumination { get; set; } = 1.0;
 
     /// <summary>Illumination it drops to when you shade it by double-clicking.</summary>
