@@ -8,6 +8,35 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**An ADC on the I²C bus.** Everything else on that bus dealt in bytes that were already digital —
+memory, pins, the time. The **ADS1115** reaches back into the circuit it is sitting in and reports
+what the voltage on a node really is, which is the point of putting a converter on a bus at all.
+
+Its three ways of lying to you are modelled, because they are the ones that cost an afternoon.
+The **gain setting** decides what counts as full scale: set to ±2.048 V and fed three volts it does
+not complain, it returns the largest number it has and goes on returning it — push to five and the
+reading does not move. **Conversion takes time**: at eight samples a second, reading more often
+than every 125 ms hands back the previous answer, because polling harder does not sample faster.
+And it measures a **difference**, so single-ended quietly includes whatever sits between its ground
+and yours.
+
+**Hall sensor**, the A3144 sort. Open collector, so with no pull-up it does not work at all rather
+than working badly — reported, not left for you to find. And real **hysteresis**: on at about
+20 mT, off again at 10, and in between it remembers what it was doing, so 15 mT reads differently
+depending on which way the magnet arrived. That is what makes a wheel magnet give one pulse instead
+of a burst. Unipolar by default, so turning the magnet round gets you nothing, as it does on a
+bench.
+
+**Phototransistor**, which is the LDR's opposite and worth understanding before choosing either.
+An LDR is a resistance that falls as it is lit; this is a current source commanded by light. It is
+also a junction rather than a bulk photoconductor, so it responds in microseconds where an LDR
+takes tens of milliseconds — which is why no remote control has ever contained one. Being a current
+source is what makes it awkward: too small a load and the output barely moves, too large and it
+saturates in room light and stops following the light at all.
+
+**File > Examples > Light Meter** puts the chain together: light into the phototransistor, current
+into a resistor, volts into the ADC, a number over two wires.
+
 ## [0.18.0] - 2026-09-19
 
 The last of the serial buses, and the part that lets two voltage domains share one. The palette

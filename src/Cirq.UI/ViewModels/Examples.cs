@@ -64,6 +64,8 @@ public static class Examples
             LoadUltrasonicRanger),
         new("Serial Link", "A UART talking to a module — change one baud rate and watch it break",
             LoadSerialLink),
+        new("Light Meter", "A phototransistor into an I2C ADC — light, to current, to volts, to a number",
+            LoadLightMeter),
     ];
 
     public static void LoadRcLowPass(MainWindowViewModel vm)
@@ -1362,6 +1364,68 @@ public static class Examples
 
         // A bit is a hundred microseconds at this rate, so real time would be a blur.
         vm.Simulation.SpeedFactor = 0.01;
+    }
+
+    public static void LoadLightMeter(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "Light meter";
+
+        var rail = Place(circuit, new DcVoltageSource(3.3), -460, 140);
+
+        // Collector to the rail, emitter into a load: more light, more current, more volts across
+        // the resistor. A phototransistor gives you a current, and this is what turns it into
+        // something an ADC can read.
+        var sensor = Place(circuit, new Phototransistor { Illuminance = 300, AlternateIlluminance = 5 },
+            -220, -40);
+        var load = Place(circuit, new Resistor(4.7e3), -220, 120);
+
+        var master = Place(circuit, new I2cMaster
+        {
+            Transactions = "w 48 00; r 48 2",
+            ClockFrequency = 100e3,
+            StartDelay = 2e-3,
+        }, 60, -240);
+
+        var adc = Place(circuit, new Ads1115(), 380, -40);
+
+        var sdaPull = Place(circuit, new Resistor(4.7e3), 200, -400);
+        var sclPull = Place(circuit, new Resistor(4.7e3), 320, -400);
+
+        var gnd = Place(circuit, new Ground(), -460, 300);
+        var gnd2 = Place(circuit, new Ground(), -220, 260);
+        var gnd3 = Place(circuit, new Ground(), 380, 200);
+
+        load.RotationDegrees = 90;
+        sdaPull.RotationDegrees = 90;
+        sclPull.RotationDegrees = 90;
+
+        circuit.Connect(rail.Negative, gnd.Pin);
+        circuit.Connect(rail.Positive, sensor.Collector);
+        circuit.Connect(sensor.Emitter, load.A);
+        circuit.Connect(load.B, gnd2.Pin);
+
+        // The node between the two is what gets measured.
+        circuit.Connect(sensor.Emitter, adc.Input(0));
+
+        circuit.Connect(master.Vcc, rail.Positive);
+        circuit.Connect(master.Gnd, gnd.Pin);
+        circuit.Connect(adc.Vcc, rail.Positive);
+        circuit.Connect(adc.Gnd, gnd3.Pin);
+
+        circuit.Connect(master.Sda, adc.Sda);
+        circuit.Connect(master.Scl, adc.Scl);
+
+        circuit.Connect(rail.Positive, sdaPull.A);
+        circuit.Connect(sdaPull.B, master.Sda);
+        circuit.Connect(rail.Positive, sclPull.A);
+        circuit.Connect(sclPull.B, master.Scl);
+
+        vm.Scope.TimebasePerDivision = 200e-6;
+        vm.Scope.VoltsPerDivision = 1.0;
+        vm.Scope.Layout = ScopeLayout.Tiled;
+        vm.Scope.AddProbe(sensor.Emitter, "Sensor");
+        vm.Scope.AddProbe(master.Sda, "SDA");
     }
 
     private static T Place<T>(Circuit circuit, T component, double x, double y) where T : CircuitComponent

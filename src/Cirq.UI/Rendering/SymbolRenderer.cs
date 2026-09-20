@@ -35,6 +35,8 @@ public static class SymbolRenderer
             case CharacterLcd lcd: DrawCharacterLcd(context, pen, zoom, lcd); break;
             case I2cDevice bus: DrawPackage(context, pen, zoom, bus, bus.ComponentType); break;
             case UartPort uart: DrawPackage(context, pen, zoom, uart, uart.ComponentType); break;
+            case HallSensor hall: DrawHallSensor(context, pen, zoom, hall); break;
+            case Phototransistor photo: DrawPhototransistor(context, pen, zoom, photo); break;
             case LevelShifter shifter: DrawLevelShifter(context, pen, zoom, shifter); break;
             case SpiMaster spi: DrawPackage(context, pen, zoom, spi, spi.ComponentType); break;
             case DipSwitch dip: DrawDipSwitch(context, pen, zoom, dip); break;
@@ -857,6 +859,76 @@ public static class SymbolRenderer
 
         if (zoom > 0.45)
             DrawCenteredText(context, "SHIFT", new Point(0, 13), 8, zoom, CanvasTheme.LabelBrush);
+    }
+
+    /// <summary>
+    /// A Hall switch: the little three-legged package, with field lines coming at its face that
+    /// light up once the magnet is close enough to operate it.
+    /// </summary>
+    private static void DrawHallSensor(
+        ISymbolCanvas context, IPen pen, double zoom, HallSensor hall)
+    {
+        context.DrawRectangle(CanvasTheme.SymbolFill, pen, new RoundedRect(new Rect(-18, -26, 36, 52), 3));
+
+        context.DrawLine(pen, new Point(-30, -30), new Point(-18, -30));
+        context.DrawLine(pen, new Point(-18, -30), new Point(-18, -26));
+        context.DrawLine(pen, new Point(-30, 30), new Point(-18, 30));
+        context.DrawLine(pen, new Point(-18, 30), new Point(-18, 26));
+        context.DrawLine(pen, new Point(18, 0), new Point(30, 0));
+
+        if (zoom > 0.45)
+            DrawCenteredText(context, "H", new Point(0, 0), 13, zoom, CanvasTheme.LabelBrush);
+
+        if (zoom <= 0.4) return;
+
+        // Field arriving at the face. Lit once it has operated, which is the state that matters.
+        var field = CanvasTheme.Pen(
+            hall.IsDetecting ? CanvasTheme.ValueBrush : CanvasTheme.LabelBrush, 1.2, zoom);
+
+        for (var i = -1; i <= 1; i++)
+            context.DrawLine(field, new Point(-40, i * 13), new Point(-24, i * 13));
+
+        if (hall.Violations.Count > 0)
+        {
+            context.DrawEllipse(null, CanvasTheme.Pen(CanvasTheme.ErrorBrush, 2.0, zoom),
+                new Point(0, 0), 30, 34);
+        }
+    }
+
+    /// <summary>
+    /// A phototransistor: a transistor with no base lead, because light is its base drive, and
+    /// arrows coming in to say so. The arrows brighten with the light falling on it.
+    /// </summary>
+    private static void DrawPhototransistor(
+        ISymbolCanvas context, IPen pen, double zoom, Phototransistor photo)
+    {
+        context.DrawLine(pen, new Point(0, -30), new Point(0, -18));
+        context.DrawLine(pen, new Point(0, 30), new Point(0, 18));
+
+        context.DrawEllipse(CanvasTheme.SymbolFill, pen, new Point(0, 0), 20, 20);
+
+        // The bar, and the two slanted leads out to the collector and emitter.
+        context.DrawLine(pen, new Point(-8, -12), new Point(-8, 12));
+        context.DrawLine(pen, new Point(-8, -6), new Point(0, -18));
+        context.DrawLine(pen, new Point(-8, 6), new Point(0, 18));
+
+        // The emitter arrow, which is what says which way round it is.
+        var arrow = SymbolPath.Polyline(
+            [new Point(-2, 10), new Point(-6, 14), new Point(-7, 7)], true);
+        context.DrawGeometry(pen.Brush, pen, arrow);
+
+        if (zoom <= 0.4) return;
+
+        // Light coming in. It brightens as the part is lit, which is the whole input.
+        var lit = photo.Illuminance > 50;
+        var ray = CanvasTheme.Pen(lit ? CanvasTheme.ValueBrush : CanvasTheme.LabelBrush, 1.2, zoom);
+
+        foreach (var y in new[] { -7.0, 5.0 })
+        {
+            context.DrawLine(ray, new Point(-38, y - 9), new Point(-24, y + 1));
+            context.DrawGeometry(ray.Brush, ray, SymbolPath.Polyline(
+                [new Point(-24, y + 1), new Point(-29, y), new Point(-27, y - 5)], true));
+        }
     }
 
     private static void DrawCharacterLcd(
@@ -1731,6 +1803,11 @@ public static class SymbolRenderer
 
         // These are drawn as packages sized to their own pins, so the caption has to clear them.
         Pcf8574 => 98.0,
+        Ads1115 => 62.0,
+        HallSensor => 42.0,
+
+        // The leads reach 30, so the default offset puts the caption on top of one.
+        Phototransistor => 44.0,
         I2cDevice or SpiMaster or UartPort => 56.0,
 
         // Eleven pins reaching 52 either side of centre.

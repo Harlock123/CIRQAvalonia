@@ -67,7 +67,7 @@ at the window edge; click the rail to bring it back.
 
 Click a palette entry, then click the canvas. The part lands where you click, snapped to the grid.
 
-The palette holds **143 components in 16 categories**:
+The palette holds **146 components in 16 categories**:
 
 | Category | Count | Contents |
 | --- | --- | --- |
@@ -82,9 +82,9 @@ The palette holds **143 components in 16 categories**:
 | Logic Gates | 7 | AND, OR, NAND, NOR, XOR, XNOR, NOT |
 | 74xx Series | 18 | Counters, decoders, flip-flops, shift registers (including the **74595**), multiplexers, Schmitt inverter |
 | 40xx Series | 14 | CMOS gates, counters, flip-flops, analog switches — see [below](#the-40xx-series) |
-| Buses | 8 | I2C master, EEPROM, port expander and DS1307 clock, SPI master, **serial terminal and device**, **level shifter** — see [below](#i2c-and-spi) |
+| Buses | 9 | I2C master, EEPROM, port expander, DS1307 clock and **ADS1115 ADC**, SPI master, serial terminal and device, level shifter — see [below](#i2c-and-spi) |
 | Digital I/O | 6 | Logic toggle, clock, indicators, rotary encoder, **oscillator module** |
-| Sensors & Actuators | 13 | DC motor, LDR, thermistors, buzzers, speaker, microphone, servo, stepper, thermocouple, load cell, **HC-SR04 ranger** — see [below](#sensors-and-actuators) |
+| Sensors & Actuators | 15 | DC motor, LDR, thermistors, buzzers, speaker, microphone, servo, stepper, thermocouple, load cell, HC-SR04 ranger, **Hall switch and phototransistor** — see [below](#sensors-and-actuators) |
 | Switching & Isolation | 6 | Relay, fuses, optocouplers, **ULN2003** — see [below](#switching-and-isolation) |
 | Dev Boards | 4 | Raspberry Pi, Arduino Uno / Nano / Mega — see [below](#development-boards) |
 
@@ -393,6 +393,41 @@ its own oscillator behind the element and DC is exactly what it wants.
 
 A passive element sounds at whatever it is fed, and the frequency shown is measured from the drive
 rather than assumed.
+
+**Hall Sensor** is the A3144 sort of magnetic switch, and the part behind every fan tachometer,
+bicycle speedometer and brushless motor that knows where its rotor is. Two things about it catch
+people.
+
+Its output is **open collector** — it pulls the pin down or lets go of it, and nothing else. With
+no pull-up resistor it does not work badly, it does not work at all, exactly as an I²C bus does not
+and for the same reason. That one is reported rather than left for you to find.
+
+And it has **hysteresis**, which is the whole reason it is usable. A magnet approaching a sensor
+with a single threshold would make the output chatter as the field wobbled either side of it, and a
+wheel magnet passing at speed would give a burst of pulses instead of one. So it turns on at about
+20 mT and off again at 10, and between the two it simply remembers what it was doing — feed it
+15 mT and the answer depends on which way it got there.
+
+Most of these are also **unipolar**: they answer to one pole and ignore the other entirely.
+Turning the magnet round and getting nothing is the other half-hour people lose to this part, so
+`IsUnipolar` is there and on by default. Double-click it to bring a magnet up and take it away.
+
+**Phototransistor** is the light sensor to reach for when the LDR will not do, and the difference
+is worth knowing before choosing either. An LDR is a **resistance** that falls as it is lit, so
+what it does to a circuit depends on what it is wired in series with. A phototransistor is a
+**current source** commanded by light: it passes a current proportional to what falls on it and,
+until it runs out of voltage, does not much care what it is connected to.
+
+The difference that usually decides it is speed. An LDR is a bulk photoconductor and takes tens of
+milliseconds — it is useless above a few hertz, which is why no remote control, optical encoder or
+pulse oximeter has ever contained one. A phototransistor is a junction and responds in
+microseconds.
+
+Being a current source is also what makes it awkward. The current is in microamps, and turning
+that into a voltage is what the load resistor is for — too small and the output barely moves, too
+large and it saturates in ordinary room light and stops following the light at all. `IsSaturated`
+says when that has happened. Doing it properly means a transimpedance stage round one of the
+op-amps in the palette.
 
 **Ultrasonic Ranger** is the HC-SR04, and the whole part is a lesson in one idea: **the distance is
 in the width of a pulse, and nowhere else**. Give TRIG at least ten microseconds high, and about
@@ -768,6 +803,36 @@ bit first with data set while the clock is low — mode zero, which is what near
 
 **File > Examples > I2C EEPROM**, **I2C Clock** and **SPI Shift Register** are all wired up, with
 the bus lines on the scope.
+
+### Reading the circuit itself
+
+The **I2C ADC** — an ADS1115 — is the one that reaches back into the circuit. Everything else on
+the bus deals in bytes that were already digital; this one measures a node and reports what the
+voltage on it really is, which is the point of putting a converter on a bus at all.
+
+Three things about it are worth getting wrong here rather than on a bench.
+
+**The gain setting is a trap.** The programmable amplifier decides what counts as full scale, and
+a real part defaults to a range far smaller than its supply. Set to ±2.048 V and fed three volts it
+does not complain — it returns 32767, the largest number it has, and goes on returning it however
+much further the input rises. Push it to five volts and the reading does not move. A value pinned
+at full scale is the only symptom, and it looks exactly like a reading.
+
+**Conversion takes time.** At eight samples a second a conversion takes 125 ms, and reading the
+register more often than that hands you the same answer again — polling harder does not sample
+faster. Turn the data rate up and it keeps up.
+
+**It measures a difference.** Single-ended means "against the chip's own ground", so whatever sits
+between that ground and the one your signal is referenced to is added to every reading.
+Differential mode is there because that is often not zero.
+
+`Configuration` is the register exactly as it is over the bus, so you can set the multiplexer,
+gain, mode and data rate from the properties panel or by writing to register 1. It starts in
+continuous mode on A0 against ground so that placing one and pressing run gives you a reading; a
+real part powers up single-shot and differential, and does nothing at all until written to.
+
+**File > Examples > Light Meter** puts the whole chain together — light into a phototransistor,
+current into a resistor, volts into the ADC, and a number over two wires.
 
 ---
 
