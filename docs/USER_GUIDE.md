@@ -28,6 +28,10 @@ the [README](../README.md), and what changed between releases is in the
 16. [Keyboard reference](#keyboard-reference)
 17. [When a circuit will not simulate](#when-a-circuit-will-not-simulate)
 
+This guide is also attached to every [release](../../releases) as a PDF, with a contents page and
+the screenshots in place — the same document, laid out for reading away from the machine. Build it
+yourself with `./scripts/build-guide.sh`.
+
 ---
 
 ## Running it

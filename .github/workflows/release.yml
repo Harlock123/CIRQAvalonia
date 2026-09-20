@@ -90,6 +90,43 @@ jobs:
       - name: Test
         run: dotnet test CirqAvalonia.slnx --configuration Release --no-build --verbosity normal
 
+  guide:
+    name: User guide
+    needs: [prepare]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      # The runner images ship Chrome, but say so out loud rather than discovering it by way of
+      # a release that quietly came out without its guide.
+      - name: Find a browser
+        run: |
+          set -euo pipefail
+          for c in google-chrome google-chrome-stable chromium chromium-browser; do
+            if command -v "$c" >/dev/null 2>&1; then
+              echo "using $c"; exit 0
+            fi
+          done
+          echo "::notice::no browser on the image — installing chromium"
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends chromium
+
+      - name: Build the PDF
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: ./scripts/build-guide.sh "$VERSION"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: guide
+          path: |
+            dist/CirqAvalonia-User-Guide.pdf
+          if-no-files-found: error
+          retention-days: 7
+
   build:
     name: ${{ matrix.rid }}
     needs: [prepare, test]
@@ -136,7 +173,7 @@ jobs:
 
   release:
     name: Publish release
-    needs: [prepare, build]
+    needs: [prepare, build, guide]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -147,6 +184,11 @@ jobs:
         with:
           pattern: pkg-*
           merge-multiple: true
+          path: dist
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: guide
           path: dist
 
       - name: Verify the complete set
@@ -161,7 +203,7 @@ jobs:
           ./scripts/verify-artifacts.sh
 
       - name: Checksums
-        run: cd dist && sha256sum ./*.zip ./*.tar.gz | sed 's|\./||' > SHA256SUMS && cat SHA256SUMS
+        run: cd dist && sha256sum ./*.zip ./*.tar.gz ./*.pdf | sed 's|\./||' > SHA256SUMS && cat SHA256SUMS
 
       - name: Release notes
         env:

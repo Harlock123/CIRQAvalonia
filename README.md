@@ -8,8 +8,8 @@ schematic editor with a live oscilloscope on top.
 
 ![The CirqAvalonia editor: component palette on the left, schematic canvas in the centre, properties panel on the right, and the oscilloscope showing the input square wave and the capacitor charging against it](docs/images/01-overview.png)
 
-**[Read the User Guide](docs/USER_GUIDE.md)** for how to drive the editor. What follows is how it
-works underneath.
+**[Read the User Guide](docs/USER_GUIDE.md)** for how to drive the editor — also attached to every
+[release](../../releases) as a printable PDF. What follows is how it works underneath.
 
 ```
 CirqAvalonia.slnx
@@ -33,6 +33,7 @@ Core ← Engine ← Components ← UI, which keeps the whole engine headless-tes
 ```bash
 dotnet run --project src/Cirq.UI     # the editor
 dotnet test                          # 1889 tests
+./scripts/build-guide.sh             # the user guide as a PDF
 ```
 
 Targets .NET 10. The UI uses Avalonia 12 and ScottPlot 5.1; those two versions are pinned
@@ -40,7 +41,14 @@ together in `Directory.Packages.props` because they must agree on SkiaSharp (see
 
 Prebuilt binaries for every supported platform are on the
 [releases page](../../releases) — self-contained, so there is no runtime to install first.
-Download, extract, run.
+Download, extract, run. The user guide is there too, as a PDF.
+
+`build-guide.sh` renders `docs/USER_GUIDE.md` into `dist/`: a small tool turns the Markdown into
+one HTML file with a title page, a two-column contents and a stylesheet written for paper, and a
+headless browser prints it. The Markdown stays the single source, so the PDF cannot drift from the
+guide people read on GitHub — and the browser does the hard part, which is pagination, widow and
+orphan control, shaping the Greek and the box-drawing characters, and keeping a table row off a
+page boundary. `PAPER=Letter` for US paper instead of A4.
 
 **On macOS the build is not signed or notarized**, so Gatekeeper blocks the first launch. You get
 "cannot be opened" or "is damaged", which reads like a bad download rather than a policy decision.

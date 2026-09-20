@@ -5,6 +5,9 @@
     <Project Path="src/Cirq.Engine/Cirq.Engine.csproj" />
     <Project Path="src/Cirq.UI/Cirq.UI.csproj" />
   </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/Cirq.Docs/Cirq.Docs.csproj" />
+  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Cirq.Components.Tests/Cirq.Components.Tests.csproj" />
     <Project Path="tests/Cirq.Engine.Tests/Cirq.Engine.Tests.csproj" />

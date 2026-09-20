@@ -18,6 +18,9 @@
     <!-- Already in the tree underneath Avalonia and ScottPlot; referenced explicitly because the
          exporter draws on it directly, and pinned to the version both of those agree on. -->
     <PackageVersion Include="SkiaSharp" Version="3.119.0" />
+    <!-- Markdown to HTML for the printable guide, used only by tools/Cirq.Docs. BSD-2-Clause,
+         no transitive dependencies on net10.0, and nothing the application ships references it. -->
+    <PackageVersion Include="Markdig" Version="1.4.0" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
     <PackageVersion Include="xunit" Version="2.9.2" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="2.8.2" />
