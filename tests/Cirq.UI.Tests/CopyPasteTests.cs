@@ -296,17 +296,15 @@ public class CopyPasteTests
         Assert.True(clipboard.HasContent);
         Assert.Equal("Inductor", clipboard.HeldDescription);
 
-        var first = clipboard.PasteInto(circuit);
-        var second = clipboard.PasteInto(circuit);
+        var first = Assert.Single(clipboard.PasteInto(circuit));
+        var second = Assert.Single(clipboard.PasteInto(circuit));
 
-        Assert.NotNull(first);
-        Assert.NotNull(second);
         Assert.NotSame(first, second);
-        Assert.Equal(4.0, ((Inductor)second!).SeriesResistance);
+        Assert.Equal(4.0, ((Inductor)second).SeriesResistance);
 
         clipboard.Clear();
         Assert.False(clipboard.HasContent);
-        Assert.Null(clipboard.PasteInto(circuit));
+        Assert.Empty(clipboard.PasteInto(circuit));
     }
 
     /// <summary>

@@ -330,7 +330,9 @@ public static class CircuitExporter
         // once for the whole page, decides how many pixels that is. Passing the raster scale here
         // instead would thin every stroke by exactly the amount the scale then thickened it.
         CircuitRenderer.Draw(symbols, circuit,
-            new CircuitRenderOptions(1.0, null, options.ShowInteractiveMarkers));
+            // Selection is an editing state, not part of the drawing: a picture of the circuit
+            // must not depend on what happened to be highlighted when it was taken.
+            new CircuitRenderOptions(1.0, null, options.ShowInteractiveMarkers, ShowSelection: false));
     }
 
     // ---- files -----------------------------------------------------------

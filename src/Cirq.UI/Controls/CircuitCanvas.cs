@@ -134,6 +134,10 @@ public class CircuitCanvas : Control
     private Point _lastPointerPosition;
     private bool _isPanning;
     private bool _isDraggingComponent;
+    private bool _isBanding;
+    private CorePoint _bandStart;
+    private CorePoint _bandEnd;
+    private readonly List<(CircuitComponent Component, CorePoint Grab)> _dragGroup = [];
     private CorePoint _dragGrabOffset;
     private bool _spaceHeld;
 
@@ -330,6 +334,28 @@ public class CircuitCanvas : Control
         // Editing aids rather than part of the circuit, so they stay here and out of an export.
         DrawTerminals(canvas, circuit);
         DrawWireInProgress(canvas);
+        DrawSelectionBand(canvas);
+    }
+
+    /// <summary>The band as a rectangle, however it was dragged — up, down, left or right.</summary>
+    private Rect BandRect() => new(
+        Math.Min(_bandStart.X, _bandEnd.X),
+        Math.Min(_bandStart.Y, _bandEnd.Y),
+        Math.Abs(_bandEnd.X - _bandStart.X),
+        Math.Abs(_bandEnd.Y - _bandStart.Y));
+
+    private void DrawSelectionBand(ISymbolCanvas canvas)
+    {
+        if (!_isBanding) return;
+
+        var band = BandRect();
+        if (band.Width < 1 && band.Height < 1) return;
+
+        // Dashed, because a solid rectangle over the schematic reads as a part rather than as
+        // something in the middle of being dragged.
+        var pen = CanvasTheme.Pen(CanvasTheme.SelectionBrush, 1.5, Zoom, new DashStyle([4, 3], 0));
+
+        canvas.DrawRectangle(null, pen, band);
     }
 
     private void DrawGrid(DrawingContext context)
@@ -535,11 +561,28 @@ public class CircuitCanvas : Control
             return;
         }
 
-        if (_isDraggingComponent && SelectedComponent is { } dragged)
+        if (_isBanding)
         {
-            var target = Snap(new CorePoint(world.X - _dragGrabOffset.X, world.Y - _dragGrabOffset.Y));
-            dragged.X = target.X;
-            dragged.Y = target.Y;
+            _bandEnd = world;
+            InvalidateVisual();
+            return;
+        }
+
+        if (_isDraggingComponent && _dragGroup.Count > 0)
+        {
+            // Snapped on the part under the pointer and everything else moved by the same amount,
+            // so a group keeps its shape instead of each part rounding to the grid separately.
+            var anchor = _dragGroup[0];
+            var snapped = Snap(new CorePoint(world.X - anchor.Grab.X, world.Y - anchor.Grab.Y));
+            var shiftX = snapped.X - (world.X - anchor.Grab.X);
+            var shiftY = snapped.Y - (world.Y - anchor.Grab.Y);
+
+            foreach (var (part, grab) in _dragGroup)
+            {
+                part.X = world.X - grab.X + shiftX;
+                part.Y = world.Y - grab.Y + shiftY;
+            }
+
             InvalidateVisual();
             return;
         }
@@ -630,9 +673,35 @@ public class CircuitCanvas : Control
             e.Pointer.Capture(null);
         }
 
+        if (_isBanding)
+        {
+            _isBanding = false;
+            e.Pointer.Capture(null);
+
+            var band = BandRect();
+
+            // A click rather than a drag: the selection was already cleared on press, so there is
+            // nothing to do but let it be a click on empty space.
+            if (band.Width > 2 && band.Height > 2 && Circuit is { } circuit)
+            {
+                var caught = ComponentsWithin(circuit, band);
+                SetSelection(caught);
+
+                StatusChanged?.Invoke(this, caught.Count switch
+                {
+                    0 => "Nothing in the box.",
+                    1 => $"Selected {caught[0].Name}",
+                    _ => $"Selected {caught.Count} parts",
+                });
+            }
+
+            InvalidateVisual();
+        }
+
         if (_isDraggingComponent)
         {
             _isDraggingComponent = false;
+            _dragGroup.Clear();
             InteractiveEditEnded?.Invoke(this, EventArgs.Empty);
             e.Pointer.Capture(null);
             TopologyChanged?.Invoke(this, EventArgs.Empty);
@@ -694,20 +763,48 @@ public class CircuitCanvas : Control
 
         if (component is not null)
         {
-            SelectedComponent = component;
-            foreach (var wire in Circuit!.Wires) wire.IsSelected = false;
+            // Pressing a part that is already in a group keeps the group and moves all of it.
+            // Pressing one outside the group selects just that part, which is what every other
+            // editor does and the only behaviour that lets you get out of a selection.
+            if (!component.IsSelected) SetSelection([component]);
 
+            var moving = Selection;
+            if (moving.Count == 0) moving = [component];
+
+            _dragGroup.Clear();
+            foreach (var part in moving)
+                _dragGroup.Add((part, new CorePoint(world.X - part.X, world.Y - part.Y)));
+
+            SelectedComponent = moving.Count == 1 ? moving[0] : null;
             _isDraggingComponent = true;
             _dragGrabOffset = new CorePoint(world.X - component.X, world.Y - component.Y);
-            InteractiveEditBegan?.Invoke(this, $"Move {component.ComponentType}");
+
+            InteractiveEditBegan?.Invoke(this, moving.Count == 1
+                ? $"Move {component.ComponentType}"
+                : $"Move {moving.Count} parts");
+
             e.Pointer.Capture(this);
             return;
         }
 
         var hitWire = WireAt(world);
-        foreach (var wire in Circuit!.Wires) wire.IsSelected = ReferenceEquals(wire, hitWire);
 
-        SelectedComponent = null;
+        if (hitWire is not null)
+        {
+            SetSelection([]);
+            hitWire.IsSelected = true;
+            SelectedComponent = null;
+            return;
+        }
+
+        // Empty canvas: start a band. A press that turns out not to be a drag clears the
+        // selection on release, which is what a plain click on nothing has always done.
+        SetSelection([]);
+
+        _isBanding = true;
+        _bandStart = world;
+        _bandEnd = world;
+        e.Pointer.Capture(this);
     }
 
     private void HandleWireClick(CorePoint world)
@@ -811,10 +908,65 @@ public class CircuitCanvas : Control
     }
 
     /// <summary>Rotates the selected component by 90 degrees.</summary>
+    /// <summary>
+    /// Everything currently selected. The flag on the parts is what holds a selection, rather
+    /// than <see cref="SelectedComponent"/> — that one names the part the inspector is editing,
+    /// which is meaningless once there are five of them.
+    /// </summary>
+    public IReadOnlyList<CircuitComponent> Selection =>
+        Circuit is null ? [] : [.. Circuit.Components.Where(c => c.IsSelected)];
+
+    /// <summary>
+    /// Replaces the selection. Wires follow rather than being chosen: one is selected exactly when
+    /// <b>both</b> of its ends are on selected parts, which is the same rule that decides whether
+    /// it can be copied — a wire with one end outside the group has nothing to attach a copy to.
+    /// </summary>
+    public void SetSelection(IEnumerable<CircuitComponent> components)
+    {
+        var circuit = Circuit;
+        if (circuit is null) return;
+
+        var chosen = components as IReadOnlySet<CircuitComponent> ?? components.ToHashSet();
+
+        foreach (var component in circuit.Components) component.IsSelected = chosen.Contains(component);
+
+        foreach (var wire in circuit.Wires)
+        {
+            var from = wire.SourceTerminal?.Owner;
+            var to = wire.TargetTerminal?.Owner;
+
+            wire.IsSelected = from is not null && to is not null
+                && chosen.Contains(from) && chosen.Contains(to);
+        }
+
+        SelectedComponent = chosen.Count == 1 ? chosen.First() : null;
+    }
+
+    /// <summary>
+    /// Everything a band caught: the parts whose symbol lies <b>wholly</b> inside it.
+    /// <para>
+    /// The test is against the symbol rather than <see cref="VisualBoundsOf"/>, which includes the
+    /// caption printed under a part. Dragging a box that visibly encloses three parts and getting
+    /// two, because one of them has a long value label hanging below it, is not a rule anybody can
+    /// work with.
+    /// </para>
+    /// </summary>
+    public static IReadOnlyList<CircuitComponent> ComponentsWithin(Circuit circuit, Rect band) =>
+        [.. circuit.Components.Where(c => band.Contains(BoundsOf(c)))];
+
     public void RotateSelection()
     {
-        if (SelectedComponent is not { } component) return;
-        component.RotationDegrees = (component.RotationDegrees + 90) % 360;
+        var selection = Selection;
+
+        if (selection.Count == 0)
+        {
+            if (SelectedComponent is not { } single) return;
+            selection = [single];
+        }
+
+        foreach (var component in selection)
+            component.RotationDegrees = (component.RotationDegrees + 90) % 360;
+
         TopologyChanged?.Invoke(this, EventArgs.Empty);
         InvalidateVisual();
     }
@@ -824,9 +976,9 @@ public class CircuitCanvas : Control
     /// Shows a component that has just appeared — a pasted copy — and makes it the selection so
     /// it can be dragged straight away.
     /// </summary>
-    public void BringIntoView(CircuitComponent component)
+    public void BringIntoView(IReadOnlyList<CircuitComponent> components)
     {
-        SelectedComponent = component;
+        SelectedComponent = components.Count == 1 ? components[0] : null;
         TopologyChanged?.Invoke(this, EventArgs.Empty);
         InvalidateVisual();
     }
@@ -836,7 +988,16 @@ public class CircuitCanvas : Control
         var circuit = Circuit;
         if (circuit is null) return;
 
-        if (SelectedComponent is { } component)
+        var selection = Selection;
+
+        if (selection.Count > 0)
+        {
+            // Removing a part takes its wires with it, so the wires in the selection need no
+            // separate pass — and a wire selected on its own is not in this branch at all.
+            foreach (var component in selection) circuit.Remove(component);
+            SelectedComponent = null;
+        }
+        else if (SelectedComponent is { } component)
         {
             circuit.Remove(component);
             SelectedComponent = null;

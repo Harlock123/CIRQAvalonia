@@ -100,7 +100,22 @@ Anything you can operate is ringed with a small dot beside its designator, so yo
 remember which parts those are. Turn the rings off with **View > Mark Interactive Parts** once
 they have served their purpose.
 
-### Copying a part
+### Selecting more than one part
+
+With the **Select** tool, drag a box across empty canvas and everything inside it is selected —
+parts and the wires between them, all highlighted together. Drag any one of them and the whole
+group moves, keeping its shape. `R` rotates all of them, `Delete` removes all of them.
+
+A part has to be **wholly inside** the box to be caught. Clipping one leaves it out, which is what
+stops a selection from depending on exactly where you stopped dragging. The captions under parts do
+not have to be inside — a generator's value label can hang well below its symbol, and judging the
+box against that would catch far less than the box visibly encloses.
+
+Wires are not selected by the box directly. A wire is selected exactly when **both of its ends are
+on selected parts**, which is the same rule that decides whether it can be copied. Click empty
+canvas to clear the selection, or click a single part to select just that one.
+
+### Copying
 
 Select a part and press `Ctrl` `C`, then `Ctrl` `V`: a duplicate appears a little down and to the
 right, already selected and ready to drag where you want it. It is a **new part**, with its own
@@ -109,14 +124,20 @@ are easy to forget about: the model on an op-amp, the number of inputs on a gate
 duty cycle on a generator. Eight identical current-limiting resistors is now eight keystrokes
 rather than eight trips to the palette and eight visits to the properties panel.
 
+**A box selection copies as a group**, and the wires come with it. Draw a box round an input stage
+you like and you get the whole thing back, wired the way you drew it — the copy is a working
+circuit, not a pile of parts that happen to look right. Paste it twice and you have two independent
+stages, each wired inside itself and neither joined to the other.
+
+A wire only comes across when **both** of its ends are in the group. One leaving the selection went
+to something that is not being duplicated, so there is nothing for the copy to attach to — those
+are dropped rather than guessed at, and the copy arrives with that connection open.
+
 Two details are worth knowing. The copy is taken **when you press `Ctrl` `C`**, not when you paste:
 change the original afterwards, or delete it, and what comes out of the clipboard is still what you
 copied. And **each paste lands further along** than the last, so pressing `Ctrl` `V` four times
-gives you four parts spread down the canvas rather than four stacked on the same spot with only the
-top one reachable.
-
-Wires are not copied, because one part has no wires of its own — what it had were connections to
-other parts, and those cannot mean anything on a duplicate. The copy arrives unconnected.
+gives you four copies spread down the canvas rather than four stacked on the same spot with only
+the top one reachable.
 
 Everything you do to the schematic can be taken back with `Ctrl` `Z`, and put back with `Ctrl` `Y`
 (or `Ctrl` `Shift` `Z`). The Edit menu names what it is about to reverse — **Undo Add Resistor**,
@@ -2506,11 +2527,12 @@ Also available in the app at **Help > Keyboard Shortcuts**.
 
 | | |
 | --- | --- |
-| `V` | Select tool — drag to move |
+| `V` | Select tool — drag a part to move it, drag empty canvas to box-select |
 | `W` | Wire tool |
 | `P` | Probe tool |
 | `R` | Rotate selection |
-| `Ctrl` `C` / `Ctrl` `V` | Copy the selected part / paste a duplicate |
+| Drag on empty canvas | Box-select everything wholly inside it |
+| `Ctrl` `C` / `Ctrl` `V` | Copy the selection / paste a duplicate of it |
 | `Ctrl` `Z` / `Ctrl` `Y` | Undo / redo (`Ctrl` `Shift` `Z` redoes as well) |
 | `Delete` | Delete selection |
 | `Ctrl` `+` / `Ctrl` `-` | Zoom in / out (the numeric keypad's `+` and `-` work too) |

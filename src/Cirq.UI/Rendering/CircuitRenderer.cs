@@ -11,14 +11,20 @@ namespace Cirq.UI.Rendering;
 /// constant size on screen — and, in an export, so a schematic drawn at 3× does not come out with
 /// hairline strokes.
 /// </param>
-/// <param name="SelectedComponent">Drawn in the selection colour, if it is on this canvas.</param>
+/// <param name="SelectedComponent">
+/// Drawn in the selection colour, if it is on this canvas — along with anything else carrying
+/// <see cref="CircuitComponent.IsSelected"/>, which is how a band selection of several parts is
+/// held. Exports pass null and the flags are not set on a loaded document, so neither shows
+/// selection highlighting.
+/// </param>
 /// <param name="ShowInteractiveMarkers">Rings the parts that can be operated by double-clicking.</param>
 /// <param name="ShowProbes">Whether probe pennants are drawn.</param>
 public sealed record CircuitRenderOptions(
     double Zoom,
     CircuitComponent? SelectedComponent = null,
     bool ShowInteractiveMarkers = true,
-    bool ShowProbes = true);
+    bool ShowProbes = true,
+    bool ShowSelection = true);
 
 /// <summary>
 /// Draws a whole circuit — wires, symbols, captions and probes — onto any <see cref="ISymbolCanvas"/>.
@@ -52,8 +58,9 @@ public static class CircuitRenderer
         {
             if (wire.SourceTerminal is null || wire.TargetTerminal is null) continue;
 
-            var brush = wire.IsSelected ? CanvasTheme.SelectionBrush : CanvasTheme.WireBrush;
-            var pen = CanvasTheme.Pen(brush, wire.IsSelected ? 3.0 : 2.0, options.Zoom);
+            var highlight = options.ShowSelection && wire.IsSelected;
+            var brush = highlight ? CanvasTheme.SelectionBrush : CanvasTheme.WireBrush;
+            var pen = CanvasTheme.Pen(brush, highlight ? 3.0 : 2.0, options.Zoom);
             var points = BuildWirePath(wire).Select(p => new Point(p.X, p.Y)).ToList();
             if (points.Count < 2) continue;
 
@@ -121,8 +128,12 @@ public static class CircuitRenderer
                        Matrix.CreateRotation(component.RotationDegrees * Math.PI / 180.0) *
                        Matrix.CreateTranslation(component.X, component.Y)))
             {
-                SymbolRenderer.Draw(canvas, component, options.Zoom,
-                    ReferenceEquals(component, options.SelectedComponent));
+                // Either way of being selected counts: the flag, which a band sets on everything
+                // it caught, or being the one part the inspector is editing.
+                var selected = options.ShowSelection
+                    && (component.IsSelected || ReferenceEquals(component, options.SelectedComponent));
+
+                SymbolRenderer.Draw(canvas, component, options.Zoom, selected);
             }
 
             DrawComponentLabels(canvas, component, options);

@@ -406,7 +406,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     public event EventHandler? RequestDeleteSelection;
 
     /// <summary>Raised when the pasted component should be selected on the canvas.</summary>
-    public event EventHandler<CircuitComponent>? RequestSelect;
+    public event EventHandler<IReadOnlyList<CircuitComponent>>? RequestSelect;
 
     /// <summary>Raised when the window should close.</summary>
     public event EventHandler? RequestClose;
@@ -496,19 +496,26 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void CopySelection()
     {
-        if (SelectedComponent is not { } component)
+        // The selection is whatever carries the flag, which is one part after a click and as many
+        // as the band caught after a drag.
+        var components = Circuit.Components.Where(c => c.IsSelected).ToList();
+
+        if (components.Count == 0 && SelectedComponent is { } single) components.Add(single);
+
+        if (components.Count == 0)
         {
             StatusMessage = "Nothing selected to copy.";
             return;
         }
 
-        Clipboard.Copy(component);
+        Clipboard.Copy(components, Circuit.Wires);
 
         OnPropertyChanged(nameof(PasteMenuText));
-        CopySelectionCommand.NotifyCanExecuteChanged();
         PasteCommand.NotifyCanExecuteChanged();
 
-        StatusMessage = $"Copied {component.Name}";
+        StatusMessage = Clipboard.WireCount > 0
+            ? $"Copied {Describe(Clipboard.Count)} and {Describe(Clipboard.WireCount, "wire")}"
+            : $"Copied {Describe(Clipboard.Count)}";
     }
 
     [RelayCommand(CanExecute = nameof(CanPaste))]
@@ -516,21 +523,30 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     {
         List<string> warnings = [];
 
-        if (Clipboard.PasteInto(Circuit, warnings) is not { } copy)
+        var pasted = Clipboard.PasteInto(Circuit, warnings);
+
+        if (pasted.Count == 0)
         {
             StatusMessage = "Nothing on the clipboard.";
             return;
         }
 
-        // Selecting it is the point of pasting it: the copy lands offset from the original and is
+        // Selecting the copy is the point of pasting it: it lands offset from the original and is
         // almost always about to be dragged somewhere.
-        SelectedComponent = copy;
-        RequestSelect?.Invoke(this, copy);
+        foreach (var component in Circuit.Components) component.IsSelected = pasted.Contains(component);
+        foreach (var wire in Circuit.Wires) wire.IsSelected = false;
+
+        SelectedComponent = pasted.Count == 1 ? pasted[0] : null;
+        RequestSelect?.Invoke(this, pasted);
 
         StatusMessage = warnings.Count == 0
-            ? $"Pasted {copy.Name}"
-            : $"Pasted {copy.Name} — {warnings[0]}";
+            ? $"Pasted {Describe(pasted.Count)}"
+            : $"Pasted {Describe(pasted.Count)} — {warnings[0]}";
     }
+
+    /// <summary>"1 part" rather than "1 parts", which is worth four lines to get right.</summary>
+    private static string Describe(int count, string noun = "part") =>
+        count == 1 ? $"1 {noun}" : $"{count} {noun}s";
 
     private bool CanPaste() => Clipboard.HasContent;
 

@@ -79,7 +79,7 @@ public partial class MainWindow : Window
     {
         viewModel.RequestRotateSelection += (_, _) => _canvas?.RotateSelection();
         viewModel.RequestDeleteSelection += (_, _) => _canvas?.DeleteSelection();
-        viewModel.RequestSelect += (_, component) => _canvas?.BringIntoView(component);
+        viewModel.RequestSelect += (_, components) => _canvas?.BringIntoView(components);
         viewModel.RequestClose += (_, _) => Close();
         viewModel.RequestSettings += async (_, _) => await ShowSettingsAsync();
         viewModel.RequestAbout += async (_, _) => await ShowAboutAsync();
