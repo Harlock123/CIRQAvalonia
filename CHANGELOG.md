@@ -8,6 +8,85 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-09-20
+
+The examples stop being a menu and start being a library. The palette gains three parts and now
+holds 164 components in 16 categories; there are 54 worked examples in 12 groups, and 1799 tests.
+
+**File > Examples... is now a browser** (`Ctrl+Shift+E`). Forty-odd entries in a submenu is a list
+to be got through rather than one to look at, and it was getting worse with every release. They are
+now grouped the way the component palette is — Fundamentals, Analog, Power Supplies, Switching &
+Motors, Digital Logic, Timers & Oscillators, Buses & Interfaces, Sensors, Signal Integrity & RF,
+Audio, Displays, Development Boards — with a description of whichever one is selected beside the
+list and a search box across the name, the description and the group. Looking for `I2C` finds the
+bus examples; looking for `hysteresis` finds the comparator circuit whose name you have forgotten.
+
+**Eleven new examples**, most of them for parts that had been in the palette with nothing
+demonstrating them:
+
+- **Rail to Rail** — the same follower three times on one 5 V supply, an LM741 against an LM358
+  against an MCP6002, so how much of a supply each part can actually use is one picture instead of
+  a table. The single most common surprise in single-supply analog work.
+- **Character LCD** — an Arduino driving an HD44780 in four-bit mode, playing the whole
+  initialisation dance as a pin sequence. The part every library hides, visible byte by byte.
+- **Load Cell** — a strain-gauge bridge into an INA126: ten millivolts riding on two and a half
+  volts of common mode, which is the measurement instrumentation amplifiers exist for.
+- **Audio Amplifier** — a microphone through a volume control into an LM386 into a speaker.
+- **Relay Driver** — logic to a coil through an optocoupler and a ULN2003, with both sides of the
+  changeover contact lit.
+- **Solar Panel** — the one example where the thing under test is the *load*: turn the knob and
+  find the maximum power point, which lands four fifths of the way to open circuit.
+- **Lithium Charge Cycle** — constant current to 4.2 V, then constant voltage tapering to
+  termination, the whole cycle in about a second.
+- **Surge Protection** — a varistor, a series resistor and a TVS bringing a two-hundred-volt spike
+  down in two stages, because neither clamp could do it alone.
+- **Rotary Encoder** — quadrature, where the direction is in which output moves first and neither
+  one alone says anything.
+- **Varactor Tuning** and **RS-485 Link** for the new parts below.
+
+**Three new components.** A **varactor** — a diode used for its capacitance, which is how every
+radio built since the sixties is tuned. A **common-mode choke**, which passes a signal and blocks
+the noise riding on both of its wires at once. And an **RS-485 transceiver**, with a terminator you
+can switch out mid-run to watch fifty metres of cable start ringing.
+
+**Speakers and microphones can now work in audio files.** A **Speaker** takes a `Recording Path`
+and writes the voltage across it to a WAV as the simulation runs; **Simulate > Play Speaker
+Recording** hands that file to whatever your desktop plays audio with. A **Microphone** takes a
+`Source Path` and plays a WAV instead of its built-in tone, so real programme material goes through
+the circuit rather than one frequency for ever. A waveform and a sound are different evidence about
+the same circuit, and for an audio stage the second is what it is actually judged by: clipping is a
+small flat spot on a trace and an unmistakable noise.
+
+It is files rather than the sound card deliberately. A variable-step transient solver takes the
+steps the circuit needs, not the steps a clock wants, so it cannot hand a device forty-four thousand
+samples a second on time for ever — and through a file the same run is reproducible and can be
+asserted in a test. The recording is resampled onto a fixed grid, because otherwise its pitch would
+follow the solver's step size.
+
+### Fixed
+
+- **The ULN2003's COM pin did nothing.** It was declared and never modelled, which meant the part's
+  freewheeling diodes — the entire reason that pin exists, and the reason the part is used for
+  relay coils and stepper windings — were not there. An inductive load switched off drove its
+  output to tens of kilovolts. The diodes are now modelled, so tying COM to the load's supply
+  clamps a diode drop above it and leaving it off has the consequence it has on a breadboard.
+- **The rotary encoder's Detent control changed a number and nothing else.** Its contacts are
+  driven by a turn in progress and only double-clicking the part ever started one, so dragging the
+  control on the CONTROLS panel produced no quadrature at all. The two are now the same action.
+- **The Window Detector example never detected anything.** Both LM339 channels had their signal and
+  reference the wrong way round, so the two open-collector outputs were never released together and
+  the "In range" probe was a flat line at every input voltage. An open collector says "out of
+  range" by pulling and says "in range" only by letting go.
+- **The load cell had no operable property**, so the weight could not be varied while it ran.
+
+### Documentation
+
+Ten older examples had never been named anywhere in the guide, so nothing led a reader from the
+prose to the circuit demonstrating it — a JFET amplifier was one click away and unmentioned. Every
+one of the 54 examples is now referenced from the section it belongs to, and the guide gains
+sections on recording audio, on maximum power point, on two-stage surge protection and on what the
+COM pin is for.
+
 ## [0.25.1] - 2026-09-20
 
 One new example. The palette is unchanged at 161 components in 16 categories; there are now 43
