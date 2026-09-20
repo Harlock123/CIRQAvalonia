@@ -56,6 +56,11 @@ GitHub. `PAPER=Letter` for US paper.
   renderer could no longer take the selection from a single property, so a PNG of a circuit risked
   depending on what happened to be highlighted when it was taken. Rendering now takes an explicit
   option and the exporter turns it off.
+- **A timing test was flaky on shared machines.** The one covering real-time pacing compared a
+  paced run against an unpaced one, which measures the scheduler as much as the pacing and failed
+  on a loaded CI runner. It is now two tests, each asserting against the pacing ceiling at a speed
+  factor chosen to give its own assertion a wide margin — load can only move both in the safe
+  direction.
 
 ## [0.27.0] - 2026-09-20
 
