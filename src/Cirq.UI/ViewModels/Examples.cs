@@ -68,6 +68,8 @@ public static class Examples
             LoadLightMeter),
         new("Motor Reversing", "An H-bridge running a motor both ways — forward, brake, reverse, coast",
             LoadMotorReversing),
+        new("Noise and Hysteresis", "A comparator chattering on a noisy ramp — add hysteresis and it stops",
+            LoadNoiseAndHysteresis),
     ];
 
     public static void LoadRcLowPass(MainWindowViewModel vm)
@@ -1478,6 +1480,80 @@ public static class Examples
         vm.Scope.AddProbe(bridge.Output2, "OUT2");
 
         vm.Simulation.SpeedFactor = 1.0;
+    }
+
+    public static void LoadNoiseAndHysteresis(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "Noise and hysteresis";
+
+        var rail = Place(circuit, new DcVoltageSource(5.0), -520, 180);
+
+        // A slow triangle creeping through the threshold, with noise riding on it. Either alone
+        // is well behaved; together they are what makes a bare comparator useless.
+        var ramp = Place(circuit, new FunctionGenerator
+        {
+            Shape = Waveform.Triangle,
+            Frequency = 20,
+            AmplitudePeakToPeak = 2.0,
+            DcOffset = 2.5,
+        }, -520, -160);
+
+        var noise = Place(circuit, new NoiseSource
+        {
+            RmsVoltage = 12e-3,
+            Bandwidth = 50e3,
+        }, -280, -160);
+
+        var comparator = Place(circuit, new Comparator(ComparatorModel.Lm393), 60, -140);
+        var reference = Place(circuit, new DcVoltageSource(2.5), -280, 40);
+
+        // The pull-up an open-collector comparator cannot work without.
+        var pullUp = Place(circuit, new Resistor(4.7e3), 300, -260);
+
+        // The feedback resistor that turns one threshold into two. Large against the source
+        // impedance, so it moves the reference by tens of millivolts rather than volts — which is
+        // all it takes to outrun the noise.
+        var hysteresis = Place(circuit, new Resistor(470e3), 60, 40);
+        var source = Place(circuit, new Resistor(10e3), -100, -160);
+
+        var gnd = Place(circuit, new Ground(), -520, 340);
+        var gnd2 = Place(circuit, new Ground(), 60, 180);
+
+        pullUp.RotationDegrees = 90;
+
+        circuit.Connect(rail.Negative, gnd.Pin);
+        circuit.Connect(ramp.Return, gnd.Pin);
+        circuit.Connect(reference.Negative, gnd.Pin);
+
+        circuit.Connect(comparator.PositiveSupply, rail.Positive);
+        circuit.Connect(comparator.NegativeSupply, gnd2.Pin);
+
+        // Signal, then noise in series with it, then a resistor into the non-inverting input.
+        // That resistor is what the feedback works against: hysteresis is the divider between the
+        // two, and without it the feedback fights the generator's own fifty ohms and moves the
+        // threshold by a millivolt, which is nothing against the noise.
+        circuit.Connect(ramp.Output, noise.A);
+        circuit.Connect(noise.B, source.A);
+        circuit.Connect(source.B, comparator.NonInverting);
+
+        circuit.Connect(reference.Positive, comparator.Inverting);
+
+        circuit.Connect(rail.Positive, pullUp.A);
+        circuit.Connect(pullUp.B, comparator.Output);
+
+        // Output back to the non-inverting input: that is the hysteresis. Delete this resistor
+        // and the chatter comes back.
+        circuit.Connect(comparator.Output, hysteresis.A);
+        circuit.Connect(hysteresis.B, comparator.NonInverting);
+
+        vm.Scope.TimebasePerDivision = 5e-3;
+        vm.Scope.VoltsPerDivision = 1.0;
+        vm.Scope.Layout = ScopeLayout.Tiled;
+        vm.Scope.AddProbe(comparator.NonInverting, "Noisy ramp");
+        vm.Scope.AddProbe(comparator.Output, "Output");
+
+        vm.Simulation.SpeedFactor = 0.05;
     }
 
     private static T Place<T>(Circuit circuit, T component, double x, double y) where T : CircuitComponent

@@ -53,6 +53,7 @@ public static class SymbolRenderer
             case Servo servo: DrawServo(context, pen, zoom, servo); break;
             case StepperMotor stepper: DrawStepper(context, pen, zoom, stepper); break;
             case UltrasonicRanger sonar: DrawUltrasonicRanger(context, pen, zoom, sonar); break;
+            case NoiseSource noise: DrawNoiseSource(context, pen, zoom, noise); break;
             case Battery battery: DrawBattery(context, pen, zoom, battery); break;
             case TransientSuppressor tvs: DrawTvs(context, pen, zoom, tvs); break;
             case Varistor varistor: DrawVaristor(context, pen, zoom, varistor); break;
@@ -971,6 +972,32 @@ public static class SymbolRenderer
             context.DrawEllipse(null, CanvasTheme.Pen(CanvasTheme.ErrorBrush, 2.0, zoom),
                 new Point(0, 0), body.Width / 2 + 6, body.Height / 2 + 6);
         }
+    }
+
+    /// <summary>
+    /// A noise source: the usual source circle with a jagged trace in it rather than a waveform,
+    /// because that is what it puts out.
+    /// </summary>
+    private static void DrawNoiseSource(
+        ISymbolCanvas context, IPen pen, double zoom, NoiseSource noise)
+    {
+        context.DrawLine(pen, new Point(-30, 0), new Point(-18, 0));
+        context.DrawLine(pen, new Point(18, 0), new Point(30, 0));
+        context.DrawEllipse(CanvasTheme.SymbolFill, pen, new Point(0, 0), 18, 18);
+
+        if (zoom <= 0.35) return;
+
+        // A fixed jag rather than a random one: a symbol that changed every repaint would be
+        // unreadable, and the part is deterministic anyway.
+        double[] steps = [0.35, -0.8, 0.55, -0.3, 0.9, -0.65, 0.2];
+
+        List<Point> trace = [new(-11, 0)];
+
+        for (var i = 0; i < steps.Length; i++)
+            trace.Add(new Point(-11 + ((i + 1) * 22.0 / steps.Length), steps[i] * 7));
+
+        context.DrawGeometry(null, CanvasTheme.Pen(CanvasTheme.SymbolBrush, 1.3, zoom),
+            SymbolPath.Polyline(trace, false));
     }
 
     private static void DrawCharacterLcd(

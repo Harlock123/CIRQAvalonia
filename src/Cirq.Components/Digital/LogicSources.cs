@@ -55,6 +55,7 @@ public partial class ClockSource : DigitalComponent, IBreakpointSource
     public Terminal Out { get; }
 
     [ObservableProperty]
+    [Operable("Frequency", Minimum = 0.1, Maximum = 1e6, Unit = "Hz", IsLogarithmic = true)]
     public partial double Frequency { get; set; }
 
     [ObservableProperty]

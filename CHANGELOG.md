@@ -8,6 +8,32 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**A noise source**, and with it the reason half the analog parts in the palette exist. Every
+circuit here has been perfectly clean until now, which is the one way in which none of them
+resembled a real one.
+
+Feed a slow ramp through a comparator and the output changes once. Put a dozen millivolts of noise
+on the same ramp and it changes a dozen times — every wobble back across the threshold is another
+edge, and anything counting them counts all of them. Add a feedback resistor and it goes back to
+once. That is what the LM311, the LM393 and the 74HC14 are *for*, and there was previously no way
+to show it. **File > Examples > Noise and Hysteresis** is that circuit; a test asserts all three
+outcomes rather than the docs merely claiming them.
+
+The noise is **band-limited** — drawn at a fixed rate and held, not a fresh number every time
+point, or its character would depend on the solver's step size — and **repeatable** from a seed,
+because a result you cannot reproduce is not much use for working out what went wrong.
+
+**MCP6002**, a rail-to-rail op-amp, for the comparison. Build the same follower on a single 5 V
+supply with each part and ask for 4.9 V: an LM741 manages 3.5, an LM358 4.3, and the MCP6002 4.9.
+Ask for 1 V and the LM741 cannot do it at all — its output stops a volt and a half above the
+negative rail, which is why single-supply parts exist. Halfway up they all agree, so the difference
+really is the rails.
+
+**Bench instruments now have knobs.** A supply's voltage and a generator's frequency, amplitude,
+offset and duty are controls in the CONTROLS panel alongside the switches — so you can sweep a
+frequency with the scope running and watch a filter turn over, rather than stopping, typing a
+number and starting again.
+
 ## [0.20.0] - 2026-09-19
 
 A circuit you can operate while it runs, and a motor you can run both ways. The palette holds 148

@@ -15,6 +15,7 @@ public partial class DcCurrentSource : TwoTerminalComponent
 
     /// <summary>Source current in amps.</summary>
     [ObservableProperty]
+    [Operable("Current", Minimum = 0, Maximum = 2, Unit = "A")]
     public partial double Current { get; set; }
 
     /// <summary>Shunt resistance across the source in ohms; null models an ideal source.</summary>

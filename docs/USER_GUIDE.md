@@ -68,18 +68,18 @@ at the window edge; click the rail to bring it back.
 
 Click a palette entry, then click the canvas. The part lands where you click, snapped to the grid.
 
-The palette holds **148 components in 16 categories**:
+The palette holds **150 components in 16 categories**:
 
 | Category | Count | Contents |
 | --- | --- | --- |
 | Passive | 8 | Resistor, capacitor, electrolytic capacitor, inductor, transformer, **centre-tapped transformer**, potentiometer, **crystal** — see [below](#crystals) |
 | Switches | 4 | SPST, SPDT, push button, **8-way DIP switch** |
-| Sources | 6 | Ground, DC voltage, DC current, function generator, battery, **solar cell** — see [below](#batteries-and-panels) |
+| Sources | 7 | Ground, DC voltage, DC current, function generator, battery, solar cell, **noise source** — see [below](#noise-and-why-hysteresis-exists) |
 | Semiconductors | 11 | 1N4148, 1N4001, Schottky, zeners, bridge rectifier, SCR, triac, diac, **TVS and varistor** — see [below](#surge-protection) |
 | Transistors | 10 | NPN and PNP bipolars, N- and P-channel MOSFETs, **three JFETs** — see [below](#jfets) |
 | LEDs & Displays | 9 | Six LED colours, seven-segment displays, **HD44780 character LCD** — see [below](#the-character-lcd) |
 | Power | 10 | Fixed and adjustable regulators, TL431 shunt reference, ICL7660 charge pump, MC34063 switching controller, **TP4056 lithium charger** — see [below](#charging-a-lithium-cell) |
-| Analog ICs | 10 | LM741, NE555, LM311, LM339, **LM386** audio amp and **INA126** instrumentation amp |
+| Analog ICs | 11 | LM741, TL081, LM358, **MCP6002** rail-to-rail, NE555, LM311, LM339, LM386 audio amp and INA126 instrumentation amp — see [below](#how-close-to-the-rails) |
 | Logic Gates | 7 | AND, OR, NAND, NOR, XOR, XNOR, NOT |
 | 74xx Series | 18 | Counters, decoders, flip-flops, shift registers (including the **74595**), multiplexers, Schmitt inverter |
 | 40xx Series | 14 | CMOS gates, counters, flip-flops, analog switches — see [below](#the-40xx-series) |
@@ -138,8 +138,12 @@ A few things worth knowing:
   half-millimetre of travel.
 - **A part with several controls names each one** — a DIP switch reads `SW2 · 1` through
   `SW2 · 8`, while a lone switch just reads `SW1`.
-- **The panel is not there when there is nothing to operate.** A circuit of resistors and sources
-  shows no controls section at all rather than an empty box.
+- **Bench instruments have knobs too.** A supply's voltage, a generator's frequency, amplitude,
+  offset and duty are all controls. Sweeping a frequency with the scope running is how you find
+  where a filter turns over or an oscillator starts, and it beats stopping, typing a number and
+  starting again.
+- **The panel is not there when there is nothing to operate.** A circuit of only resistors shows
+  no controls section at all rather than an empty box.
 
 What appears is decided by the components themselves. A property marked `[Operable]` becomes a
 control, which means a part added later gets one by saying so on the property rather than by
@@ -1006,6 +1010,71 @@ it.
 Both rails have to be present. The gates are tied to LV, so without that supply nothing conducts
 at all; without HV the high side has nothing to pull up to; and the two the wrong way round makes
 the body diodes conduct regardless of what anything drives. All three are reported.
+
+---
+
+## Noise, and why hysteresis exists
+
+Every circuit in this guide so far has been perfectly clean, and that is the one way in which none
+of them resembles a real one. The **Noise Source** is a two-terminal part that adds a random
+voltage to whatever it is in series with — put it between a signal and the thing reading the
+signal, and you have a realistic input.
+
+It is worth having for one demonstration in particular. Feed a slow ramp through a comparator and
+the output changes **once** as it crosses the threshold. Put a dozen millivolts of noise on the
+same ramp and it changes a dozen times: every wobble back across the threshold is another
+transition, and anything downstream counting edges counts all of them. Add a feedback resistor
+from the output to the input and it goes back to changing once.
+
+That is what the LM311, the LM393 and the 74HC14 in your palette are *for*. Their hysteresis is
+not a quirk on the datasheet, it is the entire reason they exist, and until now there was no way
+to show it.
+
+**File > Examples > Noise and Hysteresis** is that circuit. Delete the 470 kΩ feedback resistor
+while it runs and watch the output start chattering; put it back and it stops.
+
+Two things about the model are worth knowing:
+
+- It is **band-limited**. A new value is drawn at a fixed rate and held in between, rather than a
+  fresh random number at every time point. Noise that changed every step would not be a signal —
+  its character would depend on the solver's step size, so halving the time step would change the
+  answer and nothing downstream could be filtered or reasoned about.
+- It is **repeatable**. The sequence comes from a `Seed`, so the same circuit run twice gives the
+  same noise and the same answer. Change the seed for a different run of the same character.
+
+The hysteresis itself needs a resistor **between the source and the input** as well as the
+feedback one — the two form a divider, and that is what sets how far the threshold moves. Without
+it the feedback works against the generator's own fifty ohms and shifts the threshold by about a
+millivolt, which is nothing against the noise.
+
+---
+
+## How close to the rails
+
+An op-amp's output cannot reach its supplies, and how close it gets is often what decides whether
+a circuit works at all. Three parts in the palette make the point between them, and the fastest
+way to see it is to build the same follower three times on a single 5 V supply:
+
+| Part | Output asked for 4.9 V | Output asked for 1.0 V |
+| --- | --- | --- |
+| **LM741** | about 3.5 V | about 1.5 V |
+| **LM358** | about 4.3 V | about 0.7 V |
+| **MCP6002** | about 4.9 V | about 1.0 V |
+
+The LM741 cannot put out one volt on a single supply *at all* — its output stops a volt and a half
+above the negative rail, so a follower asked for one volt sits at one and a half and looks broken.
+That is why the LM358 exists, and why **MCP6002** and parts like it exist: "rail to rail" means the
+output reaches within a few tens of millivolts of both supplies, so you get to use the range you
+paid for.
+
+Halfway up the supply all three are simply buffers and agree with each other, so the difference
+really is about the rails rather than about accuracy.
+
+One limitation to know about: the output stage clamps **symmetrically** about the midpoint of the
+supplies. A real LM358 is asymmetric — it reaches within tens of millivolts of the negative rail
+while stopping about a volt and a half below the positive one — and that asymmetry is not modelled.
+The figure it uses is a compromise between the two. Use it to compare parts, not to predict how
+close to one particular rail an LM358 will get.
 
 ---
 

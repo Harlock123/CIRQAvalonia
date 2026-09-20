@@ -32,7 +32,7 @@ Core ← Engine ← Components ← UI, which keeps the whole engine headless-tes
 
 ```bash
 dotnet run --project src/Cirq.UI     # the editor
-dotnet test                          # 1229 tests
+dotnet test                          # 1247 tests
 ```
 
 Targets .NET 10. The UI uses Avalonia 12 and ScottPlot 5.1; those two versions are pinned
@@ -192,6 +192,9 @@ Tests measure the solver against closed-form answers rather than recorded output
 | MOSFET | Square-law saturation current, triode switching, zero gate current, reverse conduction, body diode |
 | JFET | Full I_DSS at zero gate drive, square law across the range, pinch-off, vanishing gate current, P-channel mirroring |
 | Thyristors | SCR blocking and firing, staying on after the gate drive goes away, dropping out when the anode current is interrupted, reverse blocking; triac firing on both half cycles and turning itself off at every zero crossing; diac breakover in either polarity |
+| Noise | The RMS coming out being the RMS asked for and centred on zero, the same seed giving the same noise and a different one giving different, a sample held for its whole interval rather than redrawn every time point, and the amplitude scaling as asked |
+| Hysteresis | A clean ramp crossing a comparator's threshold once, the same ramp with noise on it chattering, and a feedback resistor putting it back to one — which is what the LM311, LM393 and 74HC14 are for |
+| Output swing | A rail-to-rail part reaching within a whisker of both supplies where an LM358 stops short and an LM741 stops further, all three agreeing halfway up, and a 741 unable to put out one volt on a single five volt supply |
 | Live controls | Building the panel changing nothing and raising no change events, working a control moving its component and reporting it, the panel following a part worked from the canvas without reporting that as an edit, a range becoming a slider and a six-decade one becoming a logarithmic slider, a whole-number property being written a whole number, and the panel following parts placed and removed |
 | H-bridge | Driving forward and reverse with the current reversing too, both inputs the same braking with nothing across the motor, disabling coasting rather than braking, the interlock stopping shoot-through and its absence making a short across the supply, unwired inputs reading low, and the body diodes clamping an inductive kick |
 | Li-ion charger | Constant current well below full, the current tapering as the cell approaches its float voltage and stopping at it, no headroom meaning no charge, the dissipation being exactly what the input does not put in the cell, and termination latching rather than cycling |
@@ -327,7 +330,7 @@ toolbar used to show: active tool, simulation speed, elapsed time and solver rat
 `Help > Keyboard Shortcuts` lists everything below, and the
 [User Guide](docs/USER_GUIDE.md) walks through building a circuit from an empty canvas.
 
-The palette holds 148 components in 16 collapsible categories:
+The palette holds 150 components in 16 collapsible categories:
 
 ![The component palette showing all sixteen categories with their counts — passive, switches, sources, semiconductors, transistors, LEDs and displays, power, analog ICs, logic gates, 74xx series, 40xx series, buses, digital I/O, sensors and actuators, switching and isolation, and dev boards — with the Passive group open](docs/images/02-palette.png)
 
@@ -381,7 +384,7 @@ the whole thing at its natural size. The editing aids — dot grid, terminal dot
 | Export | `Ctrl+E` writes the schematic and the traces out as PNG, JPEG, BMP, SVG or PDF, optionally with a grouped parts list. SVG and PDF are true vector, drawn by the same code that draws the screen. The frame follows the circuit rather than the view |
 | About | `Help > About` reports the version and the libraries it is built on, read from the loaded assemblies rather than a hand-kept list, with a button that copies the lot for a bug report |
 | Transport | `F5` run/pause, `F6` single step, `F8` reset |
-| Controls | Every switch, potentiometer, light level, temperature and magnet in the circuit is gathered into a **CONTROLS** panel under the properties panel, and can be worked while the simulation runs. A part declares a control by marking the property `[Operable]`, so a new component gets one without the UI being edited |
+| Controls | Every switch, potentiometer, light level, temperature and magnet — and every supply voltage, generator frequency and amplitude — is gathered into a **CONTROLS** panel under the properties panel, and can be worked while the simulation runs. Sweep a frequency with the scope running and watch a filter turn over. A part declares a control by marking the property `[Operable]`, so a new component gets one without the UI being edited |
 | Interactive | Switches, buttons, logic toggles, LDRs and thermistors are operated by double-clicking them. They are ringed with a small dot so you can tell which parts those are; **View > Mark Interactive Parts** turns the rings off |
 | Panels | `F9` collapses the palette to the left, `F10` the properties panel to the right — or click the chevron in either panel's header. A collapsed panel leaves a labelled rail at the edge; click it to bring the panel back. Palette groups also collapse individually (`All` toggles every group) |
 

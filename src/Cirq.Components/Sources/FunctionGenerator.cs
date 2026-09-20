@@ -25,10 +25,12 @@ public partial class FunctionGenerator : TwoTerminalComponent, IBreakpointSource
 
     /// <summary>Frequency in hertz.</summary>
     [ObservableProperty]
+    [Operable("Frequency", Minimum = 1, Maximum = 1e6, Unit = "Hz", IsLogarithmic = true)]
     public partial double Frequency { get; set; }
 
     /// <summary>Peak-to-peak amplitude in volts.</summary>
     [ObservableProperty]
+    [Operable("Amplitude", Minimum = 0, Maximum = 50, Unit = "Vpp")]
     public partial double AmplitudePeakToPeak { get; set; }
 
     /// <summary>Phase offset in degrees.</summary>
@@ -37,10 +39,12 @@ public partial class FunctionGenerator : TwoTerminalComponent, IBreakpointSource
 
     /// <summary>DC offset added to the waveform, in volts.</summary>
     [ObservableProperty]
+    [Operable("Offset", Minimum = -25, Maximum = 25, Unit = "V")]
     public partial double DcOffset { get; set; }
 
     /// <summary>High-time fraction for square waves, and rise fraction for triangles. Clamped to (0, 1).</summary>
     [ObservableProperty]
+    [Operable("Duty", Minimum = 0.01, Maximum = 0.99)]
     public partial double DutyCycle { get; set; } = 0.5;
 
     /// <summary>Transition time of square and sawtooth edges, in seconds.</summary>

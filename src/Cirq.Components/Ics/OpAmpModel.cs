@@ -34,11 +34,35 @@ public sealed record OpAmpModel(
     public static readonly OpAmpModel Tl081 = new(
         "TL081", 200_000, 3e6, 13e6, 1e12, 100, 1.5, 3e-3, 30e-12, 1.4e-3);
 
-    /// <summary>Single-supply capable, output swings close to the negative rail.</summary>
+    /// <summary>
+    /// The single-supply workhorse. Its output gets closer to the rails than an LM741's, which is
+    /// what lets it work on one battery, but it still stops well short of them.
+    /// <para>
+    /// The real part is <b>asymmetric</b> — it reaches within tens of millivolts of the negative
+    /// rail and stops about a volt and a half below the positive one — and that asymmetry is not
+    /// modelled here. The output stage clamps symmetrically about the midpoint of the supplies,
+    /// so the figure below is a compromise between the two. Compare it with the
+    /// <see cref="Mcp6002"/> for what rail-to-rail buys you; do not rely on it for how close to
+    /// each individual rail this particular part will get.
+    /// </para>
+    /// </summary>
     public static readonly OpAmpModel Lm358 = new(
         "LM358", 100_000, 1e6, 0.3e6, 2e6, 100, 0.7, 2e-3, 45e-9, 0.7e-3);
 
-    public static readonly IReadOnlyList<OpAmpModel> Library = [Lm741, Tl081, Lm358];
+    /// <summary>
+    /// A CMOS rail-to-rail part, and the reason to have it here is the comparison.
+    /// <para>
+    /// "Rail to rail" means what it says: the output reaches within a few tens of millivolts of
+    /// the supplies, where the LM358 above stops the better part of a volt short and the LM741
+    /// a volt and a half. Build the same follower three times and watch how much of a five volt
+    /// supply each one can actually use — that is the single most common surprise in
+    /// single-supply analog work, and much easier to believe once seen.
+    /// </para>
+    /// </summary>
+    public static readonly OpAmpModel Mcp6002 = new(
+        "MCP6002", 112_000, 1e6, 0.6e6, 1e13, 100, 0.025, 2e-3, 1e-12, 100e-6);
+
+    public static readonly IReadOnlyList<OpAmpModel> Library = [Lm741, Tl081, Lm358, Mcp6002];
 
     /// <summary>Input-stage transconductance. Fixed; the other values scale around it.</summary>
     public double Transconductance => 1e-4;

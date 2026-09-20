@@ -15,6 +15,7 @@ public partial class DcVoltageSource : TwoTerminalComponent
 
     /// <summary>Source voltage in volts, measured from the + pin to the - pin.</summary>
     [ObservableProperty]
+    [Operable("Voltage", Minimum = 0, Maximum = 50, Unit = "V")]
     public partial double Voltage { get; set; }
 
     /// <summary>Internal series resistance in ohms; zero models an ideal source.</summary>
