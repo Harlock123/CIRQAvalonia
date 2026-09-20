@@ -8,6 +8,44 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-09-20
+
+Op-amps that stop where the real ones do. The palette holds 150 components in 16 categories, and
+1493 tests measure them against closed-form answers.
+
+**An LM358 now reaches the bottom rail.** The real part is lopsided — its output pulls down to
+within twenty millivolts of the negative supply but stops a volt and a half below the positive one
+— and that asymmetry is the whole reason it exists. It is why an LM358 works on a single battery
+where an LM741 does not. Until now the model clamped symmetrically about the middle of the
+supplies and split the difference, so the guide had to tell you not to trust it near either rail
+in particular.
+
+Build the same follower three times on a single 5 V supply and ask each one for 50 mV. The MCP6002
+and the LM358 both give you 50 mV; the LM741 gives you 1.5 V and looks broken. Ask the same three
+for 4.9 V and the LM358 is no better than the LM741 — both stop around 3.5 V, and only the
+rail-to-rail part gets there. Which rail a part is good at is worth checking before you pick one,
+and now the simulator will tell you.
+
+**Coming out of saturation no longer takes milliseconds.** Drive an op-amp hard against a rail and
+leave it there, and its internal gain node used to drift off into the kilovolts, because nothing
+in the model bounded it. The DC answer still looked right — the output was at the rail either way
+— but the next time the input changed its mind, that node had to travel all the way back at the
+datasheet slew rate. A 741 that should recover in fifty microseconds took thousands. Comparators,
+peak detectors, anything that spends time against a rail and then has to come off it, were all
+slower than the part they were modelling.
+
+**And the slew rate is now the datasheet figure.** A 741 driven by a fast step sustains 0.50 V/µs,
+where before it managed 0.23 — the old output stage compressed the ramp on its way through.
+
+Under all three: the output buffer no longer clamps itself. The rails clamp the **gain node**,
+which is where a real amplifier does it, and the buffer that follows is a plain linear follower.
+That leaves the solver something to steer with when the output is hard against a rail, which is
+what made the asymmetric case converge at last.
+
+Verified over a **245-case matrix** — every headroom pair against every supply arrangement,
+split and single, asked for voltages inside the window and well outside it. A symmetric part on a
+split supply hides every one of these faults, which is how they survived this long.
+
 ## [0.21.0] - 2026-09-19
 
 Noise, and the parts that exist because of it. The palette holds 150 components in 16 categories,
@@ -783,7 +821,8 @@ First public build of CirqAvalonia — an electronic circuit analyzer and mixed-
 
 **501 tests** measure the solver against closed-form answers rather than recorded output.
 
-[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.21.0...HEAD
+[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.22.0...HEAD
+[0.22.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.21.0...v0.22.0
 [0.21.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.20.0...v0.21.0
 [0.20.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.19.0...v0.20.0
 [0.19.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.18.0...v0.19.0
