@@ -8,6 +8,12 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-09-19
+
+Everything you draw can now leave the application as a file. Alongside that, four parts about what
+a component does past the point its headline number applies. The palette holds 140 components in
+16 categories, and 1115 tests measure them against closed-form answers.
+
 **Export.** `File > Export...`, or `Ctrl+E`, writes the schematic and the oscilloscope traces out
 as **PNG, JPEG, BMP, SVG or PDF**. Choose the schematic, the traces, or both — and when both,
 either one file with the schematic above the traces, or a file each plus a combined PDF with the
@@ -28,10 +34,6 @@ part is *and* what it is set to, so three 10 kΩ resistors are one line and a 4k
 another — with the quantity, the designators, the part and its value. Below the drawing on a single
 sheet, or a page of its own in the combined PDF. Grounds are left out, being net labels rather than
 things you can buy.
-
-Four parts that all come down to the same thing: what a component does when you push it past where
-the datasheet's headline number applies. The palette holds 140 components in 16 categories, and
-1115 tests measure them against closed-form answers.
 
 **Centre-tapped transformer.** The other way to rectify, and for fifty years the usual one. Take
 the tap as your zero volt line and the two ends swing opposite ways, so two diodes do full-wave
@@ -612,7 +614,8 @@ First public build of CirqAvalonia — an electronic circuit analyzer and mixed-
 
 **501 tests** measure the solver against closed-form answers rather than recorded output.
 
-[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.15.0...HEAD
+[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.16.0...HEAD
+[0.16.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.12.0...v0.13.0
