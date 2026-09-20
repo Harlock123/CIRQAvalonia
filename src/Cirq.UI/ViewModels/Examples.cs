@@ -66,6 +66,8 @@ public static class Examples
             LoadSerialLink),
         new("Light Meter", "A phototransistor into an I2C ADC — light, to current, to volts, to a number",
             LoadLightMeter),
+        new("Motor Reversing", "An H-bridge running a motor both ways — forward, brake, reverse, coast",
+            LoadMotorReversing),
     ];
 
     public static void LoadRcLowPass(MainWindowViewModel vm)
@@ -1426,6 +1428,56 @@ public static class Examples
         vm.Scope.Layout = ScopeLayout.Tiled;
         vm.Scope.AddProbe(sensor.Emitter, "Sensor");
         vm.Scope.AddProbe(master.Sda, "SDA");
+    }
+
+    public static void LoadMotorReversing(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "Motor reversing";
+
+        var logic = Place(circuit, new DcVoltageSource(5.0), -520, -40);
+        var supply = Place(circuit, new DcVoltageSource(12.0), -520, 130);
+
+        // Enable is held on; the two inputs are switches you can flip while it runs. Both the
+        // same is a brake, one of each drives, and dropping enable lets it coast.
+        var enable = Place(circuit, new ToggleSwitch { IsClosed = true }, -250, -190);
+        var in1 = Place(circuit, new ToggleSwitch { IsClosed = true }, -250, -110);
+        var in2 = Place(circuit, new ToggleSwitch(), -250, -30);
+
+        var bridge = Place(circuit, new HBridge(), 90, -60);
+        var motor = Place(circuit, new DcMotor(), 430, -60);
+
+        var gnd = Place(circuit, new Ground(), -520, 270);
+        var gnd2 = Place(circuit, new Ground(), 90, 150);
+
+        circuit.Connect(logic.Negative, gnd.Pin);
+        circuit.Connect(supply.Negative, gnd.Pin);
+
+        circuit.Connect(bridge.LogicSupply, logic.Positive);
+        circuit.Connect(bridge.MotorSupply, supply.Positive);
+        circuit.Connect(bridge.Gnd, gnd2.Pin);
+
+        foreach (var (contact, pin) in new[]
+                 {
+                     (enable, bridge.Enable),
+                     (in1, bridge.Input1),
+                     (in2, bridge.Input2),
+                 })
+        {
+            circuit.Connect(logic.Positive, contact.A);
+            circuit.Connect(contact.B, pin);
+        }
+
+        circuit.Connect(bridge.Output1, motor.A);
+        circuit.Connect(motor.B, bridge.Output2);
+
+        vm.Scope.TimebasePerDivision = 50e-3;
+        vm.Scope.VoltsPerDivision = 5.0;
+        vm.Scope.Layout = ScopeLayout.Unified;
+        vm.Scope.AddProbe(bridge.Output1, "OUT1");
+        vm.Scope.AddProbe(bridge.Output2, "OUT2");
+
+        vm.Simulation.SpeedFactor = 1.0;
     }
 
     private static T Place<T>(Circuit circuit, T component, double x, double y) where T : CircuitComponent

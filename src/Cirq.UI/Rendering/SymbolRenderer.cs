@@ -36,6 +36,8 @@ public static class SymbolRenderer
             case I2cDevice bus: DrawPackage(context, pen, zoom, bus, bus.ComponentType); break;
             case UartPort uart: DrawPackage(context, pen, zoom, uart, uart.ComponentType); break;
             case HallSensor hall: DrawHallSensor(context, pen, zoom, hall); break;
+            case HBridge bridge: DrawHBridge(context, pen, zoom, bridge); break;
+            case LithiumCharger charger: DrawPackage(context, pen, zoom, charger, "Li-ION"); break;
             case Phototransistor photo: DrawPhototransistor(context, pen, zoom, photo); break;
             case LevelShifter shifter: DrawLevelShifter(context, pen, zoom, shifter); break;
             case SpiMaster spi: DrawPackage(context, pen, zoom, spi, spi.ComponentType); break;
@@ -931,6 +933,46 @@ public static class SymbolRenderer
         }
     }
 
+    /// <summary>
+    /// The bridge as a package, with an arrow between the outputs showing which way it is
+    /// driving — the one thing about it you want to see at a glance.
+    /// </summary>
+    private static void DrawHBridge(
+        ISymbolCanvas context, IPen pen, double zoom, HBridge bridge)
+    {
+        var body = DrawPackage(context, pen, zoom, bridge, "H-BRIDGE");
+
+        if (zoom <= 0.45) return;
+
+        var driving = bridge.State is BridgeState.Forward or BridgeState.Reverse;
+        var faulted = bridge.State == BridgeState.ShootThrough;
+
+        var brush = faulted ? CanvasTheme.ErrorBrush
+            : driving ? CanvasTheme.ValueBrush
+            : CanvasTheme.LabelBrush;
+
+        var mark = CanvasTheme.Pen(brush, 1.6, zoom);
+
+        var y = 22.0;
+        var direction = bridge.State == BridgeState.Reverse ? -1 : 1;
+
+        context.DrawLine(mark, new Point(-16, y), new Point(16, y));
+
+        if (driving)
+        {
+            var tip = new Point(16 * direction, y);
+            context.DrawGeometry(brush, mark, SymbolPath.Polyline(
+                [tip, new Point(tip.X - (7 * direction), y - 4), new Point(tip.X - (7 * direction), y + 4)],
+                true));
+        }
+
+        if (faulted)
+        {
+            context.DrawEllipse(null, CanvasTheme.Pen(CanvasTheme.ErrorBrush, 2.0, zoom),
+                new Point(0, 0), body.Width / 2 + 6, body.Height / 2 + 6);
+        }
+    }
+
     private static void DrawCharacterLcd(
         ISymbolCanvas context, IPen pen, double zoom, CharacterLcd lcd)
     {
@@ -1804,6 +1846,8 @@ public static class SymbolRenderer
         // These are drawn as packages sized to their own pins, so the caption has to clear them.
         Pcf8574 => 98.0,
         Ads1115 => 62.0,
+        HBridge => 62.0,
+        LithiumCharger => 50.0,
         HallSensor => 42.0,
 
         // The leads reach 30, so the default offset puts the caption on top of one.

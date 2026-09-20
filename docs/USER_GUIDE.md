@@ -67,7 +67,7 @@ at the window edge; click the rail to bring it back.
 
 Click a palette entry, then click the canvas. The part lands where you click, snapped to the grid.
 
-The palette holds **146 components in 16 categories**:
+The palette holds **148 components in 16 categories**:
 
 | Category | Count | Contents |
 | --- | --- | --- |
@@ -77,7 +77,7 @@ The palette holds **146 components in 16 categories**:
 | Semiconductors | 11 | 1N4148, 1N4001, Schottky, zeners, bridge rectifier, SCR, triac, diac, **TVS and varistor** — see [below](#surge-protection) |
 | Transistors | 10 | NPN and PNP bipolars, N- and P-channel MOSFETs, **three JFETs** — see [below](#jfets) |
 | LEDs & Displays | 9 | Six LED colours, seven-segment displays, **HD44780 character LCD** — see [below](#the-character-lcd) |
-| Power | 9 | Fixed and adjustable regulators, TL431 shunt reference, ICL7660 charge pump, **MC34063 switching controller** — see [below](#switching-instead-of-dropping) |
+| Power | 10 | Fixed and adjustable regulators, TL431 shunt reference, ICL7660 charge pump, MC34063 switching controller, **TP4056 lithium charger** — see [below](#charging-a-lithium-cell) |
 | Analog ICs | 10 | LM741, NE555, LM311, LM339, **LM386** audio amp and **INA126** instrumentation amp |
 | Logic Gates | 7 | AND, OR, NAND, NOR, XOR, XNOR, NOT |
 | 74xx Series | 18 | Counters, decoders, flip-flops, shift registers (including the **74595**), multiplexers, Schmitt inverter |
@@ -85,7 +85,7 @@ The palette holds **146 components in 16 categories**:
 | Buses | 9 | I2C master, EEPROM, port expander, DS1307 clock and **ADS1115 ADC**, SPI master, serial terminal and device, level shifter — see [below](#i2c-and-spi) |
 | Digital I/O | 6 | Logic toggle, clock, indicators, rotary encoder, **oscillator module** |
 | Sensors & Actuators | 15 | DC motor, LDR, thermistors, buzzers, speaker, microphone, servo, stepper, thermocouple, load cell, HC-SR04 ranger, **Hall switch and phototransistor** — see [below](#sensors-and-actuators) |
-| Switching & Isolation | 6 | Relay, fuses, optocouplers, **ULN2003** — see [below](#switching-and-isolation) |
+| Switching & Isolation | 7 | Relay, fuses, optocouplers, ULN2003, **H-bridge** — see [below](#switching-and-isolation) |
 | Dev Boards | 4 | Raspberry Pi, Arduino Uno / Nano / Mega — see [below](#development-boards) |
 
 Click a category header to open or close it. **All** in the palette header toggles every group at
@@ -600,6 +600,73 @@ CMOS is also much slower. The gates here are modelled at around 90 ns at 5 V aga
 TTL equivalents, which is the real difference and occasionally the reason a design that works in
 one family does not in the other. A real part speeds up substantially at 15 V; that is not
 modelled.
+
+---
+
+## Driving a motor both ways
+
+A single transistor can only turn a motor *on*. Running it backwards means being able to put the
+supply on either terminal and ground on the other, and the only arrangement that does that is four
+switches in an H around the motor — which is where the **H-Bridge** gets its name and why there is
+no simpler way.
+
+Two inputs and an enable choose what happens, and all four input combinations matter:
+
+| EN | IN1 | IN2 | What happens |
+| --- | --- | --- | --- |
+| high | high | low | **Forward** — supply on OUT1, ground on OUT2 |
+| high | low | high | **Reverse** |
+| high | same | same | **Brake** — both outputs to the same rail, so the motor is shorted to itself |
+| low | — | — | **Coast** — everything released |
+
+**Brake and coast are not the same thing**, and it is the distinction people most often get wrong.
+Braking shorts the motor so its own back-EMF drags it to a halt; coasting lets it spin down. A
+driver that stops dead when you cut the drive is braking, and one that drifts on is coasting —
+decide which you want before wiring it.
+
+**Shoot-through** is the failure this part exists to let you make safely. Turn the top and bottom
+of one leg on together and there is a path from the supply to ground through two switches and no
+motor at all: a dead short, limited only by how good the switches are. Real drivers decode the
+inputs so it cannot happen, which is what `PreventShootThrough` models. Turn it off — as a bridge
+built from four loose MOSFETs effectively is — and both inputs high becomes a short instead of a
+brake, and it is reported with the watts it is throwing away.
+
+Two smaller things the model will show you. The **switches keep some of the supply**: at 1.2 Ω
+each against a 12 Ω motor, two in the path cost you a sixth of it, which is why on-resistance is
+the number on the front of a driver's datasheet. And the four **body diodes** are there because a
+motor is an inductance — when the switches open, its current has to go somewhere, and without them
+the outputs would fly to whatever voltage it took to stop the current dead.
+
+**File > Examples > Motor Reversing** wires one up with three switches you can flip while it runs.
+
+---
+
+## Charging a lithium cell
+
+A lithium cell cannot simply be connected to a supply. Put five volts across a cell sitting at
+three and the only thing deciding the current is the cell's own internal resistance — tens of amps,
+briefly, and then a fire. Charging one is a *procedure*, and the **Li-Ion Charger** is that
+procedure in a chip.
+
+It has two phases. **Constant current** first: push a fixed current in and let the cell's voltage
+rise wherever it likes. That is most of the charge and nearly all of the time. Once the cell
+reaches its float voltage — 4.2 V, and the number is not negotiable — it switches to **constant
+voltage**: hold exactly 4.2 and let the current fall away as the cell fills. When the current has
+dropped to about a tenth of what it started at, the cell is as full as it is going to get and the
+charger stops. It stops *for good*, rather than starting again the moment the voltage sags, which
+is what keeps a charger from cycling a cell to death.
+
+The thing that catches people is heat. This is a **linear** charger, so everything between the
+input and the cell is thrown away inside it: a full amp from five volts into a cell at three and a
+half is one and a half watts in a part the size of a grain of rice. That is why a board which is
+fine at 300 mA is too hot to touch at a full amp, and it is reported rather than left to be
+discovered by smell. Lower the current, or feed it from a lower voltage.
+
+It also cannot lift a voltage, only drop one — so with the input below the cell plus its dropout,
+nothing happens at all. That is why a sagging USB supply quietly stops charging.
+
+`CHRG` and `STDBY` are the two open-drain status pins the indicator LEDs hang off: one low while
+charging, the other low when it has finished.
 
 ---
 

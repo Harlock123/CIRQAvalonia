@@ -167,6 +167,8 @@ public static class ComponentCatalog
                 () => new ChargePump()),
             new("TL431 Reference", "Programmable 2.5 V shunt — the adjustable half of a feedback loop",
                 () => new ShuntReference()),
+            new("Li-Ion Charger", "TP4056 — constant current then constant voltage, and all the heat",
+                () => new LithiumCharger()),
             new("Regulator LD1117", "Low-dropout 3.3 V regulator", () => new VoltageRegulator(RegulatorModel.Ld1117)),
         ]),
 
@@ -323,6 +325,8 @@ public static class ComponentCatalog
             new("Fuse 1A", "Opens on its melting integral, not on instantaneous current",
                 () => new Fuse(1.0)),
             new("Fuse 500mA", "Half-amp quick-blow", () => new Fuse(0.5)),
+            new("H-Bridge", "Drives a motor both ways — forward, reverse, brake and coast",
+                () => new HBridge()),
             new("ULN2003", "Seven Darlington sinks — the way logic drives relays and steppers",
                 () => new Uln2003()),
             new("Optocoupler PC817", "LED and phototransistor, galvanically isolated",

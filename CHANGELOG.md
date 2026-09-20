@@ -8,6 +8,32 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**H-bridge.** There was a DC motor in the palette and no way to run it backwards, which is most of
+what anyone does with one. Four switches in an H, two inputs and an enable, and all four input
+combinations behave as they should — including the two people get wrong. **Both inputs the same is
+a brake**, not an off: the motor is shorted to itself and its own back-EMF stops it. **Disabling is
+a coast**, where it just spins down. Deciding which of those you want is usually the whole design.
+
+**Shoot-through** is the failure it exists to let you make safely. Real drivers decode the inputs
+so the top and bottom of one leg cannot be on together; turn that interlock off — as a bridge built
+from four loose MOSFETs effectively is — and both inputs high becomes a dead short across the
+supply through two switches, doing nothing whatsoever to the motor, reported with the watts it is
+burning. The four **body diodes** are modelled too, because a motor is an inductance and when the
+switches open its current has to go somewhere.
+
+**TP4056 lithium charger**, which completes a chain the library could nearly build: generate,
+store, regulate — and now charge. A cell cannot simply be connected to a supply, so this is the
+procedure instead. Constant current until the cell reaches 4.2 V, then constant voltage while the
+current tails away, then stop — and stay stopped, rather than restarting the moment the voltage
+sags.
+
+It is a **linear** charger, so everything between the input and the cell is thrown away inside it:
+a full amp from five volts into a cell at three and a half is one and a half watts in a part the
+size of a grain of rice, and that is reported rather than left to be found by smell. It also
+cannot lift a voltage, only drop one, so a supply that sags below the cell quietly stops charging.
+
+**File > Examples > Motor Reversing** has three switches you can flip while it runs.
+
 ## [0.19.0] - 2026-09-19
 
 Three ways of getting the physical world into a circuit, and one of getting the circuit back out
