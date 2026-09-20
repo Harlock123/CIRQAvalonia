@@ -8,6 +8,48 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-09-20
+
+A lit LED that looks lit. The palette holds 150 components in 16 categories, and 1499 tests measure
+them against closed-form answers.
+
+**You can now tell at a glance which LEDs are on.** An LED that was conducting barely changed its
+symbol: the triangle — the biggest mark in it, and the one your eye goes to — stayed the same dark
+shape whether it was passing twenty milliamps or nothing at all, and the only difference was a pale
+wash behind it and two arrows a few pixels long. On a board with half a dozen indicators you had to
+go looking for which ones were on, which rather defeats the point of an indicator.
+
+Now the body itself takes the light, its outline deepens to match, the emission arrows turn the
+colour of the light when it is on and stay neutral when it is off, and the glow behind it is a soft
+falloff rather than a flat disc. Off is a plain dark diode; on is unmistakable, at the size symbols
+are actually drawn rather than only when zoomed in.
+
+**The same for the seven-segment display**, where a half-lit digit used to wash out to pink instead
+of reading as a dimmer red. Lit elements now go solid immediately and carry how hard they are driven
+in the colour, which is how a real display looks; they also bleed a little past their own edges, so
+an element that is on is never merely a slightly different grey from one that is off.
+
+Three rules sit under all of that, and each of them fixed something visible:
+
+- **How hard a part is driven is not how strongly it should be drawn.** An LED at a tenth of its
+  rated current is plainly on to anyone looking at the breadboard, but a tenth of the way from the
+  unlit colour to the lit one is a smudge. Anything conducting is now drawn at least half way to
+  full, with the rest of the range separating dim from bright.
+- **Dimness belongs in the colour, not in transparency.** A half-transparent red on a white sheet
+  becomes pink; a dim LED should look like a darker red.
+- **An emitted colour too close to the canvas cannot be seen at all.** A white LED on a light sheet
+  used to draw as an empty outline — which reads as *off*, the exact opposite of what it was trying
+  to show. Emitted colours are now pushed away from the background until they stand out, and left
+  alone when they already do.
+
+**Fixed:** the unlit colour of a seven-segment element was written into the renderer as the dark
+theme's value, so on a light canvas the off segments were drawn in a colour meant to sit on a dark
+one. It comes from the theme now, which has had a light variant waiting unused.
+
+One thing to know: a white LED on the dark theme is still the least striking of the six, because an
+unlit symbol is already drawn in a light colour there. Its halo tells you it is on, but it will not
+jump out the way a red or green one does.
+
 ## [0.22.0] - 2026-09-20
 
 Op-amps that stop where the real ones do. The palette holds 150 components in 16 categories, and
@@ -821,7 +863,8 @@ First public build of CirqAvalonia — an electronic circuit analyzer and mixed-
 
 **501 tests** measure the solver against closed-form answers rather than recorded output.
 
-[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.22.0...HEAD
+[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.23.0...HEAD
+[0.23.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.22.0...v0.23.0
 [0.22.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.21.0...v0.22.0
 [0.21.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.20.0...v0.21.0
 [0.20.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.19.0...v0.20.0
