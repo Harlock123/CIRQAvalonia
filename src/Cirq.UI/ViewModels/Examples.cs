@@ -76,6 +76,10 @@ public static class Examples
                 LoadLithiumCharge),
             new("Surge Protection", "A varistor takes the energy and a TVS clamps what gets past it",
                 LoadSurgeProtection),
+            new("Negative Rail", "An ICL7660 making -5 V from +5 V, and an amplifier that needs it",
+                LoadNegativeRail),
+            new("Battery Resistance", "Three cells, one load each — the number nobody reads off the packet",
+                LoadBatteryInternalResistance),
             new("Buck Converter", "MC34063 stepping 12 V down to 5 V without turning the difference into heat",
                 LoadBuckConverter),
         ]),
@@ -90,6 +94,8 @@ public static class Examples
                 LoadLampDimmer),
             new("Relay Driver", "Logic to a coil through an optocoupler and a Darlington array",
                 LoadRelayDriver),
+            new("Stepper Motor", "A 4017 walking four windings through a ULN2003",
+                LoadStepper),
             new("Motor Reversing", "An H-bridge running a motor both ways — forward, brake, reverse, coast",
                 LoadMotorReversing),
         ]),
@@ -111,6 +117,8 @@ public static class Examples
             new("555 Astable", "Free-running multivibrator at about 480 Hz", Load555Astable),
             new("4060 Timer", "A 4060 clocking itself from one resistor and one capacitor",
                 Load4060Timer),
+            new("Crystal Q", "A crystal and a tuned circuit at the same frequency — sweep them and compare",
+                LoadCrystalQ),
             new("Phase-Locked Loop", "A 4046 dragging its oscillator onto an incoming signal and holding it",
                 LoadPhaseLockedLoop),
         ]),
@@ -130,6 +138,8 @@ public static class Examples
                 LoadDacAndAdc),
             new("Current Sensing", "An INA219 watching a load from the high side of the rail",
                 LoadCurrentSensing),
+            new("Level Shifting", "A 3.3 V part and a 5 V part on the same wires, both ways at once",
+                LoadLevelShifting),
             new("RS-485 Link", "Two transceivers down fifty metres of cable — open SW1 and watch it ring",
                 LoadRs485Link),
         ]),
@@ -148,6 +158,8 @@ public static class Examples
                 LoadLoadCell),
             new("Rotary Encoder", "Quadrature, where the direction is in the phase and not in either output",
                 LoadRotaryEncoder),
+            new("Thermostat", "An NTC, a comparator and the feedback resistor that stops it chattering",
+                LoadThermostat),
         ]),
 
         new("Signal Integrity & RF",
@@ -158,6 +170,8 @@ public static class Examples
                 LoadFerriteBead),
             new("Amplitude Modulation", "A carrier multiplied by an audio tone — which is what AM is",
                 LoadAmplitudeModulation),
+            new("Common-Mode Choke", "It passes the signal and blocks the noise riding on both wires at once",
+                LoadCommonModeFilter),
             new("Varactor Tuning", "An LC tank tuned by a voltage — move RV1 and sweep it in Frequency Response",
                 LoadVaractorTuning),
         ]),
@@ -172,6 +186,8 @@ public static class Examples
         [
             new("Character LCD", "An Arduino driving an HD44780 in four-bit mode — the whole initialisation dance",
                 LoadCharacterLcd),
+            new("I2C LCD", "The same display on a PCF8574 backpack — two wires instead of six",
+                LoadI2cLcd),
         ]),
 
         new("Development Boards",
@@ -3043,6 +3059,537 @@ public static class Examples
         vm.Scope.Layout = ScopeLayout.Tiled;
         vm.Scope.AddProbe(encoder.OutputA, "A");
         vm.Scope.AddProbe(encoder.OutputB, "B");
+    }
+
+    /// <summary>
+    /// The same sequence of latches the parallel LCD example plays, with each one turned into a
+    /// byte written to the port expander.
+    /// <para>
+    /// Every backpack sold has the same wiring — P0 is RS, P2 is E, P3 is the backlight and the
+    /// top nibble is D4 to D7 — so this is the byte pattern a library produces on real hardware
+    /// too. Note that it is <b>two writes per latch</b>, one with E high and one with E low,
+    /// exactly as the six-wire version is two steps per latch. The bus is a different shape; the
+    /// controller behind it is not.
+    /// </para>
+    /// </summary>
+    private static string BackpackScript()
+    {
+        List<(bool Data, int Nibble)> latches = [];
+
+        void Command(int value)
+        {
+            latches.Add((false, (value >> 4) & 0x0F));
+            latches.Add((false, value & 0x0F));
+        }
+
+        void Text(string text)
+        {
+            foreach (var c in text)
+            {
+                latches.Add((true, (c >> 4) & 0x0F));
+                latches.Add((true, c & 0x0F));
+            }
+        }
+
+        latches.Add((false, 0x2));      // the eight-bit function set that asks for four-bit working
+
+        Command(0x28);
+        Command(0x0C);
+        Command(0x06);
+        Command(0x01);
+
+        Text("I2C BACKPACK");
+
+        Command(0x80 | 0x40);
+
+        Text("TWO WIRES");
+
+        List<string> bytes = [];
+
+        foreach (var (isData, nibble) in latches)
+        {
+            foreach (var enable in new[] { true, false })
+            {
+                // Backlight on throughout, RW low throughout: the expander drives the whole port
+                // every time, so every bit has to be right in every byte.
+                var value = (nibble << 4) | 0x08 | (enable ? 0x04 : 0x00) | (isData ? 0x01 : 0x00);
+                bytes.Add(value.ToString("X2"));
+            }
+        }
+
+        return "w 27 " + string.Join(" ", bytes);
+    }
+
+    /// <summary>
+    /// A negative rail made out of a positive one, and then something that needs it: an amplifier
+    /// asked to follow a signal that goes below ground, which on one supply it cannot.
+    /// </summary>
+    public static void LoadNegativeRail(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "Making a negative rail";
+
+        var supply = Place(circuit, new DcVoltageSource(5.0), -620, 160);
+        var pump = Place(circuit, new ChargePump(), -320, -40);
+
+        // The flying capacitor, which is the whole mechanism: charged across the supply, then
+        // turned over and emptied into the reservoir the other way up.
+        var flying = Place(circuit, new Capacitor(10e-6), -140, -220);
+        var reservoir = Place(circuit, new Capacitor(10e-6), -80, 120);
+
+        var signal = Place(circuit, new FunctionGenerator(Waveform.Sine, 500, 4.0), -620, -240);
+        var amplifier = Place(circuit, new OperationalAmplifier(OpAmpModel.Tl081), 180, -60);
+        var load = Place(circuit, new Resistor(10e3), 420, 60);
+
+        var gnd = Place(circuit, new Ground(), -620, 320);
+        var gnd2 = Place(circuit, new Ground(), -620, -100);
+        var gnd3 = Place(circuit, new Ground(), -320, 140);
+        var gnd4 = Place(circuit, new Ground(), -80, 260);
+        var gnd5 = Place(circuit, new Ground(), 420, 200);
+
+        flying.RotationDegrees = 90;
+        reservoir.RotationDegrees = 90;
+        load.RotationDegrees = 90;
+
+        circuit.Connect(supply.Negative, gnd.Pin);
+        circuit.Connect(signal.Return, gnd2.Pin);
+
+        circuit.Connect(pump.Supply, supply.Positive);
+        circuit.Connect(pump.Ground, gnd3.Pin);
+        circuit.Connect(pump.CapacitorPositive, flying.A);
+        circuit.Connect(flying.B, pump.CapacitorNegative);
+        circuit.Connect(pump.Output, reservoir.A);
+        circuit.Connect(reservoir.B, gnd4.Pin);
+
+        // The amplifier straddles both rails, so its output has somewhere to go in both directions.
+        circuit.Connect(amplifier.PositiveSupply, supply.Positive);
+        circuit.Connect(amplifier.NegativeSupply, pump.Output);
+        circuit.Connect(amplifier.NonInverting, signal.Output);
+        circuit.Connect(amplifier.Inverting, amplifier.Output);
+        circuit.Connect(amplifier.Output, load.A);
+        circuit.Connect(load.B, gnd5.Pin);
+
+        vm.Scope.TimebasePerDivision = 500e-6;
+        vm.Scope.VoltsPerDivision = 2.0;
+        vm.Scope.AddProbe(pump.Output, "Negative rail");
+        vm.Scope.AddProbe(signal.Output, "In");
+        vm.Scope.AddProbe(amplifier.Output, "Out");
+    }
+
+    /// <summary>
+    /// A 3.3 V part and a 5 V part on the same two wires, which is the commonest wiring question
+    /// there is and has a part made for it.
+    /// </summary>
+    public static void LoadLevelShifting(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "An I2C bus across a 3.3 V to 5 V boundary";
+
+        var lowRail = Place(circuit, new DcVoltageSource(3.3), -680, 220);
+        var highRail = Place(circuit, new DcVoltageSource(5.0), -680, 420);
+
+        // A 3.3 V controller talking to a 5 V memory, which is the situation the part exists for.
+        // Write four bytes, then set the address back with a write of nothing but the address,
+        // then read them. Without that second write the read starts wherever the first one left
+        // the pointer, which is a byte past the data and reads as zeros.
+        var master = Place(circuit, new I2cMaster
+        {
+            Transactions = "w 50 00 00 43 49 52 51; w 50 00 00; r 50 4",
+        }, -420, -120);
+        var shifter = Place(circuit, new LevelShifter(), 40, -60);
+        var memory = Place(circuit, new I2cEeprom(), 460, -100);
+
+        var gnd = Place(circuit, new Ground(), -680, 580);
+        var gnd2 = Place(circuit, new Ground(), -420, 140);
+        var gnd3 = Place(circuit, new Ground(), 40, 200);
+        var gnd4 = Place(circuit, new Ground(), 460, 160);
+
+        circuit.Connect(lowRail.Negative, gnd.Pin);
+        circuit.Connect(highRail.Negative, gnd.Pin);
+
+        circuit.Connect(master.Vcc, lowRail.Positive);
+        circuit.Connect(master.Gnd, gnd2.Pin);
+        circuit.Connect(memory.Vcc, highRail.Positive);
+        circuit.Connect(memory.Gnd, gnd4.Pin);
+
+        // The shifter's own gates run from the two rails, and its pull-ups are what make every
+        // high level on both sides. Nothing here drives a line up; everything only pulls down.
+        circuit.Connect(shifter.LowReference, lowRail.Positive);
+        circuit.Connect(shifter.HighReference, highRail.Positive);
+        circuit.Connect(shifter.Gnd, gnd3.Pin);
+
+        circuit.Connect(shifter.Low(0), master.Sda);
+        circuit.Connect(shifter.High(0), memory.Sda);
+        circuit.Connect(shifter.Low(1), master.Scl);
+        circuit.Connect(shifter.High(1), memory.Scl);
+
+        vm.Scope.TimebasePerDivision = 50e-6;
+        vm.Scope.VoltsPerDivision = 1.0;
+        vm.Scope.Layout = ScopeLayout.Tiled;
+        vm.Scope.AddProbe(master.Sda, "SDA at 3V3");
+        vm.Scope.AddProbe(memory.Sda, "SDA at 5V");
+        vm.Scope.AddProbe(master.Scl, "SCL at 3V3");
+    }
+
+    /// <summary>
+    /// What a crystal is for, put next to the thing it replaces. A tuned circuit and a crystal at
+    /// the same frequency, swept side by side — the difference is not subtle.
+    /// </summary>
+    public static void LoadCrystalQ(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "A crystal against a tuned circuit";
+
+        var drive = Place(circuit, new FunctionGenerator(Waveform.Sine, 1e6, 2.0) { AcMagnitude = 1.0 },
+            -560, 0);
+
+        // Each resonator in series with the signal and a load after it, so what gets through is
+        // what the resonator let past: a peak at resonance rather than the notch you get probing
+        // across one.
+        var crystal = Place(circuit, new Crystal(CrystalModel.Mhz1), -300, -160);
+        var crystalLoad = Place(circuit, new Resistor(1e3), -60, -80);
+
+        // An LC series-resonant at the same megahertz: 25 uH with about a nanofarad, and five
+        // ohms of winding loss, which is what a real coil of that size costs.
+        var coil = Place(circuit, new Inductor(25e-6) { SeriesResistance = 5.0 }, -300, 160);
+        var tune = Place(circuit, new Capacitor(1013e-12), -120, 160);
+        var tankLoad = Place(circuit, new Resistor(1e3), 60, 240);
+
+        var gnd = Place(circuit, new Ground(), -560, 200);
+        var gnd2 = Place(circuit, new Ground(), -60, 100);
+        var gnd3 = Place(circuit, new Ground(), 60, 400);
+
+        crystalLoad.RotationDegrees = 90;
+        tankLoad.RotationDegrees = 90;
+
+        circuit.Connect(drive.Return, gnd.Pin);
+
+        circuit.Connect(drive.Output, crystal.A);
+        circuit.Connect(crystal.B, crystalLoad.A);
+        circuit.Connect(crystalLoad.B, gnd2.Pin);
+
+        circuit.Connect(drive.Output, coil.A);
+        circuit.Connect(coil.B, tune.A);
+        circuit.Connect(tune.B, tankLoad.A);
+        circuit.Connect(tankLoad.B, gnd3.Pin);
+
+        // And the part you actually buy when you want a frequency: the same quartz with the
+        // oscillator already round it, in a can with four pins.
+        var moduleRail = Place(circuit, new DcVoltageSource(5.0), 560, 300);
+        var module = Place(circuit, new OscillatorModule(1e6), 560, 0);
+        var divider = Place(circuit, new Ic4040(), 800, 0);
+        var moduleGround = Place(circuit, new Ground(), 560, 460);
+        var dividerGround = Place(circuit, new Ground(), 800, 240);
+
+        circuit.Connect(moduleRail.Negative, moduleGround.Pin);
+        circuit.Connect(module.Vcc, moduleRail.Positive);
+        circuit.Connect(module.Gnd, moduleGround.Pin);
+        circuit.Connect(divider.Vcc, moduleRail.Positive);
+        circuit.Connect(divider.Gnd, dividerGround.Pin);
+        circuit.Connect(divider.Reset, dividerGround.Pin);
+        circuit.Connect(module.Output, divider.Clock);
+
+        vm.Scope.TimebasePerDivision = 2e-6;
+        vm.Scope.VoltsPerDivision = 1.0;
+        // Only the two analog nodes are probed. The divider is there to be looked at on the
+        // canvas, not swept: a logic node has no small-signal response and would sit at the floor
+        // of the Bode plot being distracting.
+        vm.Scope.AddProbe(crystalLoad.A, "Through crystal");
+        vm.Scope.AddProbe(tankLoad.A, "Through tank");
+    }
+
+    /// <summary>
+    /// A choke that passes a signal and blocks the noise riding on both of its wires at once,
+    /// which is the one thing a pair of separate inductors cannot do.
+    /// </summary>
+    public static void LoadCommonModeFilter(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "A choke that only sees common mode";
+
+        // The wanted signal, driven between the two conductors.
+        var signal = Place(circuit, new FunctionGenerator(Waveform.Sine, 100e3, 2.0), -640, -120);
+
+        // And the unwanted one, lifting the whole pair together against ground — which is what
+        // every nearby switching supply does to every cable near it.
+        var noise = Place(circuit, new FunctionGenerator(Waveform.Sine, 5e6, 4.0), -640, 180);
+
+        var choke = Place(circuit, new CommonModeChoke(1e-3, 0.995), -220, 0);
+
+        // Terminated across the pair with the midpoint grounded, so common-mode current has a
+        // path home and the choke has something to work against.
+        var upper = Place(circuit, new Resistor(50), 200, -100);
+        var lower = Place(circuit, new Resistor(50), 200, 100);
+
+        var gnd = Place(circuit, new Ground(), -640, 340);
+        var gnd2 = Place(circuit, new Ground(), 200, 280);
+
+        upper.RotationDegrees = 90;
+        lower.RotationDegrees = 90;
+
+        circuit.Connect(noise.Return, gnd.Pin);
+        circuit.Connect(signal.Return, noise.Output);
+
+        circuit.Connect(signal.Output, choke.A1);
+        circuit.Connect(noise.Output, choke.A2);
+
+        circuit.Connect(choke.B1, upper.A);
+        circuit.Connect(upper.B, lower.A);
+        circuit.Connect(lower.B, choke.B2);
+        circuit.Connect(upper.B, gnd2.Pin);
+
+        vm.Scope.TimebasePerDivision = 2e-6;
+        vm.Scope.VoltsPerDivision = 1.0;
+        vm.Scope.AddProbe(choke.A1, "Line in");
+        vm.Scope.AddProbe(choke.B1, "Line out");
+        vm.Scope.AddProbe(choke.B2, "Return out");
+    }
+
+    /// <summary>
+    /// The same HD44780, driven over two wires instead of six. Everything the parallel example
+    /// does is still done — it is just wrapped in a byte to a port expander each time.
+    /// </summary>
+    public static void LoadI2cLcd(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "An LCD on an I2C backpack";
+
+        var supply = Place(circuit, new DcVoltageSource(5.0), -620, 160);
+        var master = Place(circuit, new I2cMaster { Transactions = BackpackScript() }, -400, -80);
+        var expander = Place(circuit, new Pcf8574 { Address = 0x27 }, -40, -40);
+        var lcd = Place(circuit, new CharacterLcd(), 420, -100);
+        var contrast = Place(circuit, new Potentiometer(10e3, 0.3), 200, 360);
+
+        var sdaPull = Place(circuit, new Resistor(4.7e3), -240, -320);
+        var sclPull = Place(circuit, new Resistor(4.7e3), -120, -320);
+
+        var gnd = Place(circuit, new Ground(), -620, 320);
+        var gnd2 = Place(circuit, new Ground(), -40, 180);
+        var gnd3 = Place(circuit, new Ground(), 200, 500);
+        var gnd4 = Place(circuit, new Ground(), 420, 200);
+
+        contrast.RotationDegrees = 90;
+        sdaPull.RotationDegrees = 90;
+        sclPull.RotationDegrees = 90;
+
+        circuit.Connect(supply.Negative, gnd.Pin);
+        circuit.Connect(master.Vcc, supply.Positive);
+        circuit.Connect(master.Gnd, gnd.Pin);
+        circuit.Connect(expander.Vcc, supply.Positive);
+        circuit.Connect(expander.Gnd, gnd2.Pin);
+
+        circuit.Connect(master.Sda, expander.Sda);
+        circuit.Connect(master.Scl, expander.Scl);
+        circuit.Connect(sdaPull.A, supply.Positive);
+        circuit.Connect(sdaPull.B, master.Sda);
+        circuit.Connect(sclPull.A, supply.Positive);
+        circuit.Connect(sclPull.B, master.Scl);
+
+        // The backpack's wiring, which is the same on every one of them you can buy:
+        // P0=RS, P1=RW, P2=E, P3=backlight, P4-P7=D4-D7.
+        circuit.Connect(expander.Pins[0], lcd.RegisterSelect);
+        circuit.Connect(expander.Pins[1], lcd.ReadWrite);
+        circuit.Connect(expander.Pins[2], lcd.Enable);
+
+        for (var i = 0; i < 4; i++) circuit.Connect(expander.Pins[4 + i], lcd.Data[4 + i]);
+
+        // A PCF8574 releases a pin rather than driving it high, so every line it feeds needs
+        // something to pull it up. On a real backpack that is the chip's own weak pull-up; here
+        // it is explicit, because a released pin with nothing on it is a floating input.
+        var pulled = new[] { lcd.RegisterSelect, lcd.Enable, lcd.Data[4], lcd.Data[5], lcd.Data[6], lcd.Data[7] };
+
+        for (var i = 0; i < pulled.Length; i++)
+        {
+            var pull = Place(circuit, new Resistor(10e3), 180 + (i * 40), -420);
+            pull.RotationDegrees = 90;
+
+            circuit.Connect(pull.A, supply.Positive);
+            circuit.Connect(pull.B, pulled[i]);
+        }
+
+        circuit.Connect(lcd.Vcc, supply.Positive);
+        circuit.Connect(lcd.Gnd, gnd4.Pin);
+        circuit.Connect(lcd.Backlight, supply.Positive);
+        circuit.Connect(lcd.BacklightCathode, gnd4.Pin);
+
+        circuit.Connect(contrast.A, supply.Positive);
+        circuit.Connect(contrast.B, gnd3.Pin);
+        circuit.Connect(contrast.Wiper, lcd.Contrast);
+
+        vm.Scope.TimebasePerDivision = 500e-6;
+        vm.Scope.VoltsPerDivision = 2.0;
+        vm.Scope.AddProbe(master.Scl, "SCL");
+        vm.Scope.AddProbe(master.Sda, "SDA");
+        vm.Scope.AddProbe(lcd.Enable, "E");
+    }
+
+    /// <summary>
+    /// A thermistor, a comparator and the feedback resistor between them, which is the difference
+    /// between a thermostat and a relay that chatters.
+    /// </summary>
+    public static void LoadThermostat(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "Thermostat with hysteresis";
+
+        var supply = Place(circuit, new DcVoltageSource(5.0), -600, 180);
+
+        var sensor = Place(circuit, new Thermistor { Temperature = 20.0 }, -360, -140);
+        var lower = Place(circuit, new Resistor(10e3), -360, 40);
+
+        var referenceTop = Place(circuit, new Resistor(10e3), -160, -140);
+        var referenceBottom = Place(circuit, new Resistor(10e3), -160, 40);
+
+        var comparator = Place(circuit, new Comparator(ComparatorModel.Lm311), 100, -60);
+        var feedback = Place(circuit, new Resistor(470e3), 100, -280);
+        var pullUp = Place(circuit, new Resistor(4.7e3), 320, -200);
+
+        var limiter = Place(circuit, new Resistor(330), 520, -60);
+        var lamp = Place(circuit, Led.OfColour("Red"), 660, -60);
+        var buzzer = Place(circuit, new Buzzer { Kind = BuzzerKind.Active }, 660, 140);
+
+        var gnd = Place(circuit, new Ground(), -600, 340);
+        var gnd2 = Place(circuit, new Ground(), -360, 180);
+        var gnd3 = Place(circuit, new Ground(), -160, 180);
+        var gnd4 = Place(circuit, new Ground(), 100, 120);
+        var gnd5 = Place(circuit, new Ground(), 660, 300);
+
+        sensor.RotationDegrees = 90;
+        lower.RotationDegrees = 90;
+        referenceTop.RotationDegrees = 90;
+        referenceBottom.RotationDegrees = 90;
+        pullUp.RotationDegrees = 90;
+
+        circuit.Connect(supply.Negative, gnd.Pin);
+
+        // The sensing divider: an NTC falls as it warms, so this node rises with temperature.
+        circuit.Connect(sensor.A, supply.Positive);
+        circuit.Connect(sensor.B, lower.A);
+        circuit.Connect(lower.B, gnd2.Pin);
+
+        circuit.Connect(referenceTop.A, supply.Positive);
+        circuit.Connect(referenceTop.B, referenceBottom.A);
+        circuit.Connect(referenceBottom.B, gnd3.Pin);
+
+        circuit.Connect(comparator.PositiveSupply, supply.Positive);
+        circuit.Connect(comparator.NegativeSupply, gnd4.Pin);
+        circuit.Connect(comparator.NonInverting, sensor.B);
+        circuit.Connect(comparator.Inverting, referenceTop.B);
+
+        // The hysteresis, which moves the threshold the moment the output changes so the noise on
+        // the sensor cannot walk it back across.
+        circuit.Connect(feedback.A, comparator.Output);
+        circuit.Connect(feedback.B, comparator.NonInverting);
+
+        circuit.Connect(pullUp.A, supply.Positive);
+        circuit.Connect(pullUp.B, comparator.Output);
+
+        circuit.Connect(limiter.A, supply.Positive);
+        circuit.Connect(limiter.B, lamp.Anode);
+        circuit.Connect(lamp.Cathode, comparator.Output);
+
+        circuit.Connect(buzzer.A, supply.Positive);
+        circuit.Connect(buzzer.B, comparator.Output);
+        circuit.Connect(gnd5.Pin, gnd.Pin);
+
+        vm.Scope.TimebasePerDivision = 10e-3;
+        vm.Scope.VoltsPerDivision = 1.0;
+        vm.Scope.AddProbe(sensor.B, "Sensor");
+        vm.Scope.AddProbe(comparator.NonInverting, "Threshold");
+        vm.Scope.AddProbe(comparator.Output, "Output");
+    }
+
+    /// <summary>
+    /// The ULN2003's own reason for existing: four windings, energised in turn, with the array's
+    /// freewheeling diodes catching each one as it lets go.
+    /// </summary>
+    public static void LoadStepper(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "Stepper motor on a ULN2003";
+
+        var logic = Place(circuit, new DcVoltageSource(5.0), -680, 240);
+        var coilSupply = Place(circuit, new DcVoltageSource(12.0), 620, 300);
+        var clock = Place(circuit, new ClockSource(40.0) { Levels = LogicLevels.Cmos5V }, -680, -160);
+
+        // A 4017 walks one output at a time, which is exactly the wave-drive sequence.
+        var sequencer = Place(circuit, new Ic4017(), -400, -40);
+        var driver = Place(circuit, new Uln2003(), 40, -40);
+        var motor = Place(circuit, new StepperMotor(), 400, -40);
+
+        var gnd = Place(circuit, new Ground(), -680, 400);
+        var gnd2 = Place(circuit, new Ground(), -400, 200);
+        var gnd3 = Place(circuit, new Ground(), 40, 200);
+        var gnd4 = Place(circuit, new Ground(), 620, 460);
+
+        circuit.Connect(logic.Negative, gnd.Pin);
+        circuit.Connect(coilSupply.Negative, gnd4.Pin);
+
+        circuit.Connect(sequencer.Vcc, logic.Positive);
+        circuit.Connect(sequencer.Gnd, gnd2.Pin);
+        circuit.Connect(sequencer.Clock, clock.Out);
+        circuit.Connect(sequencer.ClockInhibit, gnd2.Pin);
+
+        // Reset on the fifth output, so it counts 0-3 and starts again: four coils, four steps.
+        circuit.Connect(sequencer.Reset, sequencer.Outputs[4]);
+
+        circuit.Connect(driver.Gnd, gnd3.Pin);
+        circuit.Connect(driver.Common, coilSupply.Positive);
+
+        for (var i = 0; i < 4; i++)
+        {
+            circuit.Connect(driver.Inputs[i], sequencer.Outputs[i]);
+            circuit.Connect(driver.Outputs[i], motor.Coils[i]);
+        }
+
+        for (var i = 4; i < driver.Inputs.Count; i++) circuit.Connect(driver.Inputs[i], gnd3.Pin);
+
+        circuit.Connect(motor.Common, coilSupply.Positive);
+
+        vm.Scope.TimebasePerDivision = 10e-3;
+        vm.Scope.VoltsPerDivision = 5.0;
+        vm.Scope.AddProbe(motor.Coils[0], "Coil A");
+        vm.Scope.AddProbe(motor.Coils[1], "Coil B");
+    }
+
+    /// <summary>
+    /// Three cells, the same load on each, and the only thing separating them is the resistance
+    /// inside them. It is the number nobody reads off the packet and the one that decides what a
+    /// battery can actually run.
+    /// </summary>
+    public static void LoadBatteryInternalResistance(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "What internal resistance costs";
+
+        var cells = new[]
+        {
+            BatteryModel.AlkalineAA,
+            BatteryModel.CoinCell2032,
+            BatteryModel.Lithium18650,
+        };
+
+        var y = -280;
+
+        foreach (var model in cells)
+        {
+            var battery = Place(circuit, new Battery(model) { StateOfCharge = 1.0 }, -300, y);
+            var load = Place(circuit, new DcCurrentSource { Current = 0.05 }, 40, y);
+            var ground = Place(circuit, new Ground(), -300, y + 160);
+            var loadGround = Place(circuit, new Ground(), 40, y + 160);
+
+            circuit.Connect(battery.Negative, ground.Pin);
+            circuit.Connect(battery.Positive, load.Positive);
+            circuit.Connect(load.Negative, loadGround.Pin);
+
+            vm.Scope.AddProbe(battery.Positive, model.Name);
+
+            y += 280;
+        }
+
+        vm.Scope.TimebasePerDivision = 10e-3;
+        vm.Scope.VoltsPerDivision = 2.0;
+        vm.Scope.Layout = ScopeLayout.Tiled;
     }
 
     private static T Place<T>(Circuit circuit, T component, double x, double y) where T : CircuitComponent

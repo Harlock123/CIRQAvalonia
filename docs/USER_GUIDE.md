@@ -349,7 +349,7 @@ gets roughly two-thirds of the way each time.
 
 ### The example browser
 
-Everything above is also in **File > Examples...** (`Ctrl+Shift+E`), along with fifty-three others.
+Everything above is also in **File > Examples...** (`Ctrl+Shift+E`), along with sixty-one others.
 
 They are grouped the way the component palette is — Fundamentals, Analog, Power Supplies, Switching
 & Motors, Digital Logic, Timers & Oscillators, Buses & Interfaces, Sensors, Signal Integrity & RF,
@@ -508,6 +508,18 @@ cover both.
 
 Double-click it to swing between cold and warm while the simulation runs, and pair it with a
 comparator to act on temperature.
+
+**File > Examples > Thermostat** is that pairing, with the part that makes it work rather than
+merely switch. An NTC against a fixed 10 kΩ feeds an LM311 compared with a mid-rail reference, and
+its output drives an LED and an active buzzer. Drag **Temperature** in the CONTROLS panel and it
+changes over.
+
+The component to look at is the **470 kΩ from the output back to the input**. It shifts the
+threshold the moment the output moves, so the temperature it switches off at is a degree or two
+above the one it switches back on at. Delete it and the thermostat still works — right up until
+the sensor reading wobbles across the threshold, at which point the output chatters and, on real
+hardware, the relay buzzes and its contacts weld. A thermostat without hysteresis is not a slightly
+worse thermostat; it is a device with a failure mode.
 
 **Buzzer** comes in the two sorts you can buy, and the difference is the point rather than a
 detail. A **passive** piezo is a capacitor: it turns a *changing* voltage into movement, so a
@@ -760,6 +772,20 @@ The setting that matters is **Coupling**. It is never quite one, and what is lef
 leakage inductance — which is the part the signal does see, and therefore what decides how fast a
 pair can still run through one.
 
+**File > Examples > Common-Mode Choke** does both at once, which is the only way to see that it is
+one component and not two. A 100 kHz signal is driven across the pair; a 5 MHz interferer is driven
+against the pair and ground together, the way every switching supply near a cable does it. The pair
+is terminated with two 50 Ω resistors and the midpoint grounded, so common-mode current has a path
+home and the choke has something to push against.
+
+Out the far end: the signal arrives at essentially its full two volts, and the five volts of
+common-mode noise arrives as about **fifty millivolts**. Same component, same instant, two answers
+a hundred times apart.
+
+Wind the **Coupling** down towards 0.9 and watch the rejection collapse — that is leakage
+inductance becoming the dominant term, and it is why the number on a real choke's datasheet
+matters more than its inductance.
+
 ---
 
 ## Tuning with a voltage
@@ -843,6 +869,14 @@ because the spike now has somewhere to go.
 
 Pull-in and drop-out are deliberately different currents, so a coil sitting near the threshold
 holds its state instead of chattering. `COM` connects to `NC` at rest and to `NO` when energised.
+
+**File > Examples > Stepper Motor** is the ULN2003's own reason for existing. A 4017 walks one
+output at a time — which is exactly the four-phase wave-drive sequence, for free — through four
+Darlington channels into the windings of a stepper, and the shaft follows one step per clock. Watch
+the two coil traces: as each winding is released its node rises to a diode drop **above** the
+twelve volt rail and stops there, because COM is tied to that rail and the array's freewheeling
+diodes have somewhere to send the current. Disconnect COM and the same instant reads in the
+millions of volts, which is the arithmetic of `v = L·di/dt` with nowhere for the current to go.
 
 **Fuse** — opens on its melting integral rather than on instantaneous current, which is why a real
 fuse survives an inrush many times its rating: the heat has to accumulate. A fuse carries its rated
@@ -1198,6 +1232,15 @@ holds up across most of the discharge and then falls off a cliff, which is the s
 has and the reason batteries give so little warning. Turn **Discharges** off in the inspector if
 you want the sag without the clock running.
 
+**File > Examples > Battery Resistance** is that first paragraph as one screen. Three cells — an AA
+alkaline, a CR2032 and an 18650 — each with the same fifty milliamp load and nothing else in the
+circuit, so the only thing separating the three traces is what is inside the cells. The AA gives up
+thirteen millivolts, the 18650 three, and the coin cell **half a volt**: a sixth of everything it
+had, for a current an indicator LED would draw.
+
+That is the number nobody reads off the packet and the one that decides what a cell can run. Raise
+the load current on any of them in the CONTROLS panel and watch which trace gives way first.
+
 **Solar cell.** A panel is a current source in parallel with the diode it is made of, and that
 one fact explains everything awkward about them. Light makes **current**, not voltage: the current
 is almost exactly proportional to brightness while the voltage barely moves — halving the light
@@ -1388,6 +1431,15 @@ worth of charge per cycle, its output impedance is about `1/(f·C)` — a small 
 slow oscillator gives a rail that sags the moment anything draws from it, and no amount of
 smoothing on the output fixes that.
 
+**File > Examples > Negative Rail** makes one and then uses it. An ICL7660 with a 10 µF flying
+capacitor and a 10 µF reservoir gives about −4.9 V from +5, and a TL081 straddling both rails
+follows a sine centred on ground — down to −2 V and back, which on a single supply is simply not
+available. That is the whole reason to go to the trouble: not the negative rail itself, but the
+half of the waveform it buys.
+
+The rail reads a little short of −5 V, and that is the output impedance above rather than an
+error. Lower the oscillator frequency in the inspector and watch it sag further.
+
 ---
 
 ## The character LCD
@@ -1418,6 +1470,23 @@ on E and RS and watch the bytes go by.
 The example writes both lines, so the 0x80 | 0x40 that gets to the second one is in it too — take
 that command out and the second string runs off the end of line one into memory nobody can see,
 which is the fault in its natural habitat.
+
+**File > Examples > I2C LCD** is the same display on the backpack almost everyone actually buys: a
+PCF8574 port expander, and two wires instead of six. Every one of those boards is wired the same —
+P0 is RS, P2 is E, P3 is the backlight and the top nibble is D4 to D7 — so the byte pattern in the
+example is the byte pattern a library produces on real hardware.
+
+It is worth opening next to the parallel one, because nothing about the display has changed. It is
+still four-bit, still two writes per latch with E going down to clock each nibble in, still the
+same initialisation sequence in the same order. All that moved is how the six lines get set: a byte
+over a bus instead of six pins. What the backpack saves is wiring, and what it costs is that every
+latch is now a bus transaction, which is why an I²C LCD updates visibly slower than a parallel one.
+
+One detail the example makes explicit that a real board hides: a PCF8574 **releases** a pin rather
+than driving it high — that is what quasi-bidirectional means, and it is why these sink an LED
+nicely and barely source at all. On a real backpack the chip's own weak pull-up makes the high
+level. Here the pull-ups are wired in, because a released pin with nothing on it is a floating
+input rather than a high one.
 
 ---
 
@@ -1741,6 +1810,17 @@ Both rails have to be present. The gates are tied to LV, so without that supply 
 at all; without HV the high side has nothing to pull up to; and the two the wrong way round makes
 the body diodes conduct regardless of what anything drives. All three are reported.
 
+**File > Examples > Level Shifting** is the case it was designed for and not the one people reach
+for it with: a whole I²C bus crossing the boundary. A 3.3 V controller writes four bytes into a
+5 V EEPROM, sets the address back, and reads them again — and the bytes come back, which is the
+part worth noticing. The data went *up* through the shifter and every acknowledgement came back
+*down* through the same channel, with nothing reconfigured in between, because there is nothing
+to configure: it is a MOSFET and two pull-ups.
+
+Watch the two SDA traces on the tiled scope. They are the same waveform at two different heights,
+each idling at its own rail. Put a probe on SCL as well and you have the whole bus at both
+voltages at once.
+
 ---
 
 ## Noise, and why hysteresis exists
@@ -1851,6 +1931,19 @@ of simulated time for anything to happen. The frequency is unaffected — it dep
 C — so what you lose is sharpness, not accuracy. And the stocked parts **stop at 1 MHz**, because a
 resonance needs many time steps per cycle to come out in the right place; a 16 MHz crystal would
 need the simulation step shortened by two orders of magnitude before it meant anything.
+
+**File > Examples > Crystal Q** puts one next to the thing it replaces. A 1 MHz crystal and an LC
+tuned to the same megahertz — 25 µH and about a nanofarad — each in series with the signal and the
+same 1 kΩ load after it. Press `F7` and sweep them together.
+
+The crystal passes a band about **fourteen kilohertz** wide. The LC passes nearly the whole sweep.
+They are tuned to the same frequency and one of them is a filter.
+
+The reason is one number, and it is the number the derated Q above does not touch. The coil's
+reactance at a megahertz is 157 Ω, so a kilohm of load swamps it completely. The crystal's motional
+inductance is **12.7 millihenries** — its reactance is nearly eighty kilohms — so the same load
+barely touches it. That is what a mechanical resonance written as components buys you: not a better
+coil, an inductance nobody could wind.
 
 ---
 
