@@ -1113,6 +1113,51 @@ Double-click it to turn one detent; set **Reverse** to turn it the other way.
 
 ---
 
+## Making a fixed regulator adjustable
+
+A 78xx is a *fixed* regulator, and it can be made a variable one in about two components — which
+is worth knowing both because it is useful and because how it works explains what the part
+actually does.
+
+All a 7805 does is hold its output **five volts above its own GND pin**. Ground that pin and you
+get five volts, which is how everybody uses it. Lift it and the output goes up with it:
+
+- **R1** from the output to the GND pin. The regulator holds 5 V across it, so it carries 5/R1 —
+  a fixed current, whatever the output ends up at.
+- **A potentiometer** from the GND pin to ground. That current flows through it, so the GND pin
+  sits at R2 × 5/R1, and the output at five volts above that.
+
+**File > Examples > Adjustable Supply** is the whole thing end to end: transformer, bridge,
+reservoir, the 7805 wired this way, and a probe on each of the three voltages. Turn **RV1** in the
+CONTROLS panel while it runs and the output moves from 5 V to about 18 V. The other two traces
+stay where they are, which is the point of the regulator being there.
+
+The arithmetic, with the regulator's quiescent current in it:
+
+> V<sub>out</sub> = 5 V + R2 × (5 V / R1 + I<sub>q</sub>)
+
+That last term is the honest fault of the arrangement, and the reason to know it is there. A 78xx
+returns its **whole quiescent current — several milliamps — through the GND pin**, so it flows
+through R2 as well and adds a few volts of its own. It is not a constant you can calibrate out
+either: it moves with load and temperature. So this is a fine way to get an adjustable rail and a
+poor way to get an accurate one.
+
+Which is exactly why the **LM317** exists. It works the same way — it holds 1.25 V between OUT and
+ADJ — but its adjust pin takes *fifty microamps* rather than several milliamps, so the same
+arithmetic has a term small enough to ignore. Swap the 7805 in the example for one and the
+relationship becomes the clean V<sub>out</sub> = 1.25 (1 + R2/R1) that the datasheet prints.
+
+Two things to check when you build one, both visible on the scope in that example:
+
+- **The rail has to stay above the output by the dropout voltage — at the ripple troughs, not on
+  average.** That is what sizes the transformer and the reservoir, and a supply that is fine at
+  5 V out and misbehaves at 18 V is nearly always this.
+- **Everything the regulator does not deliver, it dissipates.** Turn the output *down* and the
+  part gets *hotter*, because the difference across the pass element is larger. The model carries
+  a junction temperature and will shut down at 150 °C, as a real one does.
+
+---
+
 ## Switching instead of dropping
 
 Every other part in **Power** is linear. A 7805 bringing 12 V down to 5 V drops the other seven

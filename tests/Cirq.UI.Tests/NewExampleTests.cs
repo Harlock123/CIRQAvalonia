@@ -318,4 +318,100 @@ public class NewExampleTests
         // 100 Ω and 47 Ω in parallel is 32 Ω, so a good deal more.
         Assert.True(sensor.Current > 0.35, $"switching the second load in should show, not {sensor.Current:0.000} A");
     }
+
+    /// <summary>
+    /// The whole supply end to end, at five settings of the knob. A 7805 holds five volts above
+    /// its own GND pin, so lifting that pin through R1 and the potentiometer lifts the output with
+    /// it: V = 5 + R2·(5/R1 + Iq), which with 220 Ω and a 470 Ω pot runs from 5 V to 18 V.
+    /// </summary>
+    [Theory]
+    [InlineData(0.0, 5.00)]
+    [InlineData(0.25, 8.26)]
+    [InlineData(0.5, 11.51)]
+    [InlineData(0.75, 14.77)]
+    [InlineData(1.0, 18.03)]
+    public void TheAdjustableSupplyFollowsItsPotentiometer(double position, double expected)
+    {
+        using var vm = Load("Adjustable Supply");
+
+        var pot = vm.Circuit.Components.OfType<Potentiometer>().Single();
+        var regulator = vm.Circuit.Components.OfType<VoltageRegulator>().Single();
+
+        pot.Position = position;
+        Assert.True(vm.Simulation.Rebuild(), vm.Simulation.Status);
+
+        var sim = vm.Simulation.Simulator!;
+        sim.Run(0.4);
+
+        Assert.Equal(expected, sim.NodeVoltage(regulator.Output), 0.05);
+    }
+
+    /// <summary>
+    /// And rejects the ripple it is sitting on. The reservoir leaves well over a volt of it on the
+    /// rectified rail; almost none of that reaches the output, which is what the regulator is for.
+    /// </summary>
+    [Fact]
+    public void AndRejectsTheRippleOnTheRailBelowIt()
+    {
+        using var vm = Load("Adjustable Supply");
+
+        var regulator = vm.Circuit.Components.OfType<VoltageRegulator>().Single();
+        var sim = vm.Simulation.Simulator!;
+
+        sim.Run(0.4);
+
+        double railLow = double.MaxValue, railHigh = double.MinValue;
+        double outLow = double.MaxValue, outHigh = double.MinValue;
+
+        // A couple of mains cycles, once the reservoir has charged.
+        while (sim.Time < 0.44)
+        {
+            sim.Step();
+
+            var rail = sim.NodeVoltage(regulator.Input);
+            var output = sim.NodeVoltage(regulator.Output);
+
+            railLow = Math.Min(railLow, rail);
+            railHigh = Math.Max(railHigh, rail);
+            outLow = Math.Min(outLow, output);
+            outHigh = Math.Max(outHigh, output);
+        }
+
+        Assert.True(railHigh - railLow > 0.8,
+            $"the rectified rail should ripple, not sit at {railHigh - railLow:0.000} V of it");
+
+        Assert.True(outHigh - outLow < 0.02,
+            $"and the regulator should reject it, not pass {(outHigh - outLow) * 1e3:0.0} mV");
+    }
+
+    /// <summary>
+    /// The rail has to stay above the output by the regulator's dropout at every setting, ripple
+    /// troughs included — which is what sizes the transformer and the reservoir, and the thing
+    /// that goes wrong when either is chosen too small.
+    /// </summary>
+    [Fact]
+    public void TheRailClearsDropoutRightAcrossTheRange()
+    {
+        using var vm = Load("Adjustable Supply");
+
+        var pot = vm.Circuit.Components.OfType<Potentiometer>().Single();
+        var regulator = vm.Circuit.Components.OfType<VoltageRegulator>().Single();
+
+        pot.Position = 1.0;
+        Assert.True(vm.Simulation.Rebuild(), vm.Simulation.Status);
+
+        var sim = vm.Simulation.Simulator!;
+        sim.Run(0.4);
+
+        var lowest = double.MaxValue;
+        while (sim.Time < 0.44)
+        {
+            sim.Step();
+            lowest = Math.Min(lowest, sim.NodeVoltage(regulator.Input));
+        }
+
+        // 18 V out, plus the 7805's two volts of dropout.
+        Assert.True(lowest > 20.0, $"the trough falls to {lowest:0.0} V, which is into dropout");
+        Assert.False(regulator.IsInDropout);
+    }
 }

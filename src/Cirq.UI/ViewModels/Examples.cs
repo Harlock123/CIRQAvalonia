@@ -90,6 +90,8 @@ public static class Examples
             LoadAmplitudeModulation),
         new("Current Sensing", "An INA219 watching a load from the high side of the rail",
             LoadCurrentSensing),
+        new("Adjustable Supply", "Transformer, bridge, reservoir and a 7805 made adjustable — turn RV1 and watch it move",
+            LoadAdjustableSupply),
     ];
 
     public static void LoadRcLowPass(MainWindowViewModel vm)
@@ -2109,6 +2111,110 @@ public static class Examples
         vm.Scope.VoltsPerDivision = 5.0;
         vm.Scope.AddProbe(sensor.ShuntMinus, "Load");
         vm.Scope.AddProbe(sensor.Sda, "SDA");
+    }
+
+    /// <summary>
+    /// A whole linear bench supply end to end: transformer, bridge, reservoir, and a 7805 made
+    /// <b>adjustable</b> by a potentiometer — with a probe on each of the three voltages so the
+    /// stages can be watched turning into one another.
+    /// <para>
+    /// The trick with the regulator is worth understanding, because a 7805 is a <i>fixed</i> five
+    /// volt part and this one is not. All a 78xx does is hold its output five volts above its own
+    /// GND pin. Ground that pin and you get five volts. Lift it — by putting R1 from the output to
+    /// it, and the potentiometer from there to ground — and the output rises by however far the
+    /// pin has been lifted. Turning RV1 up raises the pin, and the output goes with it.
+    /// </para>
+    /// <para>
+    /// It also has the honest fault of the arrangement built into it. The regulator's own
+    /// quiescent current leaves through that same GND pin and flows through RV1, adding its own
+    /// few volts to the answer — which is why this is a fine way to get an adjustable rail and a
+    /// poor way to get an accurate one. An LM317 exists because its adjust pin takes microamps
+    /// instead of milliamps.
+    /// </para>
+    /// </summary>
+    public static void LoadAdjustableSupply(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "Adjustable bridge-rectified supply";
+
+        // A 1:1 transformer against 50 V peak-to-peak: about 18 V RMS on the secondary, which
+        // rectifies to roughly 24 V and leaves headroom over the whole adjustment range.
+        var mains = Place(circuit, new FunctionGenerator
+        {
+            Shape = Waveform.Sine,
+            Frequency = 50,
+            AmplitudePeakToPeak = 50,
+            OutputResistance = 1.0,
+        }, -620, 40);
+
+        var transformer = Place(circuit, new Transformer(1.0, 1.0, 0.999), -420, 40);
+        var bridge = Place(circuit, new BridgeRectifier(), -220, 40);
+
+        // Large enough that the troughs between mains peaks still clear the regulator's dropout,
+        // which is the whole job of a reservoir — and no larger, so there is a volt or so of
+        // ripple left on the rail to watch the regulator throw away.
+        var reservoir = Place(circuit, new ElectrolyticCapacitor(470e-6) { VoltageRating = 35 }, -40, 160);
+
+        var regulator = Place(circuit, new VoltageRegulator(RegulatorModel.Lm7805), 160, 20);
+
+        // R1 sets the current through the adjustment network. Smaller swamps the regulator's
+        // quiescent current and gives a more honest answer; larger wastes less.
+        var setter = Place(circuit, new Resistor(220), 340, 140);
+        var adjust = Place(circuit, new Potentiometer(470, 0.5), 340, 320);
+
+        var output = Place(circuit, new ElectrolyticCapacitor(10e-6) { VoltageRating = 35 }, 520, 160);
+        var load = Place(circuit, new Resistor(470), 680, 160);
+
+        var gnd = Place(circuit, new Ground(), -620, 220);
+        var gnd2 = Place(circuit, new Ground(), -220, 220);
+        var gnd3 = Place(circuit, new Ground(), -40, 320);
+        var gnd4 = Place(circuit, new Ground(), 340, 460);
+        var gnd5 = Place(circuit, new Ground(), 520, 320);
+        var gnd6 = Place(circuit, new Ground(), 680, 320);
+
+        reservoir.RotationDegrees = 90;
+        setter.RotationDegrees = 90;
+        output.RotationDegrees = 90;
+        load.RotationDegrees = 90;
+
+        circuit.Connect(mains.Return, gnd.Pin);
+        circuit.Connect(mains.Output, transformer.P1);
+        circuit.Connect(transformer.P2, gnd.Pin);
+
+        circuit.Connect(transformer.S1, bridge.Ac1);
+        circuit.Connect(transformer.S2, bridge.Ac2);
+        circuit.Connect(bridge.Negative, gnd2.Pin);
+
+        circuit.Connect(bridge.Positive, reservoir.A);
+        circuit.Connect(reservoir.B, gnd3.Pin);
+        circuit.Connect(bridge.Positive, regulator.Input);
+
+        // The GND pin is not grounded, which is the whole of the trick.
+        circuit.Connect(regulator.Output, setter.A);
+        circuit.Connect(setter.B, regulator.Common);
+
+        // The pot as a rheostat: more track between the GND pin and ground lifts it further, so
+        // turning the wiper up turns the output up. Its far end goes to ground as well, so the
+        // unused half of the track is not left floating.
+        circuit.Connect(regulator.Common, adjust.A);
+        circuit.Connect(adjust.Wiper, gnd4.Pin);
+        circuit.Connect(adjust.B, gnd4.Pin);
+
+        circuit.Connect(regulator.Output, output.A);
+        circuit.Connect(output.B, gnd5.Pin);
+        circuit.Connect(regulator.Output, load.A);
+        circuit.Connect(load.B, gnd6.Pin);
+
+        vm.Scope.TimebasePerDivision = 10e-3;
+        vm.Scope.VoltsPerDivision = 5.0;
+        vm.Scope.Layout = ScopeLayout.Unified;
+        vm.Scope.AddProbe(transformer.S1, "AC in");
+        vm.Scope.AddProbe(bridge.Positive, "Rectified");
+        vm.Scope.AddProbe(regulator.Output, "Regulated");
+
+        // Mains is 50 Hz, so at the default 1/1000 speed a single cycle would take twenty seconds
+        // of wall time.
+        vm.Simulation.SpeedFactor = 1.0;
     }
 
     private static T Place<T>(Circuit circuit, T component, double x, double y) where T : CircuitComponent
