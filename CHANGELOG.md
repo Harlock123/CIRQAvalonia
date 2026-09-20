@@ -8,6 +8,75 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+## [0.27.0] - 2026-09-20
+
+Every component in the palette now has a worked example. That was not true of any previous
+release, and it is the point of this one: 164 components in 16 categories, **68 worked examples**
+in 12 groups, and 1852 tests.
+
+Two releases ago, thirty-five of the parts had nothing demonstrating them and eleven sections of
+the guide described a circuit that did not ship. Both numbers are now zero. If a part is in the
+palette, something in **File > Examples...** uses it, and the guide section that explains it says
+which one.
+
+**Sixteen new examples.**
+
+Analog and power:
+
+- **Negative Rail** — an ICL7660 making −4.9 V out of +5, and a TL081 straddling both rails to
+  follow a sine that goes below ground. The negative rail is not the point; the half of the
+  waveform it buys is.
+- **Battery Resistance** — three cells, the same fifty milliamp load on each, nothing else in the
+  circuit. The AA gives up thirteen millivolts, the 18650 three, and the coin cell **half a volt**.
+- **Crystal Q** — a 1 MHz crystal and an LC tuned to the same megahertz, each into the same load.
+  The crystal passes a fourteen kilohertz band; the LC passes the whole sweep. Press `F7`.
+- **Common-Mode Choke** — a signal across the pair and a five volt interferer on both wires at
+  once. The signal arrives whole and about fifty millivolts of the noise does.
+- **Analog Switch** — a 4066 picking one of four sources, and what happens when you close two.
+- **Night Light** — an LDR against a TL431 rather than another divider, because a divider's
+  threshold moves with the supply and a reference's does not.
+
+Sensors and actuators:
+
+- **Thermostat** — an NTC, a comparator, and the feedback resistor that is the difference between
+  a thermostat and a relay that chatters.
+- **Thermocouple** — forty-one microvolts a degree into an INA126, and the cold junction problem
+  made visible: warm the cold end and the reading falls with the hot end untouched.
+- **Servo Sweep** — 1.0, 1.5 and 2.0 ms against the three angles on the datasheet. Change the
+  frequency instead of the width and watch nothing happen.
+- **Hall Counter** — a Hall switch counting one pass per pass, next to the reed switch that cannot.
+
+Buses and displays:
+
+- **Level Shifting** — a whole I²C bus crossing a 3.3 V to 5 V boundary, with the acknowledgements
+  coming back down the channels the data went up.
+- **I2C LCD** — the same HD44780 on a PCF8574 backpack, two wires instead of six.
+- **Stepper Motor** — a 4017 walking four windings through a ULN2003.
+- **Analog and Logic** — the ADC and DAC bridges, and why one of them has two thresholds.
+
+### Fixed
+
+- **The rotary encoder's Detent control did nothing electrically.** Its contacts are driven by a
+  turn in progress and only double-clicking the part started one, so dragging the control on the
+  CONTROLS panel changed a number and produced no quadrature at all. The two are now one action.
+- **The ULN2003's COM pin was declared and never modelled**, so the part's freewheeling diodes —
+  the reason it exists for relay coils and stepper windings — were not there, and an inductive load
+  switched off drove its output to tens of kilovolts. *(Also in 0.26.0; the stepper example is what
+  it was built for.)*
+- **The Window Detector example never detected anything**, and **the Night Light came on in
+  daylight**: both had a comparator's inputs the wrong way up, which gives a working circuit that
+  is exactly wrong. Each now has a test that fails if it is put back.
+- **The TL431 in the night light was fed through 2.2 kΩ**, which leaves it under its minimum
+  operating current once the supply falls to four volts. Sized for the bottom of the supply
+  instead, which is the advice its own section gives.
+
+### Documentation
+
+The guide gains sections on the two signal bridges — which had been in the palette with nothing
+written about them — and on maximum power point, two-stage surge protection, recording audio and
+what a ULN2003's COM pin is for. Sixty-eight examples, sixty-eight pointers from the prose to the
+circuit.
+
 ## [0.26.0] - 2026-09-20
 
 The examples stop being a menu and start being a library. The palette gains three parts and now
