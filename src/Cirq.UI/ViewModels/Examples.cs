@@ -54,6 +54,8 @@ public static class Examples
             new("Window Detector", "LM339 outputs wired together to flag an out-of-range voltage",
                 LoadWindowDetector),
             new("JFET Amplifier", "2N3819 common-source stage with self-bias", LoadJfetAmplifier),
+            new("Rail to Rail", "The same follower three times — an LM741, an LM358 and an MCP6002 on one 5 V supply",
+                LoadRailToRail),
             new("Noise and Hysteresis", "A comparator chattering on a noisy ramp — add hysteresis and it stops",
                 LoadNoiseAndHysteresis),
         ]),
@@ -68,6 +70,12 @@ public static class Examples
                 LoadLinearPowerSupply),
             new("Adjustable Supply", "Transformer, bridge, reservoir and a 7805 made adjustable — turn RV1 and watch it move",
                 LoadAdjustableSupply),
+            new("Solar Panel", "A panel and an adjustable load — turn RV1 and find the maximum power point",
+                LoadSolarPanel),
+            new("Lithium Charge Cycle", "Constant current to 4.2 V, then constant voltage tapering away",
+                LoadLithiumCharge),
+            new("Surge Protection", "A varistor takes the energy and a TVS clamps what gets past it",
+                LoadSurgeProtection),
             new("Buck Converter", "MC34063 stepping 12 V down to 5 V without turning the difference into heat",
                 LoadBuckConverter),
         ]),
@@ -80,6 +88,8 @@ public static class Examples
                 LoadScrLatch),
             new("Lamp Dimmer", "Triac and diac phase control — move the firing angle and the lamp dims",
                 LoadLampDimmer),
+            new("Relay Driver", "Logic to a coil through an optocoupler and a Darlington array",
+                LoadRelayDriver),
             new("Motor Reversing", "An H-bridge running a motor both ways — forward, brake, reverse, coast",
                 LoadMotorReversing),
         ]),
@@ -134,6 +144,10 @@ public static class Examples
                 LoadReedSwitchBounce),
             new("Motion Light", "A PIR holding a lamp on long after you stop moving",
                 LoadMotionLight),
+            new("Load Cell", "A strain-gauge bridge into an INA126 — millivolts on top of half a supply",
+                LoadLoadCell),
+            new("Rotary Encoder", "Quadrature, where the direction is in the phase and not in either output",
+                LoadRotaryEncoder),
         ]),
 
         new("Signal Integrity & RF",
@@ -146,6 +160,12 @@ public static class Examples
                 LoadAmplitudeModulation),
             new("Varactor Tuning", "An LC tank tuned by a voltage — move RV1 and sweep it in Frequency Response",
                 LoadVaractorTuning),
+        ]),
+
+        new("Audio",
+        [
+            new("Audio Amplifier", "A microphone into an LM386 into a speaker, and the two capacitors that matter",
+                LoadAudioAmplifier),
         ]),
 
         new("Displays",
@@ -2591,6 +2611,438 @@ public static class Examples
             $"D3={rate}{data[2]}",
             $"D2={rate}{data[3]}",
         ]);
+    }
+
+    /// <summary>
+    /// The same follower three times, on one five volt supply, with three different op-amps in it.
+    /// How much of the supply each one can actually use is the single most common surprise in
+    /// single-supply analog work, and it is far easier to believe once seen side by side.
+    /// </summary>
+    public static void LoadRailToRail(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "How close to the rails";
+
+        var supply = Place(circuit, new DcVoltageSource(5.0), -620, 240);
+
+        // A slow ramp over the whole supply, so each output is asked to go everywhere it can.
+        var signal = Place(circuit, new FunctionGenerator(Waveform.Triangle, 100, 5.0) { DcOffset = 2.5 },
+            -620, -80);
+
+        var gnd = Place(circuit, new Ground(), -620, 400);
+        var gnd2 = Place(circuit, new Ground(), -620, 80);
+
+        var u1 = Place(circuit, new OperationalAmplifier(OpAmpModel.Lm741), -180, -320);
+        var u2 = Place(circuit, new OperationalAmplifier(OpAmpModel.Lm358), -180, 0);
+        var u3 = Place(circuit, new OperationalAmplifier(OpAmpModel.Mcp6002), -180, 320);
+
+        circuit.Connect(supply.Negative, gnd.Pin);
+        circuit.Connect(signal.Return, gnd2.Pin);
+
+        var y = -320;
+
+        foreach (var amplifier in new[] { u1, u2, u3 })
+        {
+            var load = Place(circuit, new Resistor(10e3), 160, y + 120);
+            var loadGround = Place(circuit, new Ground(), 160, y + 240);
+
+            load.RotationDegrees = 90;
+
+            circuit.Connect(amplifier.PositiveSupply, supply.Positive);
+            circuit.Connect(amplifier.NegativeSupply, gnd.Pin);
+
+            // Unity gain: the output is wired straight back to the inverting input, so whatever
+            // the output can reach is the whole of what the part can do.
+            circuit.Connect(amplifier.NonInverting, signal.Output);
+            circuit.Connect(amplifier.Inverting, amplifier.Output);
+
+            circuit.Connect(amplifier.Output, load.A);
+            circuit.Connect(load.B, loadGround.Pin);
+
+            y += 320;
+        }
+
+        vm.Scope.TimebasePerDivision = 2e-3;
+        vm.Scope.VoltsPerDivision = 1.0;
+        vm.Scope.AddProbe(signal.Output, "In");
+        vm.Scope.AddProbe(u1.Output, "LM741");
+        vm.Scope.AddProbe(u2.Output, "LM358");
+        vm.Scope.AddProbe(u3.Output, "MCP6002");
+    }
+
+    /// <summary>
+    /// A strain-gauge bridge into an instrumentation amplifier: millivolts of difference sitting on
+    /// half a supply of common mode, which is the measurement ordinary amplifiers cannot make.
+    /// </summary>
+    public static void LoadLoadCell(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "Load cell and INA126";
+
+        var supply = Place(circuit, new DcVoltageSource(5.0), -520, 120);
+        var cell = Place(circuit, new LoadCell { LoadKilograms = 2.5 }, -260, -40);
+        var amplifier = Place(circuit, new Ina126 { DifferentialGain = 100 }, 120, -40);
+
+        // The reference pin is what the output is measured from, and on a single supply it cannot
+        // be left at ground or half the answer has nowhere to go.
+        var refTop = Place(circuit, new Resistor(1e3), 60, 220);
+        var refBottom = Place(circuit, new Resistor(1e3), 60, 340);
+
+        var gnd = Place(circuit, new Ground(), -520, 280);
+        var gnd2 = Place(circuit, new Ground(), -260, 200);
+        var gnd3 = Place(circuit, new Ground(), 60, 440);
+
+        refTop.RotationDegrees = 90;
+        refBottom.RotationDegrees = 90;
+
+        circuit.Connect(supply.Negative, gnd.Pin);
+        circuit.Connect(cell.ExcitationPositive, supply.Positive);
+        circuit.Connect(cell.ExcitationNegative, gnd2.Pin);
+
+        circuit.Connect(amplifier.PositiveSupply, supply.Positive);
+        circuit.Connect(amplifier.NegativeSupply, gnd.Pin);
+        circuit.Connect(amplifier.InPlus, cell.SignalPositive);
+        circuit.Connect(amplifier.InMinus, cell.SignalNegative);
+
+        circuit.Connect(supply.Positive, refTop.A);
+        circuit.Connect(refTop.B, refBottom.A);
+        circuit.Connect(refBottom.B, gnd3.Pin);
+        circuit.Connect(refTop.B, amplifier.Reference);
+
+        vm.Scope.TimebasePerDivision = 1e-3;
+        vm.Scope.VoltsPerDivision = 0.5;
+        vm.Scope.AddProbe(cell.SignalPositive, "Bridge +");
+        vm.Scope.AddProbe(amplifier.Output, "Amplified");
+    }
+
+    /// <summary>
+    /// An electret microphone into an LM386 into a speaker: the whole of a small audio chain, and
+    /// the two capacitors in it are the part worth looking at.
+    /// </summary>
+    public static void LoadAudioAmplifier(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "Microphone, LM386 and speaker";
+
+        var supply = Place(circuit, new DcVoltageSource(9.0), -620, 160);
+        var microphone = Place(circuit, new Microphone { ToneFrequency = 1e3 }, -400, -80);
+        var bias = Place(circuit, new Resistor(2.2e3), -400, -240);
+
+        // Blocks the microphone's bias so only the sound reaches the amplifier.
+        var coupling = Place(circuit, new Capacitor(1e-6), -220, -120);
+
+        // Volume, and not a decoration: an electret straight into a gain of two hundred is a
+        // square wave at the rails, which is the first thing anybody building this discovers.
+        var volume = Place(circuit, new Potentiometer(10e3, 0.08), -100, -40);
+
+        var amplifier = Place(circuit, new Lm386 { VoltageGain = 200 }, 120, -120);
+
+        // And this one blocks the amplifier's idle half-supply, which would otherwise sit across
+        // the voice coil continuously.
+        var output = Place(circuit, new Capacitor(220e-6), 360, -120);
+        var speaker = Place(circuit, new Speaker(8.0), 520, -40);
+
+        var gnd = Place(circuit, new Ground(), -620, 320);
+        var gnd2 = Place(circuit, new Ground(), -400, 120);
+        var gnd3 = Place(circuit, new Ground(), -100, 140);
+        var gnd4 = Place(circuit, new Ground(), 120, 140);
+        var gnd5 = Place(circuit, new Ground(), 520, 160);
+
+        bias.RotationDegrees = 90;
+        volume.RotationDegrees = 90;
+        speaker.RotationDegrees = 90;
+
+        circuit.Connect(supply.Negative, gnd.Pin);
+
+        // Electret bias: a resistor from the rail, and the sound arrives as a wobble on the node.
+        circuit.Connect(bias.A, supply.Positive);
+        circuit.Connect(bias.B, microphone.A);
+        circuit.Connect(microphone.B, gnd2.Pin);
+
+        circuit.Connect(microphone.A, coupling.A);
+        // Signal at B and ground at A, so the Wiper control reads as a volume knob: the tap ratio
+        // is measured from A, and a knob that gets quieter as it goes up is a knob wired backwards.
+        circuit.Connect(coupling.B, volume.B);
+        circuit.Connect(volume.A, gnd3.Pin);
+
+        circuit.Connect(amplifier.InPlus, volume.Wiper);
+        circuit.Connect(amplifier.InMinus, gnd4.Pin);
+        circuit.Connect(amplifier.PositiveSupply, supply.Positive);
+        circuit.Connect(amplifier.NegativeSupply, gnd4.Pin);
+
+        circuit.Connect(amplifier.Output, output.A);
+        circuit.Connect(output.B, speaker.A);
+        circuit.Connect(speaker.B, gnd5.Pin);
+
+        vm.Scope.TimebasePerDivision = 500e-6;
+        vm.Scope.VoltsPerDivision = 1.0;
+        vm.Scope.AddProbe(microphone.A, "Microphone");
+        vm.Scope.AddProbe(amplifier.Output, "LM386 out");
+        vm.Scope.AddProbe(speaker.A, "Speaker");
+    }
+
+    /// <summary>
+    /// Logic on one side, a relay coil on the other, and three parts between them that each do
+    /// something a logic pin cannot: an optocoupler, a Darlington array and the relay itself.
+    /// </summary>
+    public static void LoadRelayDriver(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "Optocoupler, ULN2003 and relay";
+
+        var logic = Place(circuit, new DcVoltageSource(5.0), -680, 200);
+        var coilSupply = Place(circuit, new DcVoltageSource(12.0), 560, 220);
+        var clock = Place(circuit, new ClockSource(3.0) { Levels = LogicLevels.Ttl }, -680, -160);
+
+        var ledResistor = Place(circuit, new Resistor(330), -460, -160);
+        var opto = Place(circuit, new Optocoupler(OptocouplerModel.Pc817), -260, -80);
+        var emitterLoad = Place(circuit, new Resistor(10e3), -100, 60);
+
+        var driver = Place(circuit, new Uln2003(), 120, -80);
+        var relay = Place(circuit, new Relay(), 400, -80);
+        var lamp = Place(circuit, new Resistor(120), 740, -60);
+        var restLamp = Place(circuit, new Resistor(120), 880, 100);
+
+        var gnd = Place(circuit, new Ground(), -680, 360);
+        var gnd2 = Place(circuit, new Ground(), -260, 160);
+        var gnd3 = Place(circuit, new Ground(), -100, 200);
+        var gnd4 = Place(circuit, new Ground(), 120, 200);
+        var gnd5 = Place(circuit, new Ground(), 560, 380);
+        var gnd6 = Place(circuit, new Ground(), 740, 100);
+        var gnd7 = Place(circuit, new Ground(), 880, 260);
+
+        emitterLoad.RotationDegrees = 90;
+        lamp.RotationDegrees = 90;
+        restLamp.RotationDegrees = 90;
+
+        circuit.Connect(logic.Negative, gnd.Pin);
+        circuit.Connect(coilSupply.Negative, gnd5.Pin);
+
+        // The LED wants milliamps, not the microamps a logic pin thinks it is giving away.
+        circuit.Connect(clock.Out, ledResistor.A);
+        circuit.Connect(ledResistor.B, opto.Anode);
+        circuit.Connect(opto.Cathode, gnd2.Pin);
+
+        // Emitter follower, so the output goes high when the LED lights rather than the other way.
+        circuit.Connect(opto.Collector, logic.Positive);
+        circuit.Connect(opto.Emitter, emitterLoad.A);
+        circuit.Connect(emitterLoad.B, gnd3.Pin);
+
+        // No supply pin to wire: a ULN2003 is powered by whatever it is sinking from, and the
+        // part says so by aliasing Vcc onto its ground pin. Connect it to a rail and the ground
+        // pin is shorted to that rail.
+        circuit.Connect(driver.Gnd, gnd4.Pin);
+        circuit.Connect(driver.Inputs[0], opto.Emitter);
+
+        // The other six channels are unused, and a Darlington input left floating is a Darlington
+        // that switches on whatever the board picks up. Tie them down.
+        for (var i = 1; i < driver.Inputs.Count; i++) circuit.Connect(driver.Inputs[i], gnd4.Pin);
+
+        // Common goes to the coil's supply, which is where the array's own flyback diodes send
+        // the inductive kick when the channel lets go.
+        circuit.Connect(driver.Common, coilSupply.Positive);
+        circuit.Connect(relay.CoilA, coilSupply.Positive);
+        circuit.Connect(relay.CoilB, driver.Outputs[0]);
+
+        // Both contacts are used, which is what a changeover relay is for: the lamp the coil turns
+        // on, and the one it turns off.
+        circuit.Connect(relay.Common, coilSupply.Positive);
+        circuit.Connect(relay.NormallyOpen, lamp.A);
+        circuit.Connect(lamp.B, gnd6.Pin);
+        circuit.Connect(relay.NormallyClosed, restLamp.A);
+        circuit.Connect(restLamp.B, gnd7.Pin);
+
+        vm.Scope.TimebasePerDivision = 50e-3;
+        vm.Scope.VoltsPerDivision = 5.0;
+        vm.Scope.AddProbe(opto.Emitter, "Opto out");
+        vm.Scope.AddProbe(relay.CoilB, "Coil");
+        vm.Scope.AddProbe(lamp.A, "Lamp");
+    }
+
+    /// <summary>
+    /// A solar panel and an adjustable load, which is the one circuit here where the thing under
+    /// test is the load. Too light and too heavy both waste most of the panel.
+    /// </summary>
+    public static void LoadSolarPanel(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "Finding a panel's maximum power point";
+
+        var panel = Place(circuit, new SolarCell { CellCount = 6, ShortCircuitCurrent = 150e-3 },
+            -320, 0);
+        var load = Place(circuit, new Potentiometer(100.0, 0.5), 0, -40);
+        var shunt = Place(circuit, new Resistor(1.0), 220, 100);
+
+        var gnd = Place(circuit, new Ground(), -320, 220);
+        var gnd2 = Place(circuit, new Ground(), 220, 240);
+
+        shunt.RotationDegrees = 90;
+
+        circuit.Connect(panel.B, gnd.Pin);
+        circuit.Connect(panel.A, load.A);
+
+        // Wiper tied to one end makes it a rheostat: one variable resistance rather than a divider.
+        circuit.Connect(load.Wiper, load.B);
+        circuit.Connect(load.B, shunt.A);
+        circuit.Connect(shunt.B, gnd2.Pin);
+
+        vm.Scope.TimebasePerDivision = 10e-3;
+        vm.Scope.VoltsPerDivision = 0.5;
+        vm.Scope.AddProbe(panel.A, "Panel");
+        vm.Scope.AddProbe(shunt.A, "Shunt (1 ohm = 1 V per amp)");
+    }
+
+    /// <summary>
+    /// A lithium charge cycle end to end: constant current until the cell reaches its float
+    /// voltage, then constant voltage with the current tapering away to termination.
+    /// </summary>
+    public static void LoadLithiumCharge(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "Lithium charge cycle";
+
+        var supply = Place(circuit, new DcVoltageSource(5.0), -460, 80);
+        var charger = Place(circuit, new LithiumCharger { ChargeCurrent = 0.5 }, -180, -40);
+
+        // A capacitor standing in for the cell, and a large one: a real 18650 moves so little over
+        // a charge that neither phase would be visible in a window anybody wants to watch.
+        var cell = Place(circuit, new Capacitor(0.1), 320, 60);
+
+        // The cell's own internal resistance, and it is what makes the second phase visible: with
+        // nothing between the charger and an ideal capacitor there is no taper to watch, because
+        // a capacitor at the float voltage stops taking current the instant it gets there.
+        var internalResistance = Place(circuit, new Resistor(1.0), 140, -40);
+
+        var chargingResistor = Place(circuit, new Resistor(1e3), 60, -260);
+        var standbyResistor = Place(circuit, new Resistor(1e3), 240, -260);
+        var chargingLed = Place(circuit, Led.OfColour("Red"), 60, -140);
+        var standbyLed = Place(circuit, Led.OfColour("Green"), 240, -140);
+
+        var gnd = Place(circuit, new Ground(), -460, 240);
+        var gnd2 = Place(circuit, new Ground(), -180, 200);
+        var gnd3 = Place(circuit, new Ground(), 320, 220);
+
+        cell.RotationDegrees = 90;
+        chargingResistor.RotationDegrees = 90;
+        standbyResistor.RotationDegrees = 90;
+        chargingLed.RotationDegrees = 90;
+        standbyLed.RotationDegrees = 90;
+
+        circuit.Connect(supply.Negative, gnd.Pin);
+        circuit.Connect(charger.Input, supply.Positive);
+        circuit.Connect(charger.Gnd, gnd2.Pin);
+
+        circuit.Connect(charger.Battery, internalResistance.A);
+        circuit.Connect(internalResistance.B, cell.A);
+        circuit.Connect(cell.B, gnd3.Pin);
+
+        // The status pins pull down, so each LED hangs off the rail rather than off the pin.
+        circuit.Connect(chargingResistor.A, supply.Positive);
+        circuit.Connect(chargingResistor.B, chargingLed.Anode);
+        circuit.Connect(chargingLed.Cathode, charger.Charging);
+
+        circuit.Connect(standbyResistor.A, supply.Positive);
+        circuit.Connect(standbyResistor.B, standbyLed.Anode);
+        circuit.Connect(standbyLed.Cathode, charger.Standby);
+
+        vm.Scope.TimebasePerDivision = 100e-3;
+        vm.Scope.VoltsPerDivision = 1.0;
+        vm.Scope.AddProbe(charger.Battery, "Charger out");
+        vm.Scope.AddProbe(cell.A, "Cell");
+        vm.Scope.AddProbe(charger.Charging, "CHRG");
+    }
+
+    /// <summary>
+    /// Two-stage surge protection, which is how it is actually done: a varistor takes the energy
+    /// at the input, a resistor limits what gets past it, and a TVS clamps the remainder down to
+    /// something the electronics behind it can survive.
+    /// </summary>
+    public static void LoadSurgeProtection(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "Two-stage surge protection";
+
+        var supply = Place(circuit, new DcVoltageSource(24.0), -680, 140);
+
+        // The surge itself: a short, hard pulse in series with the rail, the way a nearby
+        // switching load puts one onto a supply that was perfectly quiet a moment ago.
+        var surge = Place(circuit, new FunctionGenerator(Waveform.Square, 200, 160.0)
+        {
+            DutyCycle = 0.005,
+            DcOffset = 80.0,
+            OutputResistance = 20.0,
+        }, -680, -140);
+
+        var fuse = Place(circuit, new Fuse(1.0), -420, -260);
+        var mov = Place(circuit, new Varistor(60.0) { EnergyRating = 70.0 }, -200, -140);
+        var series = Place(circuit, new Resistor(10.0), 0, -260);
+        var tvs = Place(circuit, new TransientSuppressor(24.0), 220, -140);
+        var load = Place(circuit, new Resistor(240.0), 440, -140);
+
+        var gnd = Place(circuit, new Ground(), -680, 300);
+        var gnd2 = Place(circuit, new Ground(), -200, 40);
+        var gnd3 = Place(circuit, new Ground(), 220, 40);
+        var gnd4 = Place(circuit, new Ground(), 440, 40);
+
+        mov.RotationDegrees = 90;
+        tvs.RotationDegrees = 90;
+        load.RotationDegrees = 90;
+
+        circuit.Connect(supply.Negative, gnd.Pin);
+        circuit.Connect(supply.Positive, surge.Return);
+
+        circuit.Connect(surge.Output, fuse.A);
+        circuit.Connect(fuse.B, mov.A);
+        circuit.Connect(mov.B, gnd2.Pin);
+
+        circuit.Connect(mov.A, series.A);
+        circuit.Connect(series.B, tvs.A);
+        circuit.Connect(tvs.B, gnd3.Pin);
+
+        circuit.Connect(tvs.A, load.A);
+        circuit.Connect(load.B, gnd4.Pin);
+
+        vm.Scope.TimebasePerDivision = 1e-3;
+        vm.Scope.VoltsPerDivision = 20.0;
+        vm.Scope.AddProbe(mov.A, "Input");
+        vm.Scope.AddProbe(load.A, "Protected");
+    }
+
+    /// <summary>
+    /// A quadrature encoder, where the direction is not in either output but in the relationship
+    /// between them. Turn the Detent control and watch which one moves first.
+    /// </summary>
+    public static void LoadRotaryEncoder(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "Quadrature from a rotary encoder";
+
+        var supply = Place(circuit, new DcVoltageSource(5.0), -400, 100);
+        var encoder = Place(circuit, new RotaryEncoder(), -120, -40);
+
+        // Both contacts are switches to the common pin, so both need pulling up to read anything.
+        var pullA = Place(circuit, new Resistor(10e3), 140, -220);
+        var pullB = Place(circuit, new Resistor(10e3), 300, -220);
+
+        var gnd = Place(circuit, new Ground(), -400, 260);
+        var gnd2 = Place(circuit, new Ground(), -120, 180);
+
+        pullA.RotationDegrees = 90;
+        pullB.RotationDegrees = 90;
+
+        circuit.Connect(supply.Negative, gnd.Pin);
+        circuit.Connect(encoder.Common, gnd2.Pin);
+
+        circuit.Connect(pullA.A, supply.Positive);
+        circuit.Connect(pullA.B, encoder.OutputA);
+        circuit.Connect(pullB.A, supply.Positive);
+        circuit.Connect(pullB.B, encoder.OutputB);
+
+        vm.Scope.TimebasePerDivision = 10e-3;
+        vm.Scope.VoltsPerDivision = 1.0;
+        vm.Scope.Layout = ScopeLayout.Tiled;
+        vm.Scope.AddProbe(encoder.OutputA, "A");
+        vm.Scope.AddProbe(encoder.OutputB, "B");
     }
 
     private static T Place<T>(Circuit circuit, T component, double x, double y) where T : CircuitComponent

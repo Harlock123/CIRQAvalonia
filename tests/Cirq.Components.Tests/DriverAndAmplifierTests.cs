@@ -97,6 +97,66 @@ public class Uln2003Tests
             "there is nothing to push current through a load wired this way");
     }
 
+    /// <summary>
+    /// The COM pin's diodes, which are the reason the pin is there. An inductive load switched off
+    /// has to put its current somewhere, and with COM tied to the load's supply it freewheels
+    /// round through the diode instead of taking the output pin with it.
+    /// </summary>
+    [Fact]
+    public void ComClampsAnInductiveLoadAtADiodeDropAboveItsSupply()
+    {
+        var peak = InductiveKick(clamped: true);
+
+        Assert.InRange(peak, 12.0, 14.0);
+    }
+
+    /// <summary>
+    /// And with COM left unconnected there is no path, which is modelled rather than assumed away.
+    /// Leaving that pin off is the mistake this part invites and the answer is not a small one.
+    /// </summary>
+    [Fact]
+    public void AndWithComUnconnectedThereIsNothingToClampIt()
+    {
+        var peak = InductiveKick(clamped: false);
+
+        Assert.True(peak > 100.0, $"the unclamped output only reached {peak:0} V");
+    }
+
+    private static double InductiveKick(bool clamped)
+    {
+        var circuit = new Circuit();
+        var rail = circuit.Add(new DcVoltageSource(12.0));
+        var driver = circuit.Add(new Uln2003());
+        var coil = circuit.Add(new Inductor(10e-3) { SeriesResistance = 8.0 });
+        var clock = circuit.Add(new ClockSource(500.0));
+        var gnd = circuit.Add(new Ground());
+
+        circuit.Connect(rail.Negative, gnd.Pin);
+        circuit.Connect(driver.Gnd, gnd.Pin);
+
+        if (clamped) circuit.Connect(driver.Common, rail.Positive);
+
+        circuit.Connect(rail.Positive, coil.A);
+        circuit.Connect(coil.B, driver.Outputs[0]);
+        circuit.Connect(driver.Inputs[0], clock.Out);
+
+        for (var i = 1; i < 7; i++) circuit.Connect(driver.Inputs[i], gnd.Pin);
+
+        var sim = new CircuitSimulator(circuit);
+        sim.Reset();
+        sim.SolveOperatingPoint();
+
+        var peak = 0.0;
+
+        while (sim.Time < 6e-3)
+        {
+            sim.Step();
+            peak = Math.Max(peak, sim.NodeVoltage(coil.B));
+        }
+
+        return peak;
+    }
+
     [Fact]
     public void AllSevenChannelsAreIndependent()
     {

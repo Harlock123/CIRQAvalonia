@@ -349,11 +349,11 @@ gets roughly two-thirds of the way each time.
 
 ### The example browser
 
-Everything above is also in **File > Examples...** (`Ctrl+Shift+E`), along with forty-five others.
+Everything above is also in **File > Examples...** (`Ctrl+Shift+E`), along with fifty-three others.
 
 They are grouped the way the component palette is — Fundamentals, Analog, Power Supplies, Switching
 & Motors, Digital Logic, Timers & Oscillators, Buses & Interfaces, Sensors, Signal Integrity & RF,
-Displays, Development Boards — with a description of whichever one is selected beside the list, and a search
+Audio, Displays, Development Boards — with a description of whichever one is selected beside the list, and a search
 box across all three of the name, the description and the group. So looking for `I2C` finds the
 four bus examples, and looking for `hysteresis` finds the comparator circuit whose name you have
 forgotten. Double-click to open, or select and press Enter.
@@ -859,7 +859,11 @@ output pin, not between the output and ground. An output that is off is not driv
 disconnected — so a load wired from an output down to ground does nothing at all, which is the
 usual first mistake. Being a Darlington it does not saturate to nothing either: about a volt stays
 across a conducting output, which matters when a 5 V relay is running off a 5 V rail. Tie the COM
-pin to the load's supply and the internal flyback diodes have somewhere to send the inductive kick.
+pin to the load's supply and the internal flyback diodes have somewhere to send the inductive kick;
+they are modelled, so leaving that pin off has the consequence it has on a breadboard rather than
+none. Note also that there is genuinely no supply pin on a ULN2003 — the part runs on whatever it
+is sinking from — so the Vcc terminal on the symbol is the ground pin under another name, and
+connecting it to a rail shorts the ground pin to that rail.
 
 **Optocoupler** — an infrared LED facing a phototransistor with no conductive path between them, so
 the output side can sit at a completely different potential. This is the honest answer to "how do I
@@ -869,6 +873,21 @@ The isolated side still needs its own ground reference. That is a property of is
 limitation of the simulator — two circuits with nothing at all between them have no solution. A
 real device leaks through some hundreds of gigohms and that is what is modelled, which keeps the
 matrix solvable without meaningfully coupling the halves.
+
+**File > Examples > Relay Driver** puts three of these in a row between a logic pin and a coil,
+because no one of them is enough on its own. A clock drives the optocoupler's LED through 330 Ω —
+milliamps, not the microamps people budget, because the transfer ratio is a current ratio and a
+tenth of a milliamp in gives a tenth of nothing out. The phototransistor is wired as an emitter
+follower so the output goes high when the LED lights rather than the other way round. That feeds a
+ULN2003 channel, which sinks the coil. And the relay drives both lamps: one off its normally-open
+contact and one off its normally-closed, so the changeover is on the screen rather than inferred.
+
+Two details in it are the ones that bite. **COM goes to the coil's supply** — that is the ULN2003's
+freewheeling diode path, and with it the output stops a diode drop above 12 V when the channel lets
+go. Disconnect it and watch what the same turn-off does instead. And the ULN2003 has **no supply
+pin at all**: it is powered by whatever it is sinking from, so the Vcc terminal on the symbol is
+its ground pin under another name. Wire that to a rail and you have shorted the ground pin to the
+rail, which the solver will tell you about in the bluntest possible terms.
 
 ---
 
@@ -1146,6 +1165,19 @@ nothing happens at all. That is why a sagging USB supply quietly stops charging.
 `CHRG` and `STDBY` are the two open-drain status pins the indicator LEDs hang off: one low while
 charging, the other low when it has finished.
 
+**File > Examples > Lithium Charge Cycle** plays the whole thing through in about a second, with
+both status LEDs on it. The cell is a **capacitor**, deliberately: a real 18650 moves so little
+across a charge that neither phase would be visible in any window worth watching. There is a
+one-ohm resistor in series with it standing in for the cell's internal resistance, and that resistor
+is what makes the second phase exist at all — with an ideal capacitor straight onto the pin there
+is nothing to taper, because a capacitor at the float voltage stops taking current the instant it
+arrives.
+
+What you should see, in order: a straight ramp at the set current, a corner at 4.2 V, an exponential
+tail as the current falls away, and `CHRG` going out when the current drops below a tenth of what it
+started at. Raise `Charge Current` and the ramp gets steeper and the part gets hotter, which the
+dissipation figure will tell you about before the corner arrives.
+
 ---
 
 ## Batteries and panels
@@ -1176,6 +1208,16 @@ and it collapses, because there is no more current to be had at any voltage. A p
 battery with a smaller capacity: there is a maximum power point part way down that knee, and
 loading it either side of that gives you less. Double-click it to shade it.
 
+**File > Examples > Solar Panel** is the only circuit in the set where the thing under test is the
+**load**. A six-cell panel, a 100 Ω potentiometer as a rheostat across it, and a one-ohm shunt at
+the bottom so the second probe reads a volt per amp. Turn `RV1` and watch the two traces move in
+opposite directions: voltage up and current down, all the way from a short to an open circuit, and
+their product peaks in the middle. It lands about four fifths of the way to the open-circuit
+voltage, which is where it lands on a datasheet, and it is why a maximum power point tracker is a
+thing that has to exist — the right load is not a resistor value you can pick once.
+
+Shade the panel while it runs and the peak moves, which is the other half of the problem.
+
 ---
 
 ## Surge protection
@@ -1199,6 +1241,23 @@ It also **wears out**, which is the thing about MOVs nobody expects. Every surge
 it permanently. The absorbed energy is counted against the rating here, and a spent one says so —
 a real one at the end of its life conducts at normal working voltage and cooks.
 
+**File > Examples > Surge Protection** is the arrangement all three parts are actually used in,
+which is a staircase rather than a single clamp. A 24 V rail with a short, hard transient injected
+into it; a fuse; a varistor across the input; ten ohms in series; a TVS across the load. The two
+probes are either side of that resistor, and the point is that they show **different numbers**. The
+spike arrives at nearly two hundred volts. The MOV, being soft, brings it down to seventy or so —
+that is all a high-order power law will do for you. The ten ohms drops what is left across itself,
+and the TVS holds the load at its clamping voltage of about thirty-nine. Neither part could have
+done that alone: the MOV is not sharp enough and the TVS could not have absorbed the energy.
+
+The fuse in it looks like it is doing nothing, and that is correct — a fuse blows on the integral of
+current over time, and a transient lasting microseconds contributes almost none of it. What it is
+there for is the MOV **failing short**, which is how MOVs end their lives. Set the varistor voltage
+down to a volt while it runs, to stand in for a worn-out one, and the fuse opens about a second
+later. Note also that nothing downstream can blow it: the ten ohms limits any load fault to less
+than the rating, so the fuse is protecting against the part in front of it and not the circuit
+behind it.
+
 ---
 
 ## Rotary encoders
@@ -1215,6 +1274,15 @@ palette are what you reach for to fix it. Set **Bounce Duration** to zero if you
 signal a debounced circuit would see.
 
 Double-click it to turn one detent; set **Reverse** to turn it the other way.
+
+**File > Examples > Rotary Encoder** is the two contacts pulled up and probed, and the scope is
+tiled so A sits above B rather than on top of it. Drag the **Detent** control in the CONTROLS panel
+and one detent is played out: turning it up closes A first, turning it down closes B first, and
+that is the entire direction signal. Neither trace on its own says anything at all — cover either
+one and the other is the same waveform in both directions.
+
+Turning it from the panel and double-clicking it on the canvas are the same action, so the control
+is a shaft rather than a number.
 
 ---
 
@@ -1752,6 +1820,16 @@ pulls down to within twenty millivolts of the negative rail, so on a single supp
 low end of the range that the LM741 simply cannot reach. Most single-supply parts are lopsided
 this way, and which rail they are good at is worth checking before you pick one.
 
+**File > Examples > Rail to Rail** is the three of them side by side, which is much harder to argue
+with than a table. One 5 V supply, one slow ramp across the whole of it, and the same unity-gain
+follower built three times — so anywhere the three traces disagree is a rail somebody cannot
+reach. The LM741 sits in the middle of the screen and never leaves it. The LM358 goes all the way
+down and stops with the LM741 at the top. Only the MCP6002 follows the input from one end to the
+other.
+
+Swap any of the three to a different part from the inspector and the trace moves to that part's
+headroom, because that is all the figure is.
+
 ---
 
 ## Crystals
@@ -1919,6 +1997,27 @@ The gain on the real part is set by one external resistor, `G = 5 + 80kΩ/R_G`. 
 you set on the part, with that formula available both ways. The **REF** pin is not decoration: on a
 single supply the output cannot go below ground, so a difference that swings both ways needs the
 reference lifted off it — tie REF to ground and half the measurement is lost at the rail.
+
+**File > Examples > Load Cell** is the case it is made for. A 5 kg strain-gauge bridge on 5 V of
+excitation gives 2 mV per volt at full load — ten millivolts, sitting on a common mode of two and a
+half volts, which is to say a signal two hundred and fifty times smaller than the thing it is
+riding on. The **Load** control in the CONTROLS panel is the weight; the two probes are the bridge
+output and the amplified one. At half load the bridge moves five millivolts and the output moves
+half a volt, and the common mode does not appear in the answer anywhere.
+
+The REF pin in that example goes to a divider at half the supply rather than to ground, which is
+what lets the output sit in the middle and swing both ways. Move it to ground and the measurement
+still works — until the first time the load goes slightly negative, which is what happens the
+moment you tare it.
+
+**File > Examples > Audio Amplifier** is the other half of this section: an electret through a
+volume control into an LM386 into an eight-ohm speaker. Three things in it are worth a look. The
+**gain** is twenty as built, and setting `Voltage Gain` to 200 — the capacitor between pins 1 and 8
+on the real part — gives exactly ten times the output with nothing else changed. The **volume
+control** is not a decoration: an electret straight into a gain of two hundred is a square wave at
+the rails, which is the first thing anybody building this discovers. And the **output capacitor**
+is what keeps the amplifier's idle half-supply off the voice coil — delete it and the speaker's
+power reading tells you what four and a half volts of standing DC costs.
 
 ---
 

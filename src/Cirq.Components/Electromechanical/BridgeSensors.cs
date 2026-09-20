@@ -165,6 +165,7 @@ public partial class LoadCell : CircuitComponent, ICurrentReporting
 
     /// <summary>What is sitting on it, in kilograms.</summary>
     [ObservableProperty]
+    [Operable("Load", Minimum = 0, Maximum = 10, Unit = "kg")]
     public partial double LoadKilograms { get; set; }
 
     public override string ComponentType => "Load Cell";

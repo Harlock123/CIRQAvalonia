@@ -32,6 +32,7 @@ public partial class RotaryEncoder : CircuitComponent, IInteractiveComponent
 
     private double _turnStartedAt = double.NegativeInfinity;
     private int _turnDirection;
+    private int _lastDetent;
 
     private bool _contactA;
     private bool _contactB;
@@ -94,13 +95,12 @@ public partial class RotaryEncoder : CircuitComponent, IInteractiveComponent
     /// <summary>Whether contact B is closed at the last solved point.</summary>
     public bool IsBClosed => _contactB;
 
-    public void Interact()
-    {
-        _turnDirection = Reverse ? -1 : 1;
-        _turnStartedAt = double.NaN;         // picked up at the next time point
-        Detent += _turnDirection;
-        NotifyValueChanged();
-    }
+    /// <summary>
+    /// Turning it one detent. It goes through <see cref="Detent"/> rather than round it, so that
+    /// double-clicking the part on the canvas and dragging the control on the panel are the same
+    /// action and produce the same quadrature.
+    /// </summary>
+    public void Interact() => Detent += Reverse ? -1 : 1;
 
     public override void StampMatrix(MnaSystem system, SimulationState state)
     {
@@ -168,11 +168,28 @@ public partial class RotaryEncoder : CircuitComponent, IInteractiveComponent
     {
         _turnStartedAt = double.NegativeInfinity;
         _turnDirection = 0;
+        _lastDetent = Detent;
         _contactA = false;
         _contactB = false;
         IsTurning = false;
         Detent = 0;
     }
 
-    partial void OnDetentChanged(int value) => NotifyValueChanged();
+    /// <summary>
+    /// Moving the detent <i>is</i> the turn. Without this the control on the panel would change a
+    /// number and nothing else, because the contacts are driven by a turn in progress rather than
+    /// by where the shaft has come to rest — and at rest both contacts are open, so the outputs
+    /// would never move whatever the panel said.
+    /// </summary>
+    partial void OnDetentChanged(int value)
+    {
+        if (value != _lastDetent)
+        {
+            _turnDirection = value > _lastDetent ? 1 : -1;
+            _turnStartedAt = double.NaN;     // picked up at the next time point
+            _lastDetent = value;
+        }
+
+        NotifyValueChanged();
+    }
 }

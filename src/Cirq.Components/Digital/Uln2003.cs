@@ -1,4 +1,6 @@
+using Cirq.Components.Nonlinear;
 using Cirq.Core.Digital;
+using Cirq.Core.Simulation;
 using Cirq.Core.Topology;
 using CommunityToolkit.Mvvm.ComponentModel;
 
@@ -33,6 +35,9 @@ public sealed partial class Uln2003 : DigitalIc
 
     private readonly Terminal[] _inputs = new Terminal[Channels];
     private readonly Terminal[] _outputs = new Terminal[Channels];
+
+    private readonly double[] _previousClamp = new double[Channels];
+    private bool _limitedThisIteration;
 
     public Uln2003() : base(16)
     {
@@ -93,6 +98,59 @@ public sealed partial class Uln2003 : DigitalIc
 
     /// <summary>Whether a given channel is currently pulling its output down.</summary>
     public bool IsSinking(int channel) => GetOutputState(channel) == LogicState.Low;
+
+    // The freewheeling diodes make this nonlinear, which a logic part is not usually.
+    public override bool IsNonlinear => true;
+
+    /// <summary>
+    /// The seven freewheeling diodes, which are the entire reason the COM pin exists.
+    /// <para>
+    /// Every load this part is made for is inductive — relay coils, stepper windings, solenoids —
+    /// and the current in an inductor does not stop because a transistor did. Each output has a
+    /// diode to COM, so tying COM to the load's own supply gives that current somewhere to go: it
+    /// freewheels round through the diode and the supply and dies away in the winding's
+    /// resistance. Leave COM unconnected and there is no path, which is modelled here rather than
+    /// assumed away — the drain voltage climbs until something gives, and the part driving the
+    /// coil reports the kickback it just took.
+    /// </para>
+    /// </summary>
+    public override void StampMatrix(MnaSystem system, SimulationState state)
+    {
+        base.StampMatrix(system, state);
+
+        _limitedThisIteration = false;
+
+        var common = system.Node(Common);
+
+        for (var i = 0; i < Channels; i++)
+            StampClamp(system, state, system.Node(_outputs[i]), common, ref _previousClamp[i]);
+    }
+
+    private void StampClamp(
+        MnaSystem system, SimulationState state, int anode, int cathode, ref double previous)
+    {
+        const double saturation = 1e-12;
+
+        var vt = state.ThermalVoltage;
+        var raw = system.IterationVoltageAcross(anode, cathode);
+        var limited = Junction.Limit(raw, previous, vt, Junction.CriticalVoltage(saturation, vt));
+
+        if (Math.Abs(limited - raw) > 1e-12) _limitedThisIteration = true;
+        previous = limited;
+
+        var (current, conductance) = Junction.Evaluate(limited, saturation, vt);
+        system.StampNorton(anode, cathode, conductance, current - (conductance * limited));
+    }
+
+    public override bool HasConverged(MnaSystem system, SimulationState state) => !_limitedThisIteration;
+
+    public override void ResetState()
+    {
+        base.ResetState();
+
+        Array.Clear(_previousClamp);
+        _limitedThisIteration = false;
+    }
 
     protected override void EvaluatePoweredLogic(IDigitalContext context)
     {
