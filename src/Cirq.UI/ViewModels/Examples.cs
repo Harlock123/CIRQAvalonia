@@ -92,6 +92,10 @@ public static class Examples
             LoadCurrentSensing),
         new("Adjustable Supply", "Transformer, bridge, reservoir and a 7805 made adjustable — turn RV1 and watch it move",
             LoadAdjustableSupply),
+        new("RS-485 Link", "Two transceivers down fifty metres of cable — open SW1 and watch it ring",
+            LoadRs485Link),
+        new("Varactor Tuning", "An LC tank tuned by a voltage — move RV1 and sweep it in Frequency Response",
+            LoadVaractorTuning),
     ];
 
     public static void LoadRcLowPass(MainWindowViewModel vm)
@@ -2215,6 +2219,146 @@ public static class Examples
         // Mains is 50 Hz, so at the default 1/1000 speed a single cycle would take twenty seconds
         // of wall time.
         vm.Simulation.SpeedFactor = 1.0;
+    }
+
+    /// <summary>
+    /// Two transceivers at the ends of fifty metres of cable, with the far terminator on a switch.
+    /// <para>
+    /// Open SW1 and the line is unterminated: every edge arrives, bounces off the open end, comes
+    /// home and bounces again, so the receiver sees a staircase instead of a transition. Close it
+    /// and the 120 Ω absorbs the wave — which is what the terminator in every RS-485 installation
+    /// is for, and why it goes at the <i>ends</i> of the run rather than at each device.
+    /// </para>
+    /// </summary>
+    public static void LoadRs485Link(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "RS-485 over fifty metres";
+
+        var supply = Place(circuit, new DcVoltageSource(5.0), -680, 260);
+
+        // Fast enough that the cable's 250 ns of delay matters, which is the whole point.
+        var data = Place(circuit, new ClockSource(1e6) { Levels = LogicLevels.Cmos5V }, -680, -120);
+
+        var near = Place(circuit, new Rs485Transceiver(), -380, 0);
+
+        // Fifty metres of twisted pair: about 250 ns each way, and 100 Ω rather than a coax's 50.
+        var cable = Place(circuit, new TransmissionLine
+        {
+            CharacteristicImpedance = 100,
+            Length = 50,
+            VelocityFactor = 0.66,
+        }, -60, 0);
+
+        var far = Place(circuit, new Rs485Transceiver(), 280, 0);
+
+        var terminator = Place(circuit, new Resistor(120), 560, 60);
+        var switchIn = Place(circuit, new ToggleSwitch(closed: true), 560, -100);
+
+        var gnd = Place(circuit, new Ground(), -680, 400);
+        var gnd2 = Place(circuit, new Ground(), -380, 200);
+        var gnd3 = Place(circuit, new Ground(), 280, 200);
+
+        terminator.RotationDegrees = 90;
+        switchIn.RotationDegrees = 90;
+
+        circuit.Connect(supply.Negative, gnd.Pin);
+
+        foreach (var end in new[] { near, far })
+        {
+            circuit.Connect(end.Vcc, supply.Positive);
+            circuit.Connect(end.Gnd, end == near ? gnd2.Pin : gnd3.Pin);
+
+            // Receivers always listening: RE is active low.
+            circuit.Connect(end.ReceiverEnable, end == near ? gnd2.Pin : gnd3.Pin);
+        }
+
+        // The near end talks; the far end only listens.
+        circuit.Connect(near.DriverEnable, supply.Positive);
+        circuit.Connect(near.DriverIn, data.Out);
+        circuit.Connect(far.DriverEnable, gnd3.Pin);
+        circuit.Connect(far.DriverIn, gnd3.Pin);
+
+        // The pair, as two conductors of one cable rather than two wires.
+        circuit.Connect(near.A, cable.NearPlus);
+        circuit.Connect(near.B, cable.NearMinus);
+        circuit.Connect(cable.FarPlus, far.A);
+        circuit.Connect(cable.FarMinus, far.B);
+
+        // The terminator across the far end, on a switch so it can be taken away.
+        circuit.Connect(far.A, switchIn.A);
+        circuit.Connect(switchIn.B, terminator.A);
+        circuit.Connect(terminator.B, far.B);
+
+        vm.Scope.TimebasePerDivision = 200e-9;
+        vm.Scope.VoltsPerDivision = 2.0;
+        vm.Scope.Layout = ScopeLayout.Tiled;
+        vm.Scope.AddProbe(near.A, "Near A");
+        vm.Scope.AddProbe(far.A, "Far A");
+        vm.Scope.AddProbe(far.ReceiverOut, "Received");
+    }
+
+    /// <summary>
+    /// An LC tank whose capacitor is a voltage. Move RV1 in the CONTROLS panel and the resonance
+    /// moves with it — and opening <b>Simulate &gt; Frequency Response</b> shows the peak itself
+    /// rather than what the peak does to one particular signal.
+    /// </summary>
+    public static void LoadVaractorTuning(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "Varactor-tuned tank";
+
+        var supply = Place(circuit, new DcVoltageSource(20.0), -620, 240);
+
+        // Driven through a high resistance, so the source excites the tank without damping it.
+        var source = Place(circuit, new FunctionGenerator(Waveform.Sine, 10e6, 0.2)
+        {
+            OutputResistance = 10e3,
+        }, -620, -100);
+
+        var inductor = Place(circuit, new Inductor(10e-6) { SeriesResistance = 0.5 }, -260, 100);
+
+        // The blocking capacitor is the part that is easy to leave out: without it the inductor
+        // is a short at DC, the cathode is grounded, and no bias ever reaches the junction.
+        var block = Place(circuit, new Capacitor(10e-9), -60, -100);
+        var varactor = Place(circuit, new Varactor
+        {
+            ZeroBiasCapacitance = 100e-12,
+            JunctionPotential = 0.7,
+            GradingCoefficient = 1.0,
+        }, 160, -100);
+
+        var feed = Place(circuit, new Resistor(100e3), 160, 100);
+        var tune = Place(circuit, new Potentiometer(10e3, 0.5), 400, 240);
+
+        var gnd = Place(circuit, new Ground(), -620, 380);
+        var gnd2 = Place(circuit, new Ground(), -260, 260);
+        var gnd3 = Place(circuit, new Ground(), 320, -100);
+        var gnd4 = Place(circuit, new Ground(), 400, 380);
+
+        inductor.RotationDegrees = 90;
+        feed.RotationDegrees = 90;
+
+        circuit.Connect(supply.Negative, gnd.Pin);
+        circuit.Connect(source.Return, gnd.Pin);
+
+        // The tank: inductor to ground, and the varactor to ground through the blocking capacitor.
+        circuit.Connect(source.Output, inductor.A);
+        circuit.Connect(inductor.B, gnd2.Pin);
+        circuit.Connect(source.Output, block.A);
+        circuit.Connect(block.B, varactor.Cathode);
+        circuit.Connect(varactor.Anode, gnd3.Pin);
+
+        // The tuning voltage onto the cathode, through a resistance large enough not to load it.
+        circuit.Connect(tune.Wiper, feed.A);
+        circuit.Connect(feed.B, varactor.Cathode);
+        circuit.Connect(tune.A, gnd4.Pin);
+        circuit.Connect(tune.B, supply.Positive);
+
+        vm.Scope.TimebasePerDivision = 50e-9;
+        vm.Scope.VoltsPerDivision = 0.2;
+        vm.Scope.AddProbe(inductor.A, "Tank");
+        vm.Scope.AddProbe(varactor.Cathode, "Bias");
     }
 
     private static T Place<T>(Circuit circuit, T component, double x, double y) where T : CircuitComponent

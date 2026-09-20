@@ -68,14 +68,14 @@ at the window edge; click the rail to bring it back.
 
 Click a palette entry, then click the canvas. The part lands where you click, snapped to the grid.
 
-The palette holds **161 components in 16 categories**:
+The palette holds **164 components in 16 categories**:
 
 | Category | Count | Contents |
 | --- | --- | --- |
-| Passive | 10 | Resistor, capacitor, electrolytic capacitor, inductor, transformer, centre-tapped transformer, potentiometer, crystal, **ferrite bead** and **transmission line** — see [below](#transmission-lines-and-why-a-wire-stops-being-a-wire) |
+| Passive | 11 | Resistor, capacitor, electrolytic capacitor, inductor, transformer, centre-tapped transformer, potentiometer, crystal, ferrite bead, **common-mode choke** and transmission line — see [below](#common-mode-chokes) |
 | Switches | 4 | SPST, SPDT, push button, **8-way DIP switch** |
 | Sources | 7 | Ground, DC voltage, DC current, function generator, battery, solar cell, **noise source** — see [below](#noise-and-why-hysteresis-exists) |
-| Semiconductors | 11 | 1N4148, 1N4001, Schottky, zeners, bridge rectifier, SCR, triac, diac, **TVS and varistor** — see [below](#surge-protection) |
+| Semiconductors | 12 | 1N4148, 1N4001, Schottky, zeners, **varactor**, bridge rectifier, SCR, triac, diac, TVS and varistor — see [below](#tuning-with-a-voltage) |
 | Transistors | 10 | NPN and PNP bipolars, N- and P-channel MOSFETs, **three JFETs** — see [below](#jfets) |
 | LEDs & Displays | 9 | Six LED colours, seven-segment displays, **HD44780 character LCD** — see [below](#the-character-lcd) |
 | Power | 10 | Fixed and adjustable regulators, TL431 shunt reference, ICL7660 charge pump, MC34063 switching controller, **TP4056 lithium charger** — see [below](#charging-a-lithium-cell) |
@@ -83,7 +83,7 @@ The palette holds **161 components in 16 categories**:
 | Logic Gates | 7 | AND, OR, NAND, NOR, XOR, XNOR, NOT |
 | 74xx Series | 18 | Counters, decoders, flip-flops, shift registers (including the **74595**), multiplexers, Schmitt inverter |
 | 40xx Series | 15 | CMOS gates, counters, flip-flops, analog switches and a **4046 phase-locked loop** — see [below](#phase-locked-loops) |
-| Buses | 13 | I2C master, EEPROM, port expander, DS1307 clock, ADS1115 ADC, MCP4725 DAC and **INA219 current sensor**, SPI master, 1-Wire master and DS18B20 thermometer, serial terminal and device, level shifter — see [below](#i2c-and-spi) |
+| Buses | 14 | I2C master, EEPROM, port expander, DS1307 clock, ADS1115 ADC, MCP4725 DAC and INA219 current sensor, SPI master, 1-Wire master and DS18B20 thermometer, serial terminal and device, **RS-485 transceiver**, level shifter — see [below](#rs-485-signalling-by-difference) |
 | Digital I/O | 6 | Logic toggle, clock, indicators, rotary encoder, **oscillator module** |
 | Sensors & Actuators | 17 | DC motor, LDR, thermistors, buzzers, speaker, microphone, servo, stepper, thermocouple, load cell, HC-SR04 ranger, Hall switch, phototransistor, **reed switch** and **PIR motion sensor** — see [below](#sensors-and-actuators) |
 | Switching & Isolation | 8 | Relay, fuses, optocouplers, ULN2003, H-bridge, **MOSFET gate driver** — see [below](#driving-a-mosfet-gate) |
@@ -701,6 +701,68 @@ wire through it, which is what decides how much voltage it drops at an amp or tw
 hundred megahertz of rubbish and a chip's supply pin, with both sides probed. Turn the noise
 bandwidth down in the CONTROLS panel and watch the bead stop helping, because the noise has left
 the band it works in.
+
+---
+
+## Common-mode chokes
+
+The other way of dealing with noise on a cable, and it works on a completely different principle
+from the bead above. A bead selects by **frequency**. A common-mode choke selects by **which way
+the current is going**, and it is the only part in the palette that does.
+
+Both conductors of a pair go through it, and the winding sense is the trick. Current going out
+along one and back along the other — the **differential** current, which is your signal — makes two
+equal and opposite fluxes that cancel in the core. As far as that current is concerned the choke is
+not there: a microhenry of leakage and nothing else.
+
+Current going the *same* way along both — **common-mode** current, which is noise riding on the
+pair and returning through the ground, the chassis, or the air — makes fluxes that add. That
+current sees the full inductance of both windings, and it is stopped.
+
+So one can be fitted in series with a signal **without attenuating the signal at all**, which no
+ordinary inductor can manage. That is why one sits at the entry of every mains inlet and across
+every USB and Ethernet pair.
+
+Sweep one in **Frequency Response** and the two impedances are the whole component in one picture:
+at a megahertz a 1 mH choke is over ten kilohms to common-mode current and under ten ohms to the
+signal. Both numbers are at the *same* frequency, which is what makes it not a filter.
+
+The setting that matters is **Coupling**. It is never quite one, and what is left over is the
+leakage inductance — which is the part the signal does see, and therefore what decides how fast a
+pair can still run through one.
+
+---
+
+## Tuning with a voltage
+
+Reverse-bias any junction and its depletion layer widens. That layer is an insulator with
+conducting silicon either side of it, which is a capacitor, and a wider one is a smaller capacitor.
+A **varactor** is a diode built to make that relationship large, repeatable and worth using:
+
+> C = C₀ / (1 + V/V<sub>j</sub>)<sup>m</sup>
+
+Put one across an LC tank, take the knob off the variable capacitor and replace it with a
+potentiometer feeding a few volts of bias, and the resonance moves. That is a car radio, and it is
+why the tuning control can be on the front panel while the tuned circuit is up at the aerial.
+
+**File > Examples > Varactor Tuning** is that circuit. Move **RV1** in the CONTROLS panel, then
+open **Simulate > Frequency Response** and sweep it — the peak itself moves, which is a clearer
+picture than watching what the peak does to one particular signal.
+
+Two things decide whether one is any use:
+
+- **How far it swings.** The grading coefficient `m` is about 0.5 for an ordinary junction, which
+  gives roughly two to one over a usable bias. The hyperabrupt doping profiles made for tuning give
+  1 or more, and ten to one — which is why tuning varactors are a separate part rather than people
+  using any old diode.
+- **Staying reverse-biased.** Let the signal swing the junction into conduction and it stops being
+  a capacitor and starts being a diode. That is the usual reason a varactor-tuned oscillator
+  distorts or will not start, and the symbol marks it when it happens.
+
+One piece of wiring is easy to leave out and stops the whole thing working: the **blocking
+capacitor** between the tank and the varactor. Without it the tank inductor is a short at DC, the
+cathode is grounded through it, no bias ever reaches the junction, and the tuning control does
+nothing whatever.
 
 ---
 
@@ -1424,6 +1486,43 @@ Three things worth knowing:
 **File > Examples > Serial Link** has a terminal talking to a module every five milliseconds, both
 lines on the scope. Change one end's baud rate while it runs and watch the other end start
 reporting framing errors.
+
+---
+
+## RS-485: signalling by difference
+
+A UART's pins measure against **ground**, and over any distance that is the problem: the ground at
+the far end is not the ground at this end, and whatever the difference happens to be is added to
+every bit.
+
+RS-485 measures one wire against *the other*. Noise picked up along the way lands on both equally
+and subtracts out, and the two grounds can differ by volts without anybody noticing. Everything
+else about the standard follows from that one idea, including all three of the things that catch
+people.
+
+**An idle bus is not low — it is floating.** Nothing drives the pair between transmissions, so the
+difference across it is whatever noise is there, and a receiver faithfully reports the sign of it.
+That is a stream of invented characters arriving from a bus nobody is talking on, and it is the
+classic first fault. The cures are a pair of **bias resistors** holding the line a couple of
+hundred millivolts apart when nothing else is driving it, or a receiver with failsafe built in —
+which is the `HasFailSafe` setting here. Turn it off, release the driver, and the part says what is
+wrong rather than leaving you to find it.
+
+**It is half duplex, and the enable is yours to drive.** Two devices driving at once is a short
+between two stiff sources, not merely a collision. Releasing too early truncates the last
+character.
+
+**A long line is a transmission line.** **File > Examples > RS-485 Link** puts two transceivers at
+the ends of fifty metres of cable with the terminator on a switch. Open SW1 and every edge bounces
+off the open far end, comes home, and bounces again — the receiver sees a staircase instead of a
+transition. Close it and the 120 Ω absorbs the wave. That is why the terminators go at the **ends**
+of a run and not at each device.
+
+And one limit that is not the supply: the **common-mode range**, −7 V to +12 V in the standard. That
+window is the budget the whole idea is spent from — the two ends' grounds may differ by that much,
+plus whatever the cable picked up. Past it the receiver stops being a differential amplifier, and a
+perfectly good difference between the wires decides nothing at all. It is what a long run between
+two buildings fails like, and why isolated transceivers exist.
 
 ---
 

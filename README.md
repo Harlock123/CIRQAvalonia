@@ -32,7 +32,7 @@ Core ← Engine ← Components ← UI, which keeps the whole engine headless-tes
 
 ```bash
 dotnet run --project src/Cirq.UI     # the editor
-dotnet test                          # 1680 tests
+dotnet test                          # 1719 tests
 ```
 
 Targets .NET 10. The UI uses Avalonia 12 and ScottPlot 5.1; those two versions are pinned
@@ -201,6 +201,9 @@ Tests measure the solver against closed-form answers rather than recorded output
 | PLL | The VCO range falling out of R1 and C1, the loop pulling the oscillator onto signals across its range and following them as they move, reporting lock on pin 1, a phase-frequency detector capturing from anywhere in range where an exclusive-OR only captures what is already close, a signal outside the VCO's range never being caught, and inhibit stopping the oscillator |
 | Analog multiplier | The product over ten volts across the quadrants, the Z input summing, squaring when the inputs are tied, clipping at the rail and saying so, and an envelope that follows the modulation |
 | Current sensor | The current through the shunt and the voltage on the load, the power as their product, a rail above the common-mode range being flagged rather than reported, a larger shunt reading better and wasting more, the registers in the datasheet's own units, over-range stopping rather than wrapping, and the reading coming back over the bus |
+| RS-485 | A bit crossing as a difference rather than a voltage against ground, a common-mode offset on the pair changing nothing until it leaves the receiver's window, releasing the driver letting go of the bus entirely, an idle bus without biasing being flagged rather than trusted, failsafe and bias resistors each fixing it, and a terminator loading the driver far more than the receivers do |
+| Varactor | The capacitance following the junction law across the range, a hyperabrupt profile buying ten to one where an abrupt one gives two, a tuned tank whose resonance rises with the bias and lands where 1/(2π√LC) says with the capacitance that bias gives, and losing reverse bias being reported rather than quietly wrong |
+| Common-mode choke | Two modes seeing completely different inductances, the leakage being whatever the coupling missed, kilohms to common-mode current and a fraction of an ohm to the signal at the same frequency, the signal passing while the noise does not, and being wire either way at DC |
 | Transmission line | A matched source seeing half its voltage until the far end answers, an open end doubling the wave and a short inverting it, a matched load absorbing it completely, a stiff driver into an unterminated line giving a staircase, and a series resistor at the source stopping the ringing — every figure from the textbook reflection coefficient rather than from a previous run |
 | 1-Wire | A presence pulse answering a reset, a temperature arriving over a single wire as pulse widths, 85 °C coming back when the conversion was skipped or cut short, a function command without a ROM command being ignored, resolution trading precision for conversion time, the Dallas CRC against a known scratchpad, parasitic power browning out on an ordinary pull-up and working on a strong one, and a hundred metres of cable returning rubbish where two metres does not |
 | I2C DAC | Code over full scale times the supply, full scale following the supply because there is no reference, a load pulling the output down and an op-amp follower restoring it, both write forms and their different bit alignments, only the EEPROM write surviving a power cycle, and the ADC beside it reading back what the DAC put out |
@@ -245,7 +248,7 @@ Tests measure the solver against closed-form answers rather than recorded output
 | Files | Every component type round-trips with its parameters, pins, wires, waypoints and probes; a reloaded circuit solves to the same answer; damaged, unknown and newer-format files are handled without losing the open circuit |
 | Settings | Theme round-trips across a restart, corrupt and newer-format preference files fall back to defaults, opening the dialog writes nothing, choosing a theme saves immediately |
 | UI | Background transport, probe decimation, reflection-built inspector, dirty tracking, every example compiles, runs, saves and reopens |
-| Shipped examples | Each one run for real and asserted against the thing it exists to show — an adjustable 7805 supply tracking its potentiometer across five settings and rejecting the ripple on the rail below it, the PLL locking onto its signal, the modulated carrier having an envelope, the current sensor following a load switched in while it runs, the reflections example doubling at the far end and going quiet when the terminator is switched in, the bead cutting the noise on the rail, the driven gate reaching twelve volts where the one off the logic pin cannot, the DS18B20 returning the temperature it was set to with a valid CRC, the DAC coming back round through the ADC, one magnet counted several times, and the PIR holding its lamp on after the movement stops |
+| Shipped examples | Each one run for real and asserted against the thing it exists to show — an RS-485 link carrying data down fifty metres and ringing once its terminator is switched out, a varactor-tuned tank whose resonance follows its knob, an adjustable 7805 supply tracking its potentiometer across five settings and rejecting the ripple on the rail below it, the PLL locking onto its signal, the modulated carrier having an envelope, the current sensor following a load switched in while it runs, the reflections example doubling at the far end and going quiet when the terminator is switched in, the bead cutting the noise on the rail, the driven gate reaching twelve volts where the one off the logic pin cannot, the DS18B20 returning the temperature it was set to with a valid CRC, the DAC coming back round through the ADC, one magnet counted several times, and the PIR holding its lamp on after the movement stops |
 
 ## Development boards
 
@@ -342,7 +345,7 @@ toolbar used to show: active tool, simulation speed, elapsed time and solver rat
 `Help > Keyboard Shortcuts` lists everything below, and the
 [User Guide](docs/USER_GUIDE.md) walks through building a circuit from an empty canvas.
 
-The palette holds 161 components in 16 collapsible categories:
+The palette holds 164 components in 16 collapsible categories:
 
 ![The component palette showing all sixteen categories with their counts — passive, switches, sources, semiconductors, transistors, LEDs and displays, power, analog ICs, logic gates, 74xx series, 40xx series, buses, digital I/O, sensors and actuators, switching and isolation, and dev boards — with the Passive group open](docs/images/02-palette.png)
 

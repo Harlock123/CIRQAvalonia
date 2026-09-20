@@ -41,6 +41,9 @@ public static class SymbolRenderer
             case GateDriver driver: DrawGateDriver(context, pen, zoom, driver); break;
             case AnalogMultiplier multiplier: DrawMultiplier(context, pen, zoom, multiplier); break;
             case FerriteBead: DrawFerriteBead(context, pen); break;
+            case Varactor varactor: DrawVaractor(context, pen, zoom, varactor); break;
+            case CommonModeChoke choke: DrawCommonModeChoke(context, pen, zoom, choke); break;
+            case Rs485Transceiver transceiver: DrawRs485(context, pen, zoom, transceiver); break;
             case TransmissionLine line: DrawTransmissionLine(context, pen, zoom, line); break;
             case Ds18b20 sensor: DrawPackage(context, pen, zoom, sensor, "DS18B20"); break;
             case OneWireMaster master: DrawPackage(context, pen, zoom, master, master.ComponentType); break;
@@ -1647,6 +1650,94 @@ public static class SymbolRenderer
     }
 
     /// <summary>
+    /// A varactor: the diode symbol with a capacitor's plates against its cathode, which is the
+    /// standard way of saying "this one is being used for its junction capacitance".
+    /// </summary>
+    private static void DrawVaractor(ISymbolCanvas context, IPen pen, double zoom, Varactor varactor)
+    {
+        context.DrawLine(pen, new Point(-30, 0), new Point(-8, 0));
+        context.DrawLine(pen, new Point(14, 0), new Point(30, 0));
+
+        var triangle = SymbolPath.Polyline([new Point(-8, -11), new Point(8, 0), new Point(-8, 11)], true);
+        context.DrawGeometry(pen.Brush, pen, triangle);
+
+        // Two bars rather than the diode's one: the cathode, and the capacitor plate facing it.
+        context.DrawLine(pen, new Point(8, -11), new Point(8, 11));
+        context.DrawLine(pen, new Point(14, -11), new Point(14, 11));
+
+        // Lit when the junction has come out of reverse bias and stopped being a capacitor.
+        if (zoom > 0.4 && varactor.HasLostReverseBias)
+            context.DrawEllipse(CanvasTheme.ErrorBrush, null, new Point(0, -20), 3.5, 3.5);
+    }
+
+    /// <summary>
+    /// A common-mode choke: two windings facing a shared core, drawn with both entered from the
+    /// same side, because the winding sense is the entire component.
+    /// </summary>
+    private static void DrawCommonModeChoke(
+        ISymbolCanvas context, IPen pen, double zoom, CommonModeChoke choke)
+    {
+        foreach (var (y, terminals) in new[] { (-20.0, (choke.A1, choke.B1)), (20.0, (choke.A2, choke.B2)) })
+        {
+            context.DrawLine(pen, new Point(-40, y), new Point(-16, y));
+            context.DrawLine(pen, new Point(16, y), new Point(40, y));
+
+            var winding = new SymbolPath();
+            using (var ctx = winding.Open())
+            {
+                ctx.BeginFigure(new Point(-16, y), false);
+
+                for (var i = 0; i < 4; i++)
+                {
+                    ctx.ArcTo(
+                        new Point(-16 + ((i + 1) * 8), y), new Size(4, 4), 0, false,
+                        y < 0 ? SweepDirection.Clockwise : SweepDirection.CounterClockwise);
+                }
+
+                ctx.EndFigure(false);
+            }
+
+            context.DrawGeometry(null, pen, winding);
+        }
+
+        // The core between them, and the dots that say the windings are in phase — which is what
+        // makes this a common-mode choke rather than a transformer.
+        context.DrawLine(pen, new Point(-16, -6), new Point(16, -6));
+        context.DrawLine(pen, new Point(-16, 6), new Point(16, 6));
+
+        context.DrawEllipse(pen.Brush, null, new Point(-19, -12), 2.2, 2.2);
+        context.DrawEllipse(pen.Brush, null, new Point(-19, 12), 2.2, 2.2);
+    }
+
+    /// <summary>
+    /// An RS-485 transceiver: a driver triangle pointing at the bus and a receiver triangle
+    /// pointing back off it, which is what the part is.
+    /// </summary>
+    private static void DrawRs485(
+        ISymbolCanvas context, IPen pen, double zoom, Rs485Transceiver transceiver)
+    {
+        var body = DrawPackage(context, pen, zoom, transceiver, string.Empty);
+
+        if (zoom <= 0.45) return;
+
+        // The receiver, pointing away from the bus.
+        var receiver = SymbolPath.Polyline(
+            [new Point(6, -34), new Point(6, -14), new Point(-14, -24)], true);
+
+        // And the driver, pointing at it.
+        var driver = SymbolPath.Polyline(
+            [new Point(-14, 14), new Point(-14, 34), new Point(6, 24)], true);
+
+        context.DrawGeometry(CanvasTheme.SymbolFill, pen, receiver);
+        context.DrawGeometry(CanvasTheme.SymbolFill, pen, driver);
+
+        DrawCenteredText(context, "485", new Point(0, 0), 9, zoom, CanvasTheme.LabelBrush);
+
+        if (transceiver.Violations.Count > 0)
+            context.DrawEllipse(CanvasTheme.ErrorBrush, null, new Point(body.Right - 10, body.Top + 10), 4, 4);
+    }
+
+    /// <summary>
     /// A transmission line, drawn as the coax it usually is: an inner conductor running the length
     /// of it inside a screen, rather than as the plain box other tools use. The point of the
     /// component is that the two ends are not the same place, and a symbol you can see a length in
@@ -2125,6 +2216,8 @@ public static class SymbolRenderer
         ReedSwitch => 34.0,
         Ds18b20 or OneWireMaster => 56.0,
         AnalogMultiplier => 52.0,
+        CommonModeChoke => 52.0,
+        Rs485Transceiver => 78.0,
 
         // The leads reach 30, so the default offset puts the caption on top of one.
         Phototransistor => 44.0,

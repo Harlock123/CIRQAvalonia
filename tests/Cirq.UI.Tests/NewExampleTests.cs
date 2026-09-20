@@ -5,6 +5,7 @@ using Cirq.Components.Digital;
 using Cirq.Components.Electromechanical;
 using Cirq.Components.Nonlinear;
 using Cirq.Components.Passive;
+using Cirq.Engine.Simulation;
 using Cirq.UI.ViewModels;
 
 namespace Cirq.UI.Tests;
@@ -413,5 +414,89 @@ public class NewExampleTests
         // 18 V out, plus the 7805's two volts of dropout.
         Assert.True(lowest > 20.0, $"the trough falls to {lowest:0.0} V, which is into dropout");
         Assert.False(regulator.IsInDropout);
+    }
+
+    /// <summary>
+    /// The link carries the bit down fifty metres of cable, and the terminator is what makes the
+    /// far end's copy of the edge a clean one rather than a staircase.
+    /// </summary>
+    [Fact]
+    public void TheRs485LinkCarriesItsDataAndTheTerminatorMatters()
+    {
+        using var vm = Load("RS-485 Link");
+
+        var ends = vm.Circuit.Components.OfType<Rs485Transceiver>().OrderBy(t => t.X).ToList();
+        var near = ends[0];
+        var far = ends[1];
+        var terminator = vm.Circuit.Components.OfType<ToggleSwitch>().Single();
+
+        var sim = vm.Simulation.Simulator!;
+        sim.Run(2e-6);
+
+        Assert.True(near.IsDriving);
+        Assert.False(far.IsDriving);
+
+        // With the terminator in, the far end settles at the differential voltage that was sent.
+        var settled = Overshoot(sim, far, 2e-6);
+        Assert.True(settled < 1.4,
+            $"a terminated line should not overshoot much, and this reached {settled:0.00}x");
+
+        terminator.IsClosed = false;
+        Assert.True(vm.Simulation.Rebuild(), vm.Simulation.Status);
+        vm.Simulation.Simulator!.Run(2e-6);
+
+        var ringing = Overshoot(vm.Simulation.Simulator!, far, 2e-6);
+
+        Assert.True(ringing > settled + 0.3,
+            $"taking the terminator out should ring: {ringing:0.00}x against {settled:0.00}x");
+    }
+
+    /// <summary>The largest the far end's difference gets, against what was actually driven.</summary>
+    private static double Overshoot(CircuitSimulator sim, Rs485Transceiver far, double duration)
+    {
+        var until = sim.Time + duration;
+        var highest = 0.0;
+
+        while (sim.Time < until)
+        {
+            sim.Step();
+            highest = Math.Max(highest, Math.Abs(far.Difference));
+        }
+
+        return highest / far.DifferentialDrive;
+    }
+
+    /// <summary>
+    /// Turning the tuning control moves the resonance, which is the whole example — and it is
+    /// measured with a frequency sweep, because that is the instrument the question belongs to.
+    /// </summary>
+    [Fact]
+    public void TheVaractorExampleTunesItsTank()
+    {
+        static double ResonanceAt(double position)
+        {
+            using var vm = Load("Varactor Tuning");
+
+            vm.Circuit.Components.OfType<Potentiometer>().Single().Position = position;
+            Assert.True(vm.Simulation.Rebuild(), vm.Simulation.Status);
+
+            var simulator = vm.Simulation.Simulator!;
+            simulator.ResolveProbes();
+
+            var sweep = new AcSweep(simulator).Run(new AcSweepRequest(1e6, 3e8, 300));
+            var trace = sweep.Traces[0];
+
+            var peak = 0;
+            for (var i = 1; i < sweep.Frequencies.Count; i++)
+                if (trace.Decibels(i) > trace.Decibels(peak)) peak = i;
+
+            return sweep.Frequencies[peak];
+        }
+
+        var low = ResonanceAt(0.1);
+        var high = ResonanceAt(1.0);
+
+        Assert.True(high > low * 1.5,
+            $"the knob should move the tuning, not from {low / 1e6:0.0} MHz to {high / 1e6:0.0} MHz");
     }
 }
