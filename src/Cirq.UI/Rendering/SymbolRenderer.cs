@@ -34,6 +34,8 @@ public static class SymbolRenderer
             case Crystal: DrawCrystal(context, pen); break;
             case CharacterLcd lcd: DrawCharacterLcd(context, pen, zoom, lcd); break;
             case I2cDevice bus: DrawPackage(context, pen, zoom, bus, bus.ComponentType); break;
+            case UartPort uart: DrawPackage(context, pen, zoom, uart, uart.ComponentType); break;
+            case LevelShifter shifter: DrawLevelShifter(context, pen, zoom, shifter); break;
             case SpiMaster spi: DrawPackage(context, pen, zoom, spi, spi.ComponentType); break;
             case DipSwitch dip: DrawDipSwitch(context, pen, zoom, dip); break;
             case SolarCell pv: DrawSolarCell(context, pen, zoom, pv); break;
@@ -803,7 +805,7 @@ public static class SymbolRenderer
     /// The generic box is a fixed size, so a part with twelve pins spread over 140 units came out
     /// as a starburst with the leads radiating from a stamp in the middle.
     /// </summary>
-    private static void DrawPackage(
+    private static Rect DrawPackage(
         ISymbolCanvas context, IPen pen, double zoom, CircuitComponent component, string label)
     {
         // Wide enough that the pin names sit near the edges without running into the part
@@ -835,6 +837,26 @@ public static class SymbolRenderer
 
         if (zoom > 0.4)
             DrawCenteredText(context, label, new Point(0, 0), 9, zoom, CanvasTheme.LabelBrush);
+
+        return body;
+    }
+
+    /// <summary>
+    /// The level shifter: a package with a dashed line down the middle, because the whole point of
+    /// the part is that the two sides are different voltage domains.
+    /// </summary>
+    private static void DrawLevelShifter(
+        ISymbolCanvas context, IPen pen, double zoom, LevelShifter shifter)
+    {
+        var body = DrawPackage(context, pen, zoom, shifter, "LEVEL");
+
+        // Broken either side of the caption rather than drawn through it.
+        var divider = CanvasTheme.Pen(CanvasTheme.LabelBrush, 1.0, zoom, new DashStyle([3, 3], 0));
+        context.DrawLine(divider, new Point(0, body.Top + 8), new Point(0, -16));
+        context.DrawLine(divider, new Point(0, 22), new Point(0, body.Bottom - 8));
+
+        if (zoom > 0.45)
+            DrawCenteredText(context, "SHIFT", new Point(0, 13), 8, zoom, CanvasTheme.LabelBrush);
     }
 
     private static void DrawCharacterLcd(
@@ -1709,7 +1731,10 @@ public static class SymbolRenderer
 
         // These are drawn as packages sized to their own pins, so the caption has to clear them.
         Pcf8574 => 98.0,
-        I2cDevice or SpiMaster => 56.0,
+        I2cDevice or SpiMaster or UartPort => 56.0,
+
+        // Eleven pins reaching 52 either side of centre.
+        LevelShifter => 84.0,
         OscillatorModule => 44.0,
         Ne555 => DipPackage.BodyHeight(8) / 2 + 16,
         DigitalIc ic => DipPackage.BodyHeight(ic.PinCount) / 2 + 16,

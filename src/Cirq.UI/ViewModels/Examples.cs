@@ -62,6 +62,8 @@ public static class Examples
             LoadI2cClock),
         new("Ultrasonic Ranger", "An HC-SR04 triggered on a timer — the distance is the echo's width",
             LoadUltrasonicRanger),
+        new("Serial Link", "A UART talking to a module — change one baud rate and watch it break",
+            LoadSerialLink),
     ];
 
     public static void LoadRcLowPass(MainWindowViewModel vm)
@@ -1311,6 +1313,54 @@ public static class Examples
 
         // The interesting part is milliseconds wide, so the default thousandth of real time leaves
         // you waiting a quarter of a minute between pings.
+        vm.Simulation.SpeedFactor = 0.01;
+    }
+
+    public static void LoadSerialLink(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "Serial link";
+
+        var rail = Place(circuit, new DcVoltageSource(3.3), -420, 140);
+
+        var terminal = Place(circuit, new SerialTerminal
+        {
+            BaudRate = 9600,
+            Message = "hi\r\n",
+            StartDelay = 500e-6,
+
+            // Every five milliseconds, so there is always traffic on the scope rather than one
+            // burst that has scrolled away by the time you look.
+            RepeatInterval = 5e-3,
+        }, -180, 0);
+
+        var device = Place(circuit, new SerialDevice
+        {
+            BaudRate = 9600,
+            Greeting = "READY\r\n",
+        }, 220, 0);
+
+        var gnd = Place(circuit, new Ground(), -420, 300);
+        var gnd2 = Place(circuit, new Ground(), 220, 200);
+
+        circuit.Connect(rail.Negative, gnd.Pin);
+        circuit.Connect(terminal.Vcc, rail.Positive);
+        circuit.Connect(terminal.Gnd, gnd.Pin);
+        circuit.Connect(device.Vcc, rail.Positive);
+        circuit.Connect(device.Gnd, gnd2.Pin);
+
+        // Crossed over: each end's transmit goes to the other end's receive. Joining TX to TX is
+        // the mistake everybody makes once, and it is completely silent.
+        circuit.Connect(terminal.Transmit, device.Receive);
+        circuit.Connect(device.Transmit, terminal.Receive);
+
+        vm.Scope.TimebasePerDivision = 200e-6;
+        vm.Scope.VoltsPerDivision = 1.0;
+        vm.Scope.Layout = ScopeLayout.Tiled;
+        vm.Scope.AddProbe(terminal.Transmit, "Terminal TX");
+        vm.Scope.AddProbe(device.Transmit, "Device TX");
+
+        // A bit is a hundred microseconds at this rate, so real time would be a blur.
         vm.Simulation.SpeedFactor = 0.01;
     }
 

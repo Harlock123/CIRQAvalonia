@@ -67,7 +67,7 @@ at the window edge; click the rail to bring it back.
 
 Click a palette entry, then click the canvas. The part lands where you click, snapped to the grid.
 
-The palette holds **140 components in 16 categories**:
+The palette holds **143 components in 16 categories**:
 
 | Category | Count | Contents |
 | --- | --- | --- |
@@ -82,7 +82,7 @@ The palette holds **140 components in 16 categories**:
 | Logic Gates | 7 | AND, OR, NAND, NOR, XOR, XNOR, NOT |
 | 74xx Series | 18 | Counters, decoders, flip-flops, shift registers (including the **74595**), multiplexers, Schmitt inverter |
 | 40xx Series | 14 | CMOS gates, counters, flip-flops, analog switches — see [below](#the-40xx-series) |
-| Buses | 5 | I2C master, EEPROM, port expander and **DS1307 clock**, SPI master — see [below](#i2c-and-spi) |
+| Buses | 8 | I2C master, EEPROM, port expander and DS1307 clock, SPI master, **serial terminal and device**, **level shifter** — see [below](#i2c-and-spi) |
 | Digital I/O | 6 | Logic toggle, clock, indicators, rotary encoder, **oscillator module** |
 | Sensors & Actuators | 13 | DC motor, LDR, thermistors, buzzers, speaker, microphone, servo, stepper, thermocouple, load cell, **HC-SR04 ranger** — see [below](#sensors-and-actuators) |
 | Switching & Isolation | 6 | Relay, fuses, optocouplers, **ULN2003** — see [below](#switching-and-isolation) |
@@ -768,6 +768,79 @@ bit first with data set while the clock is low — mode zero, which is what near
 
 **File > Examples > I2C EEPROM**, **I2C Clock** and **SPI Shift Register** are all wired up, with
 the bus lines on the scope.
+
+---
+
+## UART, the bus with no clock
+
+The third serial bus, and the one on the other end of every USB cable you have ever plugged into a
+dev board. It is two wires — one each way — and, unlike I²C and SPI, **no clock line at all**.
+
+Everything awkward about it follows from that. A receiver has no way of being told when a bit
+begins, so it is built to assume. It waits for the line to fall out of idle, starts its **own**
+clock, and samples in the middle of where it believes each bit to be. The two ends never agree on
+timing; they agree in advance on a *number*, and then each counts for itself.
+
+So set the two ends to different rates and the link does not fall silent — it produces **definite
+wrong characters**. Sending `Hello` at 9600 into a receiver counting at 19200 gives seven bytes
+where five were sent, because every transmitted bit is read as two. Counting at 4800 instead gives
+two, because pairs of bits are merged. Both are repeatable: run it again and you get the same wrong
+bytes, because nothing about it is random.
+
+The only warning the hardware gives you is the **framing error** — the stop bit is high by
+definition, so finding it low means this end counted the frame out wrongly. The Serial Device
+reports those, and they are what a baud mismatch actually feels like on a bench.
+
+A couple of percent of error is fine, as it is on hardware: the receiver only has to stay inside
+the bit until the stop. Two percent works here; doubling does not.
+
+Two parts:
+
+- **Serial Terminal** — the end you type at. It sends `Message` once after `StartDelay`, or
+  repeatedly if you give it a `RepeatInterval`, and shows what comes back.
+- **Serial Device** — a module at the far end that greets you when it powers up and echoes what
+  you send, in capitals so you can tell the far end did it rather than the wire.
+
+Three things worth knowing:
+
+- **TX goes to the other end's RX**, both ways round. Joining TX to TX is the mistake everybody
+  makes once and it is completely silent — no data, no error, nothing.
+- **A receive line held at ground is a break**, not a byte. That is what an unconnected RX pin
+  looks like, and it gives exactly one framing error and then stops: the receiver needs the line
+  back up at idle before it can frame anything again, and a line held down never gets there.
+- **Parity has to match too.** Both ends have a `Parity` setting, and disagreeing about it is its
+  own kind of error, counted separately from framing.
+
+**File > Examples > Serial Link** has a terminal talking to a module every five milliseconds, both
+lines on the scope. Change one end's baud rate while it runs and watch the other end start
+reporting framing errors.
+
+---
+
+## Mixing 3.3 V and 5 V
+
+**Level Shifter** is the four-channel BSS138 board, and it does something that looks impossible:
+it passes signals **both ways** through a transistor that can only conduct one.
+
+One MOSFET per channel, gate tied to the low-voltage rail, source on the low side, drain on the
+high side, and a pull-up on each side. Pull the low side down and the gate-source voltage becomes
+the whole low rail, so the channel turns on and drags the high side down with it. Pull the *high*
+side down and the transistor is the wrong way round to help — but its **body diode** is not. The
+diode conducts, the low side falls, and once it has fallen the channel turns on properly and
+finishes the job. The body diode, a nuisance everywhere else, is the entire trick.
+
+It is modelled as those two things rather than as logic, so the cascade really happens: the diode
+has to pull the low side down before the channel can help.
+
+What follows from the circuit is the thing that catches people. This only shifts signals that are
+**pulled down and released**, never driven high. It is made for I²C, which works that way already.
+For a push-pull output — a UART's TX, say — it is the wrong part: the pull-ups are what make the
+high level, and something driving hard against them fights the shifter rather than passing through
+it.
+
+Both rails have to be present. The gates are tied to LV, so without that supply nothing conducts
+at all; without HV the high side has nothing to pull up to; and the two the wrong way round makes
+the body diodes conduct regardless of what anything drives. All three are reported.
 
 ---
 

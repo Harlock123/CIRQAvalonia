@@ -260,6 +260,12 @@ public static class ComponentCatalog
             new("I2C Clock", "DS1307 real-time clock — BCD registers that move on their own",
                 () => new Ds1307()),
             new("SPI Master", "Plays a written list of SPI transfers", () => new SpiMaster()),
+            new("Serial Terminal", "UART end you type at — set both ends to the same baud rate",
+                () => new SerialTerminal()),
+            new("Serial Device", "UART module that greets you and echoes back, at its own baud rate",
+                () => new SerialDevice()),
+            new("Level Shifter", "Bidirectional 3.3 V / 5 V, for open-drain signals",
+                () => new LevelShifter()),
         ]),
 
         new("Digital I/O",

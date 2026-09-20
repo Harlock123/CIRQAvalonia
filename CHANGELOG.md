@@ -8,6 +8,36 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**UART**, the third serial bus and the one every dev board actually has. Two wires, one each way,
+and — unlike I²C and SPI — no clock line at all.
+
+Everything awkward about it follows from that, so it is modelled rather than asserted: the
+receiver really does wait for the line to fall out of idle, start its **own** clock, and sample in
+the middle of where it believes each bit to be. Which means a baud rate that does not match does
+not produce silence, it produces **definite wrong characters** — `Hello` at 9600 into a receiver
+counting at 19200 comes out as seven bytes where five were sent, because every bit is read as two,
+and at 4800 as two bytes, because pairs are merged. Repeatable, not random. The **framing error**
+is the only warning the hardware gives and it is the only warning given here.
+
+A couple of percent of clock error is tolerated, as on a bench. TX wired to TX moves nothing and
+says nothing, which is exactly how that mistake behaves. A receive line held at ground is a break
+rather than a byte, and gives one framing error and then stops — a receiver needs the line back at
+idle before it can frame again. Parity is there too, and disagreeing about it is its own error.
+
+**Serial Terminal** is the end you type at, sending once or on a repeat; **Serial Device** is a
+module that greets you on power-up and echoes back in capitals.
+
+**Level shifter**, the four-channel BSS138 board, which passes signals both ways through a
+transistor that only conducts one. Pull the low side down and the channel turns on; pull the high
+side down and the **body diode** carries it — the diode drags the low side down far enough for the
+channel to turn on and finish the job. It is built from an actual diode and a gate-controlled
+channel rather than from logic, so that cascade really happens, and so the part cannot end up
+reading the pin it is driving. Which means it only shifts open-drain signals, never push-pull, and
+both rails have to be present and the right way round — all reported.
+
+**File > Examples > Serial Link** has the two ends talking every five milliseconds. Change one
+baud rate while it runs.
+
 ## [0.17.0] - 2026-09-19
 
 A small one: the application can now tell you what it is. The palette holds 140 components in

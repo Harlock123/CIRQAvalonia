@@ -32,7 +32,7 @@ Core ← Engine ← Components ← UI, which keeps the whole engine headless-tes
 
 ```bash
 dotnet run --project src/Cirq.UI     # the editor
-dotnet test                          # 1125 tests
+dotnet test                          # 1157 tests
 ```
 
 Targets .NET 10. The UI uses Avalonia 12 and ScottPlot 5.1; those two versions are pinned
@@ -192,6 +192,8 @@ Tests measure the solver against closed-form answers rather than recorded output
 | MOSFET | Square-law saturation current, triode switching, zero gate current, reverse conduction, body diode |
 | JFET | Full I_DSS at zero gate drive, square law across the range, pinch-off, vanishing gate current, P-channel mirroring |
 | Thyristors | SCR blocking and firing, staying on after the gate drive goes away, dropping out when the anode current is interrupted, reverse blocking; triac firing on both half cycles and turning itself off at every zero crossing; diac breakover in either polarity |
+| UART | A character crossing the wire and a whole string in order, the far end echoing back, a two-percent clock error tolerated and a doubled or halved one reading definite wrong bytes — more than were sent when counting fast, fewer when counting slow — with framing errors where the stop bit missed; the same wrong bytes every run; TX wired to TX moving nothing; a receive line held low being a break rather than a byte; parity agreed and disagreed |
+| Level shifter | Each side resting at its own rail, the low side pulled down taking the high side with it and the high side pulled down taking the low side back through the body diode, channels independent, and each missing or reversed rail reported |
 | I2C | A byte written over two wires and found in the device, multi-byte writes and read-back, an unanswered address going unacknowledged, two devices sharing one bus, a port expander's byte reaching eight pins, and a bus with no pull-ups doing nothing at all |
 | SPI | A byte clocked into a 74595 and onto its outputs, most significant bit first, the latch holding the outputs still while the bits walk through, and output enable releasing rather than driving |
 | Character LCD | Latching on E falling and not before, the command table, four-bit nibble pairing, an unpaired nibble doing nothing, and line two being an address rather than a continuation |
@@ -319,7 +321,7 @@ toolbar used to show: active tool, simulation speed, elapsed time and solver rat
 `Help > Keyboard Shortcuts` lists everything below, and the
 [User Guide](docs/USER_GUIDE.md) walks through building a circuit from an empty canvas.
 
-The palette holds 140 components in 16 collapsible categories:
+The palette holds 143 components in 16 collapsible categories:
 
 ![The component palette showing all sixteen categories with their counts — passive, switches, sources, semiconductors, transistors, LEDs and displays, power, analog ICs, logic gates, 74xx series, 40xx series, buses, digital I/O, sensors and actuators, switching and isolation, and dev boards — with the Passive group open](docs/images/02-palette.png)
 
