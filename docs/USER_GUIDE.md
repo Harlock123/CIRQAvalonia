@@ -502,7 +502,9 @@ What it has against it is everything mechanical. It is slow, hundreds of microse
 few. It wears out. And it **bounces**: the blades snap together, spring apart and snap back several
 times over the first half millisecond. Wire one to a pull-up, put the scope on it, and bring a
 magnet up — a single magnet passing produces a burst of edges. Feed that into a counter and you
-count five; feed it into an interrupt and you get five interrupts. That is what debouncing is for,
+count five; feed it into an interrupt and you get five interrupts. **File > Examples > Reed Switch
+Bounce** is exactly that, a reed switch clocking a 7490: bring the magnet up once from the CONTROLS
+panel and watch the count move several places. That is what debouncing is for,
 and it is the difference you can see between this part and the Hall switch beside it, which does
 not bounce at all. Opening does not bounce either, in the model as in life: there is nothing for
 the blades to rebound off.
@@ -527,7 +529,8 @@ will be wrong for the whole of the hold time.
 every fresh movement, so the output stays high while somebody keeps moving. Single-shot does not:
 the output drops at the end of the hold whatever is going on, then blanks for a moment before it
 can fire again — so the light goes out while you are still standing under it. Both settings are in
-the CONTROLS panel; turn `Movement` on and off and watch the difference.
+the CONTROLS panel; turn `Movement` on and off and watch the difference. **File > Examples > Motion
+Light** has one holding a lamp on, with a short warm-up so it does something in the first minute.
 
 And when power is first applied it needs a **warm-up** of some tens of seconds, during which a real
 one produces nonsense and this one simply refuses to trigger. That is enough to explain a sensor
@@ -582,6 +585,9 @@ that a resistor at the far end could not — because it absorbs the reflection c
 than preventing the one going out. It is why series termination is a single resistor next to the
 chip and costs nothing in DC current.
 
+**File > Examples > Reflections** is that circuit with the terminator on a switch, so you can close
+SW1 from the CONTROLS panel while it runs and watch the ringing disappear.
+
 The practical question is only ever whether the delay matters compared with your edges. Ten
 centimetres of track is 500 picoseconds. At 1 MHz that is nothing and the track is a wire. At 500
 MHz it is a quarter of a cycle and the track is a component.
@@ -632,6 +638,11 @@ Its settings are the two numbers a datasheet gives — the **peak impedance** an
 it happens at — plus a **sharpness** for how broad the peak is and the **DC resistance** of the
 wire through it, which is what decides how much voltage it drops at an amp or two.
 
+**File > Examples > Ferrite Bead** puts one where it belongs: between a rail carrying a couple of
+hundred megahertz of rubbish and a chip's supply pin, with both sides probed. Turn the noise
+bandwidth down in the CONTROLS panel and watch the bead stop helping, because the noise has left
+the band it works in.
+
 ---
 
 ## Driving a MOSFET gate
@@ -662,6 +673,10 @@ changes twice over:
 It sinks harder than it sources, as real drivers do, because getting a FET *off* in a hurry is what
 keeps a half-bridge from shooting through. And it has an **under-voltage lockout**: run it from too
 little supply and it says so rather than quietly half-driving the gate.
+
+**File > Examples > Gate Driver** is the comparison in one schematic: one clock, two identical
+MOSFETs, one gate straight off the logic pin and the other through a driver, with both gates on the
+scope.
 
 ---
 
@@ -1148,6 +1163,10 @@ w 60 40 80 00    ; command write to the register only
 w 60 60 80 00    ; command write to the register and the EEPROM
 ```
 
+**File > Examples > DAC and ADC** closes the loop: the DAC's code is a slider in the CONTROLS
+panel, a follower carries it into a load the DAC could not have driven, and the ADS1115 measures
+what actually came out. Move the slider and watch both numbers follow.
+
 ---
 
 ## UART, the bus with no clock
@@ -1250,6 +1269,10 @@ which needs a milliamp and a half — far more than a 4.7 kΩ pull-up can pass. 
 chip browns out part way through, and the scratchpad still holds 85, with nothing anywhere saying
 why. The model draws the current, so the sag is real: wire the sensor's VDD to ground and watch the
 reading refuse to change.
+
+**File > Examples > 1-Wire Thermometer** is the whole exchange, at nine-bit resolution so the
+conversion is ninety milliseconds rather than three quarters of a second and the run is watchable.
+Double-click the sensor while it runs to warm it, and read it again.
 
 And the reason the bus is fussier than the other two: **the timing is the data.** An I²C bus that
 is a little slow still works, because the clock comes with the data. Here, too weak a pull-up on

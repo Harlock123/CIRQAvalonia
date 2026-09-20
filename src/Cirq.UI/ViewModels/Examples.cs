@@ -70,6 +70,20 @@ public static class Examples
             LoadMotorReversing),
         new("Noise and Hysteresis", "A comparator chattering on a noisy ramp — add hysteresis and it stops",
             LoadNoiseAndHysteresis),
+        new("Reflections", "A fast edge down a metre of coax — close SW1 to terminate it and the ringing stops",
+            LoadReflections),
+        new("Ferrite Bead", "Two hundred megahertz of rubbish on a rail, and the bead that turns it into heat",
+            LoadFerriteBead),
+        new("Gate Driver", "The same clock into two MOSFETs, one straight from the pin and one through a driver",
+            LoadGateDriver),
+        new("1-Wire Thermometer", "A DS18B20 read over a single wire — reset, convert, wait, read",
+            LoadOneWireThermometer),
+        new("DAC and ADC", "A voltage made by one chip and measured by another — move the Code slider",
+            LoadDacAndAdc),
+        new("Reed Switch Bounce", "One magnet passing, counted several times — which is what debouncing is for",
+            LoadReedSwitchBounce),
+        new("Motion Light", "A PIR holding a lamp on long after you stop moving",
+            LoadMotionLight),
     ];
 
     public static void LoadRcLowPass(MainWindowViewModel vm)
@@ -1554,6 +1568,354 @@ public static class Examples
         vm.Scope.AddProbe(comparator.Output, "Output");
 
         vm.Simulation.SpeedFactor = 0.05;
+    }
+
+    /// <summary>
+    /// A metre of coax driven by a fast edge, with a terminator that can be switched in while it
+    /// runs. Open, the far end doubles the wave and the near end knows nothing about it for
+    /// another whole delay; terminated, the wave is absorbed and one clean edge arrives late.
+    /// </summary>
+    public static void LoadReflections(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "Reflections on a transmission line";
+
+        // Matched source: 50 Ω out, so whatever comes home is absorbed rather than sent out again.
+        var driver = Place(circuit, new FunctionGenerator(Waveform.Square, 20e6, 10.0)
+        {
+            DcOffset = 5.0, EdgeTime = 100e-12, OutputResistance = 50.0,
+        }, -420, 0);
+
+        var line = Place(circuit, new TransmissionLine
+        {
+            CharacteristicImpedance = 50, Length = 1.0, VelocityFactor = 0.66,
+        }, -80, 0);
+
+        var terminator = Place(circuit, new Resistor(50.0), 260, 100);
+        var switchIn = Place(circuit, new ToggleSwitch(), 260, -60);
+
+        // Something has to reference the far end while the terminator is switched out.
+        var leak = Place(circuit, new Resistor(1e6), 400, 100);
+
+        var gnd = Place(circuit, new Ground(), -420, 200);
+        var gnd2 = Place(circuit, new Ground(), -80, 200);
+        var gnd3 = Place(circuit, new Ground(), 260, 240);
+        var gnd4 = Place(circuit, new Ground(), 400, 240);
+
+        terminator.RotationDegrees = 90;
+        switchIn.RotationDegrees = 90;
+        leak.RotationDegrees = 90;
+
+        circuit.Connect(driver.Return, gnd.Pin);
+        circuit.Connect(driver.Output, line.NearPlus);
+        circuit.Connect(line.NearMinus, gnd2.Pin);
+        circuit.Connect(line.FarMinus, gnd2.Pin);
+
+        circuit.Connect(line.FarPlus, switchIn.A);
+        circuit.Connect(switchIn.B, terminator.A);
+        circuit.Connect(terminator.B, gnd3.Pin);
+
+        circuit.Connect(line.FarPlus, leak.A);
+        circuit.Connect(leak.B, gnd4.Pin);
+
+        // Five nanoseconds a division, because the whole story is over in twenty.
+        vm.Scope.TimebasePerDivision = 5e-9;
+        vm.Scope.VoltsPerDivision = 5.0;
+        vm.Scope.AddProbe(line.NearPlus, "Near");
+        vm.Scope.AddProbe(line.FarPlus, "Far");
+    }
+
+    /// <summary>
+    /// A bead where one actually belongs: between a rail carrying a couple of hundred megahertz of
+    /// rubbish and the supply pin of a chip, whose few tens of picofarads are the only capacitance
+    /// up there that matters. Both sides are probed, so the attenuation is the gap between the
+    /// traces — and turning the noise bandwidth down in the CONTROLS panel takes it away again,
+    /// because a bead only works inside its band.
+    /// </summary>
+    public static void LoadFerriteBead(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "Ferrite bead feeding a chip";
+
+        var rail = Place(circuit, new DcVoltageSource(5.0), -460, 60);
+
+        // The noise the rest of the board is putting back into the rail, up where a bead works.
+        var noise = Place(circuit, new NoiseSource
+        {
+            RmsVoltage = 0.2, Bandwidth = 200e6, SeriesResistance = 5.0,
+        }, -300, -120);
+
+        var bead = Place(circuit, new FerriteBead(600) { PeakFrequency = 100e6 }, -60, -120);
+
+        // The chip's own pin capacitance, which at these frequencies is the whole of the load's
+        // reactance. A hundred nanofarads down here would resonate with the bead at half a
+        // megahertz, where the bead is still an inductor and no help at all.
+        var decoupling = Place(circuit, new Capacitor(47e-12), 120, -20);
+        var load = Place(circuit, new Resistor(100.0), 300, -20);
+
+        var gnd = Place(circuit, new Ground(), -460, 200);
+        var gnd2 = Place(circuit, new Ground(), 120, 140);
+        var gnd3 = Place(circuit, new Ground(), 300, 140);
+
+        decoupling.RotationDegrees = 90;
+        load.RotationDegrees = 90;
+
+        circuit.Connect(rail.Negative, gnd.Pin);
+        circuit.Connect(rail.Positive, noise.A);
+        circuit.Connect(noise.B, bead.A);
+        circuit.Connect(bead.B, decoupling.A);
+        circuit.Connect(decoupling.B, gnd2.Pin);
+        circuit.Connect(bead.B, load.A);
+        circuit.Connect(load.B, gnd3.Pin);
+
+        vm.Scope.TimebasePerDivision = 20e-9;
+        vm.Scope.VoltsPerDivision = 0.2;
+        vm.Scope.AddProbe(bead.A, "Before");
+        vm.Scope.AddProbe(bead.B, "After");
+    }
+
+    /// <summary>
+    /// The same clock into two identical MOSFETs — one gate straight off the logic pin, the other
+    /// through a driver. Both gates are probed, and the difference is the point.
+    /// </summary>
+    public static void LoadGateDriver(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "Driving a MOSFET gate";
+
+        var rail = Place(circuit, new DcVoltageSource(12.0), -560, 380);
+        var logic = Place(circuit, new ClockSource(20e3) { Levels = LogicLevels.Cmos33V }, -560, -120);
+
+        var driver = Place(circuit, new GateDriver(), -220, -300);
+
+        // The two halves well apart, each with its own load above it and its own ground below,
+        // so that neither column has anything of the other's in it.
+        var drivenFet = Place(circuit, new Mosfet(MosfetModel.IrlZ44N), 200, -300);
+        var directFet = Place(circuit, new Mosfet(MosfetModel.IrlZ44N), 200, 220);
+
+        var drivenLoad = Place(circuit, new Resistor(24.0), 200, -480);
+        var directLoad = Place(circuit, new Resistor(24.0), 200, 40);
+
+        var gnd = Place(circuit, new Ground(), -560, 500);
+        var gnd2 = Place(circuit, new Ground(), -220, -100);
+        var gnd3 = Place(circuit, new Ground(), 360, -180);
+        var gnd4 = Place(circuit, new Ground(), 360, 340);
+
+        drivenLoad.RotationDegrees = 90;
+        directLoad.RotationDegrees = 90;
+
+        circuit.Connect(rail.Negative, gnd.Pin);
+
+        circuit.Connect(driver.Vcc, rail.Positive);
+        circuit.Connect(driver.Gnd, gnd2.Pin);
+        circuit.Connect(logic.Out, driver.Input);
+        circuit.Connect(driver.Output, drivenFet.Gate);
+
+        // And the same pin straight onto the other gate, which is how it is done the first time.
+        circuit.Connect(logic.Out, directFet.Gate);
+
+        circuit.Connect(rail.Positive, drivenLoad.A);
+        circuit.Connect(drivenLoad.B, drivenFet.Drain);
+        circuit.Connect(drivenFet.Source, gnd3.Pin);
+
+        circuit.Connect(rail.Positive, directLoad.A);
+        circuit.Connect(directLoad.B, directFet.Drain);
+        circuit.Connect(directFet.Source, gnd4.Pin);
+
+        vm.Scope.TimebasePerDivision = 2e-6;
+        vm.Scope.VoltsPerDivision = 5.0;
+        vm.Scope.AddProbe(drivenFet.Gate, "Driven");
+        vm.Scope.AddProbe(directFet.Gate, "Direct");
+    }
+
+    /// <summary>
+    /// The whole DS18B20 exchange on one wire: reset, skip addressing, convert, wait, read the
+    /// scratchpad. Nine bits rather than twelve, so the conversion is ninety milliseconds instead
+    /// of three quarters of a second and the run is watchable.
+    /// </summary>
+    public static void LoadOneWireThermometer(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "DS18B20 on one wire";
+
+        var rail = Place(circuit, new DcVoltageSource(5.0), -460, 120);
+
+        var master = Place(circuit, new OneWireMaster
+        {
+            // Set nine-bit resolution first, so the conversion is quick enough to watch.
+            Operations = "reset; w CC 4E 4B 46 1F; reset; w CC 44; d 95000; reset; w CC BE; r 9",
+            StartDelay = 1e-3,
+        }, -160, 0);
+
+        var pullUp = Place(circuit, new Resistor(4.7e3), 80, -200);
+        var sensor = Place(circuit, new Ds18b20 { Temperature = 22.0, AlternateTemperature = 36.0 }, 340, 0);
+
+        var gnd = Place(circuit, new Ground(), -460, 260);
+        var gnd2 = Place(circuit, new Ground(), -160, 200);
+        var gnd3 = Place(circuit, new Ground(), 340, 200);
+
+        pullUp.RotationDegrees = 90;
+
+        circuit.Connect(rail.Negative, gnd.Pin);
+        circuit.Connect(master.Vcc, rail.Positive);
+        circuit.Connect(master.Gnd, gnd2.Pin);
+
+        // Externally powered rather than parasitic, which is the arrangement that simply works.
+        circuit.Connect(sensor.Vdd, rail.Positive);
+        circuit.Connect(sensor.Gnd, gnd3.Pin);
+
+        circuit.Connect(pullUp.A, rail.Positive);
+        circuit.Connect(pullUp.B, master.Data);
+        circuit.Connect(master.Data, sensor.Data);
+
+        vm.Scope.TimebasePerDivision = 5e-3;
+        vm.Scope.VoltsPerDivision = 2.0;
+        vm.Scope.AddProbe(master.Data, "DQ");
+    }
+
+    /// <summary>
+    /// A number turned into a voltage and measured back again. The DAC's code is a live control,
+    /// so moving the slider moves the voltage and the ADC follows it.
+    /// </summary>
+    public static void LoadDacAndAdc(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "DAC out, ADC back";
+
+        var rail = Place(circuit, new DcVoltageSource(5.0), -520, 160);
+
+        var dac = Place(circuit, new Mcp4725 { Code = 2048 }, -220, 0);
+
+        // A follower, because the DAC cannot drive anything: take the load off it directly and the
+        // voltage sags away from the number you asked for.
+        var buffer = Place(circuit, new OperationalAmplifier(OpAmpModel.Mcp6002), 120, 60);
+        var load = Place(circuit, new Resistor(2.2e3), 300, 200);
+        var adc = Place(circuit, new Ads1115(), 480, -40);
+
+        var sdaPull = Place(circuit, new Resistor(4.7e3), -60, -300);
+        var sclPull = Place(circuit, new Resistor(4.7e3), 60, -300);
+
+        var gnd = Place(circuit, new Ground(), -520, 320);
+        var gnd2 = Place(circuit, new Ground(), -220, 200);
+        var gnd3 = Place(circuit, new Ground(), 300, 340);
+        var gnd4 = Place(circuit, new Ground(), 480, 260);
+
+        load.RotationDegrees = 90;
+        sdaPull.RotationDegrees = 90;
+        sclPull.RotationDegrees = 90;
+
+        circuit.Connect(rail.Negative, gnd.Pin);
+        circuit.Connect(dac.Vcc, rail.Positive);
+        circuit.Connect(dac.Gnd, gnd2.Pin);
+        circuit.Connect(adc.Vcc, rail.Positive);
+        circuit.Connect(adc.Gnd, gnd4.Pin);
+
+        circuit.Connect(buffer.PositiveSupply, rail.Positive);
+        circuit.Connect(buffer.NegativeSupply, gnd2.Pin);
+        circuit.Connect(dac.Output, buffer.NonInverting);
+        circuit.Connect(buffer.Output, buffer.Inverting);
+        circuit.Connect(buffer.Output, load.A);
+        circuit.Connect(load.B, gnd3.Pin);
+
+        // The ADC measures what the buffer actually delivered, not what the DAC intended.
+        circuit.Connect(buffer.Output, adc.Input(0));
+
+        circuit.Connect(sdaPull.A, rail.Positive);
+        circuit.Connect(sdaPull.B, dac.Sda);
+        circuit.Connect(sclPull.A, rail.Positive);
+        circuit.Connect(sclPull.B, dac.Scl);
+        circuit.Connect(dac.Sda, adc.Sda);
+        circuit.Connect(dac.Scl, adc.Scl);
+
+        vm.Scope.TimebasePerDivision = 20e-3;
+        vm.Scope.VoltsPerDivision = 1.0;
+        vm.Scope.AddProbe(dac.Output, "DAC");
+        vm.Scope.AddProbe(buffer.Output, "Buffered");
+    }
+
+    /// <summary>
+    /// A reed switch clocking a counter. Bring the magnet up once — the CONTROLS panel has the
+    /// field — and the counter moves several places, because the blades bounce on the way shut.
+    /// </summary>
+    public static void LoadReedSwitchBounce(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "Reed switch bounce";
+
+        var rail = Place(circuit, new DcVoltageSource(5.0), -460, 140);
+        var reed = Place(circuit, new ReedSwitch(), -200, -60);
+        var pullUp = Place(circuit, new Resistor(10e3), -200, -240);
+        var counter = Place(circuit, new Ic7490(), 180, 0);
+
+        var gnd = Place(circuit, new Ground(), -460, 300);
+        var gnd2 = Place(circuit, new Ground(), -200, 120);
+        var gnd3 = Place(circuit, new Ground(), 180, 260);
+
+        pullUp.RotationDegrees = 90;
+
+        circuit.Connect(rail.Negative, gnd.Pin);
+        circuit.Connect(pullUp.A, rail.Positive);
+        circuit.Connect(pullUp.B, reed.A);
+        circuit.Connect(reed.B, gnd2.Pin);
+
+        circuit.Connect(counter.Vcc, rail.Positive);
+        circuit.Connect(counter.Gnd, gnd3.Pin);
+        circuit.Connect(counter.ClockA, reed.A);
+
+        circuit.Connect(counter.Qa, counter.ClockB);
+
+        // Resets tied low so it just counts.
+        circuit.Connect(counter.Reset0A, gnd3.Pin);
+        circuit.Connect(counter.Reset0B, gnd3.Pin);
+        circuit.Connect(counter.Reset9A, gnd3.Pin);
+        circuit.Connect(counter.Reset9B, gnd3.Pin);
+
+        vm.Scope.TimebasePerDivision = 200e-6;
+        vm.Scope.VoltsPerDivision = 2.0;
+        vm.Scope.Layout = ScopeLayout.Tiled;
+        vm.Scope.AddProbe(reed.A, "Contact");
+        vm.Scope.AddProbe(counter.Qa, "QA");
+        vm.Scope.AddProbe(counter.Qb, "QB");
+    }
+
+    /// <summary>
+    /// A PIR holding a lamp on. Turn Movement on in the CONTROLS panel, turn it straight off
+    /// again, and the lamp stays lit for the whole of the hold.
+    /// </summary>
+    public static void LoadMotionLight(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "PIR motion light";
+
+        var rail = Place(circuit, new DcVoltageSource(5.0), -420, 140);
+
+        // Short warm-up, so the example does something in the first half minute.
+        var pir = Place(circuit, new PirSensor
+        {
+            HoldSeconds = 4.0, WarmUpSeconds = 1.0, IsRetriggerable = true,
+        }, -120, 0);
+
+        var resistor = Place(circuit, new Resistor(220.0), 200, -60);
+        var lamp = Place(circuit, Led.OfColour("Amber"), 200, 100);
+
+        var gnd = Place(circuit, new Ground(), -420, 300);
+        var gnd2 = Place(circuit, new Ground(), -120, 200);
+        var gnd3 = Place(circuit, new Ground(), 200, 240);
+
+        resistor.RotationDegrees = 90;
+        lamp.RotationDegrees = 90;
+
+        circuit.Connect(rail.Negative, gnd.Pin);
+        circuit.Connect(pir.Vcc, rail.Positive);
+        circuit.Connect(pir.Gnd, gnd2.Pin);
+
+        circuit.Connect(pir.Output, resistor.A);
+        circuit.Connect(resistor.B, lamp.Anode);
+        circuit.Connect(lamp.Cathode, gnd3.Pin);
+
+        vm.Scope.TimebasePerDivision = 1.0;
+        vm.Scope.VoltsPerDivision = 1.0;
+        vm.Scope.AddProbe(pir.Output, "PIR out");
     }
 
     private static T Place<T>(Circuit circuit, T component, double x, double y) where T : CircuitComponent

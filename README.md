@@ -32,7 +32,7 @@ Core ← Engine ← Components ← UI, which keeps the whole engine headless-tes
 
 ```bash
 dotnet run --project src/Cirq.UI     # the editor
-dotnet test                          # 1587 tests
+dotnet test                          # 1610 tests
 ```
 
 Targets .NET 10. The UI uses Avalonia 12 and ScottPlot 5.1; those two versions are pinned
@@ -241,6 +241,7 @@ Tests measure the solver against closed-form answers rather than recorded output
 | Files | Every component type round-trips with its parameters, pins, wires, waypoints and probes; a reloaded circuit solves to the same answer; damaged, unknown and newer-format files are handled without losing the open circuit |
 | Settings | Theme round-trips across a restart, corrupt and newer-format preference files fall back to defaults, opening the dialog writes nothing, choosing a theme saves immediately |
 | UI | Background transport, probe decimation, reflection-built inspector, dirty tracking, every example compiles, runs, saves and reopens |
+| Shipped examples | Each one run for real and asserted against the thing it exists to show — the reflections example doubling at the far end and going quiet when the terminator is switched in, the bead cutting the noise on the rail, the driven gate reaching twelve volts where the one off the logic pin cannot, the DS18B20 returning the temperature it was set to with a valid CRC, the DAC coming back round through the ADC, one magnet counted several times, and the PIR holding its lamp on after the movement stops |
 
 ## Development boards
 
