@@ -108,6 +108,9 @@
 
       <MenuItem Header="_Help">
         <MenuItem Header="_Keyboard Shortcuts..." Command="{Binding ShowShortcutsCommand}" />
+        <Separator />
+        <MenuItem Header="_About CirqAvalonia..." Command="{Binding ShowAboutCommand}"
+                  ToolTip.Tip="Version, and the libraries this is built on" />
       </MenuItem>
     </Menu>
 

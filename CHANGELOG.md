@@ -8,6 +8,18 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**Help > About.** What version this is, what it is built on, and what it is running under —
+Avalonia, ScottPlot, SkiaSharp and CommunityToolkit.Mvvm with their versions and licences, the
+.NET and operating system versions, and how many components and examples are in the build.
+
+None of it is written down. The library versions are read off the assemblies that are actually
+loaded and the palette counts are counted, so the dialog cannot drift from the build the way a
+hand-kept list does. A build straight from the source tree has nothing stamped on it and says
+"development build" rather than claiming a version it does not have.
+
+**Copy details** puts the whole lot on the clipboard as plain text, because the alternative is
+someone transcribing four version numbers into a bug report and getting one of them wrong.
+
 ## [0.16.0] - 2026-09-19
 
 Everything you draw can now leave the application as a file. Alongside that, four parts about what

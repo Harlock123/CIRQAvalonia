@@ -358,6 +358,9 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     /// <summary>Raised when the settings dialog should open.</summary>
     public event EventHandler? RequestSettings;
 
+    /// <summary>Raised when the About dialog should be shown.</summary>
+    public event EventHandler? RequestAbout;
+
     [RelayCommand]
     private void ShowSettings() => RequestSettings?.Invoke(this, EventArgs.Empty);
 
@@ -523,6 +526,9 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         if (FileDialogs is null) return;
         await FileDialogs.ReportAsync("Keyboard shortcuts", ShortcutReference);
     }
+
+    [RelayCommand]
+    private void ShowAbout() => RequestAbout?.Invoke(this, EventArgs.Empty);
 
     partial void OnSelectedComponentChanged(CircuitComponent? value) => Inspector.Component = value;
 

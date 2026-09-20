@@ -81,6 +81,7 @@ public partial class MainWindow : Window
         viewModel.RequestDeleteSelection += (_, _) => _canvas?.DeleteSelection();
         viewModel.RequestClose += (_, _) => Close();
         viewModel.RequestSettings += async (_, _) => await ShowSettingsAsync();
+        viewModel.RequestAbout += async (_, _) => await ShowAboutAsync();
 
         // Code-drawn surfaces cannot bind to a resource, so they are told to repaint.
         ThemeManager.ThemeChanged += (_, _) => Dispatcher.UIThread.Post(() =>
@@ -99,6 +100,12 @@ public partial class MainWindow : Window
                 Dispatcher.UIThread.Post(viewModel.RefreshSpeedSelection);
             }
         };
+    }
+
+    private async Task ShowAboutAsync()
+    {
+        var dialog = new AboutWindow { DataContext = new AboutViewModel() };
+        await dialog.ShowDialog(this);
     }
 
     private async Task ShowSettingsAsync()

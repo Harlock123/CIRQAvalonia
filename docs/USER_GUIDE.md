@@ -23,8 +23,9 @@ the [README](../README.md), and what changed between releases is in the
 11. [Saving and loading](#saving-and-loading)
 12. [Exporting](#exporting)
 13. [Appearance](#appearance)
-14. [Keyboard reference](#keyboard-reference)
-15. [When a circuit will not simulate](#when-a-circuit-will-not-simulate)
+14. [What version is this](#what-version-is-this)
+15. [Keyboard reference](#keyboard-reference)
+16. [When a circuit will not simulate](#when-a-circuit-will-not-simulate)
 
 ---
 
@@ -1128,6 +1129,24 @@ back to defaults rather than stopping the application from starting.
 
 ---
 
+## What version is this
+
+**Help > About CirqAvalonia** says which version you are running, what it is built on, and what it
+is running under:
+
+![The About dialog: CirqAvalonia with a version chip beside it, the count of components and examples, the .NET and operating system versions, and a list of Avalonia, ScottPlot, SkiaSharp and CommunityToolkit.Mvvm with their versions and MIT licences](images/13-about.png)
+
+Nothing in there is written down. The library versions are read off the assemblies that are
+actually loaded and the component and example counts are counted, so the dialog cannot fall out of
+step with the build the way a hand-maintained list does. A build straight from the source tree has
+no version stamped on it and says **development build** rather than claiming one.
+
+**Copy details** puts the whole lot on the clipboard as plain text. If you are reporting a problem,
+paste that in — it saves transcribing four version numbers, and the one people get wrong is
+usually the one that mattered.
+
+---
+
 ## Keyboard reference
 
 Also available in the app at **Help > Keyboard Shortcuts**.
@@ -1150,6 +1169,7 @@ Also available in the app at **Help > Keyboard Shortcuts**.
 | View menu | **Mark Interactive Parts** rings everything you can double-click |
 | `Ctrl+N` / `Ctrl+O` / `Ctrl+S` / `Ctrl+Shift+S` | New / open / save / save as |
 | `Ctrl+E` | Export the schematic or the traces as PNG, JPEG, BMP, SVG or PDF |
+| `Help > About` | Version, and the libraries this is built on — with a button that copies the lot |
 
 ---
 
