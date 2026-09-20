@@ -173,30 +173,69 @@ public class SimulationControllerTests
         controller.Dispose();
     }
 
+    /// <summary>
+    /// Real-time pacing is a <i>ceiling</i>: at a speed factor of 1/100, a second of wall clock
+    /// buys ten milliseconds of simulated time and no more, however fast the machine is. Maximum
+    /// throughput is not held to that ceiling at all — it reaches about eighty times it.
+    /// <para>
+    /// Both assertions are written against the ceiling rather than against each other, because
+    /// this runs on shared CI machines where the transport thread competes with every other test
+    /// in the suite. Load can only make a run slower — it cannot push a paced run past its cap,
+    /// and it would have to take away almost all of the CPU before an unpaced run failed to beat
+    /// one. Comparing the two runs to each other, which is what this test used to do, measures the
+    /// scheduler as much as the pacing.
+    /// </para>
+    /// <para>
+    /// A hundredth rather than something slower, because the pacer steps until it <i>passes</i>
+    /// its target and so always takes at least one step per slice. Below about a thousandth that
+    /// floor is what governs rather than the speed factor — at 1e-4 a paced run lands seven times
+    /// over its nominal cap, which is the model working as written rather than a fault, but it
+    /// makes the cap the wrong thing to assert against.
+    /// </para>
+    /// </summary>
     [Fact]
-    public void RealTimePacingRunsSlowerThanMaximumThroughput()
+    public void RealTimePacingCapsProgressAndMaximumThroughputDoesNot()
     {
-        // At a speed factor of 1e-4, one wall-clock second is 100 us of simulated time. The
-        // unpaced run should get far further in the same window.
-        static double AdvanceFor(bool maximumThroughput, int milliseconds)
+        const double speed = 1e-2;
+
+        static (double Advanced, double Seconds) Run(bool maximumThroughput)
         {
             var (_, controller, _) = RcCircuit();
             controller.IsMaximumThroughput = maximumThroughput;
-            controller.SpeedFactor = 1e-4;
+            controller.SpeedFactor = speed;
             controller.Play();
-            Thread.Sleep(milliseconds);
+
+            // Wait for the transport to actually be running before starting the clock. On a loaded
+            // machine it can be a while before that thread is scheduled at all, and timing from
+            // before then measures how busy the machine is rather than how the run is paced.
+            Assert.True(WaitFor(() => controller.SimulationTime > 0),
+                "the transport never started stepping");
+
+            var from = controller.SimulationTime;
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+
+            Thread.Sleep(300);
+
+            clock.Stop();
             controller.Pause();
-            var reached = controller.SimulationTime;
+
+            var advanced = controller.SimulationTime - from;
             controller.Dispose();
-            return reached;
+
+            return (advanced, clock.Elapsed.TotalSeconds);
         }
 
-        var paced = AdvanceFor(false, 300);
-        var unpaced = AdvanceFor(true, 300);
+        var paced = Run(maximumThroughput: false);
+        var unpaced = Run(maximumThroughput: true);
 
-        Assert.True(paced > 0, "Paced run made no progress.");
-        Assert.True(unpaced > paced * 5,
-            $"Expected maximum throughput to outpace real time: {unpaced:g3}s vs {paced:g3}s.");
+        // The ceiling, with room for the pause landing a moment after the clock stopped.
+        var ceiling = paced.Seconds * speed * 1.5;
+        Assert.True(paced.Advanced <= ceiling,
+            $"paced reached {paced.Advanced:g3} s in {paced.Seconds:g3} s of wall clock, past its {ceiling:g3} s cap");
+
+        // And unpaced is not merely faster but in a different class: it does not consult the clock.
+        Assert.True(unpaced.Advanced > unpaced.Seconds * speed * 5,
+            $"maximum throughput only reached {unpaced.Advanced:g3} s in {unpaced.Seconds:g3} s of wall clock");
     }
 
     [Fact]
