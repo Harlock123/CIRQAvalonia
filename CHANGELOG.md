@@ -8,6 +8,35 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+## [0.25.1] - 2026-09-20
+
+One new example. The palette is unchanged at 161 components in 16 categories; there are now 43
+worked examples and 1680 tests.
+
+**File > Examples > Adjustable Supply** is a whole linear bench supply end to end — transformer,
+bridge rectifier, reservoir, regulator and load — with a probe on each of the three voltages, so
+the AC going in, the rectified rail with its ripple, and the clean regulated output can all be
+watched turning into one another.
+
+The interesting part is that the regulator is a **7805**, which is a fixed five volt part, and the
+supply is adjustable. All a 78xx does is hold its output five volts above its own GND pin. Ground
+that pin and you get five volts, which is how everybody uses one. Lift it — a resistor from the
+output to it, and a potentiometer from there to ground — and the output rises with it. Turn **RV1**
+in the CONTROLS panel while the simulation runs and the output moves from 5 V to about 18 V, while
+the two traces behind it stay exactly where they were.
+
+The arrangement's real fault is in the model rather than hidden by it. A 78xx returns its whole
+quiescent current — several milliamps — through that same GND pin, so it flows through the
+potentiometer and adds a few volts of its own to the answer, moving with load and temperature as it
+goes. It is a fine way to get an adjustable rail and a poor way to get an accurate one, and it is
+exactly why the LM317 exists: the same circuit round one, whose adjust pin takes fifty microamps
+instead, gives the clean relationship its datasheet prints.
+
+The guide gains a section on all of that, and the example is tested at five settings of the knob
+against the arithmetic, plus the two things that actually go wrong when one is built — the rail
+clearing dropout at the ripple troughs rather than on average, and the regulator rejecting a volt
+and a half of ripple down to under twenty millivolts.
+
 ## [0.25.0] - 2026-09-20
 
 A second way of looking at a circuit. The palette holds 161 components in 16 categories, 42 worked
@@ -996,7 +1025,8 @@ First public build of CirqAvalonia — an electronic circuit analyzer and mixed-
 
 **501 tests** measure the solver against closed-form answers rather than recorded output.
 
-[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.25.0...HEAD
+[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.25.1...HEAD
+[0.25.1]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.25.0...v0.25.1
 [0.25.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.24.0...v0.25.0
 [0.24.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.23.0...v0.24.0
 [0.23.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.22.0...v0.23.0
