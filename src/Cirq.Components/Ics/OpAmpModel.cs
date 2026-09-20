@@ -17,6 +17,26 @@ public sealed record OpAmpModel(
     double InputBiasCurrent,
     double QuiescentCurrent)
 {
+    private readonly double? _negativeSwingHeadroom;
+
+    /// <summary>
+    /// How close the output gets to the <i>negative</i> rail, in volts, where
+    /// <c>OutputSwingHeadroom</c> says how close it gets to the positive one. Left alone it is the
+    /// same figure, which is right for a part built round a symmetric output stage.
+    /// <para>
+    /// It is separate because most single-supply parts are not symmetric, and the asymmetry is the
+    /// whole reason they exist. An LM358 pulls its output down to within twenty millivolts of the
+    /// negative rail and stops a volt and a half below the positive one, so on a single five volt
+    /// supply it can use the bottom of the range and not the top. Modelling one headroom for both
+    /// rails gets the part wrong in the direction people actually use it.
+    /// </para>
+    /// </summary>
+    public double NegativeSwingHeadroom
+    {
+        get => _negativeSwingHeadroom ?? OutputSwingHeadroom;
+        init => _negativeSwingHeadroom = value;
+    }
+
     /// <summary>The classic bipolar general-purpose op-amp: Aol 200k, 1 MHz GBW, 0.5 V/us.</summary>
     public static readonly OpAmpModel Lm741 = new(
         Name: "LM741",
@@ -38,16 +58,18 @@ public sealed record OpAmpModel(
     /// The single-supply workhorse. Its output gets closer to the rails than an LM741's, which is
     /// what lets it work on one battery, but it still stops well short of them.
     /// <para>
-    /// The real part is <b>asymmetric</b> — it reaches within tens of millivolts of the negative
-    /// rail and stops about a volt and a half below the positive one — and that asymmetry is not
-    /// modelled here. The output stage clamps symmetrically about the midpoint of the supplies,
-    /// so the figure below is a compromise between the two. Compare it with the
-    /// <see cref="Mcp6002"/> for what rail-to-rail buys you; do not rely on it for how close to
-    /// each individual rail this particular part will get.
+    /// The part is <b>asymmetric</b>, and that is the point of it: the output pulls down to within
+    /// twenty millivolts of the negative rail but stops a volt and a half below the positive one.
+    /// On a single five volt supply that means roughly 0.02 V to 3.5 V of usable output — plenty
+    /// of room at the bottom, none at the top. Compare it with the <see cref="Mcp6002"/>, which
+    /// reaches both.
     /// </para>
     /// </summary>
     public static readonly OpAmpModel Lm358 = new(
-        "LM358", 100_000, 1e6, 0.3e6, 2e6, 100, 0.7, 2e-3, 45e-9, 0.7e-3);
+        "LM358", 100_000, 1e6, 0.3e6, 2e6, 100, 1.5, 2e-3, 45e-9, 0.7e-3)
+    {
+        NegativeSwingHeadroom = 0.02,
+    };
 
     /// <summary>
     /// A CMOS rail-to-rail part, and the reason to have it here is the comparison.

@@ -32,7 +32,7 @@ Core ← Engine ← Components ← UI, which keeps the whole engine headless-tes
 
 ```bash
 dotnet run --project src/Cirq.UI     # the editor
-dotnet test                          # 1247 tests
+dotnet test                          # 1493 tests
 ```
 
 Targets .NET 10. The UI uses Avalonia 12 and ScottPlot 5.1; those two versions are pinned
@@ -194,7 +194,7 @@ Tests measure the solver against closed-form answers rather than recorded output
 | Thyristors | SCR blocking and firing, staying on after the gate drive goes away, dropping out when the anode current is interrupted, reverse blocking; triac firing on both half cycles and turning itself off at every zero crossing; diac breakover in either polarity |
 | Noise | The RMS coming out being the RMS asked for and centred on zero, the same seed giving the same noise and a different one giving different, a sample held for its whole interval rather than redrawn every time point, and the amplitude scaling as asked |
 | Hysteresis | A clean ramp crossing a comparator's threshold once, the same ramp with noise on it chattering, and a feedback resistor putting it back to one — which is what the LM311, LM393 and 74HC14 are for |
-| Output swing | A rail-to-rail part reaching within a whisker of both supplies where an LM358 stops short and an LM741 stops further, all three agreeing halfway up, and a 741 unable to put out one volt on a single five volt supply |
+| Output swing | A rail-to-rail part reaching within a whisker of both supplies, an LM358 reaching the bottom one but not the top, an LM741 reaching neither, all three agreeing halfway up, and a 741 unable to put out one volt on a single five volt supply. Plus a matrix of every headroom pair against every supply arrangement, since a symmetric part on a split supply hides the cases that matter |
 | Live controls | Building the panel changing nothing and raising no change events, working a control moving its component and reporting it, the panel following a part worked from the canvas without reporting that as an edit, a range becoming a slider and a six-decade one becoming a logarithmic slider, a whole-number property being written a whole number, and the panel following parts placed and removed |
 | H-bridge | Driving forward and reverse with the current reversing too, both inputs the same braking with nothing across the motor, disabling coasting rather than braking, the interlock stopping shoot-through and its absence making a short across the supply, unwired inputs reading low, and the body diodes clamping an inductive kick |
 | Li-ion charger | Constant current well below full, the current tapering as the cell approaches its float voltage and stopping at it, no headroom meaning no charge, the dissipation being exactly what the input does not put in the cell, and termination latching rather than cycling |

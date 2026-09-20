@@ -1055,11 +1055,11 @@ An op-amp's output cannot reach its supplies, and how close it gets is often wha
 a circuit works at all. Three parts in the palette make the point between them, and the fastest
 way to see it is to build the same follower three times on a single 5 V supply:
 
-| Part | Output asked for 4.9 V | Output asked for 1.0 V |
-| --- | --- | --- |
-| **LM741** | about 3.5 V | about 1.5 V |
-| **LM358** | about 4.3 V | about 0.7 V |
-| **MCP6002** | about 4.9 V | about 1.0 V |
+| Part | Output asked for 4.9 V | Output asked for 1.0 V | Output asked for 0.05 V |
+| --- | --- | --- | --- |
+| **LM741** | about 3.5 V | about 1.5 V | about 1.5 V |
+| **LM358** | about 3.5 V | about 1.0 V | about 0.05 V |
+| **MCP6002** | about 4.9 V | about 1.0 V | about 0.05 V |
 
 The LM741 cannot put out one volt on a single supply *at all* — its output stops a volt and a half
 above the negative rail, so a follower asked for one volt sits at one and a half and looks broken.
@@ -1070,11 +1070,12 @@ paid for.
 Halfway up the supply all three are simply buffers and agree with each other, so the difference
 really is about the rails rather than about accuracy.
 
-One limitation to know about: the output stage clamps **symmetrically** about the midpoint of the
-supplies. A real LM358 is asymmetric — it reaches within tens of millivolts of the negative rail
-while stopping about a volt and a half below the positive one — and that asymmetry is not modelled.
-The figure it uses is a compromise between the two. Use it to compare parts, not to predict how
-close to one particular rail an LM358 will get.
+Notice that the LM358 is **not** symmetric, and that this is the whole point of it. At the top of
+the supply it is no better than the LM741: both stop about a volt and a half below the positive
+rail, which is why the first column shows them level. What it buys you is the bottom — its output
+pulls down to within twenty millivolts of the negative rail, so on a single supply it can use the
+low end of the range that the LM741 simply cannot reach. Most single-supply parts are lopsided
+this way, and which rail they are good at is worth checking before you pick one.
 
 ---
 

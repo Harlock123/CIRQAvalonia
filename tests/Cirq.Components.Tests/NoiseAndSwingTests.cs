@@ -196,17 +196,29 @@ public class OutputSwingTests
 
         Assert.True(mcp > 4.8, $"a rail-to-rail part should reach 4.9 V, not {mcp:0.00}");
         Assert.True(lm358 < mcp - 0.5, $"{lm358:0.00} should be well below {mcp:0.00}");
-        Assert.True(lm741 < lm358, $"{lm741:0.00} should be below the LM358's {lm358:0.00}");
+        Assert.True(lm741 < mcp - 0.5, $"{lm741:0.00} should be well below {mcp:0.00}");
+
+        // At the top of the supply the LM358 has nothing on the LM741: both output stages stop
+        // about a volt and a half below the positive rail. What the LM358 buys you is at the
+        // bottom, which is the next test.
+        Assert.Equal(lm358, lm741, 0.1);
     }
 
-    /// <summary>And at the bottom of the supply as well as the top.</summary>
+    /// <summary>
+    /// And at the bottom of the supply, where the parts stop agreeing. The LM358's output pulls
+    /// down to within tens of millivolts of the negative rail even though it stops well short of
+    /// the positive one — that asymmetry is the whole reason it works on one supply, and an LM741
+    /// in the same socket simply cannot get there.
+    /// </summary>
     [Fact]
     public void ARailToRailPartReachesTheBottomToo()
     {
         var mcp = FollowerOutput(OpAmpModel.Mcp6002, 0.05);
+        var lm358 = FollowerOutput(OpAmpModel.Lm358, 0.05);
         var lm741 = FollowerOutput(OpAmpModel.Lm741, 0.05);
 
         Assert.True(mcp < 0.1, $"{mcp:0.000} V should be within a whisker of ground");
+        Assert.True(lm358 < 0.1, $"an LM358 should reach the bottom too, not {lm358:0.000} V");
         Assert.True(lm741 > mcp + 0.5, $"{lm741:0.00} should be well above it");
     }
 

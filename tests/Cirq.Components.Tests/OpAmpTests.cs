@@ -202,19 +202,35 @@ public class OpAmpTests
         sim.Reset();
         sim.SolveOperatingPoint();
 
+        // Measured over the ramp rather than step by step. A slew rate is a sustained rate, and
+        // the first step after an edge is a breakpoint a nanosecond wide where the integration is
+        // still settling — reading the answer off that one step measures the time step, not the
+        // amplifier.
+        var travelled = 0.0;
+        var elapsed = 0.0;
         var previous = sim.NodeVoltage(u.Output);
-        var fastestSlew = 0.0;
         while (sim.Time < 100e-6)
         {
             var dt = sim.Step();
             var now = sim.NodeVoltage(u.Output);
-            fastestSlew = Math.Max(fastestSlew, Math.Abs(now - previous) / dt);
+            var rate = Math.Abs(now - previous) / dt;
+
+            // Only while it is actually slewing: a 20 V square into a follower spends most of
+            // each half-cycle parked against a rail with the output not moving at all.
+            if (rate > 0.3e6 && dt > 1e-9)
+            {
+                travelled += Math.Abs(now - previous);
+                elapsed += dt;
+            }
+
             previous = now;
         }
 
-        // 741 slews at 0.5 V/us. Allow headroom for the discrete step, but it must be nowhere
-        // near the 20 V/ns the ideal input edge demands.
-        Assert.InRange(fastestSlew, 0.2e6, 1.2e6);
+        Assert.True(elapsed > 10e-6, $"expected a long ramp to measure, got {elapsed * 1e6:0.0} us");
+
+        // 741 slews at 0.5 V/us, and it must be nowhere near the 20 V/ns the ideal input edge asks
+        // for: the tail current into the compensation capacitor is the only thing setting this.
+        Assert.Equal(0.5e6, travelled / elapsed, 0.05e6);
     }
 
     [Fact]
