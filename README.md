@@ -334,6 +334,17 @@ being squeezed onto a volts axis:
 
 ![The 555 astable example running, with the capacitor and output waveforms on the oscilloscope](docs/images/04-scope.png)
 
+`Ctrl+E` writes the schematic and the traces out as **PNG, JPEG, BMP, SVG or PDF** — the schematic,
+the scope, or both on one sheet, optionally with a parts list. SVG and PDF are true vector rather
+than a bitmap in a wrapper, because the export is drawn by the same renderer that draws the editor
+against a second backend; captions come out as real text, not outlines:
+
+![An exported sheet: the full-wave rectifier schematic on top with its probe flags, and below it the oscilloscope showing the two antiphase secondary halves against the flat rectified rail](docs/images/11-export-sheet.png)
+
+The frame follows the circuit rather than the window, so whatever the view is scrolled to you get
+the whole thing at its natural size. The editing aids — dot grid, terminal dots, hover highlighting
+— stay behind. `docs/USER_GUIDE.md` has [the rest](docs/USER_GUIDE.md#exporting).
+
 | | |
 | --- | --- |
 | Place | Click a palette entry, then click the canvas |

@@ -1043,6 +1043,8 @@ the file you already had.
 `File > Export...`, or `Ctrl+E`, writes the schematic and the traces out as a picture. It asks
 three things.
 
+![The export dialog over the schematic: What to export with Schematic selected and Oscilloscope traces and Both beneath it, a greyed When exporting both section offering one file or a file each plus a combined PDF, a Format list showing PNG, a Resolution list showing 2x, and checkboxes for a transparent background and a parts list](images/10-export-dialog.png)
+
 **What to export** — the schematic, the oscilloscope traces, or both. Traces are only offered when
 there is something on the scope; exporting an empty plot is a worse answer than being told there is
 nothing there.
@@ -1061,6 +1063,10 @@ the one to pick when you want the pieces separately and something to hand someon
 | **JPEG** | Smaller and lossy. Poor at line art, which a schematic is entirely made of, so prefer PNG unless something insists on JPEG |
 | **BMP** | Uncompressed, for the tools that still want it |
 
+Both on one sheet puts the schematic above the traces, at whatever size each of them needs:
+
+![An exported sheet: the full-wave rectifier schematic with its probe flags on top, and the oscilloscope below it showing the two secondary halves swinging opposite ways about the tap against the flat rectified rail](images/11-export-sheet.png)
+
 **Transparent background** drops the paper colour so the drawing can go on top of something else.
 It is not offered for JPEG, which has no transparency to give.
 
@@ -1069,10 +1075,13 @@ materials is grouped — by what the part is *and* what it is set to, so three 1
 one line reading `3 | R1, R2, R3 | Resistor | 10kΩ`, and a 4k7 among them is a line of its own.
 It goes below everything else on a single sheet, and gets a page of its own in the combined PDF.
 
-Ground symbols are left out: a ground is a net label rather than something you can buy. Everything
-else earns a line, instruments included — a function generator standing in for a mains secondary is
-part of what the drawing says, and dropping it would make the list disagree with the schematic
-beside it.
+![A parts list table from an export: columns headed Qty, Ref, Part and Value, with one 470 microfarad electrolytic capacitor, two 1N4001 diodes as a single line reading D1, D2, one function generator, one 470 ohm resistor and one centre-tapped transformer](images/12-parts-list.png)
+
+The two diodes are one line because they are the same part at the same value — that is the whole
+point of the grouping. Ground symbols are left out: a ground is a net label rather than something
+you can buy. Everything else earns a line, instruments included — a function generator standing in
+for a mains secondary is part of what the drawing says, and dropping it would make the list
+disagree with the schematic beside it.
 
 Two things worth knowing:
 
