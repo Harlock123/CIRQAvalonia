@@ -2019,6 +2019,56 @@ the rails, which is the first thing anybody building this discovers. And the **o
 is what keeps the amplifier's idle half-supply off the voice coil — delete it and the speaker's
 power reading tells you what four and a half volts of standing DC costs.
 
+### Listening to it
+
+A waveform and a sound are different evidence about the same circuit, and for an audio stage the
+second one is what it is actually judged by. Clipping is a small flat spot on a trace and an
+unmistakable noise; which of those tells you how bad it is depends on who is listening.
+
+So the two parts can work in files.
+
+- **Speaker** has a **Recording Path**. Put a `.wav` filename in it, run the circuit, and the
+  voltage across the speaker is written to that file as it goes. **Simulate > Play Speaker
+  Recording** hands it to whatever your desktop plays audio with.
+- **Microphone** has a **Source Path**. Point it at a `.wav` and it plays that instead of its
+  built-in tone, so the whole chain has real programme material going through it rather than one
+  frequency for ever. Record something with whatever your machine already has; 8, 16, 24 and
+  32-bit files are all read, and anything in stereo is mixed down, because a circuit has one node
+  and not two.
+
+Put both on the audio example and it becomes a recording studio for one amplifier: a clip in, the
+LM386 in the middle, a clip out, and the difference between them is what the circuit did. Run it
+once at a gain of twenty and once at two hundred, and listen to the two files rather than measuring
+them.
+
+Three things are worth knowing about how this works, because they are consequences of what a
+simulator is rather than decisions that could have gone the other way.
+
+**It is files, not the sound card.** The transient solver takes the steps the circuit needs, not
+the steps a clock wants — a millisecond of a fast edge may cost more steps than the hundred
+milliseconds around it. Nothing about that can be handed to a device demanding forty-four thousand
+samples every second, on time, for ever. Through a file the same run is also reproducible, which is
+the other half of it.
+
+**The recording is resampled.** Solver time points land wherever they land, and the file needs them
+evenly spaced, so each one is interpolated onto the grid. Without that the recording's *pitch*
+would follow the solver's step size, and a stretch where the circuit was easy to solve would play
+back faster than one where it was not. The consequence to watch for is ordinary sampling: anything
+above half the sample rate cannot be represented and comes back as something else.
+
+**The level is fixed, not normalised.** **Recording Full Scale Volts** says how many volts fill the
+file's range, and it defaults to two. A recorder that normalised to the loudest peak would make a
+quiet circuit and a loud one sound identical, which would hide the one thing most worth listening
+for. If a steady fraction of the file comes back clipped the speaker says so on the canvas, and
+that is a level on the recorder rather than anything the circuit is doing — raise the figure and
+run it again. A *momentary* clip is not complained about, because it is usually real.
+
+Which brings up the first thing you will hear, before any of the programme material: a **thump**.
+The LM386 idles at half its supply, the output capacitor starts empty, and for the couple of
+milliseconds it takes to charge, the speaker has four and a half volts across it. That is the
+turn-on thump every amplifier of this kind makes and the reason commercial ones have a relay that
+connects the speaker a second after the power. It is in the recording because it is in the circuit.
+
 ---
 
 ## Development boards

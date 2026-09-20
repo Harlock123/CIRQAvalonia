@@ -1,5 +1,6 @@
 using Cirq.Core.Primitives;
 using Cirq.Core.Probing;
+using Cirq.Core.Audio;
 using Cirq.Core.Simulation;
 using Cirq.Core.Topology;
 using Cirq.Core.Units;
@@ -31,6 +32,9 @@ namespace Cirq.Components.Electromechanical;
 /// </summary>
 public partial class Microphone : TwoTerminalComponent, IInteractiveComponent, ICurrentReporting
 {
+    private double[] _clip = [];
+    private int _clipRate = 44_100;
+
     public Microphone() : base("+", "-")
     {
     }
@@ -49,6 +53,29 @@ public partial class Microphone : TwoTerminalComponent, IInteractiveComponent, I
     /// <summary>Frequency of the test tone it hears while it is switched on, in hertz.</summary>
     [ObservableProperty]
     public partial double ToneFrequency { get; set; } = 1e3;
+
+    /// <summary>
+    /// A WAV file to hear instead of the built-in tone. Empty — the default — leaves it on the
+    /// tone.
+    /// <para>
+    /// A sine is the right signal for measuring a stage and the wrong one for judging it. Gain and
+    /// distortion are numbers you can read off a scope; whether an amplifier sounds like anything
+    /// is not, and a circuit fed one frequency for ever cannot tell you. Point this at a recording
+    /// and the whole chain has real programme material going through it, which can then come out
+    /// of the speaker at the other end and be listened to.
+    /// </para>
+    /// <para>
+    /// The file's own sample rate is used, and values between its samples are interpolated —
+    /// the solver asks for the signal at whatever instants it needs, which will not be the
+    /// instants the file was recorded at.
+    /// </para>
+    /// </summary>
+    [ObservableProperty]
+    public partial string SourcePath { get; set; } = string.Empty;
+
+    /// <summary>Whether a clip that has run out starts again, or leaves it silent.</summary>
+    [ObservableProperty]
+    public partial bool LoopSource { get; set; } = true;
 
     /// <summary>Whether there is currently a sound at it. Double-click the capsule to change.</summary>
     [ObservableProperty]
@@ -86,6 +113,8 @@ public partial class Microphone : TwoTerminalComponent, IInteractiveComponent, I
     {
         get
         {
+            if (SourceError is not null) return [$"cannot read {SourcePath}: {SourceError}"];
+
             // Nothing connected at all is not a fault worth reporting; a capsule sitting at the
             // rail with no resistor to work against is.
             if (Math.Abs(Voltage) < 1e-3 && Math.Abs(Current) < 1e-9) return [];
@@ -101,15 +130,75 @@ public partial class Microphone : TwoTerminalComponent, IInteractiveComponent, I
         }
     }
 
+    /// <summary>True when a clip has been loaded and is what is being heard.</summary>
+    public bool IsPlayingClip => _clip.Length > 0;
+
+    /// <summary>How long the loaded clip is, in seconds.</summary>
+    public double ClipSeconds => _clip.Length / (double)Math.Max(_clipRate, 1);
+
+    /// <summary>Why the file could not be read, if it could not be.</summary>
+    public string? SourceError { get; private set; }
+
     /// <summary>The current it wants to sink right now, sound included.</summary>
     private double Demand(SimulationState state)
     {
         if (!IsHearingSound) return BiasCurrent;
 
-        var swing = Math.Clamp(Sensitivity, 0.0, 0.95)
-                    * Math.Sin(2.0 * Math.PI * Math.Max(ToneFrequency, 1e-6) * state.Time);
+        var swing = Math.Clamp(Sensitivity, 0.0, 0.95) * Signal(state.Time);
 
         return BiasCurrent * (1.0 + swing);
+    }
+
+    /// <summary>
+    /// What it is hearing at an instant, from -1 to 1: the clip if one is loaded, the tone if not.
+    /// </summary>
+    private double Signal(double time)
+    {
+        if (_clip.Length == 0)
+            return Math.Sin(2.0 * Math.PI * Math.Max(ToneFrequency, 1e-6) * time);
+
+        var position = Math.Max(time, 0.0) * _clipRate;
+
+        if (position >= _clip.Length - 1)
+        {
+            if (!LoopSource) return 0.0;
+
+            // Modulo on the sample position rather than on the time, so a clip whose length is not
+            // a whole number of solver steps still repeats seamlessly.
+            position %= _clip.Length;
+        }
+
+        var index = (int)position;
+        var through = position - index;
+        var next = index + 1 < _clip.Length ? index + 1 : 0;
+
+        return _clip[index] + ((_clip[next] - _clip[index]) * through);
+    }
+
+    partial void OnSourcePathChanged(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            _clip = [];
+            SourceError = null;
+            NotifyValueChanged();
+            return;
+        }
+
+        try
+        {
+            (_clip, _clipRate) = WaveFile.Read(value);
+            SourceError = _clip.Length == 0 ? "the file has no audio in it" : null;
+        }
+        catch (Exception e) when (e is IOException or InvalidDataException
+                                      or UnauthorizedAccessException or ArgumentException)
+        {
+            // Reported rather than thrown: a bad path is a thing to fix, not a crash mid-solve.
+            _clip = [];
+            SourceError = e.Message;
+        }
+
+        NotifyValueChanged();
     }
 
     public override void StampMatrix(MnaSystem system, SimulationState state)

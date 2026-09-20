@@ -84,6 +84,7 @@
         <Separator />
         <MenuItem Header="_Frequency Response..." InputGesture="F7"
                   Command="{Binding ShowFrequencyResponseCommand}" />
+        <MenuItem Header="Play Speaker _Recording" Command="{Binding PlayRecordingCommand}" />
         <Separator />
         <MenuItem Header="Spee_d" ItemsSource="{Binding SpeedOptions}">
           <MenuItem.ItemContainerTheme>

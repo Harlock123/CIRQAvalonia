@@ -2,6 +2,7 @@ using System.Collections.Specialized;
 using Cirq.Core.Probing;
 using Cirq.Core.Simulation;
 using Cirq.Core.Topology;
+using Cirq.Components.Passive;
 using Cirq.Components.Serialization;
 using Cirq.UI.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -276,6 +277,45 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         foreach (var component in loaded.Components) Circuit.Components.Add(component);
         foreach (var wire in loaded.Wires) Circuit.Wires.Add(wire);
         foreach (var probe in loaded.Probes) Circuit.Probes.Add(probe);
+    }
+
+    /// <summary>
+    /// Plays what the speakers in this circuit have recorded, in whatever the desktop plays audio
+    /// with.
+    /// <para>
+    /// A waveform and a sound are different evidence about the same circuit, and the second one is
+    /// the one an amplifier is judged by. Set <c>Recording Path</c> on a speaker, run it, and this
+    /// is how you hear the result.
+    /// </para>
+    /// </summary>
+    [RelayCommand]
+    private void PlayRecording()
+    {
+        var speakers = Circuit.Components.OfType<Speaker>().Where(s => s.IsRecording).ToList();
+
+        if (speakers.Count == 0)
+        {
+            StatusMessage =
+                "No speaker here is recording. Select one and set its Recording Path to a .wav file.";
+            return;
+        }
+
+        // Everything captured since the last flush, so what plays is what is on the scope rather
+        // than what was there a quarter of a second ago.
+        foreach (var speaker in speakers) speaker.Flush();
+
+        var recorded = speakers.Where(s => s.RecordedSeconds > 0).ToList();
+
+        if (recorded.Count == 0)
+        {
+            StatusMessage = "Nothing has been recorded yet — run the circuit first.";
+            return;
+        }
+
+        // The loudest, when there is more than one, because that is the one worth hearing.
+        var chosen = recorded.MaxBy(s => s.RecordedPeak)!;
+
+        StatusMessage = AudioPlayback.Play(chosen.RecordingPath);
     }
 
     [RelayCommand]
