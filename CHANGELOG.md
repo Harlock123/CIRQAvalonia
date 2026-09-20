@@ -8,6 +8,11 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-09-19
+
+A circuit you can operate while it runs, and a motor you can run both ways. The palette holds 148
+components in 16 categories, and 1229 tests measure them against closed-form answers.
+
 **A front panel for the circuit.** Every switch, potentiometer, light level, temperature, magnet
 and target distance in a circuit is now gathered into a **CONTROLS** panel under the properties
 panel — and they can be worked while the simulation runs. Move a wiper and the next time point is
@@ -747,7 +752,8 @@ First public build of CirqAvalonia — an electronic circuit analyzer and mixed-
 
 **501 tests** measure the solver against closed-form answers rather than recorded output.
 
-[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.19.0...HEAD
+[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.20.0...HEAD
+[0.20.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.19.0...v0.20.0
 [0.19.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.16.0...v0.17.0
