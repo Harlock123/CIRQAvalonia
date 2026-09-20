@@ -661,13 +661,18 @@ public static class Examples
         var (plus0, minus0, out0) = ic.Channel(0);
         var (plus1, minus1, out1) = ic.Channel(1);
 
-        // Channel 0 trips when the signal rises above the upper limit.
-        circuit.Connect(signal.Output, plus0);
-        circuit.Connect(minus0, top.B);
+        // The reference goes to whichever input makes the output go *low* out of range. An open
+        // collector says "out of range" by pulling the shared node down and says "in range" only
+        // by letting go of it, so each channel has to pull when the signal leaves the window on
+        // its own side.
 
-        // Channel 1 trips when it falls below the lower limit.
-        circuit.Connect(signal.Output, minus1);
-        circuit.Connect(plus1, middle.B);
+        // Channel 0 pulls when the signal rises above the upper limit.
+        circuit.Connect(plus0, top.B);
+        circuit.Connect(signal.Output, minus0);
+
+        // Channel 1 pulls when it falls below the lower limit.
+        circuit.Connect(signal.Output, plus1);
+        circuit.Connect(minus1, middle.B);
 
         // Both open-collector outputs share one node: in range means neither is pulling.
         circuit.Connect(out0, out1);

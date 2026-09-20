@@ -361,6 +361,18 @@ forgotten. Double-click to open, or select and press Enter.
 Opening one replaces whatever is on the canvas, so save first if there is anything there worth
 keeping.
 
+The **Fundamentals** group is where to start, and the three in it are deliberately the three
+simplest things a circuit does. **RC Low-Pass** is the one built by hand above. **Transistor
+Switch** is a 2N3904 turning an LED on from a push button, which is the circuit that makes base
+*current* rather than base voltage the thing you are choosing — probe the base and the collector
+and watch how little of the former it takes to pull the latter down. **MOSFET Driver** is the same
+idea at twelve volts into a 10 mH coil, and the diode across that coil is the point of it. Delete
+the diode and run it again: the drain does not rise to a few hundred volts, it goes to a number
+with seven digits in it, because the current in an inductor has to keep flowing and with the FET
+off there is nowhere left for it to go. That figure is not a bug and not a prediction — it is what
+the arithmetic says when nothing limits it, and on a bench the limit is the FET's avalanche rating
+absorbing the energy, once or twice, until it does not.
+
 ---
 
 ## Digital and mixed-signal circuits
@@ -437,6 +449,15 @@ thin wire; it is also what limits the inrush when the supply is first switched o
 
 **File > Examples > Full-Wave Rectifier** wires one up with two 1N4001s. Both halves are on the
 scope against the rectified rail, and the rail sits one diode drop below the peaks rather than two.
+
+Two smaller ones sit either side of it. **File > Examples > Half-Wave Rectifier** is one diode, one
+100 µF reservoir and a 1 kΩ load off a 50 Hz secondary — the arrangement that only uses half the
+cycle, so the capacitor is left to hold the rail up for a whole period between refills and the
+ripple comes at the line frequency rather than twice it. Put the two rectifier examples side by
+side and the reason nobody builds the half-wave one is in the ripple. **File > Examples >
+Regulated Supply** is the other end on its own: a 7805 given 12 V, with the input and output
+capacitors it wants and a 100 Ω load, so the dropout and the quiescent current are visible without
+a rectifier in front of them.
 
 **Inductor saturation.** An inductor has a `SaturationCurrent`, and it is left at zero — meaning
 ideal — so nothing that worked before changes. Set it and the part behaves like iron: past the
@@ -924,6 +945,12 @@ so the divisions you can have are ÷16 up to ÷1024, then ÷4096 to ÷16384. If 
 You can also ignore the oscillator entirely: drive RS yourself, leave REXT and CEXT floating, and
 it is a plain fourteen-stage counter.
 
+**File > Examples > 4060 Timer** is the self-clocking arrangement with nothing else in it: 10 kΩ
+and 100 nF on the timing pins, 47 kΩ for Rs, and an LED on Q6. The three probes are the timing
+node, Q4 and Q6, so the oscillator and two of its divisions are on the scope together. Change the
+capacitor to 220 nF while it runs and every trace slows in proportion — the frequency is coming out
+of the network rather than out of a property.
+
 **4511** — the 7447's counterpart. That part sinks current from a common-**anode** display; this
 one sources it into a common-**cathode** one, so its outputs are active high and the two are not
 interchangeable. It also has a latch the 7447 lacks: hold `LE` high and the display freezes on
@@ -943,6 +970,14 @@ places, depending only on which end you drive. Inhibit is active high and discon
 which is how you park it or gang several onto one bus. Because the decoder only ever closes one
 path, there is no way to short two sources together by accident — which four separate 4066 switches
 will happily let you do.
+
+**File > Examples > Staircase Generator** puts the 4040 and the 4051 together into the classic use
+for both. Three stages of the counter are three address bits, so the mux walks its eight channels
+in order; the eight channels are tapped off a ladder of eight equal resistors between the rail and
+ground; and the common pin therefore climbs in eight even steps of about 0.61 V and drops back. A D/A converter
+made of one counter, one switch and some resistors, and a good picture of what "bilateral" buys
+you — the signal path here runs from the ladder *into* the common pin, the opposite direction to
+the one the part is usually drawn doing.
 
 ### Mixing CMOS with TTL
 
@@ -1660,6 +1695,19 @@ to show it.
 **File > Examples > Noise and Hysteresis** is that circuit. Delete the 470 kΩ feedback resistor
 while it runs and watch the output start chattering; put it back and it stops.
 
+Two comparator circuits without the noise are worth having beside it. **File > Examples >
+Comparator Trigger** is an LM311 against a mid-rail divider squaring up a 1 kHz sine, and it is the
+shortest demonstration of what open-collector means: remove the 4.7 kΩ pull-up and the output stops
+going high at all, because nothing in the chip ever drives it there. **File > Examples > Window
+Detector** uses two of an LM339's four channels to ask whether a voltage is *between* two limits —
+one channel trips above 3.5 V, the other below 1.5 V, and because both outputs are open collector
+they are simply wired to the same node, where either one pulling is enough. That is a wired-AND
+built out of nothing, and it is the reason comparators are made open collector in the first place.
+The trap is which input each reference goes to: an open-collector comparator says "out of range" by
+*pulling*, and says "in range" only by letting go, so both channels have to be wired to go low on
+the way out. Swap either pair over and the node never goes high at all, because the two are then
+never released at the same time.
+
 Two things about the model are worth knowing:
 
 - It is **band-limited**. A new value is drawn at a fixed rate and held in between, rather than a
@@ -1753,6 +1801,12 @@ gate, and moving the RC's time constant moves the firing angle. A lamp dimmer in
 Each of the three shows `conducting` or `blocking` as its value and is drawn filled while it
 conducts, so the latch is visible on the canvas rather than something you infer from the scope.
 
+**File > Examples > SCR Latch** is the SCR's one-way behaviour with a switch to prove it. Press the
+button in the CONTROLS panel and the lamp lights; let go and it stays lit, because the gate has had
+its say. The only way back is `SW1`, the toggle in the anode circuit — open it, the current falls
+below the holding current, and the SCR drops out. Close it again and the lamp stays dark until the
+button is pressed once more.
+
 If one of these will not stay on, the holding current is almost always why — the load is drawing
 less than the part needs to hold itself latched. If one will not fire, check the gate resistor:
 it sets the gate current, and the trigger threshold is a current, not a voltage.
@@ -1777,6 +1831,15 @@ circuit that does it is almost never the circuit you meant to build.
 
 Four models are stocked — 2N3819, J201 and 2N5457 N-channel, 2N5460 P-channel — and three of them
 are in the palette.
+
+**File > Examples > JFET Amplifier** is the common-source stage the part exists for, and the
+biasing is the thing to look at. There is no divider on the gate: a 1 MΩ resistor holds it at
+ground, and the 470 Ω in the source lifts the source *above* the gate instead, so V_GS comes out
+negative without a second supply anywhere. That is **self-bias**, and it only works on a depletion
+device — it is the direct consequence of the paragraph above. The 10 µF across the source resistor
+is what keeps the gain: take it out while it runs and the output collapses to about a third,
+because the source is then free to follow the gate and most of the signal never appears across the
+junction at all.
 
 ---
 
