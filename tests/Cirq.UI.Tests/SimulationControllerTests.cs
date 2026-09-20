@@ -174,68 +174,87 @@ public class SimulationControllerTests
     }
 
     /// <summary>
-    /// Real-time pacing is a <i>ceiling</i>: at a speed factor of 1/100, a second of wall clock
-    /// buys ten milliseconds of simulated time and no more, however fast the machine is. Maximum
-    /// throughput is not held to that ceiling at all — it reaches about eighty times it.
+    /// Runs the transport for a measured window and reports how far it got and how long that
+    /// really took — the wall clock is measured rather than assumed, because a sleep on a busy
+    /// machine is a lower bound and nothing more.
+    /// </summary>
+    private static (double Advanced, double Seconds) Advance(bool maximumThroughput, double speed)
+    {
+        var (_, controller, _) = RcCircuit();
+        controller.IsMaximumThroughput = maximumThroughput;
+        controller.SpeedFactor = speed;
+        controller.Play();
+
+        // Wait for the transport to actually be running before starting the clock. On a loaded
+        // machine it can be a while before that thread is scheduled at all, and timing from before
+        // then measures how busy the machine is rather than how the run is paced.
+        Assert.True(WaitFor(() => controller.SimulationTime > 0), "the transport never started stepping");
+
+        var from = controller.SimulationTime;
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+
+        Thread.Sleep(300);
+
+        clock.Stop();
+        controller.Pause();
+
+        var advanced = controller.SimulationTime - from;
+        controller.Dispose();
+
+        return (advanced, clock.Elapsed.TotalSeconds);
+    }
+
+    /// <summary>
+    /// Pacing is a <b>ceiling</b>: at a hundredth of real time, a second of wall clock buys ten
+    /// milliseconds of simulated time and no more, however fast the machine is.
     /// <para>
-    /// Both assertions are written against the ceiling rather than against each other, because
-    /// this runs on shared CI machines where the transport thread competes with every other test
-    /// in the suite. Load can only make a run slower — it cannot push a paced run past its cap,
-    /// and it would have to take away almost all of the CPU before an unpaced run failed to beat
-    /// one. Comparing the two runs to each other, which is what this test used to do, measures the
-    /// scheduler as much as the pacing.
+    /// Asserted as a ceiling rather than against a second run, because this runs on shared CI
+    /// machines and a comparison between two runs measures the scheduler as much as the pacing.
+    /// A busy machine can only make a paced run fall <i>behind</i> its cap, never overshoot it,
+    /// so load moves this assertion in the safe direction.
     /// </para>
     /// <para>
-    /// A hundredth rather than something slower, because the pacer steps until it <i>passes</i>
-    /// its target and so always takes at least one step per slice. Below about a thousandth that
-    /// floor is what governs rather than the speed factor — at 1e-4 a paced run lands seven times
-    /// over its nominal cap, which is the model working as written rather than a fault, but it
-    /// makes the cap the wrong thing to assert against.
+    /// A hundredth rather than something slower because the pacer steps until it <i>passes</i> its
+    /// target, so it always takes at least one step per slice. Below about a thousandth that floor
+    /// governs instead of the speed factor — a run at 1e-4 lands seven times over its nominal cap,
+    /// which is the model working as written but makes the cap the wrong thing to measure.
     /// </para>
     /// </summary>
     [Fact]
-    public void RealTimePacingCapsProgressAndMaximumThroughputDoesNot()
+    public void RealTimePacingCapsHowFarARunCanGet()
     {
         const double speed = 1e-2;
 
-        static (double Advanced, double Seconds) Run(bool maximumThroughput)
-        {
-            var (_, controller, _) = RcCircuit();
-            controller.IsMaximumThroughput = maximumThroughput;
-            controller.SpeedFactor = speed;
-            controller.Play();
-
-            // Wait for the transport to actually be running before starting the clock. On a loaded
-            // machine it can be a while before that thread is scheduled at all, and timing from
-            // before then measures how busy the machine is rather than how the run is paced.
-            Assert.True(WaitFor(() => controller.SimulationTime > 0),
-                "the transport never started stepping");
-
-            var from = controller.SimulationTime;
-            var clock = System.Diagnostics.Stopwatch.StartNew();
-
-            Thread.Sleep(300);
-
-            clock.Stop();
-            controller.Pause();
-
-            var advanced = controller.SimulationTime - from;
-            controller.Dispose();
-
-            return (advanced, clock.Elapsed.TotalSeconds);
-        }
-
-        var paced = Run(maximumThroughput: false);
-        var unpaced = Run(maximumThroughput: true);
-
-        // The ceiling, with room for the pause landing a moment after the clock stopped.
+        var paced = Advance(maximumThroughput: false, speed);
         var ceiling = paced.Seconds * speed * 1.5;
+
         Assert.True(paced.Advanced <= ceiling,
             $"paced reached {paced.Advanced:g3} s in {paced.Seconds:g3} s of wall clock, past its {ceiling:g3} s cap");
+    }
 
-        // And unpaced is not merely faster but in a different class: it does not consult the clock.
-        Assert.True(unpaced.Advanced > unpaced.Seconds * speed * 5,
-            $"maximum throughput only reached {unpaced.Advanced:g3} s in {unpaced.Seconds:g3} s of wall clock");
+    /// <summary>
+    /// And maximum throughput does not consult the clock at all, so it leaves that ceiling far
+    /// behind.
+    /// <para>
+    /// Measured against a <i>much</i> slower nominal speed than the test above uses, and that is
+    /// the point of the number rather than an oversight. The ceiling scales with the speed factor
+    /// while throughput is fixed by the machine, so a low factor is what puts distance between
+    /// them: the margin here is about five hundredfold on a quiet machine and still around fifty
+    /// on a loaded CI runner. At a hundredth it was five, and a slow afternoon on shared hardware
+    /// was enough to fail it.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void AndMaximumThroughputLeavesThatCeilingFarBehind()
+    {
+        const double speed = 1e-4;
+
+        var unpaced = Advance(maximumThroughput: true, speed);
+        var ceiling = unpaced.Seconds * speed;
+
+        Assert.True(unpaced.Advanced > ceiling * 50,
+            $"maximum throughput only reached {unpaced.Advanced:g3} s in {unpaced.Seconds:g3} s of wall clock, " +
+            $"against a pacing cap of {ceiling:g3} s");
     }
 
     [Fact]
