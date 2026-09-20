@@ -8,6 +8,55 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+## [0.28.0] - 2026-09-20
+
+An editing release. The schematic gains the gesture it was missing — select, copy, paste — and the
+guide gains a printable form. 164 components in 16 categories, 68 worked examples, 1889 tests.
+
+**Copy and paste.** Select a part and press `Ctrl+C`, then `Ctrl+V`: a duplicate lands a little
+down and to the right, already selected and ready to drag. It is a new part with its own
+designator — copy `R4` and you get `R5` — carrying every value across, including the ones easy to
+forget: the model on an op-amp, the number of inputs on a gate, the waveform and duty cycle on a
+generator. Eight identical current-limiting resistors is now eight keystrokes rather than eight
+trips to the palette.
+
+The copy is taken when you press `Ctrl+C` rather than when you paste, so editing or deleting the
+original afterwards does not change what comes out. Repeated pastes cascade down the canvas instead
+of stacking on one spot.
+
+**Box selection.** With the Select tool, drag a box across empty canvas and everything wholly
+inside it is selected — parts and the wires between them. Drag any one of them and the whole group
+moves, keeping its shape. `R` rotates all of it, `Delete` removes all of it.
+
+**And a group copies with its wiring.** Draw a box round an input stage you like, copy it, paste
+it, and you have the stage again — wired the way you drew it, a working circuit rather than a pile
+of parts that happen to look right. Paste twice and the two are independent, each wired inside
+itself and neither joined to the other. A wire only comes across when both of its ends are in the
+group; one leaving the selection went to something that is not being duplicated, so there is
+nothing for the copy to attach to.
+
+**The palette and the example browser open one group at a time.** Both start closed, and opening a
+group closes whichever was open. Sixteen palette categories and twelve example groups opened
+independently stack up past the height of the panel; kept to one, every heading and its count stays
+in view. **All** in the palette header is the way out of it, and a search in the example browser
+still opens everything it matched — a match folded away inside a closed group is the same as no
+match at all.
+
+**The user guide is now a PDF as well.** Seventy-six pages, with a title page, a two-column
+contents of all seventy headings, the screenshots in place and the tables intact. It is attached to
+this release alongside the binaries and checksummed with them, and `./scripts/build-guide.sh`
+builds it from the same Markdown — nothing is duplicated, so the PDF cannot drift from the guide on
+GitHub. `PAPER=Letter` for US paper.
+
+### Fixed
+
+- **`Ctrl+V` switched tools instead of pasting.** `V` on its own selects the Select tool, and the
+  canvas looked at the plain letters before the modifiers.
+- **Selection could have leaked into exports.** Highlighting several parts at once meant the
+  renderer could no longer take the selection from a single property, so a PNG of a circuit risked
+  depending on what happened to be highlighted when it was taken. Rendering now takes an explicit
+  option and the exporter turns it off.
+
 ## [0.27.0] - 2026-09-20
 
 Every component in the palette now has a worked example. That was not true of any previous
