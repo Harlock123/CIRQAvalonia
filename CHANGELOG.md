@@ -8,6 +8,11 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-09-19
+
+Noise, and the parts that exist because of it. The palette holds 150 components in 16 categories,
+and 1247 tests measure them against closed-form answers.
+
 **A noise source**, and with it the reason half the analog parts in the palette exist. Every
 circuit here has been perfectly clean until now, which is the one way in which none of them
 resembled a real one.
@@ -778,7 +783,8 @@ First public build of CirqAvalonia — an electronic circuit analyzer and mixed-
 
 **501 tests** measure the solver against closed-form answers rather than recorded output.
 
-[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.20.0...HEAD
+[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.21.0...HEAD
+[0.21.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.20.0...v0.21.0
 [0.20.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.19.0...v0.20.0
 [0.19.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.17.0...v0.18.0
