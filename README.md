@@ -32,7 +32,7 @@ Core ← Engine ← Components ← UI, which keeps the whole engine headless-tes
 
 ```bash
 dotnet run --project src/Cirq.UI     # the editor
-dotnet test                          # 1944 tests
+dotnet test                          # 1976 tests
 ./scripts/build-guide.sh             # the user guide as a PDF
 ```
 
@@ -258,6 +258,7 @@ Tests measure the solver against closed-form answers rather than recorded output
 | UI | Background transport, probe decimation, reflection-built inspector, dirty tracking, every example compiles, runs, saves and reopens, and both grouped lists opening one group at a time — starting closed, the open one closing as the next opens, bulk toggles exempt, and a search opening everything it matched and restoring the open group when cleared |
 | Copy and paste | A duplicate carrying every parameter including the model on an op-amp and the input count on a gate, its own designator and identity, a clipboard that survives the original being edited or deleted, repeated pastes cascading rather than stacking, an undoable paste, and every one of the 164 palette parts surviving the round trip |
 | Hover cards | A part described where it sits — designator, type, value, settings in operable-first order, a long list cut with a count, an oversized value shortened, the violations behind a red ring carried as words, and every one of the 164 palette parts describable without throwing |
+| Memory and SPI | A memory whose contents are typed in and read back with the circuit's own writes showing, a dump that round-trips and skips runs of zeros, a counter walking its addresses and every stored byte reaching the bus, a reset restoring the preset, a transparent latch that follows while open and holds what it saw, and an SPI converter whose code the master decodes exactly where the datasheet says |
 | New devices | Tri-state outputs genuinely releasing a bus where a pull-down alone then decides it, a CAN bus going dominant whenever any node sends a zero and the recessive node knowing it lost, an IGBT conducting with a voltage offset where a MOSFET holds a resistance and still passing current after its gate has gone, a photodiode linear across decades with a thousandth of a phototransistor's current and saturating when its load resistor is too big, and a synchronous counter whose carry is gated by the enable that chains it |
 | Box selection | A part caught only when wholly inside the box and not when clipped, captions excluded from the test, a group copying with the wires between its members and without the ones leaving it, the copy keeping its shape, two pastes giving two separately wired groups, and a copied divider solving to the same midpoint voltage as the original |
 | Example browser | Every example filed under exactly one group and no group left empty or enormous, the flattened list carrying the group each came from, opening with something already described, searching narrowing to what matches across name, description and group, a search opening whatever it matched, an empty result saying so, selecting one row unmarking the rest, and opening and cancelling each closing with and without a choice |
@@ -396,7 +397,7 @@ forty-four thousand samples a second on time for ever, and a file makes the same
 and assertable. The WAV reader and writer are a couple of hundred lines here rather than a
 dependency shipped for six runtime identifiers.
 
-Seventy-two worked circuits ship with it, grouped and searchable in **File > Examples...** rather
+Seventy-four worked circuits ship with it, grouped and searchable in **File > Examples...** rather
 than piled into a submenu — Fundamentals, Analog, Power Supplies, Switching & Motors, Digital
 Logic, Timers & Oscillators, Buses & Interfaces, Sensors, Signal Integrity & RF, Audio, Displays
 and Development Boards. Each one is run by the test suite and asserted against the thing it exists to show, so a

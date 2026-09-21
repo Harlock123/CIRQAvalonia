@@ -118,6 +118,10 @@ public static class Examples
             new("LED Chaser", "4017 walking a lit output along ten LEDs", LoadLedChaser),
             new("Staircase Generator", "4040 addressing a 4051 to step through a resistor ladder",
                 LoadStaircase),
+            new("Addressed Memory", "A counter walking a ROM, and a latch holding what came back",
+                LoadAddressedMemory),
+            new("Shared Bus", "Two transceivers taking turns on eight wires — the only tri-state in here",
+                LoadSharedBus),
             new("Ring Oscillator", "Three inverters with unequal delays", LoadRingOscillator),
         ]),
 
@@ -149,8 +153,8 @@ public static class Examples
                 LoadCurrentSensing),
             new("CAN Arbitration", "Two nodes talking at once, and why that is not a collision",
                 LoadCanArbitration),
-            new("Shared Bus", "Two transceivers taking turns on eight wires — the only tri-state in here",
-                LoadSharedBus),
+            new("SPI ADC", "An MCP3008 reading a knob — one transaction, answer and question overlapping",
+                LoadSpiAdc),
             new("Level Shifting", "A 3.3 V part and a 5 V part on the same wires, both ways at once",
                 LoadLevelShifting),
             new("RS-485 Link", "Two transceivers down fifty metres of cable — open SW1 and watch it ring",
@@ -4189,6 +4193,163 @@ public static class Examples
         vm.Scope.VoltsPerDivision = 1.0;
         vm.Scope.AddProbe(diode.Cathode, "Summing junction");
         vm.Scope.AddProbe(amplifier.Output, "Output");
+    }
+
+    /// <summary>
+    /// A counter, a ROM and a latch: something walks through addresses and something else answers
+    /// with what is stored there. That is the shape of every computer ever built.
+    /// </summary>
+    public static void LoadAddressedMemory(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "A counter reading a ROM";
+
+        var supply = Place(circuit, new DcVoltageSource(5.0), -880, 320);
+        var clock = Place(circuit, new ClockSource(400.0), -880, -180);
+
+        // The program counter. Synchronous, so the whole address changes at once and the memory
+        // is never shown a number nobody asked for.
+        var counter = Place(circuit, new Ic74161(), -620, -40);
+
+        // Eight bytes to walk through. Type anything into Contents and the circuit reads it back.
+        var rom = Place(circuit, new MemoryDevice
+        {
+            Contents = "48 45 4C 4C 4F 21 00 FF",
+            IsReadOnly = true,
+        }, -220, -40);
+
+        // The byte the memory answered with, held steady after the memory has let the bus go —
+        // which is what every processor does with the data it fetches.
+        var latch = Place(circuit, new Ic74373(), 240, -40);
+
+        var gnd = Place(circuit, new Ground(), -880, 480);
+        var gnd2 = Place(circuit, new Ground(), -620, 180);
+        var gnd3 = Place(circuit, new Ground(), -220, 220);
+        var gnd4 = Place(circuit, new Ground(), 240, 180);
+
+        circuit.Connect(supply.Negative, gnd.Pin);
+
+        foreach (var ic in new DigitalIc[] { counter, rom, latch })
+            circuit.Connect(ic.Vcc, supply.Positive);
+
+        circuit.Connect(counter.Gnd, gnd2.Pin);
+        circuit.Connect(rom.Gnd, gnd3.Pin);
+        circuit.Connect(latch.Gnd, gnd4.Pin);
+
+        circuit.Connect(counter.Clock, clock.Out);
+        circuit.Connect(counter.MasterReset, supply.Positive);
+        circuit.Connect(counter.ParallelEnable, supply.Positive);
+        circuit.Connect(counter.CountEnableP, supply.Positive);
+        circuit.Connect(counter.CountEnableT, supply.Positive);
+
+        foreach (var data in counter.Data) circuit.Connect(data, gnd2.Pin);
+
+        // Four address bits from the counter; the other seven are tied low, so it walks the first
+        // sixteen bytes over and over.
+        for (var i = 0; i < 4; i++) circuit.Connect(rom.Address[i], counter.Outputs[i]);
+        for (var i = 4; i < MemoryDevice.AddressLines; i++) circuit.Connect(rom.Address[i], gnd3.Pin);
+
+        // Selected and reading throughout, because nothing else is on this bus to take a turn.
+        circuit.Connect(rom.ChipEnable, gnd3.Pin);
+        circuit.Connect(rom.OutputEnable, gnd3.Pin);
+        circuit.Connect(rom.WriteEnable, supply.Positive);
+
+        // The data bus, with a resistor per wire so a released bus reads as nothing rather than
+        // holding whatever was last on it.
+        for (var i = 0; i < 8; i++)
+        {
+            var pull = Place(circuit, new Resistor(10e3), 0 + (i * 34), 300);
+            var pullGround = Place(circuit, new Ground(), 0 + (i * 34), 420);
+
+            pull.RotationDegrees = 90;
+
+            circuit.Connect(rom.Data[i], pull.A);
+            circuit.Connect(pull.B, pullGround.Pin);
+            circuit.Connect(latch.Data[i], rom.Data[i]);
+
+            var load = Place(circuit, new Resistor(10e3), 520 + (i * 34), 120);
+            var loadGround = Place(circuit, new Ground(), 520 + (i * 34), 240);
+
+            load.RotationDegrees = 90;
+
+            circuit.Connect(latch.Outputs[i], load.A);
+            circuit.Connect(load.B, loadGround.Pin);
+        }
+
+        // The latch is left open, so the outputs follow the bus. Close it — tie LE low — and it
+        // freezes the last byte fetched, which is the point of having one.
+        circuit.Connect(latch.LatchEnable, supply.Positive);
+        circuit.Connect(latch.OutputEnable, gnd4.Pin);
+
+        vm.Scope.TimebasePerDivision = 2e-3;
+        vm.Scope.VoltsPerDivision = 2.0;
+        vm.Scope.Layout = ScopeLayout.Tiled;
+        vm.Scope.AddProbe(counter.Outputs[0], "Address bit 0");
+        vm.Scope.AddProbe(rom.Data[0], "Data bit 0");
+        vm.Scope.AddProbe(latch.Outputs[0], "Latched bit 0");
+    }
+
+    /// <summary>
+    /// An SPI converter reading a potentiometer, which is the commonest thing anybody hangs off an
+    /// SPI port — and compulsory on a board with no analog inputs of its own.
+    /// </summary>
+    public static void LoadSpiAdc(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "Reading a voltage over SPI";
+
+        var supply = Place(circuit, new DcVoltageSource(5.0), -620, 260);
+
+        // Three bytes: a start bit, then single-ended and channel zero, then padding for the
+        // answer to come back underneath. The whole conversation is one transaction.
+        var master = Place(circuit, new SpiMaster
+        {
+            Transactions = "01 80 00",
+            ClockFrequency = 200e3,
+        }, -380, -120);
+
+        var adc = Place(circuit, new Mcp3008(), 60, -60);
+        var knob = Place(circuit, new Potentiometer(10e3, 0.6), 420, 120);
+
+        var gnd = Place(circuit, new Ground(), -620, 420);
+        var gnd2 = Place(circuit, new Ground(), -380, 120);
+        var gnd3 = Place(circuit, new Ground(), 60, 220);
+        var gnd4 = Place(circuit, new Ground(), 420, 300);
+
+        knob.RotationDegrees = 90;
+
+        circuit.Connect(supply.Negative, gnd.Pin);
+        circuit.Connect(master.Vcc, supply.Positive);
+        circuit.Connect(master.Gnd, gnd2.Pin);
+
+        circuit.Connect(adc.Vcc, supply.Positive);
+        circuit.Connect(adc.Gnd, gnd3.Pin);
+        circuit.Connect(adc.AnalogGround, gnd3.Pin);
+
+        // Reference tied to the same rail the divider runs from, which makes the reading
+        // ratiometric: supply noise moves both ends and cancels out of the answer.
+        circuit.Connect(adc.Reference, supply.Positive);
+
+        circuit.Connect(master.Clock, adc.Clock);
+        circuit.Connect(master.MasterOut, adc.DataIn);
+        circuit.Connect(master.MasterIn, adc.DataOutPin);
+        circuit.Connect(master.ChipSelect, adc.ChipSelect);
+
+        // Ground at A and the rail at B, so the Wiper control reads as a knob: the tap ratio is
+        // measured from A, and wired the other way round turning it up reads as less.
+        circuit.Connect(knob.A, gnd4.Pin);
+        circuit.Connect(knob.B, supply.Positive);
+        circuit.Connect(knob.Wiper, adc.Inputs[0]);
+
+        // The seven unused channels want tying down rather than left floating.
+        for (var i = 1; i < 8; i++) circuit.Connect(adc.Inputs[i], gnd3.Pin);
+
+        vm.Scope.TimebasePerDivision = 20e-6;
+        vm.Scope.VoltsPerDivision = 2.0;
+        vm.Scope.Layout = ScopeLayout.Tiled;
+        vm.Scope.AddProbe(adc.Clock, "CLK");
+        vm.Scope.AddProbe(adc.DataIn, "MOSI");
+        vm.Scope.AddProbe(adc.DataOutPin, "MISO");
     }
 
     private static T Place<T>(Circuit circuit, T component, double x, double y) where T : CircuitComponent

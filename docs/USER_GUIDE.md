@@ -72,7 +72,7 @@ at the window edge; click the rail to bring it back.
 
 Click a palette entry, then click the canvas. The part lands where you click, snapped to the grid.
 
-The palette holds **169 components in 16 categories**:
+The palette holds **173 components in 16 categories**:
 
 | Category | Count | Contents |
 | --- | --- | --- |
@@ -85,10 +85,10 @@ The palette holds **169 components in 16 categories**:
 | Power | 10 | Fixed and adjustable regulators, TL431 shunt reference, ICL7660 charge pump, MC34063 switching controller, **TP4056 lithium charger** — see [below](#charging-a-lithium-cell) |
 | Analog ICs | 12 | LM741, TL081, LM358, MCP6002 rail-to-rail, NE555, LM311, LM339, LM386 audio amp, INA126 instrumentation amp and an **AD633 analog multiplier** — see [below](#multiplying-two-voltages) |
 | Logic Gates | 7 | AND, OR, NAND, NOR, XOR, XNOR, NOT |
-| 74xx Series | 20 | Counters (including the synchronous **74161**), decoders, flip-flops, shift registers, the **74245 bus transceiver**, multiplexers, Schmitt inverter — see [below](#sharing-a-bus) |
+| 74xx Series | 21 | Counters (including the synchronous **74161**), decoders, flip-flops, shift registers, the **74245 bus transceiver** and **74373 latch**, multiplexers, Schmitt inverter — see [below](#sharing-a-bus) |
 | 40xx Series | 15 | CMOS gates, counters, flip-flops, analog switches and a **4046 phase-locked loop** — see [below](#phase-locked-loops) |
-| Buses | 15 | I2C master, EEPROM, port expander, DS1307 clock, ADS1115 ADC, MCP4725 DAC and INA219 current sensor, SPI master, 1-Wire master and DS18B20 thermometer, serial terminal and device, **RS-485** and **CAN** transceivers, level shifter — see [below](#can-signalling-by-agreement) |
-| Digital I/O | 6 | Logic toggle, clock, rotary encoder, oscillator module, **ADC and DAC bridges** — see [below](#between-the-analog-solver-and-the-logic-engine) |
+| Buses | 16 | I2C master, EEPROM, port expander, DS1307 clock, ADS1115 ADC, MCP4725 DAC and INA219 current sensor, SPI master and **MCP3008 ADC**, 1-Wire master and DS18B20 thermometer, serial terminal and device, **RS-485** and **CAN** transceivers, level shifter — see [below](#can-signalling-by-agreement) |
+| Digital I/O | 8 | Logic toggle, clock, rotary encoder, oscillator module, ADC and DAC bridges, and a **2K × 8 SRAM and ROM** — see [below](#something-worth-addressing) |
 | Sensors & Actuators | 17 | DC motor, LDR, thermistors, buzzers, speaker, microphone, servo, stepper, thermocouple, load cell, HC-SR04 ranger, Hall switch, phototransistor, **reed switch** and **PIR motion sensor** — see [below](#sensors-and-actuators) |
 | Switching & Isolation | 8 | Relay, fuses, optocouplers, ULN2003, H-bridge, **MOSFET gate driver** — see [below](#driving-a-mosfet-gate) |
 | Dev Boards | 4 | Raspberry Pi, Arduino Uno / Nano / Mega — see [below](#development-boards) |
@@ -419,7 +419,7 @@ gets roughly two-thirds of the way each time.
 
 ### The example browser
 
-Everything above is also in **File > Examples...** (`Ctrl+Shift+E`), along with seventy-one others.
+Everything above is also in **File > Examples...** (`Ctrl+Shift+E`), along with seventy-three others.
 
 They are grouped the way the component palette is — Fundamentals, Analog, Power Supplies, Switching
 & Motors, Digital Logic, Timers & Oscillators, Buses & Interfaces, Sensors, Signal Integrity & RF,
@@ -1078,6 +1078,40 @@ feeding one side. Throw `SW1` and the bus changes hands. The inverter between th
 second enable is the whole discipline of a bus in one part: the two enables are opposites, so
 exactly one transceiver is ever driving.
 
+### Something worth addressing
+
+A bus by itself is plumbing. What makes it interesting is having something on the other end of it
+with an **address**, and the **SRAM** and **ROM** in Digital I/O are that: two kilobytes, eleven
+address lines, eight tri-state data lines and three active-low controls, on the pinout of the 6116
+that generations of hobby computers were built from. They are the same part — `IsReadOnly` is the
+only difference, and it decides whether writes are obeyed or ignored.
+
+**You type its contents in and you read them back out.** `Contents` does both. Put hexadecimal
+into it and it loads, with an optional `@addr:` to jump somewhere, so a program at zero and a table
+at 0x100 is written `@000: 3E 01 C3 ... @100: FF 00 ...`. Read the same property afterwards and you
+get what is in the memory *now* — the circuit's own writes included, which is the only way to see
+what a program has been doing. Runs of zeros are skipped on the way out, so a mostly-empty memory
+does not fill the file it is saved in with nothing.
+
+Resetting the simulation puts the typed version back, so a second run gives the same answers
+however much the first one scribbled.
+
+**File > Examples > Addressed Memory** is the smallest thing worth calling a system: a 74161
+counting, a ROM answering, and a 74373 holding the answer. A counter on the address lines and a
+memory on the data lines is, in the sense that matters for understanding one, a computer — something
+walks through addresses and something else says what is stored there. Change the bytes in
+`Contents` and watch different ones come back.
+
+The **74373** in that example is a *transparent latch*, and it is worth knowing why it is not a
+flip-flop. The 7474 and 4013 sample their input on an **edge** and ignore it the rest of the time.
+This one, while its enable is high, is a piece of wire — the outputs simply follow. It remembers
+only when the enable goes low, and what it remembers is whatever the inputs happened to be at that
+instant. In the example the enable is tied high, so it is transparent and the byte flows through;
+tie it low instead and it freezes the last byte fetched, which is exactly what a processor does
+with one. That is also its classic job: on a **multiplexed bus**, where address and data share
+pins, the latch grabs the address half of the cycle so the memory can still see it while the same
+wires carry data.
+
 Wire both enables to the same signal instead and you have **bus contention** — the fault the
 arrangement exists to prevent. One transceiver holds a wire high through a few tens of ohms while
 the other holds it low through a few tens of ohms; the wire sits at half a supply, reads as
@@ -1730,6 +1764,32 @@ bit first with data set while the clock is low — mode zero, which is what near
 
 **File > Examples > I2C EEPROM**, **I2C Clock** and **SPI Shift Register** are all wired up, with
 the bus lines on the scope.
+
+### An SPI converter, and what full duplex is for
+
+The **SPI ADC** is an MCP3008: eight inputs, ten bits, and the commonest thing anybody hangs off an
+SPI port — very nearly compulsory on a Raspberry Pi, which has no analog inputs of its own.
+
+It is the part that shows what **full duplex** actually buys you, because it uses it properly.
+Three bytes go down MOSI — a start bit, then single-ended and three address bits, then padding —
+and the answer comes back up MISO *underneath them*, arriving before the master has finished
+asking. A conversion is one transaction. The I²C ADC beside it needs a write and then a read,
+because I²C only has the one wire and has to take turns on it.
+
+**File > Examples > SPI ADC** reads a potentiometer. Turn `RV1` in the CONTROLS panel and the code
+follows it; the three traces are the clock, the question going out and the answer coming back, and
+they overlap. The master's bytes decode the way every example for this part decodes them:
+`(second & 0x03) << 8 | third`.
+
+The reading is **ratiometric**, and that is the thing to understand about any ADC. The result is
+the input as a fraction of `VREF`, not a voltage. In the example VREF is tied to the same rail the
+potentiometer runs from, so if the supply sags both ends move together and the reading does not
+change — the noise cancels. Tie VREF to a proper reference instead and the reading becomes absolute,
+but the sensor's own supply noise is no longer rejected. That choice is most of ADC accuracy in
+practice, and it is made by deciding which wire goes where.
+
+An input above VREF stops being followed rather than wrapping round, and the part says so — which
+is worth knowing, because a saturated reading looks like a working one that has stopped changing.
 
 ### Reading the circuit itself
 
