@@ -29,15 +29,17 @@ the [README](../README.md), and what changed between releases is in the
 17. [Temperature](#temperature)
 18. [Writing on the schematic](#writing-on-the-schematic)
 19. [Drawing part of a circuit as one block](#drawing-part-of-a-circuit-as-one-block)
-20. [Naming a net instead of drawing it](#naming-a-net-instead-of-drawing-it)
-21. [Checking the circuit](#checking-the-circuit)
-22. [Development boards](#development-boards)
-23. [Saving and loading](#saving-and-loading)
-24. [Exporting](#exporting)
-25. [Appearance](#appearance)
-26. [What version is this](#what-version-is-this)
-27. [Keyboard reference](#keyboard-reference)
-28. [When a circuit will not simulate](#when-a-circuit-will-not-simulate)
+20. [Reusing a block](#reusing-a-block)
+21. [Plotting one trace against another](#plotting-one-trace-against-another)
+22. [Naming a net instead of drawing it](#naming-a-net-instead-of-drawing-it)
+23. [Checking the circuit](#checking-the-circuit)
+24. [Development boards](#development-boards)
+25. [Saving and loading](#saving-and-loading)
+26. [Exporting](#exporting)
+27. [Appearance](#appearance)
+28. [What version is this](#what-version-is-this)
+29. [Keyboard reference](#keyboard-reference)
+30. [When a circuit will not simulate](#when-a-circuit-will-not-simulate)
 
 This guide is also attached to every [release](../../releases) as a PDF, with a contents page and
 the screenshots in place — the same document, laid out for reading away from the machine. Build it
@@ -3076,24 +3078,36 @@ backwards.
 With both in place the textbook result falls out of the arithmetic rather than being asserted into
 it: `dVf/dT ≈ (Vf − Eg − 3·Vt) / T`, which for a silicon junction at 0.6 V is −1.99 mV/°C.
 
+- **A MOSFET's on-resistance climbs about 80 %** between 25 °C and 125 °C, because carrier
+  mobility falls with temperature. That single fact is why every power MOSFET datasheet has a
+  derating curve, and why a switch that measured fine on the bench cooks inside a box. Its
+  threshold falls about 2 mV/°C at the same time — which is why paralleled MOSFETs share current
+  where paralleled bipolars run away: the hot one loses more to mobility than it gains from the
+  threshold, so it conducts *less* and pushes current to its neighbours.
+- **An op-amp's input offset drifts**, and that is the specification separating a precision part
+  from a jellybean. The reason is arithmetic: the offset itself can be trimmed out once, at
+  whatever temperature you trimmed it at, and the drift cannot. The LM741 here drifts 15 µV/°C and
+  the MCP6002 2 µV/°C. On a gain of a thousand across a 60 °C range that is nine hundred
+  millivolts against a hundred and twenty.
+
 ### Which parts carry it
 
-Everything built on a semiconductor junction: diodes of every kind — signal, rectifier, Schottky,
-zener, LED — and bipolar transistors, and therefore everything built out of those, from bridge
-rectifiers to optocouplers to Darlington arrays.
+Everything built on a semiconductor junction — diodes of every kind, and bipolars, and therefore
+everything built out of those from bridge rectifiers to optocouplers to Darlington arrays — plus
+MOSFETs and op-amps.
 
-**Not everything else.** MOSFET thresholds, op-amp offsets, regulator references and the TL431 do
-not yet move with temperature, and the honest consequence is that they come out of a temperature
-sweep as dead straight lines. That is the model being silent, not the part being stable — a real
-TL431 drifts a few tens of millivolts over the range, and a real MOSFET's threshold falls about
-2 mV/°C like everything else. Do not read flatness in those as a result.
+**Not regulator references or the TL431.** Those do not yet move with temperature, and the honest
+consequence is that they come out of a temperature sweep as dead straight lines. That is the model
+being silent, not the part being stable: a real TL431 drifts a few tens of millivolts over the
+range. Do not read flatness in those as a result.
 
 ### Worth trying
 
-Sweep the temperature of the **Transistor Switch** example and watch the bias move — that one is
-all diode and bipolar, so all of it is real. Any zener reference shows its own drift for the same
-reason. And a diode fed from a current source is a thermometer: sweep the temperature with a
-voltage probe on it and you have plotted the calibration curve.
+Sweep the temperature of the **Transistor Switch** example and watch the bias move. Any zener
+reference shows its own drift for the same reason. A diode fed from a current source is a
+thermometer: sweep the temperature with a voltage probe on it and you have plotted the calibration
+curve. And put a current probe on a **MOSFET Driver**'s switch and sweep it to 125 °C — the
+conduction loss is most of the way to double.
 
 ---
 
@@ -3152,9 +3166,65 @@ than P1 through P6.
 ### Editing the inside
 
 Ungroup it, change it, group it again. There is no separate window for the inside of a block, and
-the round trip is lossless.
+the round trip is lossless. To put a block somewhere you can reach it again, see
+[Reusing a block](#reusing-a-block).
 
 Blocks can contain blocks, and the flattening is recursive.
+
+---
+
+## Plotting one trace against another
+
+The scope's **Layout** control has a fourth setting, **Xy**, which puts one trace along the bottom
+instead of time. An **X axis** picker appears beside it; everything else visible is drawn against
+whatever you choose.
+
+Time is not always the interesting axis.
+
+- **I-V curves, live.** Probe the current through a part and the voltage across it, sweep the
+  supply with a slow triangle wave, and the device draws its own characteristic while the circuit
+  runs — a diode's exponential knee, an LED's, a varistor's clamp, a zener turning over in both
+  directions at once.
+- **Transfer characteristics.** Output against input, with the flat bits at each end being exactly
+  where the part gives up. Do this to the **Rail to Rail** example and the three amplifiers' limits
+  are three lines of different length rather than a table.
+- **Hysteresis, as a loop.** This is the one the [DC sweep](#dc-sweeps-and-the-curve-tracer) cannot
+  do, because a sweep only goes one way. Feed a comparator a triangle wave instead, run a
+  transient, and switch to XY: the loop closes on itself and the width of it *is* the hysteresis.
+  Try it on **Noise and Hysteresis**.
+- **Lissajous figures.** Two sines against each other. In phase they collapse to a straight line;
+  a quarter cycle apart they open into a circle; anything between is an ellipse whose shape gives
+  the angle. This is how phase was measured before anything had a phase meter, and it is still the
+  quickest way to null one.
+
+Cursors are hidden in XY mode, because they mark instants and the horizontal axis is no longer
+time. The automatic measurements go on working — they are measurements of each trace, which has
+not changed.
+
+---
+
+## Reusing a block
+
+Grouping makes one block. **Edit > Block Library...** is where one goes so it can be placed again —
+in this circuit, or the next one, or in six months.
+
+Select a block, give it a name, press Save. It appears in the list with its size. Select it and
+press **Place a copy** and a fresh instance lands on the canvas, wired to nothing, with designators
+that do not clash with anything already there — including anything already inside another block.
+
+### A copy, not a reference
+
+This is worth being plain about. Placing a block twice gives two independent sets of parts. Change
+a resistor in one afterwards and the other does not follow, and neither does the saved definition.
+
+That is a real limitation rather than an oversight, and the reason to accept it is that the
+alternative is much worse than it sounds. A live link means every instance's own state — a
+capacitor's charge, a latch's contents, a motor's shaft angle — has to be reconciled with a
+definition that can change underneath it, and it means asking what happens to the wires when a pin
+disappears from a definition that three circuits are already using. Copies are predictable.
+
+The library lives in a file beside the preferences, so it survives restarts and is easy to back up
+or delete.
 
 ---
 
@@ -3458,6 +3528,8 @@ Also available in the app at **Help > Keyboard Shortcuts**.
 | Drag on empty canvas | Box-select everything wholly inside it |
 | `Ctrl` `C` / `Ctrl` `V` | Copy the selection / paste a duplicate of it |
 | `Ctrl` `G` / `Ctrl` `Shift` `G` | Group the selection into a block / ungroup one |
+| Edit > Block Library | Save a block for reuse, or place a copy of a saved one |
+| Scope layout > Xy | Plot one trace against another instead of against time |
 | `Ctrl` `Z` / `Ctrl` `Y` | Undo / redo (`Ctrl` `Shift` `Z` redoes as well) |
 | `Delete` | Delete selection |
 | `Ctrl` `+` / `Ctrl` `-` | Zoom in / out (the numeric keypad's `+` and `-` work too) |

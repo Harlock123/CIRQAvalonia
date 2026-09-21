@@ -1,3 +1,4 @@
+using Cirq.Components.Ics;
 using Cirq.Components.Nonlinear;
 using Cirq.Components.Passive;
 using Cirq.Components.Sources;
@@ -248,6 +249,137 @@ public class TemperatureTests
         // gain-versus-temperature curve shows — and why a bias network that depends on beta is a
         // bias network that drifts.
         Assert.InRange(hot.Beta / cold.Beta, 1.5, 3.0);
+    }
+
+    // ---- MOSFETs -----------------------------------------------------------
+
+    private static (double Resistance, double Threshold) OnState(MosfetModel model, double celsius)
+    {
+        var circuit = new Circuit();
+        var supply = circuit.Add(new DcVoltageSource(12.0));
+        var gate = circuit.Add(new DcVoltageSource(10.0));
+        var load = circuit.Add(new Resistor(12.0));
+        var fet = circuit.Add(new Mosfet(model));
+        var ground = circuit.Add(new Ground());
+
+        circuit.Connect(supply.Negative, ground.Pin);
+        circuit.Connect(gate.Negative, ground.Pin);
+        circuit.Connect(supply.Positive, load.A);
+        circuit.Connect(load.B, fet.Drain);
+        circuit.Connect(fet.Source, ground.Pin);
+        circuit.Connect(fet.Gate, gate.Positive);
+
+        var sim = new CircuitSimulator(circuit);
+        sim.Settings.TemperatureKelvin = celsius + 273.15;
+        sim.Reset();
+        sim.SolveOperatingPoint();
+
+        var across = sim.NodeVoltage(fet.Drain);
+        var current = (12.0 - across) / 12.0;
+
+        return (across / Math.Max(current, 1e-12), model.ThresholdAt(celsius + 273.15));
+    }
+
+    /// <summary>
+    /// The fact every power datasheet's derating curve is about, and the reason a switch that
+    /// measured fine on the bench cooks in a box.
+    /// </summary>
+    [Theory]
+    [InlineData("IRLZ44N")]
+    [InlineData("IRF540")]
+    [InlineData("2N7000")]
+    public void AMosfetsOnResistanceClimbsTowardsDoubleFromRoomTemperatureToAHotOne(string name)
+    {
+        var model = MosfetModel.Library.First(m => m.Name == name);
+
+        var cool = OnState(model, 25).Resistance;
+        var hot = OnState(model, 125).Resistance;
+
+        Assert.InRange(hot / cool, 1.6, 2.1);
+    }
+
+    /// <summary>
+    /// And the threshold falls, which is why paralleled MOSFETs share current where paralleled
+    /// bipolars run away: the hot one loses more to mobility than it gains from the threshold.
+    /// </summary>
+    [Fact]
+    public void TheThresholdFallsAboutTwoMillivoltsPerDegree()
+    {
+        var model = MosfetModel.Irf540;
+
+        var drift = (model.ThresholdAt(398.15) - model.ThresholdAt(298.15)) / 100.0;
+
+        Assert.InRange(drift * 1000, -3.0, -1.0);
+        Assert.Equal(model.ThresholdVoltage, model.ThresholdAt(300.15), 9);
+    }
+
+    // ---- op-amps -----------------------------------------------------------
+
+    /// <summary>
+    /// Offset drift is the specification that separates a precision part from a jellybean, and
+    /// the four models here are deliberately spread across that range.
+    /// </summary>
+    [Fact]
+    public void AnOpAmpsOffsetDriftsAndTheBetterPartsDriftLess()
+    {
+        double Drift(OpAmpModel model) =>
+            Math.Abs(model.OffsetAt(358.15) - model.OffsetAt(298.15)) / 60.0;
+
+        var jellybean = Drift(OpAmpModel.Lm741);
+        var precision = Drift(OpAmpModel.Mcp6002);
+
+        Assert.True(precision < jellybean / 3,
+            $"the CMOS part drifted {precision * 1e6:F1} uV/degC against the 741's {jellybean * 1e6:F1}");
+
+        // And nothing has moved at the temperature the models are quoted at.
+        foreach (var model in OpAmpModel.Library)
+            Assert.Equal(model.InputOffsetVoltage, model.OffsetAt(300.15), 12);
+    }
+
+    /// <summary>
+    /// What drift costs in practice: the same amplifier at a gain of a thousand, warmed up.
+    /// </summary>
+    [Fact]
+    public void ThatDriftReachesTheOutputMultipliedByTheGain()
+    {
+        double OutputAt(double celsius)
+        {
+            var circuit = new Circuit();
+            var positive = circuit.Add(new DcVoltageSource(15.0));
+            var negative = circuit.Add(new DcVoltageSource(-15.0));
+            var amp = circuit.Add(new OperationalAmplifier(OpAmpModel.Lm741));
+            var input = circuit.Add(new Resistor(1e3));
+            var feedback = circuit.Add(new Resistor(1e6));
+            var ground = circuit.Add(new Ground());
+
+            // Both sources' negatives at ground; the negative rail's own value is what makes it
+            // negative. Wiring its positive to ground instead puts +15 V on the negative supply
+            // pin, and the amplifier then sits with both rails at the same potential.
+            circuit.Connect(positive.Negative, ground.Pin);
+            circuit.Connect(negative.Negative, ground.Pin);
+            circuit.Connect(amp.PositiveSupply, positive.Positive);
+            circuit.Connect(amp.NegativeSupply, negative.Positive);
+
+            // Inverting, gain of a thousand, input grounded — so the output is all offset.
+            circuit.Connect(amp.NonInverting, ground.Pin);
+            circuit.Connect(input.A, ground.Pin);
+            circuit.Connect(input.B, amp.Inverting);
+            circuit.Connect(feedback.A, amp.Inverting);
+            circuit.Connect(feedback.B, amp.Output);
+
+            var sim = new CircuitSimulator(circuit);
+            sim.Settings.TemperatureKelvin = celsius + 273.15;
+            sim.Reset();
+            sim.SolveOperatingPoint();
+
+            return sim.NodeVoltage(amp.Output);
+        }
+
+        var room = OutputAt(27);
+        var hot = OutputAt(85);
+
+        // 15 uV/degC over 58 degrees is 0.87 mV of offset, times a thousand: most of a volt.
+        Assert.InRange(Math.Abs(hot - room), 0.5, 1.2);
     }
 
     // ---- sweeping it -------------------------------------------------------

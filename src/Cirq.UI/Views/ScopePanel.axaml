@@ -38,6 +38,14 @@
         <ComboBox FontSize="12" MinWidth="100" SelectedItem="{Binding Layout}"
                   ItemsSource="{Binding Source={x:Static vm:ScopeViewModel.LayoutOptions}}" />
 
+        <!-- Only in XY, where the horizontal axis is a signal and has to be chosen. -->
+        <TextBlock Classes="label" Text="X axis" VerticalAlignment="Center"
+                   IsVisible="{Binding IsXy}" />
+        <ComboBox FontSize="12" MinWidth="110" IsVisible="{Binding IsXy}"
+                  ItemsSource="{Binding Probes}" DisplayMemberBinding="{Binding Label}"
+                  SelectedItem="{Binding XyHorizontal, Mode=TwoWay}"
+                  ToolTip.Tip="Which trace goes along the bottom. Everything else is drawn against it." />
+
         <Separator Classes="vertical" />
 
         <CheckBox FontSize="12" Content="AC couple" IsChecked="{Binding AcCoupleAll}"

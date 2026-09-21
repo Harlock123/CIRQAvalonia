@@ -52,6 +52,7 @@
                   Command="{Binding GroupSelectionCommand}" />
         <MenuItem Header="_Ungroup Block" InputGesture="Ctrl+Shift+G"
                   Command="{Binding UngroupSelectionCommand}" />
+        <MenuItem Header="Block _Library..." Command="{Binding ShowBlockLibraryCommand}" />
         <Separator />
         <MenuItem Header="_Rotate" InputGesture="R" Command="{Binding RotateSelectionCommand}" />
         <MenuItem Header="_Delete" InputGesture="Delete" Command="{Binding DeleteSelectionCommand}" />

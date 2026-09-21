@@ -15,8 +15,24 @@ public sealed record OpAmpModel(
     double OutputSwingHeadroom,
     double InputOffsetVoltage,
     double InputBiasCurrent,
-    double QuiescentCurrent)
+    double QuiescentCurrent,
+    double OffsetDriftPerKelvin = 15e-6)
 {
+    /// <summary>
+    /// Input offset voltage at a temperature.
+    /// <para>
+    /// Offset <i>drift</i> is the specification that separates a precision part from a jellybean,
+    /// and the reason is arithmetic: the offset itself can be trimmed out once, at whatever
+    /// temperature you trimmed it at, and the drift cannot. A part with a millivolt of offset and
+    /// no drift is a better part than one with a hundred microvolts that moves by ten every
+    /// degree, and on a gain of a thousand across an equipment's operating range the difference
+    /// is volts.
+    /// </para>
+    /// </summary>
+    public double OffsetAt(double kelvin) =>
+        InputOffsetVoltage +
+        (OffsetDriftPerKelvin * (kelvin - Cirq.Components.Nonlinear.JunctionTemperature.NominalKelvin));
+
     private readonly double? _negativeSwingHeadroom;
 
     /// <summary>
@@ -48,11 +64,13 @@ public sealed record OpAmpModel(
         OutputSwingHeadroom: 1.5,
         InputOffsetVoltage: 1e-3,
         InputBiasCurrent: 80e-9,
-        QuiescentCurrent: 1.7e-3);
+        QuiescentCurrent: 1.7e-3,
+        OffsetDriftPerKelvin: 15e-6);
 
     /// <summary>JFET input, fast and high impedance.</summary>
     public static readonly OpAmpModel Tl081 = new(
-        "TL081", 200_000, 3e6, 13e6, 1e12, 100, 1.5, 3e-3, 30e-12, 1.4e-3);
+        "TL081", 200_000, 3e6, 13e6, 1e12, 100, 1.5, 3e-3, 30e-12, 1.4e-3,
+        OffsetDriftPerKelvin: 18e-6);
 
     /// <summary>
     /// The single-supply workhorse. Its output gets closer to the rails than an LM741's, which is
@@ -66,7 +84,8 @@ public sealed record OpAmpModel(
     /// </para>
     /// </summary>
     public static readonly OpAmpModel Lm358 = new(
-        "LM358", 100_000, 1e6, 0.3e6, 2e6, 100, 1.5, 2e-3, 45e-9, 0.7e-3)
+        "LM358", 100_000, 1e6, 0.3e6, 2e6, 100, 1.5, 2e-3, 45e-9, 0.7e-3,
+        OffsetDriftPerKelvin: 7e-6)
     {
         NegativeSwingHeadroom = 0.02,
     };
@@ -82,7 +101,8 @@ public sealed record OpAmpModel(
     /// </para>
     /// </summary>
     public static readonly OpAmpModel Mcp6002 = new(
-        "MCP6002", 112_000, 1e6, 0.6e6, 1e13, 100, 0.025, 2e-3, 1e-12, 100e-6);
+        "MCP6002", 112_000, 1e6, 0.6e6, 1e13, 100, 0.025, 2e-3, 1e-12, 100e-6,
+        OffsetDriftPerKelvin: 2e-6);
 
     /// <summary>
     /// Four of the <see cref="Lm358"/> in one package, and electrically that is all it is — same

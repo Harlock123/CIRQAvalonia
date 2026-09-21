@@ -177,7 +177,15 @@ public class NewPartExampleTests
 
     /// <summary>
     /// And unlike a load resistor, it does not saturate: a hundred times the light gives a hundred
-    /// times the output, which is the whole reason the circuit is built this way.
+    /// times the signal, which is the whole reason the circuit is built this way.
+    /// <para>
+    /// Measured against the dark output rather than against zero, and that is not a convenience.
+    /// A real transimpedance amplifier's output is the photocurrent through the feedback resistor
+    /// <i>plus</i> the amplifier's own input offset times its noise gain, and in the dark the
+    /// second term is all there is. Subtracting the dark reading is exactly what an instrument
+    /// built round one does, and without it the ratio at low light measures the op-amp rather than
+    /// the diode.
+    /// </para>
     /// </summary>
     [Fact]
     public void AndStaysLinearWhereALoadResistorWouldHaveGivenUp()
@@ -195,9 +203,14 @@ public class NewPartExampleTests
             return Math.Abs(vm.Simulation.Simulator!.NodeVoltage(amplifier.Output));
         }
 
-        var dim = OutputAt(10);
-        var bright = OutputAt(1000);
+        var dark = OutputAt(0);
+        var dim = OutputAt(10) - dark;
+        var bright = OutputAt(1000) - dark;
 
         Assert.Equal(100.0, bright / dim, 15.0);
+
+        // And the dark reading is not nothing: it is the offset, which is what sets how little
+        // light this circuit can actually resolve.
+        Assert.True(dark > 0);
     }
 }

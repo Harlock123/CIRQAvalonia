@@ -19,8 +19,40 @@ public sealed record MosfetModel(
     double ThresholdVoltage,
     double TransconductanceParameter,
     double ChannelLengthModulation,
-    bool HasBodyDiode = true)
+    bool HasBodyDiode = true,
+    double ThresholdDriftPerKelvin = -2e-3,
+    double MobilityExponent = -2.1)
 {
+    /// <summary>
+    /// Threshold voltage at a temperature. It falls as the part warms, at a couple of millivolts a
+    /// degree — the same figure as a diode's forward drop and for related reasons.
+    /// <para>
+    /// It is also why paralleled MOSFETs share current better than paralleled bipolars do. A
+    /// bipolar that gets hot conducts <i>more</i> and gets hotter; a MOSFET that gets hot has a
+    /// lower threshold but a much worse mobility, and the mobility wins — so it conducts less and
+    /// pushes current to its neighbours.
+    /// </para>
+    /// </summary>
+    public double ThresholdAt(double kelvin) =>
+        ThresholdVoltage + (ThresholdDriftPerKelvin * (kelvin - JunctionTemperature.NominalKelvin));
+
+    /// <summary>
+    /// Transconductance parameter at a temperature. Carrier mobility falls as a power of the
+    /// temperature, and that is the reason a power MOSFET's on-resistance climbs towards double
+    /// between room temperature and a hot heatsink — which is what every derating curve on every
+    /// power datasheet is about.
+    /// <para>
+    /// The exponent is fitted to those derating curves rather than taken from the physics. Silicon
+    /// mobility alone goes as about T to the minus three halves, which on its own gives a ratio
+    /// near 1.5 where the datasheets say 1.8 — because a real part's on-resistance is not only its
+    /// channel, and the metallisation and bond wires warm up too. Since the parameter's job here
+    /// is to reproduce the derating, it is fitted to it.
+    /// </para>
+    /// </summary>
+    public double TransconductanceAt(double kelvin) =>
+        TransconductanceParameter *
+        Math.Pow(Math.Max(kelvin, 1.0) / JunctionTemperature.NominalKelvin, MobilityExponent);
+
     /// <summary>Small-signal logic-level N-channel, a few hundred milliamps.</summary>
     public static readonly MosfetModel N2N7000 = new("2N7000", MosfetChannel.NChannel, 2.0, 0.05, 0.02);
 
@@ -119,6 +151,8 @@ public partial class Mosfet : CircuitComponent, ICurrentReporting
         var polarity = Polarity;
         _limitedThisIteration = false;
 
+        CacheForTemperature(state);
+
         var vd = system.IterationVoltage(d);
         var vg = system.IterationVoltage(g);
         var vs = system.IterationVoltage(s);
@@ -160,10 +194,24 @@ public partial class Mosfet : CircuitComponent, ICurrentReporting
     /// Returns the drain current and its two conductances for a channel in its own convention,
     /// where <paramref name="vds"/> is non-negative.
     /// </summary>
+    /// <summary>
+    /// The two parameters that move with temperature, worked out once per solve rather than once
+    /// per Newton iteration — they depend only on the circuit's temperature, and the inner loop
+    /// runs a hundred times for every time point.
+    /// </summary>
+    private void CacheForTemperature(SimulationState state)
+    {
+        _threshold = Model.ThresholdAt(state.TemperatureKelvin);
+        _transconductance = Model.TransconductanceAt(state.TemperatureKelvin);
+    }
+
+    private double _threshold;
+    private double _transconductance;
+
     private (double Current, double Gm, double Gds) Evaluate(double vgs, double vds)
     {
-        var overdrive = vgs - Model.ThresholdVoltage;
-        var k = Math.Max(Model.TransconductanceParameter, 1e-12);
+        var overdrive = vgs - _threshold;
+        var k = Math.Max(_transconductance, 1e-12);
         var lambda = Math.Max(Model.ChannelLengthModulation, 0);
 
         if (overdrive <= 0)
@@ -224,6 +272,8 @@ public partial class Mosfet : CircuitComponent, ICurrentReporting
     public override void CommitTimeStep(MnaSystem system, SimulationState state)
     {
         var polarity = Polarity;
+
+        CacheForTemperature(state);
 
         var vd = system.NodeVoltage(Drain);
         var vg = system.NodeVoltage(Gate);

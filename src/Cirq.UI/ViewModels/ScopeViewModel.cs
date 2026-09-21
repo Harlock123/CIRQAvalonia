@@ -17,6 +17,19 @@ public enum ScopeLayout
     Stacked,
     /// <summary>Each trace gets its own sub-plot.</summary>
     Tiled,
+
+    /// <summary>
+    /// One trace against another instead of against time.
+    /// <para>
+    /// Time is not always the interesting axis. Plotting a device's current against the voltage
+    /// across it draws its I-V curve while the circuit runs; plotting an output against its input
+    /// draws the transfer characteristic, and if the input sweeps up and back again a comparator's
+    /// hysteresis comes out as the loop it actually is — which a DC sweep cannot show, because a
+    /// sweep only goes one way. Two sine waves against each other give the Lissajous figure that
+    /// is how phase was measured before anything had a phase meter.
+    /// </para>
+    /// </summary>
+    Xy,
 }
 
 /// <summary>
@@ -44,6 +57,73 @@ public sealed partial class ScopeViewModel : ObservableObject
     /// <summary>Layout choices offered by the scope toolbar.</summary>
     public static IReadOnlyList<ScopeLayout> LayoutOptions { get; } =
         Enum.GetValues<ScopeLayout>();
+
+    /// <summary>
+    /// Which trace goes on the horizontal axis in XY mode. Null means the first visible one, which
+    /// is what somebody switching to XY with two traces up almost always wants.
+    /// </summary>
+    [ObservableProperty]
+    public partial SignalProbe? XyHorizontal { get; set; }
+
+    /// <summary>True while the scope is plotting one trace against another rather than against time.</summary>
+    public bool IsXy => Layout == ScopeLayout.Xy;
+
+    partial void OnLayoutChanged(ScopeLayout value) => OnPropertyChanged(nameof(IsXy));
+
+    /// <summary>
+    /// The pairs to draw in XY mode: the trace on the horizontal axis, and each other visible
+    /// trace against it.
+    /// </summary>
+    public (SignalProbe Horizontal, IReadOnlyList<SignalProbe> Vertical) XyPairs()
+    {
+        var visible = Probes.Where(p => p.IsVisible).ToList();
+
+        if (visible.Count == 0) return (new SignalProbe(), []);
+
+        var horizontal = XyHorizontal is { } chosen && visible.Contains(chosen)
+            ? chosen
+            : visible[0];
+
+        return (horizontal, [.. visible.Where(p => !ReferenceEquals(p, horizontal))]);
+    }
+
+    /// <summary>
+    /// Resamples one trace against another over a window, pairing them by time rather than by
+    /// position in their buffers.
+    /// <para>
+    /// By time, because the two buffers need not line up: a probe added later is shorter, and a
+    /// probe whose kind was changed has been cleared. Interpolating the vertical trace at each of
+    /// the horizontal one's sample times is right whatever the two have been through.
+    /// </para>
+    /// </summary>
+    public static (double[] X, double[] Y) XySeries(
+        SignalProbe horizontal, SignalProbe vertical, double from, double to)
+    {
+        var xs = horizontal.HistoryBuffer.ToArray();
+        var ys = vertical.HistoryBuffer.ToArray();
+
+        if (xs.Length < 2 || ys.Length < 2) return ([], []);
+
+        List<double> x = [];
+        List<double> y = [];
+
+        foreach (var sample in xs)
+        {
+            if (sample.Time < from) continue;
+            if (sample.Time > to) break;
+
+            if (ValueAt(ys, sample.Time) is not { } paired) continue;
+
+            x.Add(sample.Value);
+            y.Add(paired);
+        }
+
+        // Fewer than two paired points is not a curve, and ScottPlot would rather not be handed
+        // a single one.
+        if (x.Count < 2) return ([], []);
+
+        return ([.. x], [.. y]);
+    }
 
     /// <summary>Seconds per horizontal division.</summary>
     [ObservableProperty]

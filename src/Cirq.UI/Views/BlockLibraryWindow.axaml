@@ -1,0 +1,52 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:Cirq.UI.ViewModels"
+        x:Class="Cirq.UI.Views.BlockLibraryWindow"
+        x:DataType="vm:BlockLibraryViewModel"
+        Title="Block Library"
+        Width="620" Height="470"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource PanelBackground}">
+
+  <DockPanel>
+
+    <Border DockPanel.Dock="Top" Padding="14,12"
+            BorderBrush="{DynamicResource PanelBorder}" BorderThickness="0,0,0,1">
+      <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+        <TextBlock Text="Save the selected block as" VerticalAlignment="Center" />
+        <TextBox Width="190" Text="{Binding NameToSave, Mode=TwoWay}" />
+        <Button Content="Save" Command="{Binding SaveCommand}" Padding="16,5" />
+      </StackPanel>
+    </Border>
+
+    <Border DockPanel.Dock="Bottom" Padding="14,10"
+            BorderBrush="{DynamicResource PanelBorder}" BorderThickness="0,1,0,0">
+      <DockPanel>
+        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8">
+          <Button Content="Remove" Command="{Binding RemoveCommand}" Padding="14,5" />
+          <Button Content="Place a copy" Command="{Binding PlaceCommand}" Padding="16,5" />
+        </StackPanel>
+        <TextBlock Text="{Binding Status}" VerticalAlignment="Center" Opacity="0.85"
+                   TextTrimming="CharacterEllipsis" />
+      </DockPanel>
+    </Border>
+
+    <TextBlock IsVisible="{Binding IsEmpty}"
+               HorizontalAlignment="Center" VerticalAlignment="Center"
+               Opacity="0.7" TextAlignment="Center"
+               Text="Nothing saved yet.&#x0a;&#x0a;Select two or more parts, press Ctrl+G to group them&#x0a;into a block, then save it here under a name.&#x0a;&#x0a;What you place is a copy, not a reference — two instances&#x0a;are independent, and editing one leaves the other alone." />
+
+    <ListBox ItemsSource="{Binding Blocks}" SelectedItem="{Binding Selected, Mode=TwoWay}"
+             IsVisible="{Binding !IsEmpty}" Background="Transparent">
+      <ListBox.ItemTemplate>
+        <DataTemplate>
+          <StackPanel Margin="0,3">
+            <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding Summary}" FontSize="11" Opacity="0.7" />
+          </StackPanel>
+        </DataTemplate>
+      </ListBox.ItemTemplate>
+    </ListBox>
+
+  </DockPanel>
+</Window>

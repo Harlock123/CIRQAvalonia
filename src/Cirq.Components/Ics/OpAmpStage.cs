@@ -51,7 +51,7 @@ internal sealed class OpAmpStage
         var mid = (railHigh + railLow) * 0.5;
         var half = Math.Max((railHigh - railLow) * 0.5, 1e-6);
 
-        StampInputStage(system, model, inP, inN, gain);
+        StampInputStage(system, state, model, inP, inN, gain);
         StampGainNode(system, state, model, gain);
         StampOutputStage(system, model, gain, outNode, branch);
 
@@ -65,7 +65,8 @@ internal sealed class OpAmpStage
     }
 
     /// <summary>Differential input impedance, bias currents, and the slew-limited transconductance.</summary>
-    private void StampInputStage(MnaSystem system, OpAmpModel model, int inP, int inN, int gain)
+    private void StampInputStage(
+        MnaSystem system, SimulationState state, OpAmpModel model, int inP, int inN, int gain)
     {
         system.StampConductance(inP, inN, 1.0 / Math.Max(model.InputResistance, 1.0));
 
@@ -76,7 +77,15 @@ internal sealed class OpAmpStage
             system.StampCurrentSource(inN, -1, model.InputBiasCurrent);
         }
 
-        var vd = system.IterationVoltageAcross(inP, inN) + model.InputOffsetVoltage;
+        // The offset at the circuit's temperature, not the datasheet's. Drift is the half of an
+        // offset specification that cannot be trimmed away.
+        var offset = model.OffsetAt(state.TemperatureKelvin);
+
+        // What the pins are actually at, and what the input stage thinks they are at. The two
+        // differ by the offset, and keeping them apart is the whole of making an offset work —
+        // see the companion stamp below.
+        var terminal = system.IterationVoltageAcross(inP, inN);
+        var vd = terminal + offset;
 
         var islew = model.SlewCurrent;
         var gm = model.Transconductance;
@@ -100,9 +109,17 @@ internal sealed class OpAmpStage
         // changes from a limit cycle into a walk.
         var conductance = Math.Abs(vd) > 1e-12 ? current / vd : gm;
 
-        // i = gm_eff·vd + i0 injected into the gain node.
+        // i = gm_eff·(v + Voff) + i0 injected into the gain node, linearised about the present
+        // iterate.
+        //
+        // The constant term is taken against the <i>terminal</i> difference and not against vd,
+        // and that distinction is the entire reason an input offset does anything at all. The
+        // controlled source is driven by the pins, which know nothing about the offset; subtracting
+        // conductance·vd here would take the offset straight back out again, exactly cancelling it
+        // at convergence. Written this way the solved answer is f(v + Voff), which is what an
+        // offset means.
         system.StampVccs(-1, gain, inP, inN, conductance);
-        system.AddRhs(gain, current - conductance * vd);
+        system.AddRhs(gain, current - conductance * terminal);
 
     }
 

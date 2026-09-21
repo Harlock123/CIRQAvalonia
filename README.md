@@ -32,7 +32,7 @@ Core ← Engine ← Components ← UI, which keeps the whole engine headless-tes
 
 ```bash
 dotnet run --project src/Cirq.UI     # the editor
-dotnet test                          # 2262 tests
+dotnet test                          # 2290 tests
 ./scripts/build-guide.sh             # the user guide as a PDF
 ```
 
@@ -187,15 +187,21 @@ and should not be: one is a measurement of the circuit, the other a measurement 
 The whole circuit sits at an **ambient temperature**, saved with the file and sweepable like any
 other parameter. Every semiconductor junction reads it, so it moves forward drops, transistor gains
 and leakage together — a silicon diode falls about 2 mV/°C, which is the figure every
-temperature-compensated circuit is built around. Junction-based models carry it; MOSFET
-thresholds, op-amp offsets and regulator references do not yet, and come out of a temperature sweep
-flat because the model is silent rather than because the part is stable.
+temperature-compensated circuit is built around. Junctions, MOSFETs and op-amps
+carry it — a power MOSFET's on-resistance climbs about 80 % from 25 °C to 125 °C, which is what
+every derating curve is about. Regulator references and the TL431 do not yet, and come out of a
+temperature sweep flat because the model is silent rather than because the part is stable.
 
 Part of a circuit can be drawn as a **block**: select it, press Ctrl+G, and it becomes one symbol
 with a pin wherever a wire crossed the boundary. The hierarchy is flattened before anything is
 solved, and the parts are moved inside rather than copied, so a block changes nothing — not the
 answer, not a probe attached to something inside it, and not what you get back on ungrouping.
+A block can be **saved to a library** and placed again, here or in another circuit — as a copy
+rather than a reference, which the docs say plainly rather than implying a link that is not there.
 **Notes, headings and boxes** can be put on the drawing too, and exports carry them.
+
+The scope also plots **one trace against another** instead of against time, which draws an I-V
+curve, a transfer characteristic or a hysteresis loop while the circuit runs.
 
 Probes measure voltage, current, logic level, the **difference** between two points, or the
 **power** those two things multiply to. And **tolerance analysis** rebuilds the circuit a few
@@ -291,7 +297,10 @@ Tests measure the solver against closed-form answers rather than recorded output
 | Copy and paste | A duplicate carrying every parameter including the model on an op-amp and the input count on a gate, its own designator and identity, a clipboard that survives the original being edited or deleted, repeated pastes cascading rather than stacking, an undoable paste, and every one of the 183 palette parts surviving the round trip |
 | Hover cards | A part described where it sits — designator, type, value, settings in operable-first order, a long list cut with a count, an oversized value shortened, the violations behind a red ring carried as words, and every one of the 183 palette parts describable without throwing |
 | Memory and SPI | A memory whose contents are typed in and read back with the circuit's own writes showing, a dump that round-trips and skips runs of zeros, a counter walking its addresses and every stored byte reaching the bus, a reset restoring the preset, a transparent latch that follows while open and holds what it saw, and an SPI converter whose code the master decodes exactly where the datasheet says |
+| Temperature (MOSFET and op-amp) | A power MOSFET's on-resistance climbing towards double between room temperature and a hot heatsink, its threshold falling about two millivolts a degree, an op-amp's offset drifting with the CMOS part drifting several times less than the bipolar one, every parameter exactly nominal at 27 °C, that drift reaching the output multiplied by the noise gain, and the parts the guide says carry no temperature still carrying none |
 | Temperature | A silicon diode's forward drop falling about two millivolts a degree and a Schottky's falling less steeply, the same coefficient at both ends of the range rather than only near room temperature, LEDs falling too, saturation current roughly doubling every ten degrees, a bipolar's base-emitter voltage falling while its gain climbs by half again across the range, every parameter exactly nominal at the 27 °C the models are quoted at, a temperature sweep coming out a straight line and putting the circuit back afterwards, and a circuit carrying its own temperature through a save |
+| Block library | A block saved and rebuilt with its contents, surviving a restart, two instances that share no object, identity or designator and both solve correctly, editing one leaving the other alone, saving over a name replacing it, nesting surviving the round trip, and a damaged library file being an empty one rather than a crash |
+| XY mode | The first visible trace taken as the horizontal axis unless another is chosen, a hidden trace being neither, y = 2x coming out as exactly that, two sines a quarter cycle apart drawing a unit circle and the same two in phase collapsing to a line, and traces of different lengths paired by time rather than by index |
 | Blocks | Grouping part of a circuit changing what it solves to by nothing at all, and ungrouping changing it back; a pin appearing wherever a wire crossed the boundary and two wires onto one inner terminal sharing one pin; wires wholly inside moving inside; a non-linear part inside a block still solving as itself; a transient running through one unchanged; a block inside a block flattening the same way; every part appearing exactly once in the flattened list; a probe on a part that goes inside a block still reading it; and all of it surviving a save, nesting included |
 | Annotations | Notes and boxes that change no answer to the last bit, stay out of the bill of materials, wrap on words with the height following, keep explicit line breaks, size themselves where a part is sized by its pins, fall inside the bounds an export frames to, and raise nothing in the rule check |
 | Protocol decoding | Synthetic transactions decoded back to the bytes they were built from, and then the shipped examples decoded to what they actually contain: the EEPROM example's whole conversation including the restart between the write and the read and the master's deliberate NACK on the last byte, the SPI converter's answer arriving underneath the question with the ten-bit code landing where the knob is, the serial link's text, and a DS18B20's SKIP ROM and WRITE SCRATCHPAD with its three configuration bytes. Plus the refusals: a capture too coarse to decode reported rather than turned into shifted bytes, a CAN trace carrying no frame reported rather than parsed into one, a wrong bit rate caught by bit stuffing's own invariant, and the clock edge that sets up an I²C stop condition not counted as a ninth data bit |

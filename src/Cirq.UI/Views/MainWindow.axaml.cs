@@ -91,6 +91,7 @@ public partial class MainWindow : Window
         viewModel.RequestBusDecode += async (_, _) => await ShowBusDecodeAsync();
         viewModel.RequestMonteCarlo += async (_, _) => await ShowMonteCarloAsync();
         viewModel.RequestConditions += async (_, _) => await ShowConditionsAsync();
+        viewModel.RequestBlockLibrary += async (_, _) => await ShowBlockLibraryAsync();
         viewModel.RequestExamples += async (_, _) => await ShowExamplesAsync();
 
         // Code-drawn surfaces cannot bind to a resource, so they are told to repaint.
@@ -161,6 +162,18 @@ public partial class MainWindow : Window
         var dialog = new SpectrumAnalyserWindow
         {
             DataContext = new SpectrumViewModel(_viewModel.Circuit),
+        };
+
+        await dialog.ShowDialog(this);
+    }
+
+    private async Task ShowBlockLibraryAsync()
+    {
+        if (_viewModel is null) return;
+
+        var dialog = new BlockLibraryWindow
+        {
+            DataContext = new BlockLibraryViewModel(_viewModel),
         };
 
         await dialog.ShowDialog(this);

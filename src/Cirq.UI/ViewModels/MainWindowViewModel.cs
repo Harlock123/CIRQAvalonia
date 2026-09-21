@@ -592,6 +592,84 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>
+    /// Blocks saved for reuse, shared across circuits and across runs.
+    /// <para>
+    /// Settable so a test can point it at a temporary file. It is one of the few things here that
+    /// writes outside the document, and a test suite that quietly edited the person's own library
+    /// would be a poor trade for the convenience.
+    /// </para>
+    /// </summary>
+    public BlockLibrary Blocks { get; set; } = new();
+
+    /// <summary>Raised when the block library window should be opened.</summary>
+    public event EventHandler? RequestBlockLibrary;
+
+    [RelayCommand]
+    private void ShowBlockLibrary() => RequestBlockLibrary?.Invoke(this, EventArgs.Empty);
+
+    /// <summary>
+    /// Saves the selected block to the library under a name, so it can be placed again — here or
+    /// in another circuit.
+    /// </summary>
+    public bool SaveBlock(string name)
+    {
+        var block = Selection().OfType<Subcircuit>().FirstOrDefault()
+                    ?? SelectedComponent as Subcircuit;
+
+        if (block is null)
+        {
+            StatusMessage = "Select a block to save to the library.";
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            StatusMessage = "A saved block needs a name.";
+            return false;
+        }
+
+        var saved = Blocks.Save(name, block);
+
+        StatusMessage = $"Saved '{saved.Name}' to the block library — {saved.Summary}";
+        return true;
+    }
+
+    /// <summary>
+    /// Places a copy of a saved block on the canvas. A copy, not a reference: two instances are
+    /// independent, and editing one leaves the other alone.
+    /// </summary>
+    public Subcircuit? PlaceBlock(string name)
+    {
+        var block = Blocks.Create(name, Circuit);
+
+        if (block is null)
+        {
+            StatusMessage = $"The library has nothing called '{name}'.";
+            return null;
+        }
+
+        // Somewhere clear of what is already there, as a paste does.
+        var bounds = Circuit.Components.Count == 0
+            ? (X: 0.0, Y: 0.0)
+            : (X: Circuit.Components.Max(c => c.X) + 160, Y: Circuit.Components.Average(c => c.Y));
+
+        block.X = bounds.X;
+        block.Y = bounds.Y;
+
+        Circuit.Components.Add(block);
+
+        SelectedComponent = block;
+        foreach (var component in Circuit.Components) component.IsSelected = false;
+
+        Simulation.InvalidateTopology();
+        IsModified = true;
+        RequestRedraw?.Invoke(this, EventArgs.Empty);
+
+        StatusMessage = $"Placed {block.Name} from the library";
+        return block;
+    }
+
+    /// <summary>
     /// What is selected: the band's catch if there is one, otherwise the single part the inspector
     /// is on. The same rule copy uses.
     /// </summary>

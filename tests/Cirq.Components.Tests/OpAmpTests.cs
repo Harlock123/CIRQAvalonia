@@ -43,15 +43,34 @@ public class OpAmpTests
         return (new CircuitSimulator(circuit), u, input);
     }
 
+    /// <summary>
+    /// Gain measured as a <b>slope</b> rather than as a single ratio of output to input.
+    /// <para>
+    /// A real amplifier's output is its gain times the input <i>plus a constant</i> — the input
+    /// offset multiplied by the noise gain, and the bias current through the feedback resistor.
+    /// Dividing one output by one input folds all of that into the answer, which is why nobody
+    /// measures gain that way on a bench either: you move the input and see how far the output
+    /// moves. Two points, and every constant term cancels.
+    /// </para>
+    /// </summary>
+    private static double MeasuredGain(double rin, double rf)
+    {
+        double OutputAt(double vin)
+        {
+            var (sim, u, _) = InvertingAmplifier(rin, rf, vin);
+            sim.SolveOperatingPoint();
+
+            Assert.False(u.IsSaturated);
+            return sim.NodeVoltage(u.Output);
+        }
+
+        return (OutputAt(0.1) - OutputAt(0.05)) / 0.05;
+    }
+
     [Fact]
     public void InvertingAmplifierMatchesItsIdealGain()
     {
-        var (sim, u, _) = InvertingAmplifier(10e3, 100e3, 0.1);
-        sim.SolveOperatingPoint();
-
-        // Ideal gain is -10, so 0.1 V in gives -1 V out.
-        Assert.Equal(-1.0, sim.NodeVoltage(u.Output), 0.01);
-        Assert.False(u.IsSaturated);
+        Assert.Equal(-10.0, MeasuredGain(10e3, 100e3), 0.1);
     }
 
     [Theory]
@@ -60,12 +79,26 @@ public class OpAmpTests
     [InlineData(1e3, 47e3, -47.0)]
     public void GainFollowsTheFeedbackRatio(double rin, double rf, double expectedGain)
     {
-        const double vin = 0.05;
-        var (sim, u, _) = InvertingAmplifier(rin, rf, vin);
+        Assert.Equal(expectedGain, MeasuredGain(rin, rf), Math.Abs(expectedGain) * 0.02);
+    }
+
+    /// <summary>
+    /// The constant the slope measurement above is cancelling. A 741 has a millivolt of input
+    /// offset, and at a noise gain of eleven that is eleven millivolts at the output with nothing
+    /// at all on the input — which is the whole reason precision circuits trim it out.
+    /// </summary>
+    [Fact]
+    public void TheInputOffsetAppearsAtTheOutputMultipliedByTheNoiseGain()
+    {
+        var (sim, u, _) = InvertingAmplifier(10e3, 100e3, 0.0);
         sim.SolveOperatingPoint();
 
-        var measured = sim.NodeVoltage(u.Output) / vin;
-        Assert.Equal(expectedGain, measured, Math.Abs(expectedGain) * 0.02);
+        var expected = OpAmpModel.Lm741.InputOffsetVoltage * (1 + (100e3 / 10e3));
+
+        // Plus the bias current through the feedback resistor, which is the other term.
+        var bias = OpAmpModel.Lm741.InputBiasCurrent * 100e3;
+
+        Assert.Equal(expected + bias, sim.NodeVoltage(u.Output), Math.Abs(expected) * 0.15);
     }
 
     [Fact]

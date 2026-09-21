@@ -109,12 +109,15 @@ public partial class ScopePanel : UserControl, Cirq.UI.Services.IScopeSource
         // readout says they are rather than a frame behind it.
         scope.Measure(start, window);
 
-        if (scope.Layout == ScopeLayout.Tiled && visible.Count > 1)
+        if (scope.Layout == ScopeLayout.Xy)
+            RenderXy(scope, start, window);
+        else if (scope.Layout == ScopeLayout.Tiled && visible.Count > 1)
             RenderTiled(scope, visible, start, window, scale);
         else
             RenderSingle(scope, visible, start, window, scale);
 
-        if (scope.ShowCursors) AddCursors(scope, scale);
+        // Cursors mark instants, and in XY mode the horizontal axis is not time.
+        if (scope.ShowCursors && scope.Layout != ScopeLayout.Xy) AddCursors(scope, scale);
 
         _lastScale = scale;
         _plot.Refresh();
@@ -245,6 +248,68 @@ public partial class ScopePanel : UserControl, Cirq.UI.Services.IScopeSource
             plot.HideLegend();
         }
     }
+
+    /// <summary>
+    /// One trace against another. The horizontal axis is a signal rather than time, so the whole
+    /// of the time styling — the decade ticks, the unit in the label, the fitted window — is
+    /// replaced rather than adjusted.
+    /// </summary>
+    private void RenderXy(ScopeViewModel scope, double start, double window)
+    {
+        if (_plot!.Multiplot.Count() > 1) _plot.Multiplot.Reset();
+
+        var plot = _plot.Plot;
+        plot.Clear();
+
+        plot.FigureBackground.Color = PlotBackground;
+        plot.DataBackground.Color = PlotBackground;
+        plot.Grid.MajorLineColor = GridColour;
+        plot.Axes.Color(AxisColour);
+
+        var (horizontal, vertical) = scope.XyPairs();
+
+        plot.Axes.Bottom.Label.Text = Describe(horizontal);
+        plot.Axes.Bottom.Label.FontSize = 11;
+        plot.Axes.Left.Label.FontSize = 11;
+        plot.Axes.Left.Label.Text = vertical.Count == 1 ? Describe(vertical[0]) : "Value";
+
+        // Both axes carry a signal here, so both want engineering notation rather than the
+        // time formatting the other layouts use along the bottom.
+        static ScottPlot.TickGenerators.NumericAutomatic Engineering() => new()
+        {
+            LabelFormatter = value => Cirq.Core.Units.SiPrefix.Format(value, string.Empty),
+        };
+
+        plot.Axes.Bottom.TickGenerator = Engineering();
+        plot.Axes.Left.TickGenerator = Engineering();
+
+        var drew = false;
+
+        foreach (var probe in vertical)
+        {
+            var (xs, ys) = ScopeViewModel.XySeries(horizontal, probe, start, start + window);
+            if (xs.Length == 0) continue;
+
+            var colour = Color.FromARGB(unchecked((uint)(
+                (probe.TraceColor.A << 24) | (probe.TraceColor.R << 16) |
+                (probe.TraceColor.G << 8) | probe.TraceColor.B)));
+
+            var trace = plot.Add.ScatterLine(xs, ys, colour);
+            trace.LineWidth = 1.4f;
+            trace.MarkerSize = 0;
+            trace.LegendText = probe.Label;
+
+            drew = true;
+        }
+
+        if (drew) plot.Axes.AutoScale();
+
+        if (vertical.Count > 1) StyleLegend(plot.ShowLegend(Alignment.UpperRight));
+        else plot.HideLegend();
+    }
+
+    private static string Describe(SignalProbe probe) =>
+        probe.Unit.Length > 0 ? $"{probe.Label} ({probe.Unit})" : probe.Label;
 
     // ---- cursors ---------------------------------------------------------
 
