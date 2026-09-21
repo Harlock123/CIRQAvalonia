@@ -112,6 +112,13 @@ public sealed class CircuitSimulator
             {
                 probe.NodeIndex = Netlist.GroundIndex;
             }
+
+            // The second point of a differential or power probe. An unset reference is ground,
+            // which is what an ordinary voltage probe measures against anyway.
+            probe.ReferenceNodeIndex =
+                probe.ReferenceTerminal is not null && Netlist.Contains(probe.ReferenceTerminal)
+                    ? Netlist.NetOf(probe.ReferenceTerminal).Index
+                    : Netlist.GroundIndex;
         }
     }
 
@@ -431,8 +438,18 @@ public sealed class CircuitSimulator
         ProbeKind.Voltage => System.NodeVoltage(probe.NodeIndex),
         ProbeKind.Logic => ProbeLogicLevel(probe),
         ProbeKind.Current => ProbeCurrent(probe),
+        ProbeKind.Differential => ProbeDifference(probe),
+        ProbeKind.Power => ProbeDifference(probe) * ProbeCurrent(probe),
         _ => 0,
     };
+
+    /// <summary>
+    /// The voltage between a probe's two points. With no reference set this is the same answer an
+    /// ordinary voltage probe gives, which makes a differential probe on a grounded node behave
+    /// exactly as expected rather than reading zero.
+    /// </summary>
+    private double ProbeDifference(SignalProbe probe) =>
+        System.NodeVoltage(probe.NodeIndex) - System.NodeVoltage(probe.ReferenceNodeIndex);
 
     private double ProbeLogicLevel(SignalProbe probe)
     {

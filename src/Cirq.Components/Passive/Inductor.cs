@@ -1,3 +1,4 @@
+using Cirq.Core.Topology;
 using Cirq.Core.Simulation;
 using Cirq.Core.Units;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -8,7 +9,7 @@ namespace Cirq.Components.Passive;
 /// Inductor solved in branch-current form, so its current is a first-class unknown. That makes the
 /// bias point a plain short circuit and lets <see cref="Transformer"/> couple two of them.
 /// </summary>
-public partial class Inductor : TwoTerminalComponent
+public partial class Inductor : TwoTerminalComponent, IToleranced
 {
     private double _previousCurrent;
     private double _previousVoltage;
@@ -21,6 +22,21 @@ public partial class Inductor : TwoTerminalComponent
     /// <summary>Inductance in henries.</summary>
     [ObservableProperty]
     public partial double Inductance { get; set; }
+
+    /// <summary>
+    /// How far the real part may be from its marked inductance, as a fraction — 0.05 for a
+    /// five percent part. Ten percent is typical for a wound part, and the core it is wound on usually matters more than the band does.
+    /// <para>
+    /// Nothing in an ordinary run uses this: the solver takes the value as given. It is what a
+    /// Monte Carlo analysis varies, which is how you find out whether a circuit works with the
+    /// parts you can actually buy rather than only with the ones in the drawing.
+    /// </para>
+    /// </summary>
+    [ObservableProperty]
+    public partial double Tolerance { get; set; } = 0.1;
+
+    /// <summary>The value a tolerance applies to.</summary>
+    public string TolerancedProperty => nameof(Inductance);
 
     /// <summary>Winding resistance in ohms, stamped in series with the ideal inductance.</summary>
     [ObservableProperty]

@@ -446,6 +446,12 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     /// <summary>Raised when the spectrum window should be opened.</summary>
     public event EventHandler? RequestSpectrum;
 
+    /// <summary>Raised when the bus decode window should be opened.</summary>
+    public event EventHandler? RequestBusDecode;
+
+    /// <summary>Raised when the tolerance analysis window should be opened.</summary>
+    public event EventHandler? RequestMonteCarlo;
+
     /// <summary>Raised when the example browser should be opened.</summary>
     public event EventHandler? RequestExamples;
 
@@ -663,7 +669,9 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
           F7           Frequency response
           Shift+F7     DC sweep
           F3           Spectrum of the traces
+          Shift+F3     Decode the traces as a bus
           F4           Check circuit
+          Shift+F4     Tolerance analysis
           F8           Reset
 
         File
@@ -717,6 +725,21 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     /// </summary>
     [RelayCommand]
     private void ShowSpectrum() => RequestSpectrum?.Invoke(this, EventArgs.Empty);
+
+    /// <summary>
+    /// Opens the bus decode window, which reads the recorded traces as a protocol. It works on
+    /// what the scope has already captured, so run the circuit first.
+    /// </summary>
+    [RelayCommand]
+    private void ShowBusDecode() => RequestBusDecode?.Invoke(this, EventArgs.Empty);
+
+    /// <summary>
+    /// Opens the tolerance analysis, which rebuilds the circuit many times with its parts drawn
+    /// from their tolerance bands. It is the only analysis here that asks whether the circuit
+    /// works with the parts you can buy rather than the ones in the drawing.
+    /// </summary>
+    [RelayCommand]
+    private void ShowMonteCarlo() => RequestMonteCarlo?.Invoke(this, EventArgs.Empty);
 
     /// <summary>
     /// Selects the parts a rule-check finding is about. The inspector follows a single one, as it
@@ -888,6 +911,40 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         var probe = Scope.AddProbe(terminal);
         Simulation.Simulator?.ResolveProbes();
         StatusMessage = $"Probing {probe.Label}";
+        RequestRedraw?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// Makes a terminal the selected probe's reference point, called by the canvas when a
+    /// terminal is shift-clicked with the probe tool.
+    /// <para>
+    /// A differential or power probe measures between two points, and only one of them can be the
+    /// one you clicked to create it. Shift-clicking the second is the whole of the interaction;
+    /// shift-clicking the same terminal again clears it back to ground.
+    /// </para>
+    /// </summary>
+    public void SetProbeReference(Terminal terminal)
+    {
+        if (Scope.SelectedProbe is not { } probe)
+        {
+            StatusMessage = "Select a trace first, then shift-click its reference point.";
+            return;
+        }
+
+        var clearing = ReferenceEquals(probe.ReferenceTerminal, terminal);
+
+        probe.ReferenceTerminal = clearing ? null : terminal;
+
+        // A reference is only meaningful for the two-point kinds, so setting one says what was
+        // meant rather than being silently ignored.
+        if (!clearing && !probe.IsDerived) probe.Kind = ProbeKind.Differential;
+
+        Simulation.Simulator?.ResolveProbes();
+
+        StatusMessage = clearing
+            ? $"{probe.Label} now measures against ground"
+            : $"{probe.Label} now measures against {terminal}";
+
         RequestRedraw?.Invoke(this, EventArgs.Empty);
     }
 

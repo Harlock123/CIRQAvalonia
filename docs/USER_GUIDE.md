@@ -23,15 +23,18 @@ the [README](../README.md), and what changed between releases is in the
 11. [Measuring what is on the scope](#measuring-what-is-on-the-scope)
 12. [DC sweeps and the curve tracer](#dc-sweeps-and-the-curve-tracer)
 13. [What is in a signal](#what-is-in-a-signal)
-14. [Naming a net instead of drawing it](#naming-a-net-instead-of-drawing-it)
-15. [Checking the circuit](#checking-the-circuit)
-16. [Development boards](#development-boards)
-17. [Saving and loading](#saving-and-loading)
-18. [Exporting](#exporting)
-19. [Appearance](#appearance)
-20. [What version is this](#what-version-is-this)
-21. [Keyboard reference](#keyboard-reference)
-22. [When a circuit will not simulate](#when-a-circuit-will-not-simulate)
+14. [Reading a bus](#reading-a-bus)
+15. [Measuring between two points, and measuring power](#measuring-between-two-points-and-measuring-power)
+16. [Will it work with the parts you can buy](#will-it-work-with-the-parts-you-can-buy)
+17. [Naming a net instead of drawing it](#naming-a-net-instead-of-drawing-it)
+18. [Checking the circuit](#checking-the-circuit)
+19. [Development boards](#development-boards)
+20. [Saving and loading](#saving-and-loading)
+21. [Exporting](#exporting)
+22. [Appearance](#appearance)
+23. [What version is this](#what-version-is-this)
+24. [Keyboard reference](#keyboard-reference)
+25. [When a circuit will not simulate](#when-a-circuit-will-not-simulate)
 
 This guide is also attached to every [release](../../releases) as a PDF, with a contents page and
 the screenshots in place — the same document, laid out for reading away from the machine. Build it
@@ -2881,6 +2884,160 @@ solver was taking steps small enough to draw the waveform in the first place.
 
 ---
 
+## Reading a bus
+
+**Simulate > Decode Bus...** (`Shift+F3`) reads the traces the scope has captured as a protocol
+instead of as edges. It knows **I²C, SPI, UART, 1-Wire** and **CAN**.
+
+Open it on any of the bus examples and it is already set up: every one of them names its probes
+after the signals, so the protocol and the channel assignments are guessed from them. Press Decode.
+
+The **I2C EEPROM** example comes back as this, which is the whole lesson of the example in one
+line:
+
+```
+START 0x50 W ACK 0x00 ACK 0x00 ACK STOP  START 0x50 R ACK 0x48 ACK 0x49 ACK 0x21 NACK STOP
+```
+
+Two transactions. The first writes the address pointer; the second reads three bytes back — 0x48,
+0x49, 0x21, which is `HI!`. Three things in it are worth pausing on, and each has a line of
+explanation beside it in the list:
+
+- The **address is seven bits** with the read/write bit underneath. The byte on the wire is 0xA0
+  and the device is at 0x50, which is why half the datasheets ever written quote two different
+  numbers for the same part.
+- The second transaction opens with a **restart** rather than a stop and a start, so the master
+  never lets go of the bus between writing the pointer and reading from it.
+- The last byte of the read is **NACKed on purpose**. Nobody failed: leaving SDA alone is how the
+  master tells the device to stop sending.
+
+The **SPI ADC** example shows the other thing worth seeing:
+
+```
+01/00   80/02   00/66
+```
+
+Three bytes out and three back, and they happened in the *same* clocks — that is what full duplex
+means. The master's question is still going out while the converter's answer is coming back
+underneath it, and `0x02 0x66` is 614, which is the knob at 0.6 of full scale.
+
+### What it refuses to do
+
+Two refusals are as much the point as the decodes.
+
+**A capture too coarse to decode is rejected rather than decoded.** This matters more than it
+sounds. A trace drawn from too few samples looks slightly wrong and everybody notices; a *decode*
+from too few samples produces confident, plausible, entirely incorrect bytes, because a pulse that
+fell between two samples is not a pulse that looks short — it is a pulse that is not there, and
+every bit after it has moved. Open the **1-Wire Thermometer** example and press Decode at the
+timebase it ships with and it says so. Set a finer probe sample interval, run it again, and the
+same capture reads:
+
+```
+RESET  PRESENCE  0xCC  0x4E  0x4B  0x46  0x1F
+```
+
+SKIP ROM, then WRITE SCRATCHPAD and the three bytes a DS18B20 takes.
+
+**A trace with no frame on it is not parsed into one.** The **CAN Arbitration** example
+demonstrates dominance and arbitration by driving two transceivers from plain clocks; there is no
+CAN frame on that bus at all, and the decoder says so rather than inventing an identifier. Where
+there *is* a frame it removes the bit stuffing — the opposite bit a transmitter inserts after five
+of a kind purely so the receivers have an edge to resynchronise on — and reports the identifier,
+the length, the data and whether anybody acknowledged it.
+
+### The bit rate, for the two that need one
+
+Neither UART nor CAN carries a clock. Both ends have to have been told the rate beforehand, and
+that is exactly why getting it wrong is such a nuisance: **it does not give you silence, it gives
+you bytes.** Decode the Serial Link example at 4800 instead of 9600 and characters still come out —
+different ones. At 19200 you get four of them instead of two, all wrong, and on this particular
+message not one framing error between them. Whether a wrong rate happens to trip a framing check
+depends on the bit pattern, so it is not something to rely on: the symptom of a wrong baud rate is
+plausible rubbish, and the only cure is knowing the rate. Worth meeting once here rather than for
+the first time on a bench.
+
+SPI's equivalent is the **mode**, which decides whether the data is sampled on the rising or the
+falling clock edge. Get it wrong and every byte shifts by one bit while the scope trace looks
+perfectly correct.
+
+---
+
+## Measuring between two points, and measuring power
+
+A probe measures one of five things, chosen from the dropdown on its row in the trace list.
+Voltage, current and logic are the familiar three. The other two measure between **two** points,
+and you set the second one by **shift-clicking a terminal with the probe tool**. Shift-click the
+same terminal again to put it back to ground.
+
+**Differential** is the voltage between the probe's two points rather than against ground. Several
+things in this library are *defined* as a difference and cannot honestly be shown any other way:
+
+- A **CAN** or **RS-485** pair carries its bit as the difference between two wires, both of which
+  are doing something uninteresting against ground.
+- A **shunt** in the high side of a rail drops fifty millivolts while both of its ends sit at
+  twenty-four volts. Against ground you are reading the fourth significant figure of the rail;
+  across it, you are reading the current.
+- A **bridge sensor** puts out a few millivolts riding on half the supply.
+
+**Power** is the voltage across those two points times the current through the probed terminal.
+Power is a first-class quantity in every real design — what a regulator is burning, what a resistor
+has to be rated for, where a panel delivers the most — and it is one multiplication away from two
+things the scope already has. Probe a resistor's A pin, shift-click its B pin, set the kind to
+Power, and the trace is in watts.
+
+It is worth doing once on a divider and adding the answers up: what the supply delivers is exactly
+what the resistors dissipate, which is as good a check on a whole simulation as there is.
+
+---
+
+## Will it work with the parts you can buy
+
+**Simulate > Tolerance Analysis...** (`Shift+F4`) builds the circuit a few hundred times with its
+parts drawn at random from their tolerance bands, solves each one, and reports what the answer did.
+
+Every other analysis here uses the value written on the schematic. No resistor has ever had the
+value written on it. A divider of two 5 % resistors is not a divider by two; a 555 built round a
+20 % ceramic is not a precision timer. Whether that matters depends entirely on the circuit, and
+this is how you find out which kind you have.
+
+Resistors, capacitors and inductors have a **Tolerance** in the properties panel, as a fraction —
+0.05 for a five percent part. The defaults are what the ordinary part is: 5 % for a resistor, 20 %
+for a ceramic capacitor, 10 % for a wound inductor. Set one to zero to treat it as exact.
+
+The report gives, for every probe: the nominal answer with all parts at their marked values, the
+range across the trials, the standard deviation, **the worst departure from nominal as a
+percentage**, and what fraction of the trials landed inside the band you said you would accept.
+The histogram below shows the shape, with the nominal value drawn through it — which is where you
+see at a glance whether the circuit is *centred* on what it was designed to do or merely near it.
+
+Two things about the method are worth knowing.
+
+**Values are drawn uniformly across the band, not from a bell curve.** People assume a normal
+distribution because manufacturing usually gives one, and for resistors that is exactly wrong:
+they are made to a loose tolerance and then *sorted*, and the ones nearest the middle are pulled
+out and sold as one percent parts. What is left in the five percent bag is the skirts. Uniform is
+the honest middle — it does not flatter the circuit the way a bell curve would.
+
+**The run is repeatable.** The sequence comes from a seed, so the same circuit analysed twice gives
+the same answer. An analysis whose result changes every time you look at it decides nothing. Change
+the seed for a different draw of the same parts.
+
+### What it is worth running on
+
+The interesting circuits are the ones where the answer is a **difference between two larger
+numbers**, because there the tolerances do not add — they amplify. Build two dividers from four
+5 % resistors, both nominally at half the rail, and probe the gap between their midpoints
+differentially. Nominally it reads nothing at all. In practice it reads hundreds of millivolts, in
+either direction, which is why a real bridge is trimmed rather than built from marked parts and
+hoped over.
+
+Worth trying on the examples too: the **Adjustable Supply**, whose output is set by a divider;
+the **555** timers, whose period is a resistor times a capacitor and so carries both tolerances at
+once; and any filter, whose corner is the same product.
+
+---
+
 ## Naming a net instead of drawing it
 
 Past a certain size a schematic has signals that go everywhere — a supply rail, a reset line, a
@@ -3191,7 +3348,10 @@ Also available in the app at **Help > Keyboard Shortcuts**.
 | `F7` | Frequency response — what the circuit does to each frequency |
 | `Shift` `F7` | DC sweep — step a parameter and plot the curve |
 | `F3` | Spectrum — what frequencies are in the traces |
+| `Shift` `F3` | Decode bus — read the traces as I²C, SPI, UART, 1-Wire or CAN |
 | `F4` | Check circuit — the wiring mistakes no part can report about itself |
+| `Shift` `F4` | Tolerance analysis — will it work with the parts you can buy |
+| Shift-click with the probe tool | Set the selected probe's second point, for a differential or power measurement |
 | `F9` / `F10` | Collapse the palette / the properties panel |
 | View menu | **Mark Interactive Parts** rings everything you can double-click; **Describe Parts on Hover** turns the hover card off |
 | `Ctrl+N` / `Ctrl+O` / `Ctrl+S` / `Ctrl+Shift+S` | New / open / save / save as |

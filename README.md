@@ -32,7 +32,7 @@ Core ← Engine ← Components ← UI, which keeps the whole engine headless-tes
 
 ```bash
 dotnet run --project src/Cirq.UI     # the editor
-dotnet test                          # 2125 tests
+dotnet test                          # 2197 tests
 ./scripts/build-guide.sh             # the user guide as a PDF
 ```
 
@@ -178,10 +178,16 @@ steps a parameter and re-solves the operating point at each value, which draws t
 are specified by — a diode's exponential, a transistor's output characteristic, a panel's maximum
 power point. Stepping a second parameter as well turns the last of those into a curve tracer.
 
-To those, two measurements of the traces themselves: the scope's **automatic readouts** (peak to
-peak, mean, RMS, frequency, duty cycle, 10–90 % rise time) with a pair of draggable time cursors,
-and an **FFT** of whatever has been recorded. The response and the FFT are easy to confuse and
-should not be: one is a measurement of the circuit, the other a measurement of a signal.
+To those, three measurements of the traces themselves: the scope's **automatic readouts** (peak to
+peak, mean, RMS, frequency, duty cycle, 10–90 % rise time) with a pair of draggable time cursors;
+an **FFT** of whatever has been recorded; and **protocol decoding**, which reads the traces as
+I²C, SPI, UART, 1-Wire or CAN rather than as edges. The response and the FFT are easy to confuse
+and should not be: one is a measurement of the circuit, the other a measurement of a signal.
+
+Probes measure voltage, current, logic level, the **difference** between two points, or the
+**power** those two things multiply to. And **tolerance analysis** rebuilds the circuit a few
+hundred times with its parts drawn from their tolerance bands, which is the only analysis here
+that asks whether a design works with the parts you can buy rather than the ones in the drawing.
 
 ## Initial conditions
 
@@ -272,6 +278,9 @@ Tests measure the solver against closed-form answers rather than recorded output
 | Copy and paste | A duplicate carrying every parameter including the model on an op-amp and the input count on a gate, its own designator and identity, a clipboard that survives the original being edited or deleted, repeated pastes cascading rather than stacking, an undoable paste, and every one of the 180 palette parts surviving the round trip |
 | Hover cards | A part described where it sits — designator, type, value, settings in operable-first order, a long list cut with a count, an oversized value shortened, the violations behind a red ring carried as words, and every one of the 180 palette parts describable without throwing |
 | Memory and SPI | A memory whose contents are typed in and read back with the circuit's own writes showing, a dump that round-trips and skips runs of zeros, a counter walking its addresses and every stored byte reaching the bus, a reset restoring the preset, a transparent latch that follows while open and holds what it saw, and an SPI converter whose code the master decodes exactly where the datasheet says |
+| Protocol decoding | Synthetic transactions decoded back to the bytes they were built from, and then the shipped examples decoded to what they actually contain: the EEPROM example's whole conversation including the restart between the write and the read and the master's deliberate NACK on the last byte, the SPI converter's answer arriving underneath the question with the ten-bit code landing where the knob is, the serial link's text, and a DS18B20's SKIP ROM and WRITE SCRATCHPAD with its three configuration bytes. Plus the refusals: a capture too coarse to decode reported rather than turned into shifted bytes, a CAN trace carrying no frame reported rather than parsed into one, a wrong bit rate caught by bit stuffing's own invariant, and the clock edge that sets up an I²C stop condition not counted as a ninth data bit |
+| Derived probes | A differential probe reading between its two points and reversing sign when they swap, a shunt high in a 24 V rail readable differentially where a plain probe sees only the rail, power as the voltage across times the current through with I²R checked both ways, a supply delivering exactly what the resistors between them dissipate, and a reference that survives a save and reload |
+| Tolerance analysis | A divider's spread staying inside what the tolerance arithmetic allows and reaching its corners, a wider band giving a wider spread, the same seed giving the same run and a different seed not, every varied part put back at its marked value, the worst departure reported as a fraction of nominal, a histogram bucketing every reading exactly once, and a bridge of four 5 % resistors reading hundreds of millivolts where nominally it reads nothing at all |
 | DC sweep | A diode swept out to its own exponential and the slope between two decades of current landing on the textbook hundred millivolts, a transistor's output characteristic stepped into the fan off the datasheet with the same beta on every curve, those curves tilting upward by a few percent because a real output resistance is finite, a divider sweeping out the straight line it is, every swept property put back and the bias point restored afterwards, and a point the solver cannot reach leaving a gap rather than throwing the curve away |
 | Trace measurements | A sine giving back its own amplitude, mean and RMS and a square wave's RMS being its amplitude, the frequency of three tones across three decades, fewer than two cycles refusing to be a frequency rather than guessing at one, noise on the edges not multiplying the measured frequency, duty cycle at a quarter, a half and three quarters, the rise time of an exponential landing on ln(9) time constants, ringing after an edge not being counted as part of the rise, and a window measuring what is in it rather than the rest of the history |
 | Cursors | Placed across the window when first turned on, the gap between them and its reciprocal, what each trace did between them, a value between two samples interpolated rather than snapped, and nothing outside the samples pretending to be a reading |

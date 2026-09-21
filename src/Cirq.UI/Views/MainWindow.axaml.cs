@@ -68,6 +68,7 @@ public partial class MainWindow : Window
         _canvas.InteractiveEditBegan += (_, label) => viewModel.BeginInteractiveEdit(label);
         _canvas.InteractiveEditEnded += (_, _) => viewModel.EndInteractiveEdit();
         _canvas.ProbeRequested += (_, terminal) => viewModel.AttachProbe(terminal);
+        _canvas.ProbeReferenceRequested += (_, terminal) => viewModel.SetProbeReference(terminal);
         _canvas.StatusChanged += (_, message) => viewModel.StatusMessage = message;
     }
 
@@ -87,6 +88,8 @@ public partial class MainWindow : Window
         viewModel.RequestDcSweep += async (_, _) => await ShowDcSweepAsync();
         viewModel.RequestRuleCheck += async (_, _) => await ShowRuleCheckAsync();
         viewModel.RequestSpectrum += async (_, _) => await ShowSpectrumAsync();
+        viewModel.RequestBusDecode += async (_, _) => await ShowBusDecodeAsync();
+        viewModel.RequestMonteCarlo += async (_, _) => await ShowMonteCarloAsync();
         viewModel.RequestExamples += async (_, _) => await ShowExamplesAsync();
 
         // Code-drawn surfaces cannot bind to a resource, so they are told to repaint.
@@ -157,6 +160,30 @@ public partial class MainWindow : Window
         var dialog = new SpectrumAnalyserWindow
         {
             DataContext = new SpectrumViewModel(_viewModel.Circuit),
+        };
+
+        await dialog.ShowDialog(this);
+    }
+
+    private async Task ShowMonteCarloAsync()
+    {
+        if (_viewModel is null) return;
+
+        var dialog = new MonteCarloWindow
+        {
+            DataContext = new MonteCarloViewModel(_viewModel.Circuit),
+        };
+
+        await dialog.ShowDialog(this);
+    }
+
+    private async Task ShowBusDecodeAsync()
+    {
+        if (_viewModel is null) return;
+
+        var dialog = new BusDecodeWindow
+        {
+            DataContext = new BusDecodeViewModel(_viewModel.Circuit),
         };
 
         await dialog.ShowDialog(this);

@@ -7,7 +7,7 @@ using Cirq.Core.Topology;
 namespace Cirq.Components.Passive;
 
 /// <summary>Ideal linear resistor.</summary>
-public partial class Resistor : TwoTerminalComponent, ICurrentReporting
+public partial class Resistor : TwoTerminalComponent, ICurrentReporting, IToleranced
 {
     public Resistor(double resistance = 1e3)
     {
@@ -17,6 +17,21 @@ public partial class Resistor : TwoTerminalComponent, ICurrentReporting
     /// <summary>Resistance in ohms. Must be strictly positive.</summary>
     [ObservableProperty]
     public partial double Resistance { get; set; }
+
+    /// <summary>
+    /// How far the real part may be from its marked resistance, as a fraction — 0.05 for a
+    /// five percent part. Five percent is the common band for a carbon film part; one percent is a metal film, and the E96 series exists because somebody wanted the extra digit.
+    /// <para>
+    /// Nothing in an ordinary run uses this: the solver takes the value as given. It is what a
+    /// Monte Carlo analysis varies, which is how you find out whether a circuit works with the
+    /// parts you can actually buy rather than only with the ones in the drawing.
+    /// </para>
+    /// </summary>
+    [ObservableProperty]
+    public partial double Tolerance { get; set; } = 0.05;
+
+    /// <summary>The value a tolerance applies to.</summary>
+    public string TolerancedProperty => nameof(Resistance);
 
     public override string ComponentType => "Resistor";
 

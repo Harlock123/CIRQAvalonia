@@ -145,6 +145,9 @@ public static class CircuitSerializer
                 Target = Reference(probe.TargetTerminal),
                 Color = probe.TraceColor.ToHex(),
                 Kind = probe.Kind.ToString(),
+                Reference = probe.ReferenceTerminal is { Owner: not null }
+                    ? Reference(probe.ReferenceTerminal)
+                    : null,
                 IsVisible = probe.IsVisible,
                 AcCoupled = probe.AcCoupled,
             });
@@ -296,6 +299,11 @@ public static class CircuitSerializer
             };
 
             if (Enum.TryParse<ProbeKind>(record.Kind, ignoreCase: true, out var kind)) probe.Kind = kind;
+
+            // After the kind, because setting a kind clears the history and the reference alike.
+            if (record.Reference is not null)
+                probe.ReferenceTerminal = Resolve(record.Reference, byId, result.Warnings);
+
             circuit.Probes.Add(probe);
         }
 

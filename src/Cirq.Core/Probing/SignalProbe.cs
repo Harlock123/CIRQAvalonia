@@ -14,6 +14,31 @@ public enum ProbeKind
     Current,
     /// <summary>Digital logic level of the probed net, rendered as 0/1.</summary>
     Logic,
+
+    /// <summary>
+    /// The voltage between the probed terminal and a second one, rather than against ground.
+    /// <para>
+    /// Several things in this library are <i>defined</i> as a difference and cannot honestly be
+    /// shown any other way. A CAN or RS-485 pair carries its bit as the difference between two
+    /// wires, both of which are doing something uninteresting against ground. A shunt's whole job
+    /// is the millivolts across it while both of its ends sit near a rail. A bridge sensor outputs
+    /// a few millivolts riding on half the supply. Probing one end and imagining the subtraction
+    /// is what a person has had to do until now.
+    /// </para>
+    /// </summary>
+    Differential,
+
+    /// <summary>
+    /// Instantaneous power: the voltage across the probe's two points times the current through
+    /// the probed terminal.
+    /// <para>
+    /// Power is a first-class quantity in every real design — what a regulator is burning, what a
+    /// resistor has to be rated for, where a solar panel delivers the most — and it is one
+    /// multiplication away from two things the scope already has. Having to do that multiplication
+    /// by eye is why nobody does it.
+    /// </para>
+    /// </summary>
+    Power,
 }
 
 /// <summary>A measurement point attached to a terminal or net, feeding the oscilloscope panel.</summary>
@@ -43,11 +68,28 @@ public partial class SignalProbe : ObservableObject
     /// <summary>The kinds offered in the scope's trace list.</summary>
     public static IReadOnlyList<ProbeKind> KindOptions { get; } = Enum.GetValues<ProbeKind>();
 
+    /// <summary>
+    /// The second point a differential or power probe measures against. Null means ground, which
+    /// is what an ordinary voltage probe measures against and a sensible default for the rest.
+    /// </summary>
+    [ObservableProperty]
+    public partial Terminal? ReferenceTerminal { get; set; }
+
+    /// <summary>Node index of <see cref="ReferenceTerminal"/>, resolved with the rest.</summary>
+    public int ReferenceNodeIndex { get; set; } = Netlist.GroundIndex;
+
+    /// <summary>True for the kinds that measure between two points rather than against ground.</summary>
+    public bool IsDerived => Kind is ProbeKind.Differential or ProbeKind.Power;
+
+    /// <summary>What the reference is called, for the trace row. "ground" when there is none.</summary>
+    public string ReferenceLabel => ReferenceTerminal?.ToString() ?? "ground";
+
     /// <summary>Unit symbol for this probe's quantity — a logic trace has none.</summary>
     public string Unit => Kind switch
     {
-        ProbeKind.Voltage => "V",
+        ProbeKind.Voltage or ProbeKind.Differential => "V",
         ProbeKind.Current => "A",
+        ProbeKind.Power => "W",
         _ => "",
     };
 
@@ -166,6 +208,15 @@ public partial class SignalProbe : ObservableObject
         ResetHistory();
         OnPropertyChanged(nameof(Unit));
         OnPropertyChanged(nameof(Reading));
+        OnPropertyChanged(nameof(IsDerived));
+    }
+
+    partial void OnReferenceTerminalChanged(Terminal? value)
+    {
+        // The measurement is now against something else, so the old samples are of a different
+        // quantity. Same reasoning as changing the kind.
+        ResetHistory();
+        OnPropertyChanged(nameof(ReferenceLabel));
     }
 
     public void Record(double time, double value)

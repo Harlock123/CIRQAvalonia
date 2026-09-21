@@ -94,6 +94,10 @@
                   Command="{Binding ShowDcSweepCommand}" />
         <MenuItem Header="_Spectrum..." InputGesture="F3"
                   Command="{Binding ShowSpectrumCommand}" />
+        <MenuItem Header="Decode _Bus..." InputGesture="Shift+F3"
+                  Command="{Binding ShowBusDecodeCommand}" />
+        <MenuItem Header="_Tolerance Analysis..." InputGesture="Shift+F4"
+                  Command="{Binding ShowMonteCarloCommand}" />
         <Separator />
         <MenuItem Header="_Check Circuit..." InputGesture="F4"
                   Command="{Binding ShowRuleCheckCommand}" />

@@ -1,0 +1,97 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:sp="clr-namespace:ScottPlot.Avalonia;assembly=ScottPlot.Avalonia"
+        xmlns:vm="clr-namespace:Cirq.UI.ViewModels"
+        x:Class="Cirq.UI.Views.MonteCarloWindow"
+        x:DataType="vm:MonteCarloViewModel"
+        Title="Tolerance Analysis"
+        Width="900" Height="640"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource PanelBackground}">
+
+  <DockPanel>
+
+    <Border DockPanel.Dock="Top" Padding="14,12"
+            BorderBrush="{DynamicResource PanelBorder}" BorderThickness="0,0,0,1">
+      <StackPanel Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
+
+        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+          <TextBlock Text="Trials" VerticalAlignment="Center" />
+          <TextBox Width="74" Text="{Binding Trials, Mode=TwoWay}"
+                   ToolTip.Tip="How many circuits to build and solve. A few hundred is enough to see the shape; a few thousand to see the corners." />
+        </StackPanel>
+
+        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+          <TextBlock Text="Seed" VerticalAlignment="Center" />
+          <TextBox Width="60" Text="{Binding Seed, Mode=TwoWay}"
+                   ToolTip.Tip="The same seed gives exactly the same run. Change it for a different draw of the same parts." />
+        </StackPanel>
+
+        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+          <TextBlock Text="Accept within ±" VerticalAlignment="Center" />
+          <TextBox Width="52" Text="{Binding AcceptableBandPercent, Mode=TwoWay}" />
+          <TextBlock Text="% of nominal" VerticalAlignment="Center" Opacity="0.7" />
+        </StackPanel>
+
+        <Button Content="Run" Command="{Binding RunCommand}" IsEnabled="{Binding !IsBusy}"
+                Padding="20,5" />
+      </StackPanel>
+    </Border>
+
+    <Border DockPanel.Dock="Bottom" Padding="14,9"
+            BorderBrush="{DynamicResource PanelBorder}" BorderThickness="0,1,0,0">
+      <StackPanel Spacing="4">
+        <TextBlock Text="{Binding Summary}" TextWrapping="Wrap" Opacity="0.85" />
+        <ItemsControl ItemsSource="{Binding Varied}" IsVisible="{Binding HasRows}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate><WrapPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <Border Margin="0,0,6,0" Padding="6,1" CornerRadius="3"
+                      Background="{DynamicResource GroupHeaderBackground}">
+                <TextBlock Text="{Binding}" FontSize="10" Foreground="{DynamicResource TextMuted}" />
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+    </Border>
+
+    <Grid RowDefinitions="Auto,*">
+
+      <Border Grid.Row="0" Padding="14,10" IsVisible="{Binding HasRows}">
+        <StackPanel>
+          <Grid ColumnDefinitions="140,110,150,100,90,80" Margin="0,0,0,4">
+            <TextBlock Grid.Column="0" Text="TRACE" FontSize="10" Opacity="0.55" />
+            <TextBlock Grid.Column="1" Text="NOMINAL" FontSize="10" Opacity="0.55" />
+            <TextBlock Grid.Column="2" Text="RANGE" FontSize="10" Opacity="0.55" />
+            <TextBlock Grid.Column="3" Text="σ" FontSize="10" Opacity="0.55" />
+            <TextBlock Grid.Column="4" Text="WORST" FontSize="10" Opacity="0.55" />
+            <TextBlock Grid.Column="5" Text="IN SPEC" FontSize="10" Opacity="0.55" />
+          </Grid>
+
+          <ListBox ItemsSource="{Binding Rows}" SelectedItem="{Binding Selected, Mode=TwoWay}"
+                   Background="Transparent" MaxHeight="150">
+            <ListBox.ItemTemplate>
+              <DataTemplate>
+                <Grid ColumnDefinitions="140,110,150,100,90,80">
+                  <TextBlock Grid.Column="0" Text="{Binding Label}" FontSize="12"
+                             TextTrimming="CharacterEllipsis" />
+                  <TextBlock Grid.Column="1" Text="{Binding Nominal}" FontSize="12" />
+                  <TextBlock Grid.Column="2" Text="{Binding Range}" FontSize="12" />
+                  <TextBlock Grid.Column="3" Text="{Binding Sigma}" FontSize="12" Opacity="0.8" />
+                  <TextBlock Grid.Column="4" Text="{Binding Worst}" FontSize="12" FontWeight="SemiBold" />
+                  <TextBlock Grid.Column="5" Text="{Binding Yield}" FontSize="12" />
+                </Grid>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </StackPanel>
+      </Border>
+
+      <sp:AvaPlot Grid.Row="1" Name="Plot" />
+    </Grid>
+
+  </DockPanel>
+</Window>

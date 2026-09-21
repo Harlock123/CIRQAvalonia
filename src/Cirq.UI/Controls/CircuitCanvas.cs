@@ -128,6 +128,12 @@ public class CircuitCanvas : Control
     /// <summary>Raised when the probe tool is used on a terminal.</summary>
     public event EventHandler<Terminal>? ProbeRequested;
 
+    /// <summary>
+    /// Raised when a terminal is shift-clicked with the probe tool, to become the selected
+    /// probe's reference point.
+    /// </summary>
+    public event EventHandler<Terminal>? ProbeReferenceRequested;
+
     /// <summary>Raised with a short description of what the canvas is currently doing.</summary>
     public event EventHandler<string>? StatusChanged;
 
@@ -711,7 +717,7 @@ public class CircuitCanvas : Control
                 HandleWireClick(world);
                 break;
             case EditorTool.Probe:
-                HandleProbeClick(world);
+                HandleProbeClick(world, e.KeyModifiers.HasFlag(KeyModifiers.Shift));
                 break;
             case EditorTool.Delete:
                 HandleDeleteClick(world);
@@ -910,16 +916,22 @@ public class CircuitCanvas : Control
         TopologyChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    private void HandleProbeClick(CorePoint world)
+    private void HandleProbeClick(CorePoint world, bool shift)
     {
         var terminal = TerminalAt(world);
         if (terminal is null)
         {
-            StatusChanged?.Invoke(this, "Click a terminal to attach a probe.");
+            StatusChanged?.Invoke(this, shift
+                ? "Shift-click a terminal to make it the selected probe's reference point."
+                : "Click a terminal to attach a probe.");
             return;
         }
 
-        ProbeRequested?.Invoke(this, terminal);
+        // Shift sets the second point of a differential or power measurement rather than adding
+        // another trace — the two-terminal kinds need somewhere to measure against, and picking
+        // it on the canvas is the only place the choice makes any sense.
+        if (shift) ProbeReferenceRequested?.Invoke(this, terminal);
+        else ProbeRequested?.Invoke(this, terminal);
     }
 
     private void HandleDeleteClick(CorePoint world)

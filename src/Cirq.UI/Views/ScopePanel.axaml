@@ -94,6 +94,13 @@
                                 ToolTip.Tip="What this probe measures at that terminal" />
                       <TextBlock FontSize="11" VerticalAlignment="Center"
                                  Foreground="{DynamicResource TextMuted}" Text="{Binding Reading}" />
+                      <!-- Only for the kinds measured between two points, where it is the half of
+                           the measurement the label does not name. -->
+                      <TextBlock FontSize="10" VerticalAlignment="Center" IsVisible="{Binding IsDerived}"
+                                 Foreground="{DynamicResource TextMuted}"
+                                 Text="{Binding ReferenceLabel, StringFormat='vs {0}'}"
+                                 ToolTip.Tip="Shift-click a terminal with the probe tool to change this; shift-click it again to go back to ground."
+                                 TextTrimming="CharacterEllipsis" MaxWidth="90" />
                     </StackPanel>
                     <TextBlock Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2"
                                FontSize="10" Margin="0,2,0,0"

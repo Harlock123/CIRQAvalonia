@@ -83,6 +83,13 @@ public sealed class ProbeRecord
 
     public string Kind { get; set; } = "Voltage";
 
+    /// <summary>
+    /// The second point of a differential or power probe. Null for the kinds measured against
+    /// ground, and null in every file written before those kinds existed — which is why it is
+    /// optional rather than a required field with a sentinel.
+    /// </summary>
+    public TerminalReference? Reference { get; set; }
+
     public bool IsVisible { get; set; } = true;
 
     public bool AcCoupled { get; set; }

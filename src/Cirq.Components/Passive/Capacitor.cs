@@ -10,7 +10,7 @@ namespace Cirq.Components.Passive;
 /// Capacitor discretised with a Norton companion model: <c>i = Geq·v + Ieq</c>, where the
 /// coefficients come from Trapezoidal or Backward-Euler integration of <c>i = C·dv/dt</c>.
 /// </summary>
-public partial class Capacitor : TwoTerminalComponent, ICurrentReporting
+public partial class Capacitor : TwoTerminalComponent, ICurrentReporting, IToleranced
 {
     private double _previousVoltage;
     private double _previousCurrent;
@@ -25,6 +25,21 @@ public partial class Capacitor : TwoTerminalComponent, ICurrentReporting
     /// <summary>Capacitance in farads.</summary>
     [ObservableProperty]
     public partial double Capacitance { get; set; }
+
+    /// <summary>
+    /// How far the real part may be from its marked capacitance, as a fraction — 0.05 for a
+    /// five percent part. Twenty percent, which is ordinary for a ceramic and is much wider than people expect. A timing circuit built round one is not a precision timing circuit.
+    /// <para>
+    /// Nothing in an ordinary run uses this: the solver takes the value as given. It is what a
+    /// Monte Carlo analysis varies, which is how you find out whether a circuit works with the
+    /// parts you can actually buy rather than only with the ones in the drawing.
+    /// </para>
+    /// </summary>
+    [ObservableProperty]
+    public partial double Tolerance { get; set; } = 0.2;
+
+    /// <summary>The value a tolerance applies to.</summary>
+    public string TolerancedProperty => nameof(Capacitance);
 
     /// <summary>Optional initial voltage enforced during the bias-point solve.</summary>
     [ObservableProperty]
