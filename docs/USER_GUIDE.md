@@ -72,7 +72,7 @@ at the window edge; click the rail to bring it back.
 
 Click a palette entry, then click the canvas. The part lands where you click, snapped to the grid.
 
-The palette holds **173 components in 16 categories**:
+The palette holds **179 components in 16 categories**:
 
 | Category | Count | Contents |
 | --- | --- | --- |
@@ -83,14 +83,14 @@ The palette holds **173 components in 16 categories**:
 | Transistors | 11 | NPN and PNP bipolars, N- and P-channel MOSFETs, three JFETs and an **IGBT** — see [below](#the-igbt) |
 | LEDs & Displays | 9 | Six LED colours, seven-segment displays, **HD44780 character LCD** — see [below](#the-character-lcd) |
 | Power | 10 | Fixed and adjustable regulators, TL431 shunt reference, ICL7660 charge pump, MC34063 switching controller, **TP4056 lithium charger** — see [below](#charging-a-lithium-cell) |
-| Analog ICs | 12 | LM741, TL081, LM358, MCP6002 rail-to-rail, NE555, LM311, LM339, LM386 audio amp, INA126 instrumentation amp and an **AD633 analog multiplier** — see [below](#multiplying-two-voltages) |
+| Analog ICs | 13 | LM741, TL081, LM358, MCP6002 rail-to-rail, the **LM324 quad**, NE555, LM311, LM339, LM386 audio amp, INA126 instrumentation amp and an **AD633 analog multiplier** — see [below](#four-in-one-package) |
 | Logic Gates | 7 | AND, OR, NAND, NOR, XOR, XNOR, NOT |
 | 74xx Series | 21 | Counters (including the synchronous **74161**), decoders, flip-flops, shift registers, the **74245 bus transceiver** and **74373 latch**, multiplexers, Schmitt inverter — see [below](#sharing-a-bus) |
 | 40xx Series | 15 | CMOS gates, counters, flip-flops, analog switches and a **4046 phase-locked loop** — see [below](#phase-locked-loops) |
-| Buses | 16 | I2C master, EEPROM, port expander, DS1307 clock, ADS1115 ADC, MCP4725 DAC and INA219 current sensor, SPI master and **MCP3008 ADC**, 1-Wire master and DS18B20 thermometer, serial terminal and device, **RS-485** and **CAN** transceivers, level shifter — see [below](#can-signalling-by-agreement) |
+| Buses | 17 | I2C master, EEPROM, port expander, DS1307 clock, ADS1115 ADC, MCP4725 DAC and INA219 current sensor, SPI master and **MCP3008 ADC**, 1-Wire master and DS18B20 thermometer, serial terminal and device, **RS-485**, **CAN** and **RS-232 (MAX232)** transceivers, level shifter — see [below](#making-its-own-rails) |
 | Digital I/O | 8 | Logic toggle, clock, rotary encoder, oscillator module, ADC and DAC bridges, and a **2K × 8 SRAM and ROM** — see [below](#something-worth-addressing) |
-| Sensors & Actuators | 17 | DC motor, LDR, thermistors, buzzers, speaker, microphone, servo, stepper, thermocouple, load cell, HC-SR04 ranger, Hall switch, phototransistor, **reed switch** and **PIR motion sensor** — see [below](#sensors-and-actuators) |
-| Switching & Isolation | 8 | Relay, fuses, optocouplers, ULN2003, H-bridge, **MOSFET gate driver** — see [below](#driving-a-mosfet-gate) |
+| Sensors & Actuators | 18 | DC motor, LDR, thermistors, buzzers, speaker, microphone, servo, stepper in **unipolar and bipolar** wirings, thermocouple, load cell, HC-SR04 ranger, Hall switch, phototransistor, **reed switch** and **PIR motion sensor** — see [below](#sensors-and-actuators) |
+| Switching & Isolation | 11 | Relay, fuses and a **resettable PPTC**, optocouplers, ULN2003, H-bridge, **A4988 microstepping driver**, **solid-state relay**, **MOSFET gate driver** — see [below](#regulating-a-current-instead-of-applying-a-voltage) |
 | Dev Boards | 4 | Raspberry Pi, Arduino Uno / Nano / Mega — see [below](#development-boards) |
 
 Click a category header to open it — and whichever was open closes, so **one category is open at a
@@ -419,7 +419,7 @@ gets roughly two-thirds of the way each time.
 
 ### The example browser
 
-Everything above is also in **File > Examples...** (`Ctrl+Shift+E`), along with seventy-three others.
+Everything above is also in **File > Examples...** (`Ctrl+Shift+E`), along with seventy-eight others.
 
 They are grouped the way the component palette is — Fundamentals, Analog, Power Supplies, Switching
 & Motors, Digital Logic, Timers & Oscillators, Buses & Interfaces, Sensors, Signal Integrity & RF,
@@ -1040,6 +1040,41 @@ limitation of the simulator — two circuits with nothing at all between them ha
 real device leaks through some hundreds of gigohms and that is what is modelled, which keeps the
 matrix solvable without meaningfully coupling the halves.
 
+**Resettable fuse** — a PPTC, and the most useful thing about it is how little it resembles the
+fuse above. It does not melt and it does not open. It is a polymer stuffed with conductive
+particles, and when the current through it heats it past a transition temperature the polymer
+expands and pulls the particles apart, so its resistance climbs by three or four orders of
+magnitude in a few hundred milliseconds. That is enough to cut the fault to a trickle.
+
+The trickle is the part worth seeing. **File > Examples > Resettable Fuse** runs a 22 Ω load off a
+5 V rail through a half-amp device — 227 mA, comfortably under the hold current, and it will sit
+there for ever. Close SW1 to put 2.2 Ω across it and watch the rail current: it rises, holds for a
+moment while the heat accumulates, and then collapses to about twelve milliamps. Not zero. Those
+twelve milliamps are dissipating enough to keep the device above its transition temperature, which
+is exactly what holds it tripped — a PPTC latches thermally, on its own leakage. Open SW1 again and
+nothing happens for several seconds; it has to cool before it comes back, and cooling is far slower
+than tripping was. Both time constants are modelled and they are not the same number.
+
+Note the timebase the example sets: half a second per division. Everything else in this library
+happens in microseconds or milliseconds. A PPTC is the one part here slow enough to watch.
+
+**Solid-state relay** — an optocoupler with a triac on the output side instead of a transistor, and
+a zero-crossing detector in between. What that detector does is refuse to fire until the voltage
+across the load passes through zero, which is a much bigger deal than it sounds. A mechanical relay
+closing at the peak of the mains dumps a step of several hundred volts into whatever it is
+switching; the inrush, the arc and the radiated interference all come from that one moment. Waiting
+for the crossing removes all three.
+
+**File > Examples > Zero-Crossing Switch** has a lamp on 240 V and a toggle in the control side.
+Close the toggle at any moment you like and then look at the load trace: nothing happens, for up to
+ten milliseconds, and then the relay picks up cleanly at a crossing. On a 50 Hz supply a crossing
+comes round every 10 ms, so the wait is somewhere in that window and never zero. The same part also
+shows the other half of the bargain — once it is on it cannot be turned off mid-cycle either, since
+a triac only stops conducting when its own current falls through zero.
+
+**A4988 stepper driver** — see [below](#regulating-a-current-instead-of-applying-a-voltage), because
+what it does is different enough from the ULN2003 to be worth its own section.
+
 **File > Examples > Relay Driver** puts three of these in a row between a logic pin and a coil,
 because no one of them is enough on its own. A clock drives the optocoupler's LED through 330 Ω —
 milliamps, not the microamps people budget, because the transfer ratio is a current ratio and a
@@ -1391,6 +1426,70 @@ motor is an inductance — when the switches open, its current has to go somewhe
 the outputs would fly to whatever voltage it took to stop the current dead.
 
 **File > Examples > Motor Reversing** wires one up with three switches you can flip while it runs.
+
+---
+
+## Regulating a current instead of applying a voltage
+
+The ULN2003 above switches a stepper's windings on and off, and that is all a simple driver does.
+An A4988 does something else entirely, and the difference is why every printer, plotter and 3D
+printer built since the eighties has one of these rather than seven Darlingtons.
+
+A stepper winding is about two ohms and a couple of millihenries. At its rated amp it needs two
+volts — but at two volts the current takes *milliseconds* to get there through the inductance, and
+a motor stepping a thousand times a second never reaches its rated current at all. Torque falls off
+a cliff with speed, and no amount of better switching fixes it, because the limit is `L·di/dt` and
+the voltage is what sets it.
+
+So you cheat. Feed the winding from a supply far higher than it needs — twelve volts, or
+twenty-four — so the current rises fast, and then **chop**: switch the supply off the instant the
+current reaches target, let it decay a little, switch it back on. The winding sees its rated
+current almost immediately and never more than that, whatever the supply is.
+
+That is what the part does, and it is modelled rather than assumed, so it is on the scope.
+**File > Examples > Microstepping Drive** has the winding current as its third trace. Twelve volts
+into 2.8 Ω would be 4.3 A if anybody simply applied it; what you see instead is a flat top at the
+0.8 A limit with a fine sawtooth on it at tens of kilohertz — that sawtooth *is* the chopper. Raise
+`SupplyVoltage` and the ripple gets faster and the rise sharper. Drop it towards the two volts the
+winding actually needs and the regulation stops working, because there is no headroom left to chop
+against, and the trace turns back into the slow exponential the ULN2003 example shows.
+
+### And it microsteps
+
+Full stepping energises one winding at a time: the rotor jumps between four positions per
+electrical cycle and rings when it arrives. Drive the two windings with a **sine and a cosine**
+instead and the field can point anywhere in between, so the rotor is pulled round smoothly rather
+than snapped. MS1, MS2 and MS3 pick full, half, quarter, eighth or sixteenth steps — in the example
+all three are grounded, which is full stepping. Tie MS1 to the logic rail and re-run it: the
+winding current stops being a square wave and becomes a staircase.
+
+It is worth understanding microstepping as a **smoothness** control rather than a resolution one.
+Sixteenth-stepping does not give you sixteen times the position accuracy, because the accuracy is
+set by the motor's own detents and by the load on the shaft, not by how finely the driver can
+divide the current. What it gives you is a shaft that arrives without ringing and a motor that does
+not sing.
+
+### The motor has to be wired for it
+
+An A4988 drives a **bipolar** motor, and the stepper in the palette comes in both wirings — the
+`Wiring` property switches between them. It is the same iron and the same copper either way; what
+changes is how many wires leave the case.
+
+A **unipolar** motor taps the middle of each winding and brings the tap out, so a switch pulling
+one end down energises half the winding in one direction. Cheap to drive, and half the copper is
+idle at any moment. That is the one the ULN2003 example uses, and COM is the tap.
+
+A **bipolar** motor leaves the taps inside. Reversing a winding means reversing the current through
+it, which takes an H-bridge per winding — and in exchange all the copper works all the time, which
+is most of the reason a bipolar motor of the same size is the stronger one. Set `Wiring` to
+Bipolar and C1-C3 becomes one winding and C2-C4 the other, matching the driver's 1A/1B and 2A/2B.
+COM goes unused.
+
+Try it the wrong way round once. Wire an A4988 to a motor left in its unipolar wiring and all four
+coils still meet at the common terminal, so the two "windings" are not isolated and current divides
+between them — the driver regulates a current that is partly going somewhere else, and the shaft
+turns weakly or not at all. Nothing errors; it just does not work, which is exactly what happens on
+a bench.
 
 ---
 
@@ -2003,6 +2102,47 @@ two buildings fails like, and why isolated transceivers exist.
 
 ---
 
+## Making its own rails
+
+RS-232 predates logic levels as anybody now thinks of them. A mark is **minus** five to fifteen
+volts and a space is **plus** five to fifteen — bipolar, and inverted with respect to the TTL it is
+carrying. So an idle serial line sits at about minus ten volts, and the first thing anybody who
+scopes one thinks is that something is broken.
+
+A microcontroller pin cannot produce that and would be destroyed by receiving it, which is why the
+MAX232 exists. It is two drivers and two receivers, and the drivers are the easy half.
+
+**The charge pump is the famous half.** Before this chip, a serial port meant a board carrying plus
+and minus twelve volt rails purely for the line drivers. The MAX232 makes both from the five volts
+already there, using four capacitors and a switch matrix: one pair is charged to the supply and
+then stacked on top of it to give roughly twice the supply, and the other pair is charged and then
+flipped upside down to give roughly minus that.
+
+**File > Examples > RS-232 Link** has `V+` on the scope as its fourth trace, and it really is
+there: about ±8.5 V from a 5 V rail. Not ±12 V, which is what people expect, and not ±10 V either —
+twice five, less what the stacking costs in switch drops. It is inside the standard and nowhere
+near the headline numbers.
+
+The pump is modelled by what it produces rather than by its switching, but it is a real source with
+a real output resistance, so **loading a driver pulls the rails in**. The standard allows down to
+3 kΩ per line; go below that and the line level sags with the rail until it is no longer RS-232 at
+all, and the part says so. That is the failure people meet when they try to run four lines off one
+chip. The four capacitor pins are brought out because a real one does not work without them, but
+nothing is stamped through them.
+
+The example is two of these back to back with a UART at each end, which is what a serial cable
+between two boards actually contains. Watch the three traces together: TTL in, ±8.5 V on the cable,
+TTL out. The signal is **inverted twice** — once by the driver and once by the receiver — and the
+only proof that the two cancelled rather than adding up is that the text arrives.
+
+The receivers have about half a volt of hysteresis, and they need it: a line long enough to want
+RS-232 is long enough to pick up noise, and a receiver without hysteresis would chatter on every
+edge. They also survive ±30 V on the input, and the wide undefined band between the standard's
+levels is why an RS-232 receiver happily reads a line driven by an ordinary 0-to-5 V logic gate
+even though nothing about that is RS-232.
+
+---
+
 ## 1-Wire, the bus with no clock and no second wire
 
 The odd one of the three buses here, and the reason is in the name. I²C has two wires and SPI has
@@ -2223,6 +2363,38 @@ other.
 
 Swap any of the three to a different part from the inspector and the trace moves to that part's
 headroom, because that is all the figure is.
+
+---
+
+## Four in one package
+
+An LM324 is four LM358s on one die, and electrically that is all it is — same gain, same bandwidth,
+same stubborn volt and a half of headroom at the top of the supply. What makes it worth having as
+its own part is that the four channels **share one supply pair**. Fourteen pins: twelve for the
+amplifiers, two for the power, and nothing else.
+
+That is not a packaging convenience, it is how single-supply analog design is actually done, and
+**File > Examples > Quad Op-Amp** is one package doing the four jobs a front end needs:
+
+- **Channel A** buffers a divider to make a half-rail reference. On one supply there is no ground
+  in the middle of the signal, so you have to manufacture one — and it has to be buffered, because
+  a bare divider is a few kilohms and every stage hanging off it would load it and move it.
+- **Channel B** buffers the incoming signal, capacitor-coupled so a source referred to ground can
+  drive a stage that is not. Note the 10 kΩ from that input to the reference: without a DC path the
+  capacitor leaves the input floating, which is the commonest way this circuit fails.
+- **Channel C** amplifies, referred to the same half rail rather than to ground.
+- **Channel D** inverts it.
+
+The gain in channel C is exactly two, and the reason is the part's own limitation. On a single five
+volt supply an LM324 swings from about 0.02 V to about 3.5 V — it reaches the bottom rail and stops
+a volt and a half short of the top. Centred on 2.5 V that leaves a usable ±1 V, so a 0.4 V input
+can be doubled and no further. Raise `39k` into the feedback and run it again: the top of the wave
+flattens against that ceiling while the bottom carries on, which is worth seeing once. Compare it
+with the **Rail to Rail** example, where the MCP6002 doing the same thing has the whole supply
+available.
+
+Each channel reports its own saturation, so the inspector tells you which one ran out of room
+rather than leaving you to work it out from the trace.
 
 ---
 

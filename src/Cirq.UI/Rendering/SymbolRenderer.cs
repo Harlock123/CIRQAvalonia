@@ -66,6 +66,8 @@ public static class SymbolRenderer
             case Microphone mic: DrawMicrophone(context, pen, zoom, mic); break;
             case Servo servo: DrawServo(context, pen, zoom, servo); break;
             case StepperMotor stepper: DrawStepper(context, pen, zoom, stepper); break;
+            case StepperDriver driver: DrawStepperDriver(context, pen, zoom, driver); break;
+            case SolidStateRelay ssr: DrawSolidStateRelay(context, pen, zoom, ssr); break;
             case UltrasonicRanger sonar: DrawUltrasonicRanger(context, pen, zoom, sonar); break;
             case NoiseSource noise: DrawNoiseSource(context, pen, zoom, noise); break;
             case Battery battery: DrawBattery(context, pen, zoom, battery); break;
@@ -88,6 +90,7 @@ public static class SymbolRenderer
             case LightDependentResistor ldr: DrawLdr(context, pen, zoom, ldr); break;
             case Thermistor thermistor: DrawThermistor(context, pen, zoom, thermistor); break;
             case Relay relay: DrawRelay(context, pen, zoom, relay); break;
+            case ResettableFuse pptc: DrawResettableFuse(context, pen, zoom, pptc); break;
             case Fuse fuse: DrawFuse(context, pen, zoom, fuse); break;
             case Optocoupler opto: DrawOptocoupler(context, pen, zoom, opto); break;
             case SiliconControlledRectifier scr: DrawThyristor(context, pen, zoom, scr, scr.IsLatched, true); break;
@@ -105,6 +108,7 @@ public static class SymbolRenderer
             case SpdtSwitch spdt: DrawSpdtSwitch(context, pen, spdt); break;
             case Comparator: DrawComparator(context, pen, zoom); break;
             case VoltageRegulator reg: DrawRegulator(context, pen, zoom, reg); break;
+            case QuadOpAmp: DrawDip(context, pen, zoom, 14, "LM324"); break;
             case OperationalAmplifier: DrawOpAmp(context, pen, zoom); break;
             case Ne555: DrawDip(context, pen, zoom, 8, "NE555"); break;
             case DigitalIc ic: DrawDip(context, pen, zoom, ic.PinCount, ic.PartNumber); break;
@@ -349,6 +353,140 @@ public static class SymbolRenderer
         {
             context.DrawLine(pen, new Point(-18, 0), new Point(18, 0));
         }
+    }
+
+    /// <summary>
+    /// A PPTC, drawn as a fuse body with the IEC slash through it that says self-resetting. The
+    /// element is filled rather than broken when it trips, because that is what happens: it does
+    /// not part, it goes hot and high-resistance, and a trickle keeps flowing.
+    /// </summary>
+    private static void DrawResettableFuse(
+        ISymbolCanvas context, IPen pen, double zoom, ResettableFuse fuse)
+    {
+        context.DrawLine(pen, new Point(-30, 0), new Point(-18, 0));
+        context.DrawLine(pen, new Point(18, 0), new Point(30, 0));
+        context.DrawRectangle(CanvasTheme.SymbolFill, pen, new RoundedRect(new Rect(-18, -9, 36, 18), 3));
+        context.DrawLine(pen, new Point(-18, 0), new Point(18, 0));
+
+        // The slash, which is the marking that distinguishes a resettable device from a fuse.
+        var hot = fuse.IsTripped
+            ? CanvasTheme.Pen(CanvasTheme.ErrorBrush, 1.6, zoom)
+            : pen;
+
+        context.DrawLine(hot, new Point(-8, 7), new Point(8, -7));
+    }
+
+    /// <summary>
+    /// The A4988 as the little module it is sold as: logic pins down one side, motor pins down the
+    /// other, and the two coil currents shown as the bars they are so the chopping is visible on
+    /// the symbol as well as on the scope.
+    /// </summary>
+    private static void DrawStepperDriver(
+        ISymbolCanvas context, IPen pen, double zoom, StepperDriver driver)
+    {
+        var body = new Rect(-38, -72, 76, 164);
+        context.DrawRectangle(CanvasTheme.SymbolFill, pen, new RoundedRect(body, 3));
+
+        foreach (var terminal in driver.Terminals)
+        {
+            var p = new Point(terminal.CanvasOffset.X, terminal.CanvasOffset.Y);
+            var inner = new Point(
+                Math.Clamp(p.X, body.Left, body.Right), Math.Clamp(p.Y, body.Top, body.Bottom));
+
+            context.DrawLine(pen, p, inner);
+        }
+
+        DrawCenteredText(context, "A4988", new Point(0, -40), 10, zoom, CanvasTheme.LabelBrush);
+
+        if (zoom <= 0.5) return;
+
+        // One bar per winding, filled in proportion to the current it is carrying and signed, so a
+        // bar growing one way and shrinking the other is the electrical cycle turning.
+        var limit = Math.Max(driver.CurrentLimit, 1e-9);
+
+        for (var i = 0; i < 2; i++)
+        {
+            var y = 10 + (i * 26);
+            var track = new Rect(-24, y - 6, 48, 12);
+
+            context.DrawRectangle(null, pen, new RoundedRect(track, 2));
+
+            var fraction = Math.Clamp(driver.WindingCurrent(i) / limit, -1.0, 1.0);
+            var width = Math.Abs(fraction) * 23.0;
+            if (width < 0.5) continue;
+
+            var bar = fraction > 0
+                ? new Rect(0, y - 5, width, 10)
+                : new Rect(-width, y - 5, width, 10);
+
+            context.DrawRectangle(
+                driver.IsChopping(i) ? CanvasTheme.ValueBrush : CanvasTheme.SymbolBrush, null,
+                new RoundedRect(bar, 1));
+        }
+    }
+
+    /// <summary>
+    /// A solid-state relay: an LED on the control side, a triac on the load side, and the barrier
+    /// between them — the same shape as an optocoupler because that is what one is, with the
+    /// zero-crossing detector added.
+    /// </summary>
+    private static void DrawSolidStateRelay(
+        ISymbolCanvas context, IPen pen, double zoom, SolidStateRelay relay)
+    {
+        var body = new Rect(-26, -32, 52, 64);
+        context.DrawRectangle(CanvasTheme.SymbolFill, pen, new RoundedRect(body, 3));
+
+        foreach (var (from, to) in new[]
+                 {
+                     (new Point(-50, -20), new Point(-26, -20)),
+                     (new Point(-50, 20), new Point(-26, 20)),
+                     (new Point(50, -20), new Point(26, -20)),
+                     (new Point(50, 20), new Point(26, 20)),
+                 })
+        {
+            context.DrawLine(pen, from, to);
+        }
+
+        // Control side: an LED across the input, lit while the relay is commanded.
+        context.DrawLine(pen, new Point(-18, -20), new Point(-18, 20));
+
+        var led = new SymbolPath();
+        using (var ctx = led.Open())
+        {
+            ctx.BeginFigure(new Point(-24, -7), true);
+            ctx.LineTo(new Point(-12, -7));
+            ctx.LineTo(new Point(-18, 5));
+            ctx.EndFigure(true);
+        }
+
+        context.DrawGeometry(relay.IsCommanded ? CanvasTheme.ValueBrush : CanvasTheme.SymbolFill, pen, led);
+        context.DrawLine(pen, new Point(-24, 5), new Point(-12, 5));
+
+        var barrier = CanvasTheme.Pen(CanvasTheme.SymbolBrush, 1.0, zoom, new DashStyle([2, 2], 0));
+        context.DrawLine(barrier, new Point(-4, -28), new Point(-4, 28));
+
+        // Load side: a triac, drawn as the two back-to-back triangles it is.
+        context.DrawLine(pen, new Point(14, -20), new Point(14, 20));
+
+        var triac = new SymbolPath();
+        using (var ctx = triac.Open())
+        {
+            ctx.BeginFigure(new Point(8, -14), true);
+            ctx.LineTo(new Point(20, -14));
+            ctx.LineTo(new Point(14, -2));
+            ctx.EndFigure(true);
+            ctx.BeginFigure(new Point(8, 14), true);
+            ctx.LineTo(new Point(20, 14));
+            ctx.LineTo(new Point(14, 2));
+            ctx.EndFigure(true);
+        }
+
+        context.DrawGeometry(relay.IsConducting ? CanvasTheme.ValueBrush : CanvasTheme.SymbolFill, pen, triac);
+
+        // Commanded but not yet fired is the interesting state, and the one worth showing: it is
+        // waiting for the load voltage to cross zero, which can be milliseconds away.
+        if (zoom > 0.5 && relay.IsCommanded && !relay.IsConducting)
+            DrawCenteredText(context, "0\u2717", new Point(14, 26), 8, zoom, CanvasTheme.LabelBrush);
     }
 
     /// <summary>
@@ -2277,6 +2415,13 @@ public static class SymbolRenderer
         LevelShifter => 84.0,
         OscillatorModule => 44.0,
         Ne555 => DipPackage.BodyHeight(8) / 2 + 16,
+
+        // Drawn as a DIP-14 rather than as four triangles, so it needs a DIP's clearance.
+        QuadOpAmp => DipPackage.BodyHeight(14) / 2 + 16,
+
+        // The driver module reaches 92 below centre; the relay's case 32.
+        StepperDriver => 106.0,
+        SolidStateRelay => 46.0,
         DigitalIc ic => DipPackage.BodyHeight(ic.PinCount) / 2 + 16,
         _ => 30.0,
     };

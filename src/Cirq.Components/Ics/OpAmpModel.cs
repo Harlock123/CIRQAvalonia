@@ -84,7 +84,15 @@ public sealed record OpAmpModel(
     public static readonly OpAmpModel Mcp6002 = new(
         "MCP6002", 112_000, 1e6, 0.6e6, 1e13, 100, 0.025, 2e-3, 1e-12, 100e-6);
 
-    public static readonly IReadOnlyList<OpAmpModel> Library = [Lm741, Tl081, Lm358, Mcp6002];
+    /// <summary>
+    /// Four of the <see cref="Lm358"/> in one package, and electrically that is all it is — same
+    /// gain, same bandwidth, same stubborn volt and a half of headroom at the top. It is here as
+    /// its own entry because a channel of an LM324 is what a <see cref="QuadOpAmp"/> contains, and
+    /// a saved circuit has to be able to name it.
+    /// </summary>
+    public static readonly OpAmpModel Lm324 = Lm358 with { Name = "LM324" };
+
+    public static readonly IReadOnlyList<OpAmpModel> Library = [Lm741, Tl081, Lm358, Lm324, Mcp6002];
 
     /// <summary>Input-stage transconductance. Fixed; the other values scale around it.</summary>
     public double Transconductance => 1e-4;

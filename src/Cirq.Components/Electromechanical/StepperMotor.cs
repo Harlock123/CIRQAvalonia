@@ -23,6 +23,23 @@ namespace Cirq.Components.Electromechanical;
 /// unipolar winding means and why it pairs with a sink driver.
 /// </para>
 /// </summary>
+public enum StepperWiring
+{
+    /// <summary>
+    /// Four coils hanging off one common wire, which goes to the supply while the coil ends are
+    /// pulled down. Current only ever flows one way through a coil, so the driver can be four
+    /// switches — a ULN2003, say — and nothing more.
+    /// </summary>
+    Unipolar,
+
+    /// <summary>
+    /// Two isolated windings, C1-C3 and C2-C4, with no common wire. Current is pushed both ways
+    /// through each, which needs an H-bridge per winding, and in exchange the whole winding is
+    /// working at once rather than half of it. This is what an A4988 or a DRV8825 drives.
+    /// </summary>
+    Bipolar,
+}
+
 public partial class StepperMotor : CircuitComponent
 {
     private const int Phases = 4;
@@ -72,8 +89,35 @@ public partial class StepperMotor : CircuitComponent
     [ObservableProperty]
     public partial double HoldingCurrent { get; set; } = 10e-3;
 
-    /// <summary>Each coil needs a branch, because a winding is an inductor.</summary>
-    public override int VoltageSourceCount => Phases;
+    /// <summary>
+    /// How the windings are brought out, which decides what can drive it.
+    /// <para>
+    /// The same iron and the same copper can be wound either way, and the difference is entirely
+    /// in how many wires leave the case. A <b>unipolar</b> motor taps the middle of each winding
+    /// and brings the tap out, so a switch pulling one end down energises half the winding in one
+    /// direction — cheap to drive, and half the copper is idle at any moment. A <b>bipolar</b>
+    /// motor leaves the taps inside, so reversing a winding means reversing the current through
+    /// it, which takes an H-bridge — and all the copper works all the time, which is most of the
+    /// reason a bipolar motor of the same size is the stronger one.
+    /// </para>
+    /// <para>
+    /// Bipolar leaves <c>COM</c> unused and pairs the coils: C1-C3 is one winding and C2-C4 the
+    /// other, matching an A4988's 1A/1B and 2A/2B. <see cref="CoilResistance"/> and
+    /// <see cref="CoilInductance"/> then describe a whole winding end to end, which is the figure
+    /// a bipolar motor's datasheet gives.
+    /// </para>
+    /// </summary>
+    [ObservableProperty]
+    public partial StepperWiring Wiring { get; set; } = StepperWiring.Unipolar;
+
+    /// <summary>True when the coils are paired into two isolated windings.</summary>
+    public bool IsBipolar => Wiring == StepperWiring.Bipolar;
+
+    /// <summary>
+    /// Each winding needs a branch, because a winding is an inductor — four of them when the
+    /// coils are driven separately, two when they are paired.
+    /// </summary>
+    public override int VoltageSourceCount => IsBipolar ? Phases / 2 : Phases;
 
     public override string ComponentType => "Stepper Motor";
 
@@ -106,29 +150,76 @@ public partial class StepperMotor : CircuitComponent
 
     public override void StampMatrix(MnaSystem system, SimulationState state)
     {
+        if (IsBipolar)
+        {
+            // Two windings, each strung between a pair of coil ends. COM is left out of the
+            // matrix entirely — on a bipolar motor that wire does not exist.
+            for (var w = 0; w < Phases / 2; w++)
+                StampWinding(system, state, system.Node(_coils[w]), system.Node(_coils[w + 2]), w);
+
+            return;
+        }
+
         var common = system.Node(Common);
 
         for (var i = 0; i < Phases; i++)
+            StampWinding(system, state, common, system.Node(_coils[i]), i);
+    }
+
+    /// <summary>
+    /// One winding as a branch from <paramref name="from"/> to <paramref name="to"/>: its
+    /// resistance, and a trapezoidal companion for its inductance. Both wirings are this same
+    /// stamp; all that changes is what sits at the two ends.
+    /// </summary>
+    private void StampWinding(MnaSystem system, SimulationState state, int from, int to, int branchIndex)
+    {
+        var branch = system.Branch(this, branchIndex);
+
+        // Current leaves the first node and enters the second.
+        system.Add(from, branch, 1.0);
+        system.Add(to, branch, -1.0);
+
+        system.Add(branch, from, 1.0);
+        system.Add(branch, to, -1.0);
+        system.Add(branch, branch, -Math.Max(CoilResistance, 1e-6));
+
+        if (!state.IsTransient) return;
+
+        // Trapezoidal companion for the winding, the same shape the inductor uses.
+        var leq = 2.0 * Math.Max(CoilInductance, 1e-12) / state.TimeStep;
+        // The branch's own current last time. Bipolar keeps a winding's current in the entry for
+        // its first coil, so the index is the branch index either way.
+        var previous = _currents[branchIndex];
+
+        system.Add(branch, branch, -leq);
+        system.AddRhs(branch, -leq * previous);
+    }
+
+    /// <summary>
+    /// Fills <see cref="_currents"/> from the solved branches, as a current per coil.
+    /// <para>
+    /// Unipolar is one branch per coil and needs no thought. Bipolar has one branch per pair, and
+    /// what it means is that the two coils of a winding carry the <i>same</i> current in
+    /// <i>opposite</i> senses — the field from C3 points backwards along C1's axis. Writing it out
+    /// that way is what lets the field sum below stay exactly as it was: reverse a winding and its
+    /// pair of entries swaps sign, which swings the vector round by half a turn, which is the
+    /// whole difference between a bipolar drive and a unipolar one.
+    /// </para>
+    /// </summary>
+    private void ReadCurrents(MnaSystem system)
+    {
+        if (!IsBipolar)
         {
-            var node = system.Node(_coils[i]);
-            var branch = system.Branch(this, i);
+            for (var i = 0; i < Phases; i++) _currents[i] = system.BranchCurrent(this, i);
+            return;
+        }
 
-            // Current leaves the common wire and enters the coil end.
-            system.Add(common, branch, 1.0);
-            system.Add(node, branch, -1.0);
+        for (var w = 0; w < Phases / 2; w++)
+        {
+            var current = system.BranchCurrent(this, w);
 
-            system.Add(branch, common, 1.0);
-            system.Add(branch, node, -1.0);
-            system.Add(branch, branch, -Math.Max(CoilResistance, 1e-6));
-
-            if (!state.IsTransient) continue;
-
-            // Trapezoidal companion for the winding, the same shape the inductor uses.
-            var leq = 2.0 * Math.Max(CoilInductance, 1e-12) / state.TimeStep;
-            var previous = _currents[i];
-
-            system.Add(branch, branch, -leq);
-            system.AddRhs(branch, -leq * previous);
+            _currents[w] = current;
+            _currents[w + 2] = -current;
         }
     }
 
@@ -137,12 +228,16 @@ public partial class StepperMotor : CircuitComponent
         double x = 0, y = 0;
         var energised = false;
 
+        ReadCurrents(system);
+
         for (var i = 0; i < Phases; i++)
         {
-            _currents[i] = system.BranchCurrent(this, i);
-
-            var magnitude = Math.Max(_currents[i], 0.0);
-            if (magnitude < HoldingCurrent) continue;
+            // Signed, not rectified. A unipolar drive only ever pushes current one way through a
+            // winding, so this changes nothing for one — but a bipolar driver reverses it, and a
+            // reversed winding pulls the rotor the opposite way rather than not at all. Taking the
+            // magnitude alone would make an H-bridge look like an open circuit half the time.
+            var magnitude = _currents[i];
+            if (Math.Abs(magnitude) < HoldingCurrent) continue;
 
             energised = true;
 

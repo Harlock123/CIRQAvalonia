@@ -63,6 +63,8 @@ public static class Examples
                 LoadAnalogSwitch),
             new("Noise and Hysteresis", "A comparator chattering on a noisy ramp — add hysteresis and it stops",
                 LoadNoiseAndHysteresis),
+            new("Quad Op-Amp", "One LM324 doing four jobs on a single supply — bias, buffer, gain and invert",
+                LoadQuadOpAmpChain),
         ]),
 
         new("Power Supplies",
@@ -77,6 +79,8 @@ public static class Examples
                 LoadAdjustableSupply),
             new("Solar Panel", "A panel and an adjustable load — turn RV1 and find the maximum power point",
                 LoadSolarPanel),
+            new("Resettable Fuse", "A PPTC holding a short circuit at bay — close SW1, and it does not open, it heats",
+                LoadResettableFuse),
             new("Lithium Charge Cycle", "Constant current to 4.2 V, then constant voltage tapering away",
                 LoadLithiumCharge),
             new("Surge Protection", "A varistor takes the energy and a TVS clamps what gets past it",
@@ -105,6 +109,10 @@ public static class Examples
                 LoadServoSweep),
             new("Stepper Motor", "A 4017 walking four windings through a ULN2003",
                 LoadStepper),
+            new("Microstepping Drive", "An A4988 chopping a bipolar motor's current — step and direction in, a sine out",
+                LoadMicrosteppingDrive),
+            new("Zero-Crossing Switch", "A solid-state relay that refuses to fire until the mains passes through zero",
+                LoadZeroCrossingSwitch),
             new("Motor Reversing", "An H-bridge running a motor both ways — forward, brake, reverse, coast",
                 LoadMotorReversing),
         ]),
@@ -159,6 +167,8 @@ public static class Examples
                 LoadLevelShifting),
             new("RS-485 Link", "Two transceivers down fifty metres of cable — open SW1 and watch it ring",
                 LoadRs485Link),
+            new("RS-232 Link", "A MAX232 at each end, making ±8.5 V out of the 5 V rail and inverting on the way",
+                LoadRs232Link),
         ]),
 
         new("Sensors",
@@ -4350,6 +4360,336 @@ public static class Examples
         vm.Scope.AddProbe(adc.Clock, "CLK");
         vm.Scope.AddProbe(adc.DataIn, "MOSI");
         vm.Scope.AddProbe(adc.DataOutPin, "MISO");
+    }
+
+    /// <summary>
+    /// An A4988 running a bipolar motor. The winding current is the thing to look at: it is
+    /// regulated, not applied, and the sawtooth on it is the chopper working.
+    /// </summary>
+    public static void LoadMicrosteppingDrive(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "Microstepping drive";
+
+        var logic = Place(circuit, new DcVoltageSource(5.0), -620, 240);
+
+        // Twelve volts into a two ohm winding would be six amps if anybody applied it. Nobody
+        // does — the supply is high so the current rises fast, and the chopper takes care of the
+        // rest. That is the whole idea of the part.
+        var rail = Place(circuit, new DcVoltageSource(12.0), -620, 440);
+
+        var clock = Place(circuit, new ClockSource(200.0), -400, -160);
+        var driver = Place(circuit, new StepperDriver { CurrentLimit = 0.8 }, -60, 0);
+
+        var motor = Place(circuit, new StepperMotor
+        {
+            Wiring = StepperWiring.Bipolar,
+            CoilResistance = 2.0,
+            CoilInductance = 2e-3,
+            StepsPerRevolution = 200,
+        }, 340, 0);
+
+        var gnd = Place(circuit, new Ground(), -620, 400);
+        var gnd2 = Place(circuit, new Ground(), -620, 600);
+        var gnd3 = Place(circuit, new Ground(), -60, 240);
+
+        circuit.Connect(logic.Negative, gnd.Pin);
+        circuit.Connect(rail.Negative, gnd2.Pin);
+
+        circuit.Connect(driver.Vcc, logic.Positive);
+        circuit.Connect(driver.Gnd, gnd3.Pin);
+        circuit.Connect(driver.Motor, rail.Positive);
+
+        circuit.Connect(driver.Step, clock.Out);
+        circuit.Connect(driver.Direction, logic.Positive);
+
+        // Enable is active low, so grounding it turns the outputs on.
+        circuit.Connect(driver.Enable, gnd3.Pin);
+
+        // MS1-MS3 all low is full stepping. Tie MS1 to the logic rail for half steps, MS1 and MS2
+        // for eighths — and the current in the winding below stops being a square wave and starts
+        // being a staircase approximating a sine.
+        foreach (var pin in new[] { driver.Ms1, driver.Ms2, driver.Ms3 })
+            circuit.Connect(pin, gnd3.Pin);
+
+        // C1-C3 is one winding on a bipolar motor and C2-C4 the other.
+        circuit.Connect(driver.OutputA1, motor.Coils[0]);
+        circuit.Connect(driver.OutputB1, motor.Coils[2]);
+        circuit.Connect(driver.OutputA2, motor.Coils[1]);
+        circuit.Connect(driver.OutputB2, motor.Coils[3]);
+
+        vm.Scope.TimebasePerDivision = 2e-3;
+        vm.Scope.VoltsPerDivision = 5.0;
+        vm.Scope.Layout = ScopeLayout.Tiled;
+        vm.Scope.AddProbe(clock.Out, "STEP");
+        vm.Scope.AddProbe(driver.OutputA1, "1A");
+
+        // The one to watch. It is regulated rather than applied, so it is flat-topped at the
+        // limit with the chopper's sawtooth on it, and it reverses every other step.
+        var winding = vm.Scope.AddProbe(motor.Coils[0], "Winding 1");
+        winding.Kind = Cirq.Core.Probing.ProbeKind.Current;
+
+        vm.Simulation.SpeedFactor = 0.02;
+    }
+
+    /// <summary>
+    /// A solid-state relay commanded mid-cycle. The point of the example is the delay: it does
+    /// nothing at all until the mains next passes through zero.
+    /// </summary>
+    public static void LoadZeroCrossingSwitch(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "Zero-crossing switch";
+
+        var mains = Place(circuit, new FunctionGenerator(Waveform.Sine, 50, 340.0), -520, 0);
+        var logic = Place(circuit, new DcVoltageSource(5.0), -520, 320);
+
+        // A switch in the control side rather than a clock, so the moment of the command is
+        // whenever you happen to click it — which is the point. Fire it at a peak and the relay
+        // still waits.
+        var command = Place(circuit, new ToggleSwitch(closed: false), -240, 320);
+        var series = Place(circuit, new Resistor(470), -40, 320);
+
+        var relay = Place(circuit, new SolidStateRelay(), 200, 160);
+        var lamp = Place(circuit, new Resistor(100), 200, -80);
+
+        var gnd = Place(circuit, new Ground(), -520, 200);
+        var gnd2 = Place(circuit, new Ground(), -520, 480);
+        var gnd3 = Place(circuit, new Ground(), 440, 340);
+
+        circuit.Connect(mains.Return, gnd.Pin);
+        circuit.Connect(logic.Negative, gnd2.Pin);
+
+        circuit.Connect(mains.Output, lamp.A);
+        circuit.Connect(lamp.B, relay.LoadA);
+        circuit.Connect(relay.LoadB, gnd3.Pin);
+
+        circuit.Connect(logic.Positive, command.A);
+        circuit.Connect(command.B, series.A);
+        circuit.Connect(series.B, relay.ControlPositive);
+        circuit.Connect(relay.ControlNegative, gnd2.Pin);
+
+        vm.Scope.TimebasePerDivision = 5e-3;
+        vm.Scope.VoltsPerDivision = 100.0;
+        vm.Scope.Layout = ScopeLayout.Tiled;
+        vm.Scope.AddProbe(mains.Output, "Mains");
+        vm.Scope.AddProbe(relay.LoadA, "Load");
+
+        var lampCurrent = vm.Scope.AddProbe(relay.LoadA, "Lamp I");
+        lampCurrent.Kind = Cirq.Core.Probing.ProbeKind.Current;
+
+        vm.Simulation.SpeedFactor = 0.05;
+    }
+
+    /// <summary>
+    /// One LM324 doing the four things a single-supply analog front end needs, which is exactly
+    /// why the part is sold four to a package.
+    /// </summary>
+    public static void LoadQuadOpAmpChain(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "Quad op-amp chain";
+
+        var supply = Place(circuit, new DcVoltageSource(5.0), -760, 300);
+        var signal = Place(circuit, new FunctionGenerator(Waveform.Sine, 1e3, 0.4), -760, -120);
+        var quad = Place(circuit, new QuadOpAmp(), -200, 40);
+
+        // Half the rail, made by a divider and then buffered. On one supply there is no ground in
+        // the middle of the signal, so you have to make one — and it has to be buffered, because
+        // a bare divider is a few kilohms and every stage hanging off it would load it.
+        var top = Place(circuit, new Resistor(10e3), -520, -180);
+        var bottom = Place(circuit, new Resistor(10e3), -520, -20);
+
+        // Stage two: non-inverting, gain 1 + 10k/10k = 2.
+        //
+        // Two, and not more, because of what this part can reach. An LM324 on a single five volt
+        // supply swings from about 0.02 V to about 3.5 V — it gets to the bottom rail and stops a
+        // volt and a half short of the top. Centred on half the rail that leaves a usable ±1 V,
+        // so a 0.4 V input can be doubled and no more. Raise the gain here to 4.9 and the top of
+        // the wave flattens against that limit while the bottom carries on, which is worth doing
+        // once to see.
+        var gainTop = Place(circuit, new Resistor(10e3), 100, -220);
+        var gainBottom = Place(circuit, new Resistor(10e3), 100, -60);
+
+        // Stage three: inverting, gain -1, so it comes out upside down at the same size.
+        var inputResistor = Place(circuit, new Resistor(22e3), 300, 60);
+        var feedback = Place(circuit, new Resistor(22e3), 420, -80);
+
+        var coupling = Place(circuit, new Capacitor(1e-6), -420, 120);
+
+        var gnd = Place(circuit, new Ground(), -760, 460);
+        var gnd2 = Place(circuit, new Ground(), -760, 40);
+        var gnd3 = Place(circuit, new Ground(), -520, 120);
+        var gnd4 = Place(circuit, new Ground(), -200, 260);
+        var gnd5 = Place(circuit, new Ground(), 100, 100);
+
+        circuit.Connect(supply.Negative, gnd.Pin);
+        circuit.Connect(quad.PositiveSupply, supply.Positive);
+        circuit.Connect(quad.NegativeSupply, gnd4.Pin);
+
+        var (bias, biasMinus, biasOut) = quad.Channel(0);
+        var (bufferPlus, bufferMinus, bufferOut) = quad.Channel(1);
+        var (gainPlus, gainMinus, gainOut) = quad.Channel(2);
+        var (invertPlus, invertMinus, invertOut) = quad.Channel(3);
+
+        // Channel A: the half-rail reference, as a follower on the divider.
+        circuit.Connect(top.A, supply.Positive);
+        circuit.Connect(top.B, bottom.A);
+        circuit.Connect(bottom.B, gnd3.Pin);
+        circuit.Connect(bias, top.B);
+        circuit.Connect(biasMinus, biasOut);
+
+        // Channel B: the signal, capacitor-coupled and sat on top of that reference. The
+        // capacitor is what lets a source referred to ground drive a stage that is not.
+        circuit.Connect(signal.Return, gnd2.Pin);
+        circuit.Connect(signal.Output, coupling.A);
+        circuit.Connect(coupling.B, bufferPlus);
+
+        // The input needs a DC path or the capacitor leaves it floating, and the reference is
+        // where it belongs — that is the whole reason the first channel exists. Ten kilohms
+        // against the one microfarad puts the coupling corner at 16 Hz, well under the signal,
+        // and settles the bias in a few tens of milliseconds rather than a second. A bare divider
+        // could not supply it; a buffered one does not notice.
+        var leak = Place(circuit, new Resistor(10e3), -420, 260);
+        circuit.Connect(leak.A, bufferPlus);
+        circuit.Connect(leak.B, biasOut);
+        circuit.Connect(bufferMinus, bufferOut);
+
+        // Channel C: gain of 4.9, referred to the same half rail rather than to ground.
+        circuit.Connect(gainPlus, bufferOut);
+        circuit.Connect(gainTop.A, gainOut);
+        circuit.Connect(gainTop.B, gainMinus);
+        circuit.Connect(gainBottom.A, gainMinus);
+        circuit.Connect(gainBottom.B, biasOut);
+
+        // Channel D: inverting, unity, about the reference again.
+        circuit.Connect(invertPlus, biasOut);
+        circuit.Connect(inputResistor.A, gainOut);
+        circuit.Connect(inputResistor.B, invertMinus);
+        circuit.Connect(feedback.A, invertMinus);
+        circuit.Connect(feedback.B, invertOut);
+
+        // Keeps the ground symbol from being orphaned when the divider is the only thing on it.
+        circuit.Connect(gnd5.Pin, gnd3.Pin);
+
+        vm.Scope.TimebasePerDivision = 500e-6;
+        vm.Scope.VoltsPerDivision = 1.0;
+        vm.Scope.Layout = ScopeLayout.Tiled;
+        vm.Scope.AddProbe(biasOut, "Bias");
+        vm.Scope.AddProbe(bufferOut, "Buffered");
+        vm.Scope.AddProbe(gainOut, "x4.9");
+        vm.Scope.AddProbe(invertOut, "Inverted");
+    }
+
+    /// <summary>
+    /// A PPTC on a five volt rail, with a short to put across it. What it teaches is that it does
+    /// not open — it heats, and the trickle it keeps passing is what holds it hot.
+    /// </summary>
+    public static void LoadResettableFuse(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "Resettable fuse";
+
+        var supply = Place(circuit, new DcVoltageSource(5.0), -420, 120);
+        var fuse = Place(circuit, new ResettableFuse(0.5), -180, -120);
+
+        var load = Place(circuit, new Resistor(22.0), 60, 40);
+
+        // The fault, in parallel with the load. Close it and the pair is about two ohms, which is
+        // five times what the fuse will hold.
+        var fault = Place(circuit, new ToggleSwitch(closed: false), 280, 40);
+        var short_ = Place(circuit, new Resistor(2.2), 280, 200);
+
+        var gnd = Place(circuit, new Ground(), -420, 280);
+        var gnd2 = Place(circuit, new Ground(), 60, 220);
+        var gnd3 = Place(circuit, new Ground(), 280, 340);
+
+        circuit.Connect(supply.Negative, gnd.Pin);
+        circuit.Connect(supply.Positive, fuse.A);
+        circuit.Connect(fuse.B, load.A);
+        circuit.Connect(load.B, gnd2.Pin);
+
+        circuit.Connect(fuse.B, fault.A);
+        circuit.Connect(fault.B, short_.A);
+        circuit.Connect(short_.B, gnd3.Pin);
+
+        // Seconds, not milliseconds. A PPTC's thermal time constant is the slowest thing in this
+        // whole library, and watching it trip in real time is most of the lesson.
+        vm.Scope.TimebasePerDivision = 0.5;
+        vm.Scope.VoltsPerDivision = 1.0;
+        vm.Scope.Layout = ScopeLayout.Tiled;
+        vm.Scope.AddProbe(fuse.B, "Downstream");
+
+        var railCurrent = vm.Scope.AddProbe(fuse.A, "Rail I");
+        railCurrent.Kind = Cirq.Core.Probing.ProbeKind.Current;
+    }
+
+    /// <summary>
+    /// Two UARTs talking through a pair of MAX232s, which is what a serial cable between two
+    /// boards actually contains.
+    /// </summary>
+    public static void LoadRs232Link(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "RS-232 link";
+
+        var rail = Place(circuit, new DcVoltageSource(5.0), -820, 320);
+
+        var terminal = Place(circuit, new SerialTerminal
+        {
+            BaudRate = 9600,
+            Message = "hi\r\n",
+            StartDelay = 500e-6,
+            RepeatInterval = 5e-3,
+        }, -560, -80);
+
+        var near = Place(circuit, new Max232(), -180, 0);
+        var far = Place(circuit, new Max232(), 300, 0);
+
+        var device = Place(circuit, new SerialDevice
+        {
+            BaudRate = 9600,
+            Greeting = "READY\r\n",
+        }, 660, -80);
+
+        var gnd = Place(circuit, new Ground(), -820, 480);
+        var gnd2 = Place(circuit, new Ground(), -560, 140);
+        var gnd3 = Place(circuit, new Ground(), -180, 220);
+        var gnd4 = Place(circuit, new Ground(), 300, 220);
+        var gnd5 = Place(circuit, new Ground(), 660, 140);
+
+        circuit.Connect(rail.Negative, gnd.Pin);
+
+        foreach (var (part, ground) in new[] { (near, gnd3), (far, gnd4) })
+        {
+            circuit.Connect(part.Vcc, rail.Positive);
+            circuit.Connect(part.Gnd, ground.Pin);
+        }
+
+        circuit.Connect(terminal.Vcc, rail.Positive);
+        circuit.Connect(terminal.Gnd, gnd2.Pin);
+        circuit.Connect(device.Vcc, rail.Positive);
+        circuit.Connect(device.Gnd, gnd5.Pin);
+
+        // TTL in one side, RS-232 out the other, and the cable in the middle carries ±8.5 V.
+        circuit.Connect(terminal.Transmit, near.DriverInputs[0]);
+        circuit.Connect(near.DriverOutputs[0], far.ReceiverInputs[0]);
+        circuit.Connect(far.ReceiverOutputs[0], device.Receive);
+
+        // And back the other way, on the second channel of each package.
+        circuit.Connect(device.Transmit, far.DriverInputs[1]);
+        circuit.Connect(far.DriverOutputs[1], near.ReceiverInputs[1]);
+        circuit.Connect(near.ReceiverOutputs[1], terminal.Receive);
+
+        vm.Scope.TimebasePerDivision = 200e-6;
+        vm.Scope.VoltsPerDivision = 5.0;
+        vm.Scope.Layout = ScopeLayout.Tiled;
+        vm.Scope.AddProbe(terminal.Transmit, "TTL TX");
+        vm.Scope.AddProbe(near.DriverOutputs[0], "RS-232 line");
+        vm.Scope.AddProbe(far.ReceiverOutputs[0], "TTL RX");
+        vm.Scope.AddProbe(near.PumpPositive, "V+");
+
+        vm.Simulation.SpeedFactor = 0.01;
     }
 
     private static T Place<T>(Circuit circuit, T component, double x, double y) where T : CircuitComponent
