@@ -99,6 +99,8 @@ public static class Examples
                 LoadLampDimmer),
             new("Relay Driver", "Logic to a coil through an optocoupler and a Darlington array",
                 LoadRelayDriver),
+            new("IGBT and MOSFET", "The same load switched by each — a voltage drop against a resistance",
+                LoadIgbtAgainstMosfet),
             new("Servo Sweep", "The angle is the width of the pulse — turn Duty and watch it move",
                 LoadServoSweep),
             new("Stepper Motor", "A 4017 walking four windings through a ULN2003",
@@ -145,6 +147,10 @@ public static class Examples
                 LoadDacAndAdc),
             new("Current Sensing", "An INA219 watching a load from the high side of the rail",
                 LoadCurrentSensing),
+            new("CAN Arbitration", "Two nodes talking at once, and why that is not a collision",
+                LoadCanArbitration),
+            new("Shared Bus", "Two transceivers taking turns on eight wires — the only tri-state in here",
+                LoadSharedBus),
             new("Level Shifting", "A 3.3 V part and a 5 V part on the same wires, both ways at once",
                 LoadLevelShifting),
             new("RS-485 Link", "Two transceivers down fifty metres of cable — open SW1 and watch it ring",
@@ -167,6 +173,8 @@ public static class Examples
                 LoadRotaryEncoder),
             new("Thermostat", "An NTC, a comparator and the feedback resistor that stops it chattering",
                 LoadThermostat),
+            new("Transimpedance Amp", "A photodiode held at zero volts, its current read as a voltage",
+                LoadTransimpedance),
             new("Night Light", "An LDR against a TL431 reference, with a switch to override it",
                 LoadNightLight),
             new("Thermocouple", "Microvolts per degree into an INA126 — and it measures a difference",
@@ -3931,6 +3939,256 @@ public static class Examples
         vm.Scope.AddProbe(toLogic.AnalogIn, "Noisy ramp");
         vm.Scope.AddProbe(toLogic.DigitalOut, "As logic");
         vm.Scope.AddProbe(toAnalog.AnalogOut, "Back to analog");
+    }
+
+    /// <summary>
+    /// Two transceivers onto one bus, and the counter that feeds it — the tri-state arrangement
+    /// every processor uses to share eight wires between everything on the board.
+    /// </summary>
+    public static void LoadSharedBus(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "A bus two devices take turns on";
+
+        var supply = Place(circuit, new DcVoltageSource(5.0), -760, 260);
+        var clock = Place(circuit, new ClockSource(500.0), -760, -200);
+
+        // The talker: a synchronous counter, so every bit of the byte it puts on the bus changes
+        // on the same edge and there is nothing to decode a glitch from.
+        var counter = Place(circuit, new Ic74161(), -520, -60);
+        var talker = Place(circuit, new Ic74245(), -160, -60);
+
+        // The listener, pointed the other way and enabled by the opposite phase, so exactly one
+        // of the two is driving at any moment. That arrangement is the whole discipline of a bus.
+        var listener = Place(circuit, new Ic74245(), 320, -60);
+        var select = Place(circuit, new LogicToggle(), -420, 300);
+
+        // The inverter is the whole discipline in one part: the two enables are opposites, so
+        // whichever way SW1 is thrown exactly one transceiver is driving. Wire both enables to
+        // the same signal instead and they fight — each holding a wire through a few tens of
+        // ohms, the pair of them at half a supply, and nothing on the canvas warning you.
+        var opposite = Place(circuit, new LogicGate(GateFunction.Not, 1), -160, 300);
+
+        var gnd = Place(circuit, new Ground(), -760, 420);
+        var gnd2 = Place(circuit, new Ground(), -520, 180);
+        var gnd3 = Place(circuit, new Ground(), -160, 180);
+        var gnd4 = Place(circuit, new Ground(), 320, 180);
+
+        circuit.Connect(supply.Negative, gnd.Pin);
+
+        foreach (var ic in new DigitalIc[] { counter, talker, listener })
+        {
+            circuit.Connect(ic.Vcc, supply.Positive);
+        }
+
+        circuit.Connect(counter.Gnd, gnd2.Pin);
+        circuit.Connect(talker.Gnd, gnd3.Pin);
+        circuit.Connect(listener.Gnd, gnd4.Pin);
+
+        circuit.Connect(counter.Clock, clock.Out);
+        circuit.Connect(counter.MasterReset, supply.Positive);
+        circuit.Connect(counter.ParallelEnable, supply.Positive);
+        circuit.Connect(counter.CountEnableP, supply.Positive);
+        circuit.Connect(counter.CountEnableT, supply.Positive);
+
+        foreach (var data in counter.Data) circuit.Connect(data, gnd2.Pin);
+
+        // The counter's four bits onto the talker's A side; the top four are tied off.
+        for (var i = 0; i < 4; i++) circuit.Connect(talker.A[i], counter.Outputs[i]);
+        for (var i = 4; i < 8; i++) circuit.Connect(talker.A[i], gnd3.Pin);
+
+        // One bus, both transceivers on it.
+        for (var i = 0; i < 8; i++) circuit.Connect(talker.B[i], listener.B[i]);
+
+        // Direction fixed, enables opposed: SW1 hands the bus from one to the other.
+        circuit.Connect(talker.Direction, supply.Positive);
+        circuit.Connect(listener.Direction, gnd4.Pin);
+        circuit.Connect(talker.OutputEnable, select.Out);
+        circuit.Connect(opposite.InputTerminals[0], select.Out);
+        circuit.Connect(listener.OutputEnable, opposite.OutputTerminals[0]);
+
+        // Something for the listener's A side to drive, and a resistor per bus wire so a released
+        // bus reads as nothing rather than floating at whatever it was left at.
+        for (var i = 0; i < 8; i++)
+        {
+            var pull = Place(circuit, new Resistor(10e3), 80 + (i * 34), 320);
+            var pullGround = Place(circuit, new Ground(), 80 + (i * 34), 440);
+
+            pull.RotationDegrees = 90;
+
+            circuit.Connect(pull.A, talker.B[i]);
+            circuit.Connect(pull.B, pullGround.Pin);
+
+            var load = Place(circuit, new Resistor(10e3), 660 + (i * 34), 120);
+            var loadGround = Place(circuit, new Ground(), 660 + (i * 34), 240);
+
+            load.RotationDegrees = 90;
+
+            circuit.Connect(load.A, listener.A[i]);
+            circuit.Connect(load.B, loadGround.Pin);
+        }
+
+        vm.Scope.TimebasePerDivision = 1e-3;
+        vm.Scope.VoltsPerDivision = 2.0;
+        vm.Scope.Layout = ScopeLayout.Tiled;
+        vm.Scope.AddProbe(counter.Outputs[0], "Count bit 0");
+        vm.Scope.AddProbe(talker.B[0], "Bus bit 0");
+        vm.Scope.AddProbe(listener.A[0], "Listener bit 0");
+    }
+
+    /// <summary>
+    /// Two CAN nodes talking over each other, which on this bus is not a collision at all.
+    /// </summary>
+    public static void LoadCanArbitration(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "CAN arbitration";
+
+        var supply = Place(circuit, new DcVoltageSource(5.0), -620, 260);
+
+        // Two nodes with something to say at the same time. The clocks run at different rates so
+        // the pattern of who wins changes as you watch.
+        var first = Place(circuit, new CanTransceiver(), -260, -140);
+        var second = Place(circuit, new CanTransceiver(), -260, 140);
+
+        var firstTalk = Place(circuit, new ClockSource(2e3), -620, -160);
+        var secondTalk = Place(circuit, new ClockSource(700.0), -620, 120);
+
+        var nearEnd = Place(circuit, new Resistor(120), 140, -60);
+        var farEnd = Place(circuit, new Resistor(120), 420, -60);
+
+        var gnd = Place(circuit, new Ground(), -620, 420);
+        var gnd2 = Place(circuit, new Ground(), -260, 40);
+        var gnd3 = Place(circuit, new Ground(), -260, 320);
+
+        nearEnd.RotationDegrees = 90;
+        farEnd.RotationDegrees = 90;
+
+        circuit.Connect(supply.Negative, gnd.Pin);
+
+        circuit.Connect(first.Vcc, supply.Positive);
+        circuit.Connect(first.Gnd, gnd2.Pin);
+        circuit.Connect(second.Vcc, supply.Positive);
+        circuit.Connect(second.Gnd, gnd3.Pin);
+
+        circuit.Connect(first.TransmitIn, firstTalk.Out);
+        circuit.Connect(second.TransmitIn, secondTalk.Out);
+
+        // One pair, both nodes on it, terminated at each end as a real bus is.
+        circuit.Connect(first.High, second.High);
+        circuit.Connect(first.Low, second.Low);
+
+        circuit.Connect(nearEnd.A, first.High);
+        circuit.Connect(nearEnd.B, first.Low);
+        circuit.Connect(farEnd.A, second.High);
+        circuit.Connect(farEnd.B, second.Low);
+
+        vm.Scope.TimebasePerDivision = 500e-6;
+        vm.Scope.VoltsPerDivision = 1.0;
+        vm.Scope.Layout = ScopeLayout.Tiled;
+        vm.Scope.AddProbe(first.High, "CANH");
+        vm.Scope.AddProbe(first.Low, "CANL");
+        vm.Scope.AddProbe(first.ReceiveOut, "What both nodes hear");
+    }
+
+    /// <summary>
+    /// The same load switched by an IGBT and by a MOSFET, from one gate drive — the comparison
+    /// that decides which of them a design wants.
+    /// </summary>
+    public static void LoadIgbtAgainstMosfet(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "IGBT against MOSFET";
+
+        var supply = Place(circuit, new DcVoltageSource(60.0), -620, 180);
+        var drive = Place(circuit, new FunctionGenerator(Waveform.Square, 2e3, 15.0) { DcOffset = 7.5 },
+            -620, -200);
+
+        var igbtLoad = Place(circuit, new Resistor(6.0), -160, -280);
+        var igbt = Place(circuit, new Igbt(), -160, -100);
+
+        var mosfetLoad = Place(circuit, new Resistor(6.0), 220, -280);
+        var mosfet = Place(circuit, new Mosfet(MosfetModel.IrlZ44N), 220, -100);
+
+        var gnd = Place(circuit, new Ground(), -620, 340);
+        var gnd2 = Place(circuit, new Ground(), -620, -40);
+        var gnd3 = Place(circuit, new Ground(), -160, 60);
+        var gnd4 = Place(circuit, new Ground(), 220, 60);
+
+        igbtLoad.RotationDegrees = 90;
+        mosfetLoad.RotationDegrees = 90;
+
+        circuit.Connect(supply.Negative, gnd.Pin);
+        circuit.Connect(drive.Return, gnd2.Pin);
+
+        circuit.Connect(supply.Positive, igbtLoad.A);
+        circuit.Connect(igbtLoad.B, igbt.Collector);
+        circuit.Connect(igbt.Emitter, gnd3.Pin);
+        circuit.Connect(igbt.Gate, drive.Output);
+
+        circuit.Connect(supply.Positive, mosfetLoad.A);
+        circuit.Connect(mosfetLoad.B, mosfet.Drain);
+        circuit.Connect(mosfet.Source, gnd4.Pin);
+        circuit.Connect(mosfet.Gate, drive.Output);
+
+        vm.Scope.TimebasePerDivision = 100e-6;
+        vm.Scope.VoltsPerDivision = 1.0;
+        vm.Scope.AddProbe(igbt.Collector, "IGBT on-state");
+        vm.Scope.AddProbe(mosfet.Drain, "MOSFET on-state");
+    }
+
+    /// <summary>
+    /// A photodiode into a transimpedance amplifier, which is the only way the part is ever
+    /// actually used.
+    /// </summary>
+    public static void LoadTransimpedance(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "Photodiode and transimpedance amplifier";
+
+        var positive = Place(circuit, new DcVoltageSource(9.0), -600, 160);
+        var negative = Place(circuit, new DcVoltageSource(9.0), -600, 360);
+
+        var diode = Place(circuit, new Photodiode { Illuminance = 300 }, -220, -120);
+
+        // A megohm of feedback: a microamp of photocurrent becomes a volt, which is what makes
+        // the part readable at all.
+        var feedback = Place(circuit, new Resistor(1e6), 60, -300);
+        var amplifier = Place(circuit, new OperationalAmplifier(OpAmpModel.Tl081), 80, -120);
+        var load = Place(circuit, new Resistor(100e3), 380, -40);
+
+        var gnd = Place(circuit, new Ground(), -600, 260);
+        var gnd2 = Place(circuit, new Ground(), -220, 40);
+        var gnd3 = Place(circuit, new Ground(), 80, 20);
+        var gnd4 = Place(circuit, new Ground(), 380, 100);
+
+        diode.RotationDegrees = 90;
+        load.RotationDegrees = 90;
+
+        // A split supply, so the output can go either side of ground.
+        circuit.Connect(positive.Negative, gnd.Pin);
+        circuit.Connect(negative.Positive, gnd.Pin);
+
+        // The diode across the inputs, cathode to the summing junction. The amplifier holds that
+        // junction at ground, so the diode sits at zero volts however much light falls on it —
+        // which is what stops it saturating the way a load resistor lets it.
+        circuit.Connect(diode.Anode, gnd2.Pin);
+        circuit.Connect(diode.Cathode, amplifier.Inverting);
+
+        circuit.Connect(amplifier.NonInverting, gnd3.Pin);
+        circuit.Connect(amplifier.PositiveSupply, positive.Positive);
+        circuit.Connect(amplifier.NegativeSupply, negative.Negative);
+
+        circuit.Connect(feedback.A, amplifier.Inverting);
+        circuit.Connect(feedback.B, amplifier.Output);
+
+        circuit.Connect(amplifier.Output, load.A);
+        circuit.Connect(load.B, gnd4.Pin);
+
+        vm.Scope.TimebasePerDivision = 10e-3;
+        vm.Scope.VoltsPerDivision = 1.0;
+        vm.Scope.AddProbe(diode.Cathode, "Summing junction");
+        vm.Scope.AddProbe(amplifier.Output, "Output");
     }
 
     private static T Place<T>(Circuit circuit, T component, double x, double y) where T : CircuitComponent

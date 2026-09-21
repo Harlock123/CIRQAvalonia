@@ -72,22 +72,22 @@ at the window edge; click the rail to bring it back.
 
 Click a palette entry, then click the canvas. The part lands where you click, snapped to the grid.
 
-The palette holds **164 components in 16 categories**:
+The palette holds **169 components in 16 categories**:
 
 | Category | Count | Contents |
 | --- | --- | --- |
 | Passive | 11 | Resistor, capacitor, electrolytic capacitor, inductor, transformer, centre-tapped transformer, potentiometer, crystal, ferrite bead, **common-mode choke** and transmission line — see [below](#common-mode-chokes) |
 | Switches | 4 | SPST, SPDT, push button, **8-way DIP switch** |
 | Sources | 7 | Ground, DC voltage, DC current, function generator, battery, solar cell, **noise source** — see [below](#noise-and-why-hysteresis-exists) |
-| Semiconductors | 12 | 1N4148, 1N4001, Schottky, zeners, **varactor**, bridge rectifier, SCR, triac, diac, TVS and varistor — see [below](#tuning-with-a-voltage) |
-| Transistors | 10 | NPN and PNP bipolars, N- and P-channel MOSFETs, **three JFETs** — see [below](#jfets) |
+| Semiconductors | 13 | 1N4148, 1N4001, Schottky, zeners, **varactor**, **photodiode**, bridge rectifier, SCR, triac, diac, TVS and varistor — see [below](#three-ways-to-measure-light) |
+| Transistors | 11 | NPN and PNP bipolars, N- and P-channel MOSFETs, three JFETs and an **IGBT** — see [below](#the-igbt) |
 | LEDs & Displays | 9 | Six LED colours, seven-segment displays, **HD44780 character LCD** — see [below](#the-character-lcd) |
 | Power | 10 | Fixed and adjustable regulators, TL431 shunt reference, ICL7660 charge pump, MC34063 switching controller, **TP4056 lithium charger** — see [below](#charging-a-lithium-cell) |
 | Analog ICs | 12 | LM741, TL081, LM358, MCP6002 rail-to-rail, NE555, LM311, LM339, LM386 audio amp, INA126 instrumentation amp and an **AD633 analog multiplier** — see [below](#multiplying-two-voltages) |
 | Logic Gates | 7 | AND, OR, NAND, NOR, XOR, XNOR, NOT |
-| 74xx Series | 18 | Counters, decoders, flip-flops, shift registers (including the **74595**), multiplexers, Schmitt inverter |
+| 74xx Series | 20 | Counters (including the synchronous **74161**), decoders, flip-flops, shift registers, the **74245 bus transceiver**, multiplexers, Schmitt inverter — see [below](#sharing-a-bus) |
 | 40xx Series | 15 | CMOS gates, counters, flip-flops, analog switches and a **4046 phase-locked loop** — see [below](#phase-locked-loops) |
-| Buses | 14 | I2C master, EEPROM, port expander, DS1307 clock, ADS1115 ADC, MCP4725 DAC and INA219 current sensor, SPI master, 1-Wire master and DS18B20 thermometer, serial terminal and device, **RS-485 transceiver**, level shifter — see [below](#rs-485-signalling-by-difference) |
+| Buses | 15 | I2C master, EEPROM, port expander, DS1307 clock, ADS1115 ADC, MCP4725 DAC and INA219 current sensor, SPI master, 1-Wire master and DS18B20 thermometer, serial terminal and device, **RS-485** and **CAN** transceivers, level shifter — see [below](#can-signalling-by-agreement) |
 | Digital I/O | 6 | Logic toggle, clock, rotary encoder, oscillator module, **ADC and DAC bridges** — see [below](#between-the-analog-solver-and-the-logic-engine) |
 | Sensors & Actuators | 17 | DC motor, LDR, thermistors, buzzers, speaker, microphone, servo, stepper, thermocouple, load cell, HC-SR04 ranger, Hall switch, phototransistor, **reed switch** and **PIR motion sensor** — see [below](#sensors-and-actuators) |
 | Switching & Isolation | 8 | Relay, fuses, optocouplers, ULN2003, H-bridge, **MOSFET gate driver** — see [below](#driving-a-mosfet-gate) |
@@ -419,7 +419,7 @@ gets roughly two-thirds of the way each time.
 
 ### The example browser
 
-Everything above is also in **File > Examples...** (`Ctrl+Shift+E`), along with sixty-seven others.
+Everything above is also in **File > Examples...** (`Ctrl+Shift+E`), along with seventy-one others.
 
 They are grouped the way the component palette is — Fundamentals, Analog, Power Supplies, Switching
 & Motors, Digital Logic, Timers & Oscillators, Buses & Interfaces, Sensors, Signal Integrity & RF,
@@ -568,6 +568,42 @@ an LDR is normally read with a comparator against a divider rather than measured
 
 Double-click it on the canvas to cover and uncover it, the same as operating a switch, so a
 light-sensing circuit can be exercised while the simulation runs.
+
+### Three ways to measure light
+
+There are three light sensors in the palette now, and choosing between them is the point of having
+three.
+
+An **LDR** is a resistance that falls as it is lit. Cheap, an enormous range, and far too slow for
+anything that changes — tens of milliseconds, which is why no remote control or optical encoder
+has ever contained one.
+
+A **phototransistor** is a photodiode with a transistor built around it: the same current
+multiplied by a few hundred, which is convenient. The gain comes from stored charge in a base, and
+so does the microsecond it takes to get rid of it.
+
+A **photodiode** has no gain at all and is correspondingly quick — nanoseconds — and linear across
+six or seven decades where a phototransistor's gain drifts with current and temperature. That
+makes it the part you *measure* light with rather than merely notice it with, and it is in every
+optical receiver, pulse oximeter, laser rangefinder and camera exposure meter.
+
+The price is that the current is tiny — hundreds of nanoamps in a lit room where a phototransistor
+gives hundreds of microamps — so a load resistor is the wrong answer. Make it big enough to give a
+usable voltage and the diode runs out of bias, forward-biases, and takes its own photocurrent back;
+the reading stops rising and the part looks broken. It wants a **transimpedance amplifier**
+instead: an op-amp with the diode across its inputs and a large feedback resistor, which holds the
+diode at zero volts however much light falls on it.
+
+**File > Examples > Transimpedance Amp** is that circuit. The summing junction stays at ground —
+probe it and watch it not move — so the diode never saturates, and the output is simply the
+photocurrent times the megohm of feedback. A hundred times the light gives a hundred times the
+output, which is exactly what a load resistor could not do.
+
+Which way round it is wired decides what kind of sensor it is, and both are here. **Reverse
+biased** the junction capacitance falls and it gets fast, at the cost of a dark current that sets
+the noise floor. At **zero bias** there is no dark current at all, which is what a precision light
+meter wants, and it is slower. `Capacitance` reports the figure at the present bias, which is the
+number a transimpedance amplifier's feedback capacitor is chosen against.
 
 **File > Examples > Night Light** is that comparator-against-a-divider, except the divider is a
 **TL431** — and the reason is worth a moment. A threshold made from two resistors is a fixed
@@ -1018,6 +1054,48 @@ go. Disconnect it and watch what the same turn-off does instead. And the ULN2003
 pin at all**: it is powered by whatever it is sinking from, so the Vcc terminal on the symbol is
 its ground pin under another name. Wire that to a rail and you have shorted the ground pin to the
 rail, which the solver will tell you about in the bluntest possible terms.
+
+---
+
+## Sharing a bus
+
+Every output in the palette so far has been one of two kinds. A **push-pull** output drives high or
+low and never lets go, so only one may ever be on a wire. An **open-collector** output — a 7447
+segment, an LM339, a PCF8574 port — pulls down or releases, and a pull-up decides what released
+means; several may share a wire, and any one of them pulling wins.
+
+The **74245** is the third kind, and the one a computer is built out of. A tri-state output
+released is *nothing at all*: not pulled anywhere, not fighting anyone, simply absent. That is how
+eight devices share eight wires and take turns, which no amount of open-collector wiring can
+arrange.
+
+It is an octal transceiver, so it is bidirectional: `DIR` decides whether the A side is read and
+the B side driven or the other way round, and `/OE` releases all sixteen pins at once. Note the
+enable is active low, so an unwired one leaves the part switched on and driving.
+
+**File > Examples > Shared Bus** is two of them on one set of wires, with a **74161** counter
+feeding one side. Throw `SW1` and the bus changes hands. The inverter between the toggle and the
+second enable is the whole discipline of a bus in one part: the two enables are opposites, so
+exactly one transceiver is ever driving.
+
+Wire both enables to the same signal instead and you have **bus contention** — the fault the
+arrangement exists to prevent. One transceiver holds a wire high through a few tens of ohms while
+the other holds it low through a few tens of ohms; the wire sits at half a supply, reads as
+neither, and both chips get hot. Nothing on the canvas warns you, which is exactly the problem with
+it on real hardware. Probe a bus wire and watch it sit in the middle.
+
+The counter in that example is a **74161**, and it is synchronous — which matters here. The 4040
+and 7490 are ripple counters: the first flip-flop clocks the second, the second the third, and a
+carry walks down the chain taking a propagation delay at every stage. For a few nanoseconds after
+each clock they show a number that was never counted — 0111 on its way to 1000 passes through
+0110, 0100 and 0000 — so anything decoding them directly collects a glitch on every carry. In a
+74161 every flip-flop is clocked by the same edge and all four outputs change together, which is
+why a counter feeding address logic is one of these and not a 4040.
+
+Its two enables are deliberately asymmetric: `CET` gates the carry out as well as the counting,
+`CEP` only the counting. That is what lets several be chained — carry into the next stage's CET —
+without the carry itself rippling. Master reset is the one thing on the part that is *not*
+synchronous: it clears the moment it is taken low, without waiting for a clock.
 
 ---
 
@@ -1791,6 +1869,43 @@ reporting framing errors.
 
 ---
 
+## CAN: signalling by agreement
+
+The CAN transceiver sits next to the RS-485 one and looks almost identical — logic on one side, a
+differential pair on the other — and works on a completely opposite principle. That is why both
+are here.
+
+**RS-485 is half duplex by arrangement.** Exactly one driver may be enabled at a time, and two
+enabled at once is a fault you avoid by agreement between the devices on the bus. **CAN is
+wired-AND**, and every node may transmit whenever it likes.
+
+It gets away with that because its two bus states are not symmetric:
+
+- **Recessive** — a logic one — is *nobody driving*. The termination pulls both wires to about
+  half a supply and the difference is zero.
+- **Dominant** — a logic zero — is a driver pulling CANH up and CANL down, around two volts apart.
+
+So a dominant bit **wins**. One node driving dominant while thirty others sit recessive gives a
+dominant bus, because the others are not driving anything for it to overcome. There is no contest
+and nothing gets hot.
+
+Out of that single asymmetry falls the thing CAN is famous for. Two nodes start transmitting at the
+same moment; each watches the bus as it sends; the instant one sends recessive and reads back
+dominant, it knows somebody else is sending a zero where it sent a one — so it stops, and the
+higher-priority message carries on without ever noticing the interruption. No collision, no
+retransmission, no lost time. The part reports that moment as `LostArbitration`.
+
+**File > Examples > CAN Arbitration** is two nodes on one terminated pair, talking over each other
+at different rates. Watch CANH and CANL: they part company whenever either node sends a dominant
+bit, and sit together when both are quiet. The third trace is what *both* nodes hear, because on
+this bus there is only one answer to that question.
+
+The inversion catches everybody, so it is worth saying plainly: **TXD low sends a dominant bit**,
+and RXD reads low when the bus is dominant. An idle bus with nothing to say sits recessive, with
+both logic pins high.
+
+---
+
 ## RS-485: signalling by difference
 
 A UART's pins measure against **ground**, and over any distance that is the problem: the ground at
@@ -2120,6 +2235,42 @@ button is pressed once more.
 If one of these will not stay on, the holding current is almost always why — the load is drawing
 less than the part needs to hold itself latched. If one will not fire, check the gate resistor:
 it sets the gate current, and the trigger threshold is a current, not a voltage.
+
+---
+
+## The IGBT
+
+The palette has bipolar transistors and it has MOSFETs, and there is a gap between them that neither
+fills. A power **MOSFET** is a resistance when it is on, and that resistance rises roughly as the
+square of the voltage it is built to block — which is why MOSFETs are rare above about 250 V; a
+600 V one has a dreadful on-resistance. A **bipolar** has a fixed saturation drop instead of a
+resistance, so it does not care about its voltage rating, but it is current-driven and wants amps
+of base drive to switch tens of amps.
+
+An IGBT is the obvious combination: an insulated gate you drive like a MOSFET, in front of a
+bipolar output that conducts like a bipolar. Almost every motor drive, welder, induction hob and
+solar inverter is built out of them.
+
+Two things about one are worth seeing, and both are modelled.
+
+**It conducts with a voltage offset, not a resistance.** On-state is a junction drop of a volt or
+two, plus a small resistance on top. **File > Examples > IGBT and MOSFET** switches the same load
+with each from the same gate drive: the IGBT sits over a volt above ground while the MOSFET is at a
+few tens of millivolts. At sixty volts that comparison makes the IGBT look poor, and it is — that
+is the honest answer at low voltage. At six hundred volts and a hundred amps there is no MOSFET to
+compare it against.
+
+**And it does not stop when the gate does.** Turning the gate off stops the MOS channel at once,
+but the bipolar section is full of stored charge with nowhere to go but recombine, so the collector
+current drops sharply and then *trails away* over a fraction of a microsecond — with the full
+supply across the device the whole time. That tail is most of an IGBT's switching loss and the
+reason they run at a few kilohertz where MOSFETs run at hundreds. `IsTailing` says when it is
+happening and `Dissipation` says what it costs; the peak during a tail is many times the on-state
+figure.
+
+There is **no body diode**, unlike the MOSFETs here — an IGBT will not conduct backwards. Anything
+inductive needs a diode across it, which is why parts sold as half-bridge modules have one built in
+beside each transistor.
 
 ---
 

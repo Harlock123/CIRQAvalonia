@@ -44,12 +44,15 @@ public static class SymbolRenderer
             case Varactor varactor: DrawVaractor(context, pen, zoom, varactor); break;
             case CommonModeChoke choke: DrawCommonModeChoke(context, pen, zoom, choke); break;
             case Rs485Transceiver transceiver: DrawRs485(context, pen, zoom, transceiver); break;
+            case CanTransceiver can: DrawPackage(context, pen, zoom, can, "CAN"); break;
             case TransmissionLine line: DrawTransmissionLine(context, pen, zoom, line); break;
             case Ds18b20 sensor: DrawPackage(context, pen, zoom, sensor, "DS18B20"); break;
             case OneWireMaster master: DrawPackage(context, pen, zoom, master, master.ComponentType); break;
             case HBridge bridge: DrawHBridge(context, pen, zoom, bridge); break;
             case LithiumCharger charger: DrawPackage(context, pen, zoom, charger, "Li-ION"); break;
             case Phototransistor photo: DrawPhototransistor(context, pen, zoom, photo); break;
+            case Photodiode photodiode: DrawPhotodiode(context, pen, zoom, photodiode); break;
+            case Igbt igbt: DrawIgbt(context, pen, igbt); break;
             case LevelShifter shifter: DrawLevelShifter(context, pen, zoom, shifter); break;
             case SpiMaster spi: DrawPackage(context, pen, zoom, spi, spi.ComponentType); break;
             case DipSwitch dip: DrawDipSwitch(context, pen, zoom, dip); break;
@@ -1524,6 +1527,53 @@ public static class SymbolRenderer
         var triangle = SymbolPath.Polyline([new Point(-8, -11), new Point(8, 0), new Point(-8, 11)], true);
         context.DrawGeometry(pen.Brush, pen, triangle);
         context.DrawLine(pen, new Point(8, -11), new Point(8, 11));
+    }
+
+    /// <summary>
+    /// A photodiode: the diode, with the light arrows pointing <i>in</i>. An LED's point out; that
+    /// one difference on the page is the whole difference between the two parts.
+    /// </summary>
+    private static void DrawPhotodiode(
+        ISymbolCanvas context, IPen pen, double zoom, Photodiode photodiode)
+    {
+        DrawDiode(context, pen);
+
+        if (zoom <= 0.4) return;
+
+        var lit = photodiode.Illuminance > 50;
+        var ray = CanvasTheme.Pen(lit ? CanvasTheme.ValueBrush : CanvasTheme.LabelBrush, 1.2, zoom);
+
+        foreach (var x in new[] { -10.0, 2.0 })
+        {
+            context.DrawLine(ray, new Point(x - 9, -30), new Point(x + 1, -16));
+            context.DrawGeometry(ray.Brush, ray, SymbolPath.Polyline(
+                [new Point(x + 1, -16), new Point(x - 4, -17), new Point(x - 2, -22)], true));
+        }
+    }
+
+    /// <summary>
+    /// An IGBT: a MOSFET's insulated gate on the left, a bipolar's arrow on the emitter. The
+    /// symbol is the device — half of each, which is exactly what it is.
+    /// </summary>
+    private static void DrawIgbt(ISymbolCanvas context, IPen pen, Igbt igbt)
+    {
+        context.DrawLine(pen, new Point(0, -34), new Point(0, -22));
+        context.DrawLine(pen, new Point(0, 34), new Point(0, 22));
+
+        // The gate: a plate held off the channel, which is what insulated means.
+        context.DrawLine(pen, new Point(-40, 0), new Point(-20, 0));
+        context.DrawLine(pen, new Point(-20, -14), new Point(-20, 14));
+
+        // The channel bar, and the two leads off it.
+        context.DrawLine(pen, new Point(-13, -16), new Point(-13, 16));
+        context.DrawLine(pen, new Point(-13, -12), new Point(0, -22));
+        context.DrawLine(pen, new Point(-13, 12), new Point(0, 22));
+
+        // And the bipolar emitter arrow, pointing out of the device.
+        var arrow = SymbolPath.Polyline(
+            [new Point(0, 22), new Point(-8, 18), new Point(-6, 11)], true);
+
+        context.DrawGeometry(igbt.IsConducting ? pen.Brush : CanvasTheme.SymbolFill, pen, arrow);
     }
 
     private static void DrawLed(ISymbolCanvas context, IPen pen, Led led)
