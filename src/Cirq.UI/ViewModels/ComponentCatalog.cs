@@ -96,6 +96,8 @@ public static class ComponentCatalog
         new("Sources",
         [
             new("Ground", "Explicit 0 V reference", () => new Ground()),
+            new("Net Label", "Names a net — two labels with the same name are one net, with no wire between them",
+                () => new NetLabel()),
             new("DC Voltage", "Independent voltage source", () => new DcVoltageSource(5.0)),
             new("DC Current", "Independent current source", () => new DcCurrentSource(1e-3)),
             new("Battery", "A cell that sags under load and runs down — 9 V alkaline by default",

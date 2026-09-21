@@ -84,6 +84,9 @@ public partial class MainWindow : Window
         viewModel.RequestSettings += async (_, _) => await ShowSettingsAsync();
         viewModel.RequestAbout += async (_, _) => await ShowAboutAsync();
         viewModel.RequestFrequencyResponse += async (_, _) => await ShowFrequencyResponseAsync();
+        viewModel.RequestDcSweep += async (_, _) => await ShowDcSweepAsync();
+        viewModel.RequestRuleCheck += async (_, _) => await ShowRuleCheckAsync();
+        viewModel.RequestSpectrum += async (_, _) => await ShowSpectrumAsync();
         viewModel.RequestExamples += async (_, _) => await ShowExamplesAsync();
 
         // Code-drawn surfaces cannot bind to a resource, so they are told to repaint.
@@ -131,6 +134,46 @@ public partial class MainWindow : Window
         {
             DataContext = new FrequencyResponseViewModel(_viewModel.Circuit),
         };
+
+        await dialog.ShowDialog(this);
+    }
+
+    private async Task ShowDcSweepAsync()
+    {
+        if (_viewModel is null) return;
+
+        var dialog = new DcSweepWindow
+        {
+            DataContext = new DcSweepViewModel(_viewModel.Circuit),
+        };
+
+        await dialog.ShowDialog(this);
+    }
+
+    private async Task ShowSpectrumAsync()
+    {
+        if (_viewModel is null) return;
+
+        var dialog = new SpectrumAnalyserWindow
+        {
+            DataContext = new SpectrumViewModel(_viewModel.Circuit),
+        };
+
+        await dialog.ShowDialog(this);
+    }
+
+    private async Task ShowRuleCheckAsync()
+    {
+        if (_viewModel is null) return;
+
+        var model = new RuleCheckViewModel(_viewModel.Circuit);
+
+        // Revealing a part has to reach the canvas behind the dialog, so the selection is made
+        // and repainted while the window is still open — which is the point: read the finding,
+        // press the button, see which part it means.
+        model.RevealRequested += (_, components) => _viewModel.Reveal(components);
+
+        var dialog = new RuleCheckWindow { DataContext = model };
 
         await dialog.ShowDialog(this);
     }

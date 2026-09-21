@@ -44,6 +44,26 @@ public static class NetlistBuilder
             Union(w.SourceTerminal, w.TargetTerminal);
         }
 
+        // Then the labels. Every terminal carrying the same name is one net, however far apart
+        // they are on the page and whether or not a wire runs between them — which is the whole
+        // point of naming a net rather than drawing it.
+        var named = new Dictionary<string, Terminal>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var component in components)
+        {
+            if (component is not INetNaming label) continue;
+
+            var name = label.NetName?.Trim() ?? string.Empty;
+            if (name.Length == 0) continue;
+
+            if (!parent.ContainsKey(label.NamedTerminal))
+                throw new CircuitTopologyException(
+                    $"Net label '{name}' has a terminal whose component is not in the circuit.");
+
+            if (named.TryGetValue(name, out var first)) Union(first, label.NamedTerminal);
+            else named[name] = label.NamedTerminal;
+        }
+
         var groups = new Dictionary<Terminal, List<Terminal>>();
         foreach (var t in terminals)
         {
@@ -54,6 +74,15 @@ public static class NetlistBuilder
 
         static bool IsGroundGroup(List<Terminal> group) =>
             group.Any(t => t.Type == TerminalType.Ground || t.Owner is IGroundReference);
+
+        // A net's name is whatever a label on it says. Two different labels on one net is a
+        // mistake worth catching, but not here — the netlist's job is to answer what is connected
+        // to what, and the electrical rule check is where contradictions are reported.
+        static string? NameOf(List<Terminal> group) =>
+            group
+                .Select(t => t.Owner as INetNaming)
+                .FirstOrDefault(l => l is not null && l.NetName.Trim().Length > 0)
+                ?.NetName.Trim();
 
         var nets = new List<Net>();
         var map = new Dictionary<Terminal, Net>();
@@ -70,7 +99,9 @@ public static class NetlistBuilder
         Net? groundNet = null;
         if (groundTerminals.Count > 0)
         {
-            groundNet = new Net(Guid.NewGuid(), Netlist.GroundIndex, groundTerminals, isGround: true);
+            groundNet = new Net(
+                Guid.NewGuid(), Netlist.GroundIndex, groundTerminals, isGround: true,
+                NameOf(groundTerminals));
             nets.Add(groundNet);
             foreach (var t in groundTerminals) map[t] = groundNet;
         }
@@ -78,7 +109,7 @@ public static class NetlistBuilder
         var nextIndex = 0;
         foreach (var group in signalGroups)
         {
-            var net = new Net(Guid.NewGuid(), nextIndex++, group, isGround: false);
+            var net = new Net(Guid.NewGuid(), nextIndex++, group, isGround: false, NameOf(group));
             nets.Add(net);
             foreach (var t in group) map[t] = net;
         }

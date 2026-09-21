@@ -105,11 +105,18 @@ public partial class ScopePanel : UserControl, Cirq.UI.Services.IScopeSource
         var start = scope.AutoScroll ? Math.Max(0, latest - window) : 0;
         var scale = ChooseTimeScale(window);
 
+        // Measured before the plot is built, so the cursor lines below are drawn where the
+        // readout says they are rather than a frame behind it.
+        scope.Measure(start, window);
+
         if (scope.Layout == ScopeLayout.Tiled && visible.Count > 1)
             RenderTiled(scope, visible, start, window, scale);
         else
             RenderSingle(scope, visible, start, window, scale);
 
+        if (scope.ShowCursors) AddCursors(scope, scale);
+
+        _lastScale = scale;
         _plot.Refresh();
     }
 
@@ -237,6 +244,119 @@ public partial class ScopePanel : UserControl, Cirq.UI.Services.IScopeSource
             plot.Axes.SetLimitsY(scope.DisplayMinimum, scope.DisplayMaximum);
             plot.HideLegend();
         }
+    }
+
+    // ---- cursors ---------------------------------------------------------
+
+    /// <summary>
+    /// Draws the two time cursors onto every plot in the current layout.
+    /// <para>
+    /// Onto every plot, because in tiled mode the tiles share a time axis and a cursor on only
+    /// one of them would be useless for the thing cursors are for — lining an event on one trace
+    /// up against an event on another.
+    /// </para>
+    /// </summary>
+    private void AddCursors(ScopeViewModel scope, TimeScale scale)
+    {
+        var count = Math.Max(_plot!.Multiplot.Count(), 1);
+
+        for (var i = 0; i < count; i++)
+        {
+            var plot = count == 1 ? _plot.Plot : _plot.Multiplot.GetPlot(i);
+
+            AddCursor(plot, scope.CursorA * scale.Factor, "A");
+            AddCursor(plot, scope.CursorB * scale.Factor, "B");
+        }
+    }
+
+    private void AddCursor(Plot plot, double x, string label)
+    {
+        var line = plot.Add.VerticalLine(x);
+
+        line.Color = FromTheme("PlotAxis");
+        line.LineWidth = 1;
+        line.LinePattern = LinePattern.Dashed;
+        line.Text = label;
+    }
+
+    /// <summary>
+    /// Which cursor a pointer press has taken hold of, or null when it has not taken hold of one.
+    /// Grabbing is by proximity in pixels rather than in seconds, because a cursor is something
+    /// aimed at on screen and the timebase changes what a second is worth there by decades.
+    /// </summary>
+    private char? _dragging;
+
+    private TimeScale _lastScale = new(1.0, "s");
+
+    private const double GrabPixels = 8.0;
+
+    protected override void OnPointerPressed(Avalonia.Input.PointerPressedEventArgs e)
+    {
+        base.OnPointerPressed(e);
+
+        if (_plot is null || DataContext is not ScopeViewModel scope || !scope.ShowCursors) return;
+
+        var time = TimeAt(e, out var pixelsPerSecond);
+        if (double.IsNaN(time)) return;
+
+        var toA = Math.Abs(time - scope.CursorA) * pixelsPerSecond;
+        var toB = Math.Abs(time - scope.CursorB) * pixelsPerSecond;
+
+        if (Math.Min(toA, toB) > GrabPixels) return;
+
+        _dragging = toA <= toB ? 'A' : 'B';
+
+        // Taken by the cursor, so the plot does not also pan.
+        e.Handled = true;
+    }
+
+    protected override void OnPointerMoved(Avalonia.Input.PointerEventArgs e)
+    {
+        base.OnPointerMoved(e);
+
+        if (_dragging is null || DataContext is not ScopeViewModel scope) return;
+
+        var time = TimeAt(e, out _);
+        if (double.IsNaN(time)) return;
+
+        if (_dragging == 'A') scope.CursorA = time;
+        else scope.CursorB = time;
+
+        e.Handled = true;
+    }
+
+    protected override void OnPointerReleased(Avalonia.Input.PointerReleasedEventArgs e)
+    {
+        base.OnPointerReleased(e);
+        _dragging = null;
+    }
+
+    /// <summary>
+    /// Where the pointer is, in seconds, and how many pixels a second is worth there — which is
+    /// what the grab test needs. NaN when the pointer is not over the plot.
+    /// </summary>
+    private double TimeAt(Avalonia.Input.PointerEventArgs e, out double pixelsPerSecond)
+    {
+        pixelsPerSecond = 0;
+
+        if (_plot is null) return double.NaN;
+
+        var position = e.GetPosition(_plot);
+        var plot = _plot.Multiplot.Count() > 1 ? _plot.Multiplot.GetPlot(0) : _plot.Plot;
+
+        var axis = plot.Axes.Bottom;
+        var area = plot.RenderManager.LastRender.DataRect;
+
+        if (area.Width <= 0) return double.NaN;
+
+        // The plot's X axis is in whatever unit the timebase chose — milliseconds, microseconds —
+        // so the reading has to be divided back out to seconds before it means anything to the
+        // view model, which works in seconds throughout.
+        var scaled = axis.GetCoordinate((float)(position.X * _plot.DisplayScale), area);
+
+        pixelsPerSecond = area.Width / Math.Max(axis.Range.Span, 1e-30) * _lastScale.Factor;
+
+        return scaled / _lastScale.Factor;
     }
 
     // ---- trace construction ----------------------------------------------

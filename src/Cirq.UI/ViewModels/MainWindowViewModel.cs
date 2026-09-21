@@ -437,6 +437,15 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     /// <summary>Raised when the frequency-response window should be opened.</summary>
     public event EventHandler? RequestFrequencyResponse;
 
+    /// <summary>Raised when the DC sweep window should be opened.</summary>
+    public event EventHandler? RequestDcSweep;
+
+    /// <summary>Raised when the rule-check window should be opened.</summary>
+    public event EventHandler? RequestRuleCheck;
+
+    /// <summary>Raised when the spectrum window should be opened.</summary>
+    public event EventHandler? RequestSpectrum;
+
     /// <summary>Raised when the example browser should be opened.</summary>
     public event EventHandler? RequestExamples;
 
@@ -652,6 +661,9 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
           F5           Run or pause
           F6           Single step
           F7           Frequency response
+          Shift+F7     DC sweep
+          F3           Spectrum of the traces
+          F4           Check circuit
           F8           Reset
 
         File
@@ -682,6 +694,44 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     /// </summary>
     [RelayCommand]
     private void ShowFrequencyResponse() => RequestFrequencyResponse?.Invoke(this, EventArgs.Empty);
+
+    /// <summary>
+    /// Opens the DC sweep window, which steps a parameter and solves the operating point at each
+    /// value. Like the frequency response it runs its own solve, so it can be opened mid-transient
+    /// without disturbing what is on the scope.
+    /// </summary>
+    [RelayCommand]
+    private void ShowDcSweep() => RequestDcSweep?.Invoke(this, EventArgs.Empty);
+
+    /// <summary>
+    /// Opens the rule check, which looks for the mistakes no component can report about itself
+    /// because they are about how the parts are joined rather than about any one of them.
+    /// </summary>
+    [RelayCommand]
+    private void ShowRuleCheck() => RequestRuleCheck?.Invoke(this, EventArgs.Empty);
+
+    /// <summary>
+    /// Opens the spectrum window, which transforms the traces the scope has already recorded. It
+    /// is a measurement of the signal rather than of the circuit — the frequency response is the
+    /// other one.
+    /// </summary>
+    [RelayCommand]
+    private void ShowSpectrum() => RequestSpectrum?.Invoke(this, EventArgs.Empty);
+
+    /// <summary>
+    /// Selects the parts a rule-check finding is about. The inspector follows a single one, as it
+    /// does for any selection, so the offending pin's settings are there to look at.
+    /// </summary>
+    public void Reveal(IReadOnlyList<CircuitComponent> components)
+    {
+        foreach (var component in Circuit.Components)
+            component.IsSelected = components.Contains(component);
+
+        foreach (var wire in Circuit.Wires) wire.IsSelected = false;
+
+        SelectedComponent = components.Count == 1 ? components[0] : null;
+        RequestRedraw?.Invoke(this, EventArgs.Empty);
+    }
 
     /// <summary>
     /// Opens the example browser. The examples used to be a submenu, which worked while there

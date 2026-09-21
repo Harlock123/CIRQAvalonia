@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using Cirq.Core.Primitives;
 using Cirq.Core.Probing;
 using Cirq.Core.Topology;
+using Cirq.Core.Units;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -160,6 +161,141 @@ public sealed partial class ScopeViewModel : ObservableObject
 
     /// <summary>Raised when a setting changes that the engine needs to know about.</summary>
     public event EventHandler? SamplingChanged;
+
+    // ---- measurements and cursors ----------------------------------------
+
+    /// <summary>
+    /// True while the trace list is showing what each trace is doing rather than only its present
+    /// value. Off by default: the rows are compact, and a number under every trace is noise until
+    /// it is the number you want.
+    /// </summary>
+    [ObservableProperty]
+    public partial bool ShowMeasurements { get; set; }
+
+    /// <summary>
+    /// True while the two time cursors are on the plot. They are how you measure something the
+    /// automatic readouts do not cover — the gap between two unrelated edges, the width of one
+    /// pulse in a burst, how long a relay took to pick up.
+    /// </summary>
+    [ObservableProperty]
+    public partial bool ShowCursors { get; set; }
+
+    /// <summary>Where the first cursor sits, in seconds.</summary>
+    [ObservableProperty]
+    public partial double CursorA { get; set; }
+
+    /// <summary>Where the second cursor sits, in seconds.</summary>
+    [ObservableProperty]
+    public partial double CursorB { get; set; }
+
+    /// <summary>True once the cursors have been placed, rather than sitting on top of each other.</summary>
+    private bool _cursorsPlaced;
+
+    /// <summary>What the cursors say, written out for the strip under the plot.</summary>
+    [ObservableProperty]
+    public partial string CursorReadout { get; private set; } = string.Empty;
+
+    /// <summary>
+    /// Re-measures every trace over the window on screen, and re-reads the cursors.
+    /// <para>
+    /// Called from the panel's redraw timer rather than from the engine: a measurement is of what
+    /// is being displayed, and the display is what has the window. Doing it on the solver's
+    /// schedule would measure a hundred thousand times a second to update a label twenty-five
+    /// times a second.
+    /// </para>
+    /// </summary>
+    public void Measure(double start, double window)
+    {
+        var end = start + window;
+
+        foreach (var probe in Probes)
+            probe.SetMeasurements(
+                probe.IsVisible
+                    ? TraceMeasurements.Of(probe.HistoryBuffer.ToArray(), start, end)
+                    : TraceMeasurements.None);
+
+        if (!ShowCursors)
+        {
+            CursorReadout = string.Empty;
+            _cursorsPlaced = false;
+            return;
+        }
+
+        // First time on, put them a third and two thirds across, which is where a person would.
+        if (!_cursorsPlaced)
+        {
+            CursorA = start + (window / 3.0);
+            CursorB = start + (window * 2.0 / 3.0);
+            _cursorsPlaced = true;
+        }
+
+        CursorReadout = ReadCursors();
+    }
+
+    /// <summary>
+    /// The cursor strip: the gap between them, what that is as a frequency, and what each visible
+    /// trace was doing at each one.
+    /// <para>
+    /// The reciprocal is there because it is what the cursors are most often used for. Straddle
+    /// one cycle of anything and the answer to "what frequency is that" is 1/Δt, and doing that
+    /// division by hand at the screen is the tedious part.
+    /// </para>
+    /// </summary>
+    private string ReadCursors()
+    {
+        var delta = CursorB - CursorA;
+
+        List<string> parts =
+        [
+            $"A {SiPrefix.Format(CursorA, "s")}",
+            $"B {SiPrefix.Format(CursorB, "s")}",
+            $"Δt {SiPrefix.Format(Math.Abs(delta), "s")}",
+        ];
+
+        if (Math.Abs(delta) > 1e-15)
+            parts.Add($"1/Δt {SiPrefix.Format(1.0 / Math.Abs(delta), "Hz")}");
+
+        foreach (var probe in Probes.Where(p => p.IsVisible))
+        {
+            var samples = probe.HistoryBuffer.ToArray();
+
+            if (ValueAt(samples, CursorA) is not { } a) continue;
+            if (ValueAt(samples, CursorB) is not { } b) continue;
+
+            parts.Add($"{probe.Label} Δ {SiPrefix.Format(b - a, probe.Unit)}");
+        }
+
+        return string.Join("   ·   ", parts);
+    }
+
+    /// <summary>
+    /// What a trace was at one instant, interpolated between the samples either side. A cursor
+    /// lands between samples far more often than on one, and snapping to the nearest would make
+    /// the reading jump about as the trace scrolls underneath it.
+    /// </summary>
+    public static double? ValueAt(IReadOnlyList<Cirq.Core.Primitives.DataPoint> samples, double time)
+    {
+        if (samples.Count == 0) return null;
+        if (time < samples[0].Time || time > samples[^1].Time) return null;
+
+        for (var i = 1; i < samples.Count; i++)
+        {
+            if (samples[i].Time < time) continue;
+
+            var previous = samples[i - 1];
+            var span = samples[i].Time - previous.Time;
+
+            return span <= 0
+                ? samples[i].Value
+                : previous.Value + ((time - previous.Time) / span * (samples[i].Value - previous.Value));
+        }
+
+        return samples[^1].Value;
+    }
+
+    /// <summary>Puts the cursors back where they would have started, for the Reset button.</summary>
+    [RelayCommand]
+    public void ResetCursors() => _cursorsPlaced = false;
 
     public SignalProbe AddProbe(Terminal terminal, string? label = null)
     {

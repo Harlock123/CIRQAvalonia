@@ -105,6 +105,8 @@ public static class Examples
                 LoadRelayDriver),
             new("IGBT and MOSFET", "The same load switched by each — a voltage drop against a resistance",
                 LoadIgbtAgainstMosfet),
+            new("Curve Tracer", "A transistor set up for Simulate > DC Sweep — step the base current and get the datasheet fan",
+                LoadCurveTracer),
             new("Servo Sweep", "The angle is the width of the pulse — turn Duty and watch it move",
                 LoadServoSweep),
             new("Stepper Motor", "A 4017 walking four windings through a ULN2003",
@@ -4690,6 +4692,48 @@ public static class Examples
         vm.Scope.AddProbe(near.PumpPositive, "V+");
 
         vm.Simulation.SpeedFactor = 0.01;
+    }
+
+    /// <summary>
+    /// A transistor wired for the DC sweep rather than for a transient. There is nothing to watch
+    /// on the scope here — the whole point is <b>Simulate &gt; DC Sweep</b>.
+    /// </summary>
+    public static void LoadCurveTracer(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "Curve tracer";
+
+        // The collector supply is what gets swept, so it starts at the top of the range rather
+        // than at some midpoint nobody chose.
+        var collector = Place(circuit, new DcVoltageSource(5.0), -400, 0);
+
+        // And the base is driven by a current rather than a voltage. That is the whole trick of a
+        // curve tracer: a transistor's collector current follows its base current almost exactly
+        // and its base voltage barely at all, so stepping a current gives evenly spaced curves
+        // where stepping a voltage would give a useless bunch of them crowded together.
+        var baseDrive = Place(circuit, new DcCurrentSource(20e-6), -400, 300);
+
+        var transistor = Place(circuit, new BipolarTransistor(), 0, 60);
+
+        var gnd = Place(circuit, new Ground(), -400, 180);
+        var gnd2 = Place(circuit, new Ground(), -400, 480);
+        var gnd3 = Place(circuit, new Ground(), 0, 260);
+
+        circuit.Connect(collector.Negative, gnd.Pin);
+        circuit.Connect(collector.Positive, transistor.Collector);
+        circuit.Connect(transistor.Emitter, gnd3.Pin);
+
+        // Current out of the source's positive terminal and into the base.
+        circuit.Connect(baseDrive.Positive, gnd2.Pin);
+        circuit.Connect(baseDrive.Negative, transistor.Base);
+
+        // The probe is the Y axis of the sweep. On the supply's own terminal, because that is the
+        // branch the collector current flows through and a current probe reads a branch.
+        var current = vm.Scope.AddProbe(collector.Positive, "Ic");
+        current.Kind = Cirq.Core.Probing.ProbeKind.Current;
+
+        vm.Scope.TimebasePerDivision = 1e-3;
+        vm.Scope.VoltsPerDivision = 1.0;
     }
 
     private static T Place<T>(Circuit circuit, T component, double x, double y) where T : CircuitComponent

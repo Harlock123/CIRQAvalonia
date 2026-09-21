@@ -59,6 +59,72 @@ public partial class SignalProbe : ObservableObject
         ? LastValue switch { >= 0.75 => "1", <= 0.25 => "0", _ => "x" }
         : SiPrefix.Format(LastValue, Unit);
 
+    /// <summary>
+    /// What this trace is doing over whatever the scope last measured, or <c>None</c> before it
+    /// has measured anything. Filled in by the scope rather than computed here, because the
+    /// answer depends on the window on screen and the probe does not know what that is.
+    /// </summary>
+    public TraceMeasurements Measurements { get; private set; } = TraceMeasurements.None;
+
+    /// <summary>Records a fresh set of measurements and tells the panel to re-read the summary.</summary>
+    public void SetMeasurements(TraceMeasurements measurements)
+    {
+        Measurements = measurements;
+        OnPropertyChanged(nameof(Measurements));
+        OnPropertyChanged(nameof(Summary));
+    }
+
+    /// <summary>
+    /// A line of the measurements, sized to the trace list beside the plot. Peak to peak and
+    /// frequency first, because between them they answer "how big" and "how fast", which is what
+    /// somebody glancing at a trace wants; the rest is behind the tooltip.
+    /// </summary>
+    public string Summary
+    {
+        get
+        {
+            var m = Measurements;
+            if (!m.IsValid || Kind == ProbeKind.Logic) return string.Empty;
+
+            List<string> parts = [$"{SiPrefix.Format(m.PeakToPeak, Unit)}pp"];
+
+            if (m.Frequency is { } hertz) parts.Add(SiPrefix.Format(hertz, "Hz"));
+            else parts.Add($"{SiPrefix.Format(m.Mean, Unit)} avg");
+
+            return string.Join("  ", parts);
+        }
+    }
+
+    /// <summary>Everything measured, for the tooltip on the trace row.</summary>
+    public string SummaryDetail
+    {
+        get
+        {
+            var m = Measurements;
+            if (!m.IsValid) return "Nothing measured yet.";
+
+            List<string> lines =
+            [
+                $"Peak to peak  {SiPrefix.Format(m.PeakToPeak, Unit)}",
+                $"Minimum       {SiPrefix.Format(m.Minimum, Unit)}",
+                $"Maximum       {SiPrefix.Format(m.Maximum, Unit)}",
+                $"Mean          {SiPrefix.Format(m.Mean, Unit)}",
+                $"RMS           {SiPrefix.Format(m.Rms, Unit)}",
+            ];
+
+            if (m.Frequency is { } hertz)
+            {
+                lines.Add($"Frequency     {SiPrefix.Format(hertz, "Hz")}");
+                lines.Add($"Period        {SiPrefix.Format(m.Period!.Value, "s")}");
+            }
+
+            if (m.DutyCycle is { } duty) lines.Add($"Duty cycle    {duty * 100:0.#} %");
+            if (m.RiseTime is { } rise) lines.Add($"Rise (10-90)  {SiPrefix.Format(rise, "s")}");
+
+            return string.Join(Environment.NewLine, lines);
+        }
+    }
+
     [ObservableProperty]
     public partial Color TraceColor { get; set; } = Color.Yellow;
 

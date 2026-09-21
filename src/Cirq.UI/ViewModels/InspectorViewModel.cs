@@ -89,8 +89,12 @@ public sealed partial class InspectorViewModel : ObservableObject
 
         parameter.ValueCommitted += (_, _) =>
         {
-            // A model swap can change the pin roles, so treat those as topology-affecting.
-            var structural = parameter is OptionParameterViewModel;
+            // A model swap can change the pin roles, and renaming a net label changes what is
+            // connected to what — so both rebuild the engine rather than being picked up on the
+            // next time point.
+            var structural =
+                parameter is OptionParameterViewModel ||
+                parameter.Owner is Cirq.Core.Topology.INetNaming;
             ParameterChanged?.Invoke(this, structural);
         };
 

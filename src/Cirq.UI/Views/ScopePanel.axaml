@@ -5,7 +5,7 @@
              x:Class="Cirq.UI.Views.ScopePanel"
              x:DataType="vm:ScopeViewModel">
 
-  <Grid RowDefinitions="Auto,*" ColumnDefinitions="*,190">
+  <Grid RowDefinitions="Auto,*,Auto" ColumnDefinitions="*,190">
 
     <!-- Scope controls -->
     <Border Grid.Row="0" Grid.ColumnSpan="2" Classes="panel" BorderThickness="0,0,0,1" Padding="8,5">
@@ -46,6 +46,13 @@
 
         <Separator Classes="vertical" />
 
+        <CheckBox FontSize="12" Content="Measure" IsChecked="{Binding ShowMeasurements}"
+                  ToolTip.Tip="Show what each trace is doing — peak to peak, frequency, and the rest on the row's tooltip" />
+        <CheckBox FontSize="12" Content="Cursors" IsChecked="{Binding ShowCursors}"
+                  ToolTip.Tip="Two draggable time cursors, with the gap between them and what each trace does there" />
+
+        <Separator Classes="vertical" />
+
         <Button Classes="toolbar" Content="Clear traces" Command="{Binding ClearTracesCommand}" />
       </StackPanel>
       </WrapPanel>
@@ -71,7 +78,7 @@
             <ItemsControl.ItemTemplate>
               <DataTemplate>
                 <Border Margin="6,2" Padding="6,4" CornerRadius="4" Background="{DynamicResource GroupHeaderBackground}">
-                  <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto">
+                  <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto">
                     <CheckBox Grid.Row="0" Grid.Column="0" MinWidth="0" Margin="0,0,4,0"
                               IsChecked="{Binding IsVisible}" />
                     <TextBlock Grid.Row="0" Grid.Column="1" Classes="value" FontSize="12"
@@ -88,6 +95,12 @@
                       <TextBlock FontSize="11" VerticalAlignment="Center"
                                  Foreground="{DynamicResource TextMuted}" Text="{Binding Reading}" />
                     </StackPanel>
+                    <TextBlock Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2"
+                               FontSize="10" Margin="0,2,0,0"
+                               Foreground="{DynamicResource TextMuted}"
+                               Text="{Binding Summary}"
+                               ToolTip.Tip="{Binding SummaryDetail}"
+                               IsVisible="{Binding $parent[ItemsControl].((vm:ScopeViewModel)DataContext).ShowMeasurements}" />
                   </Grid>
                 </Border>
               </DataTemplate>
@@ -96,5 +109,16 @@
         </ScrollViewer>
       </DockPanel>
     </Border>
+
+    <!-- The cursor strip. Only there while the cursors are, since an empty bar across the bottom
+         of the scope costs height the traces would rather have. -->
+    <Border Grid.Row="2" Grid.ColumnSpan="2" Classes="panel" BorderThickness="0,1,0,0"
+            Padding="8,4" IsVisible="{Binding ShowCursors}">
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <TextBlock Classes="value" FontSize="11" VerticalAlignment="Center"
+                   Text="{Binding CursorReadout}" TextTrimming="CharacterEllipsis" />
+      </StackPanel>
+    </Border>
+
   </Grid>
 </UserControl>

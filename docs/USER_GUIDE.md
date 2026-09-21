@@ -20,13 +20,18 @@ the [README](../README.md), and what changed between releases is in the
 8. [Running a simulation](#running-a-simulation)
 9. [Worked example: an RC low-pass](#worked-example-an-rc-low-pass)
 10. [Digital and mixed-signal circuits](#digital-and-mixed-signal-circuits)
-11. [Development boards](#development-boards)
-12. [Saving and loading](#saving-and-loading)
-13. [Exporting](#exporting)
-14. [Appearance](#appearance)
-15. [What version is this](#what-version-is-this)
-16. [Keyboard reference](#keyboard-reference)
-17. [When a circuit will not simulate](#when-a-circuit-will-not-simulate)
+11. [Measuring what is on the scope](#measuring-what-is-on-the-scope)
+12. [DC sweeps and the curve tracer](#dc-sweeps-and-the-curve-tracer)
+13. [What is in a signal](#what-is-in-a-signal)
+14. [Naming a net instead of drawing it](#naming-a-net-instead-of-drawing-it)
+15. [Checking the circuit](#checking-the-circuit)
+16. [Development boards](#development-boards)
+17. [Saving and loading](#saving-and-loading)
+18. [Exporting](#exporting)
+19. [Appearance](#appearance)
+20. [What version is this](#what-version-is-this)
+21. [Keyboard reference](#keyboard-reference)
+22. [When a circuit will not simulate](#when-a-circuit-will-not-simulate)
 
 This guide is also attached to every [release](../../releases) as a PDF, with a contents page and
 the screenshots in place — the same document, laid out for reading away from the machine. Build it
@@ -72,13 +77,13 @@ at the window edge; click the rail to bring it back.
 
 Click a palette entry, then click the canvas. The part lands where you click, snapped to the grid.
 
-The palette holds **179 components in 16 categories**:
+The palette holds **180 components in 16 categories**:
 
 | Category | Count | Contents |
 | --- | --- | --- |
 | Passive | 11 | Resistor, capacitor, electrolytic capacitor, inductor, transformer, centre-tapped transformer, potentiometer, crystal, ferrite bead, **common-mode choke** and transmission line — see [below](#common-mode-chokes) |
 | Switches | 4 | SPST, SPDT, push button, **8-way DIP switch** |
-| Sources | 7 | Ground, DC voltage, DC current, function generator, battery, solar cell, **noise source** — see [below](#noise-and-why-hysteresis-exists) |
+| Sources | 8 | Ground, **net label**, DC voltage, DC current, function generator, battery, solar cell, **noise source** — see [below](#naming-a-net-instead-of-drawing-it) |
 | Semiconductors | 13 | 1N4148, 1N4001, Schottky, zeners, **varactor**, **photodiode**, bridge rectifier, SCR, triac, diac, TVS and varistor — see [below](#three-ways-to-measure-light) |
 | Transistors | 11 | NPN and PNP bipolars, N- and P-channel MOSFETs, three JFETs and an **IGBT** — see [below](#the-igbt) |
 | LEDs & Displays | 9 | Six LED colours, seven-segment displays, **HD44780 character LCD** — see [below](#the-character-lcd) |
@@ -419,7 +424,7 @@ gets roughly two-thirds of the way each time.
 
 ### The example browser
 
-Everything above is also in **File > Examples...** (`Ctrl+Shift+E`), along with seventy-eight others.
+Everything above is also in **File > Examples...** (`Ctrl+Shift+E`), along with seventy-nine others.
 
 They are grouped the way the component palette is — Fundamentals, Analog, Power Supplies, Switching
 & Motors, Digital Logic, Timers & Oscillators, Buses & Interfaces, Sensors, Signal Integrity & RF,
@@ -2712,6 +2717,233 @@ connects the speaker a second after the power. It is in the recording because it
 
 ---
 
+## Measuring what is on the scope
+
+A picture of a waveform answers "what shape" and almost never answers "how much". Two buttons on
+the scope toolbar fix that.
+
+**Measure** puts a line under every trace in the list: peak to peak, and the frequency — or the
+mean, when there is not enough signal to have a frequency. Hover the row and the tooltip has the
+rest: minimum, maximum, mean, RMS, period, duty cycle and the 10–90 % rise time.
+
+Three things about those numbers are worth knowing.
+
+They are measured over **what is on the screen**, not over the whole recorded history. A trace
+whose source was turned up halfway through has two amplitudes in its buffer and only one of them
+answers "what is it doing now".
+
+The periodic ones are **left out rather than guessed**. A frequency measured from less than two
+cycles is not a measurement, and a duty cycle off a sine is meaningless. Where the samples do not
+support a figure it is simply absent.
+
+And the frequency measurement has **hysteresis in it**, for exactly the reason the 74HC14 is in
+the palette. A trace with noise on it crosses its own midpoint dozens of times per edge, and
+without a deadband the measured frequency would be the noise's rather than the signal's. Load
+**Noise and Hysteresis** and turn Measure on to see both halves of that idea at once.
+
+**Cursors** puts two dashed vertical lines on the plot; drag either one. The strip along the
+bottom gives where each is, the gap between them, **1/Δt**, and how far each trace moved between
+them. The reciprocal is there because it is what cursors are mostly used for: straddle one cycle
+of anything and the answer to "what frequency is that" is 1/Δt.
+
+Cursors are for what the automatic readouts cannot cover — the gap between two edges on different
+traces, the width of one pulse in a burst, how long a relay took to pick up after it was told to.
+In tiled layout they are drawn on every tile, because lining an event on one trace up against an
+event on another is the main thing they are for.
+
+---
+
+## DC sweeps and the curve tracer
+
+**Simulate > DC Sweep...** (`Shift+F7`) steps a parameter, re-solves the operating point at every
+value, and plots what the probes said. It is not a transient and it is not a frequency response:
+there is no time in it at all.
+
+What it draws is the curves parts are actually specified by. Until now the only way to see one was
+to build a ramp generator and run a transient, which works, slowly, and tells you about the ramp
+as much as about the part.
+
+Pick something to sweep, give it a range, press Sweep. The list offers every settable number in
+the circuit — not only supplies — so a "DC sweep" of a resistance, a temperature or a light level
+is the same machinery and is there for free. The range defaults to something the selected part can
+actually do rather than to 0–5 whatever was picked, since a base current lives in microamps and a
+mains source in hundreds of volts.
+
+Things worth sweeping, all of them already in the examples:
+
+| Load this | Sweep | And you get |
+| --- | --- | --- |
+| **Curve Tracer** | `V1 Voltage` 0 → 5 V, stepping `I1 Current` 10 → 40 µA | A transistor's output characteristics |
+| **Rail to Rail** | `FG1 Dc Offset` −3 → 9 V | Three transfer curves, each flattening at its own headroom |
+| **Solar Panel** | `RV1 Position` 0.02 → 1 | The panel's voltage and its current against the load, and the knee between them |
+| **Noise and Hysteresis** | `FG1 Dc Offset` 0 → 5, then 5 → 0 | A comparator switching in two different places |
+
+The **Rail to Rail** one is the clearest of them. On a single 5 V supply, with the input driven
+from −5.5 V to +6.5 V, the three followers come out as:
+
+| | Lowest it reaches | Highest it reaches |
+| --- | --- | --- |
+| LM741 | 1.49 V | 3.48 V |
+| LM358 | 0.02 V | 3.47 V |
+| MCP6002 | 0.02 V | 4.93 V |
+
+The LM741 cannot use the bottom volt and a half or the top volt and a half. The LM358 reaches the
+bottom rail and still stops a volt and a half short of the top — which is why it works on one
+battery and why its output stage is asymmetric. The MCP6002 reaches both. Those are three
+sentences of prose, and one sweep.
+
+**Noise and Hysteresis** is the one that takes two sweeps, and it is worth knowing why. A DC sweep
+goes in one direction, so a hysteresis *loop* cannot be drawn in one pass. Sweep the input upward
+and the comparator switches at about 3.6 V; swap Start and Stop, sweep it back down, and it
+switches at about 3.4 V instead. It takes a higher input to turn it on than it takes to turn it
+off, and that gap is the whole of why it does not chatter on a noisy edge.
+
+### The second parameter
+
+Tick **Step** and pick a second thing, and you get one curve per value of it. That is what turns a
+line into a curve tracer, and **File > Examples > Curve Tracer** is set up for exactly it: sweep
+`V1 Voltage` from 0 to 5 V while stepping `I1 Current` from 10 µA to 40 µA in four curves, and the
+fan off the front of every transistor datasheet comes out.
+
+Two things in that plot are worth looking at properly. The curves are **evenly spaced**, because
+the base is driven by a current source rather than a voltage source — a transistor's collector
+current follows its base current almost exactly and its base voltage barely at all, so stepping a
+voltage would give a useless bunch of curves crowded together. And they are **not flat**: each one
+tilts upward a few percent across the sweep, which is the Early effect, and the slope of that tilt
+is where a transistor's output resistance comes from.
+
+### When the solver cannot get there
+
+A sweep walks into corners a single run never reaches. Where a point will not converge it is left
+as a gap in the curve and the sweep carries on, with a count of them in the status line — one
+unreachable corner is not a reason to throw away the rest of the curve. Each point starts from the
+solution of the one before it, which is less an optimisation than the thing that makes it work:
+a diode asked for 0.7 V out of nowhere is a hard solve, and the same diode asked to move ten
+millivolts from where it already is converges in two iterations.
+
+The circuit is put back exactly as it was afterwards — every swept property restored, and the bias
+point re-solved, so the canvas is not left showing the last point of the sweep.
+
+---
+
+## What is in a signal
+
+**Simulate > Spectrum...** (`F3`) transforms the traces the scope has already recorded and shows
+what frequencies are in them.
+
+This is **not** the frequency response, and the difference matters. The response sweeps a small
+signal and asks what the circuit *does* to each frequency — it is a property of the circuit, and it
+does not care what signal you are putting through it. The spectrum takes the waveform the circuit
+actually produced and asks what is *in* it. One measures a filter; the other measures a signal.
+
+Half of what this library teaches lives here and used to be invisible:
+
+- **Amplitude Modulation** — a 100 kHz carrier with a pair of sidebands 2 kHz either side of it,
+  spaced by the audio frequency and each a fixed fraction of the carrier set by the modulation
+  depth. That is what AM *is*, and on the time-domain trace it is an envelope you have to take on
+  trust. Run it for a few milliseconds first so there is enough trace to resolve the spacing, and
+  use the Blackman-Harris window — the sidebands are well below the carrier and a Hann window's
+  skirts reach far enough to blur them.
+- **Half-Wave Rectifier** against **Full-Wave Rectifier** — the half-wave output's largest ripple
+  component sits at the line frequency, 50 Hz, and the full-wave output's at 100 Hz. That is the
+  same fact as "its ripple is easier to filter" and "its ripple is half the size", said in the
+  domain where it is a single obvious peak rather than an inference from the shape.
+- **Ring Oscillator** or any square wave — the fundamental plus the odd harmonics at a third, a
+  fifth and a seventh of it, and no even ones at all.
+- **Audio Amplifier** — drive it into clipping and watch harmonics grow that were not in the input.
+  That is distortion, measured rather than described.
+- **Noise Source** — a flat spectrum that rolls off above the bandwidth it was given, which is what
+  band-limited means.
+
+### The two settings that matter
+
+**Window** decides how the block of samples is tapered before transforming. A transform assumes the
+block repeats for ever, and unless it holds a whole number of cycles the two ends do not meet — the
+discontinuity is a step, a step has energy at every frequency, and that energy smears across the
+spectrum and buries anything small. **Hann** is the general-purpose answer and the default.
+**Blackman-Harris** has a wider peak and much lower skirts, for picking a small component out from
+beside a large one — it is the one that makes AM sidebands clean. **Rectangular** applies no window
+at all and is right only when you have arranged for a whole number of cycles.
+
+**Points** is the size of the transform. More is finer resolution over a longer stretch of signal;
+fewer follows a changing signal more closely. The status line says what the resolution works out
+to and how high the spectrum goes.
+
+The vertical axis is in **decibels** by default, and should usually stay there: a harmonic at a
+hundredth of the fundamental is 40 dB down and perfectly visible, and on a linear axis it is a
+line touching the bottom of the plot.
+
+One honest note about the method. The solver's time steps are **not uniform** — it shortens them at
+an edge and lengthens them across a flat stretch — and a transform needs an even spacing, so the
+samples are resampled onto a uniform grid first by interpolating between the ones either side.
+That is sound as long as the grid is finer than the detail in the signal, which it is whenever the
+solver was taking steps small enough to draw the waveform in the first place.
+
+---
+
+## Naming a net instead of drawing it
+
+Past a certain size a schematic has signals that go everywhere — a supply rail, a reset line, a
+clock — and drawing each of them as a wire to every place it is needed produces a page of crossings
+that hides the circuit it is meant to show.
+
+A **Net Label** (in Sources) fixes that. Wire one to a point, give it a name, put another with the
+same name somewhere else, and the two points are one net. No wire between them, and the circuit
+solves exactly as though there were.
+
+The name is matched with its ends trimmed and **without regard to case**, so `VCC`, `Vcc` and
+`vcc ` are the same rail — as they are to everybody except a string comparison. A label left blank
+connects to nothing, which is what an unnamed one should do.
+
+A label is not a component in the electrical sense. It stamps nothing, carries no current and
+cannot change an answer. Its entire effect happened when the netlist was built — which is why
+renaming one rebuilds the engine rather than being picked up on the next time point.
+
+Two things to watch for, and the rule check below catches both:
+
+- A label whose name **nothing else uses** connects to nothing at all. The usual cause is a typo,
+  and it is invisible on the page: a label that goes nowhere looks exactly like one whose partner
+  is somewhere else on the drawing.
+- Two **different** names on one net is a contradiction. They are all the same net, and only one
+  of the names gets used for it.
+
+Where a net is named, the name is what gets shown for it — on a probe, in an error message, and in
+the rule check's findings. A net called `RESET` is easier to reason about than one called `N17`.
+
+---
+
+## Checking the circuit
+
+**Simulate > Check Circuit...** (`F4`) looks for the mistakes that are silent.
+
+Components already report their own faults, and those show up on the canvas as a red ring while the
+circuit runs: a relay coil with no flyback diode, a transceiver outside its common-mode range, a
+fuse past its melting integral. Every one of those is a question a part can answer about itself.
+
+What none of them can see is the **topology** — how the parts are joined. A ground pin wired to a
+rail, two outputs fighting over one net, an input left floating, a supply shorted, a mistyped net
+label. Each of those produces a number rather than an error, and a number is much harder to
+disbelieve than a red ring.
+
+| Reported | What it means |
+| --- | --- |
+| **No ground** | Nothing is measured until there is a datum. The solver says this too, as a singular matrix; this says it in words. |
+| **Shorted source** | A source with both terminals on one net. Nothing limits the current, so there is no solution. |
+| **Supply pin on the ground net** | A `Power` pin and a ground on the same net. This is the ULN2003 exactly: it has no supply pin, so the terminal marked Vcc is its ground pin under another name, and wiring it to a rail shorts the rail. |
+| **Unpowered** | A package whose supply or ground pin is not wired to anything. |
+| **Floating** | A terminal alone on its net. An error for an input, which then has no defined level; a warning for a passive lead, which is merely pointless. |
+| **Output clash** | Two driven outputs on one net. A warning rather than an error, because open-collector and tri-state parts share a net deliberately — but two outputs that *cannot* release it is how the Shared Bus example's fault works. |
+| **Label problems** | A name nothing else uses, a blank label, or two names on one net. |
+
+Select a finding and press **Show on canvas** and the parts it is about are selected behind the
+dialog, with the inspector following a single one — so you can read the finding, press the button,
+and see which part it means. Errors are listed ahead of warnings, so the list reads top-down in the
+order things matter.
+
+Running it on a working circuit should produce nothing at all, and does.
+
+---
+
 ## Development boards
 
 A Raspberry Pi or Arduino can sit on the schematic as either the **source** of signals or the
@@ -2956,7 +3188,10 @@ Also available in the app at **Help > Keyboard Shortcuts**.
 | Middle-drag / space-drag | Pan |
 | Double-click | Operate a switch, push button or logic toggle |
 | `F5` / `F6` / `F8` | Run-pause / step / reset |
-| `F7` | Frequency response |
+| `F7` | Frequency response — what the circuit does to each frequency |
+| `Shift` `F7` | DC sweep — step a parameter and plot the curve |
+| `F3` | Spectrum — what frequencies are in the traces |
+| `F4` | Check circuit — the wiring mistakes no part can report about itself |
 | `F9` / `F10` | Collapse the palette / the properties panel |
 | View menu | **Mark Interactive Parts** rings everything you can double-click; **Describe Parts on Hover** turns the hover card off |
 | `Ctrl+N` / `Ctrl+O` / `Ctrl+S` / `Ctrl+Shift+S` | New / open / save / save as |
@@ -2970,6 +3205,10 @@ Also available in the app at **Help > Keyboard Shortcuts**.
 
 The circuit is compiled before it runs, so structural problems are reported up front rather than
 quietly producing zeros.
+
+**Try `F4` first.** [Check Circuit](#checking-the-circuit) looks for exactly these problems and
+says which part each one is about, which is usually faster than reading a message about the matrix
+and working backwards to the wiring.
 
 | Message | Usually means |
 | --- | --- |

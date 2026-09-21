@@ -90,6 +90,13 @@
         <Separator />
         <MenuItem Header="_Frequency Response..." InputGesture="F7"
                   Command="{Binding ShowFrequencyResponseCommand}" />
+        <MenuItem Header="_DC Sweep..." InputGesture="Shift+F7"
+                  Command="{Binding ShowDcSweepCommand}" />
+        <MenuItem Header="_Spectrum..." InputGesture="F3"
+                  Command="{Binding ShowSpectrumCommand}" />
+        <Separator />
+        <MenuItem Header="_Check Circuit..." InputGesture="F4"
+                  Command="{Binding ShowRuleCheckCommand}" />
         <MenuItem Header="Play Speaker _Recording" Command="{Binding PlayRecordingCommand}" />
         <Separator />
         <MenuItem Header="Spee_d" ItemsSource="{Binding SpeedOptions}">

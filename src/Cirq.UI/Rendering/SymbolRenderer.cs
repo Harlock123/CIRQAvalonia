@@ -81,6 +81,7 @@ public static class SymbolRenderer
             case Transformer: DrawTransformer(context, pen, thin); break;
             case CentreTappedTransformer: DrawCentreTappedTransformer(context, pen, thin); break;
             case Potentiometer: DrawPotentiometer(context, pen); break;
+            case NetLabel label: DrawNetLabel(context, pen, zoom, label); break;
             case Ground: DrawGround(context, pen); break;
             case DcVoltageSource: DrawVoltageSource(context, pen, zoom); break;
             case DcCurrentSource: DrawCurrentSource(context, pen); break;
@@ -353,6 +354,39 @@ public static class SymbolRenderer
         {
             context.DrawLine(pen, new Point(-18, 0), new Point(18, 0));
         }
+    }
+
+    /// <summary>
+    /// A net label: the flag shape every schematic tool draws, with the name inside it. The point
+    /// is sharp and on the left, at the terminal, so it reads as pointing at the wire it names.
+    /// </summary>
+    private static void DrawNetLabel(
+        ISymbolCanvas context, IPen pen, double zoom, NetLabel label)
+    {
+        var text = label.NetName.Trim();
+
+        // Sized to the name, so a long one is not written outside its own flag. Six pixels a
+        // character is close enough for the proportional font at the size captions use.
+        var width = Math.Max(34.0, 14.0 + (text.Length * 6.0));
+
+        context.DrawLine(pen, new Point(-40, 0), new Point(-28, 0));
+
+        var flag = new SymbolPath();
+        using (var ctx = flag.Open())
+        {
+            ctx.BeginFigure(new Point(-28, 0), true);
+            ctx.LineTo(new Point(-20, -10));
+            ctx.LineTo(new Point(width - 28, -10));
+            ctx.LineTo(new Point(width - 28, 10));
+            ctx.LineTo(new Point(-20, 10));
+            ctx.EndFigure(true);
+        }
+
+        context.DrawGeometry(CanvasTheme.SymbolFill, pen, flag);
+
+        if (zoom > 0.4 && text.Length > 0)
+            DrawCenteredText(context, text, new Point((width - 48) / 2.0, 0), 10, zoom,
+                CanvasTheme.LabelBrush);
     }
 
     /// <summary>
@@ -2415,6 +2449,9 @@ public static class SymbolRenderer
         LevelShifter => 84.0,
         OscillatorModule => 44.0,
         Ne555 => DipPackage.BodyHeight(8) / 2 + 16,
+
+        // The flag is 10 either side of centre and the caption would sit on top of the name.
+        NetLabel => 24.0,
 
         // Drawn as a DIP-14 rather than as four triangles, so it needs a DIP's clearance.
         QuadOpAmp => DipPackage.BodyHeight(14) / 2 + 16,

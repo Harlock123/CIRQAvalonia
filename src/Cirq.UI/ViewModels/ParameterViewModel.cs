@@ -16,6 +16,12 @@ public abstract partial class ParameterViewModel : ObservableObject
 
     protected object Target { get; }
 
+    /// <summary>
+    /// What this parameter belongs to. Exposed so the inspector can tell a value change from a
+    /// change of shape without knowing every part in the library.
+    /// </summary>
+    public object Owner => Target;
+
     protected PropertyInfo Property { get; }
 
     public string Label { get; }

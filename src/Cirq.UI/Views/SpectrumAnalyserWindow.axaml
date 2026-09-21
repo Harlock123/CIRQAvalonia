@@ -1,0 +1,49 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:sp="clr-namespace:ScottPlot.Avalonia;assembly=ScottPlot.Avalonia"
+        xmlns:vm="clr-namespace:Cirq.UI.ViewModels"
+        x:Class="Cirq.UI.Views.SpectrumAnalyserWindow"
+        x:DataType="vm:SpectrumViewModel"
+        Title="Spectrum"
+        Width="900" Height="620"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource PanelBackground}">
+
+  <DockPanel>
+
+    <Border DockPanel.Dock="Top" Padding="14,12"
+            Background="{DynamicResource PanelBackground}"
+            BorderBrush="{DynamicResource PanelBorder}" BorderThickness="0,0,0,1">
+      <StackPanel Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
+
+        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+          <TextBlock Text="Window" VerticalAlignment="Center" />
+          <ComboBox Width="150" SelectedItem="{Binding Window, Mode=TwoWay}"
+                    ItemsSource="{Binding Source={x:Static vm:SpectrumViewModel.WindowOptions}}"
+                    ToolTip.Tip="How the block is tapered before transforming. Hann is the general-purpose choice; Blackman-Harris picks a small component out from beside a large one; Rectangular is right only when the block holds a whole number of cycles." />
+        </StackPanel>
+
+        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+          <TextBlock Text="Points" VerticalAlignment="Center" />
+          <ComboBox Width="90" SelectedItem="{Binding Size, Mode=TwoWay}"
+                    ItemsSource="{Binding Source={x:Static vm:SpectrumViewModel.SizeOptions}}"
+                    ToolTip.Tip="More points is finer resolution over a longer stretch of signal; fewer follows a changing signal more closely." />
+        </StackPanel>
+
+        <CheckBox Content="Decibels" IsChecked="{Binding IsLogarithmic}" VerticalAlignment="Center"
+                  ToolTip.Tip="A harmonic at a hundredth of the fundamental is invisible on a linear axis and obvious on a log one." />
+
+        <Button Content="Transform" Command="{Binding RunCommand}" IsEnabled="{Binding !IsBusy}"
+                Padding="18,5" />
+      </StackPanel>
+    </Border>
+
+    <Border DockPanel.Dock="Bottom" Padding="14,9"
+            BorderBrush="{DynamicResource PanelBorder}" BorderThickness="0,1,0,0">
+      <TextBlock Text="{Binding Status}" TextWrapping="Wrap" Opacity="0.85" />
+    </Border>
+
+    <sp:AvaPlot Name="Plot" />
+
+  </DockPanel>
+</Window>

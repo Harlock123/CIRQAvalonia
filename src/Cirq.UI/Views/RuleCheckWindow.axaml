@@ -1,0 +1,51 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:Cirq.UI.ViewModels"
+        x:Class="Cirq.UI.Views.RuleCheckWindow"
+        x:DataType="vm:RuleCheckViewModel"
+        Title="Check Circuit"
+        Width="760" Height="480"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource PanelBackground}">
+
+  <DockPanel Margin="0">
+
+    <Border DockPanel.Dock="Bottom" Padding="14,10"
+            BorderBrush="{DynamicResource PanelBorder}" BorderThickness="0,1,0,0">
+      <DockPanel>
+        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8">
+          <Button Content="Show on canvas" Command="{Binding RevealCommand}"
+                  CommandParameter="{Binding Selected}" Padding="14,5" />
+          <Button Content="Check again" Command="{Binding RunCommand}" Padding="14,5" />
+        </StackPanel>
+        <TextBlock Text="{Binding Summary}" VerticalAlignment="Center" Opacity="0.85" />
+      </DockPanel>
+    </Border>
+
+    <!-- Nothing wrong is worth saying clearly rather than as an empty list. -->
+    <TextBlock IsVisible="{Binding IsClean}"
+               HorizontalAlignment="Center" VerticalAlignment="Center"
+               Opacity="0.7" TextAlignment="Center"
+               Text="No problems found.&#x0a;&#x0a;This checks the wiring — grounds, supplies, floating pins,&#x0a;clashing outputs and net labels. Parts report their own&#x0a;faults on the canvas while the circuit runs." />
+
+    <ListBox ItemsSource="{Binding Rows}" SelectedItem="{Binding Selected, Mode=TwoWay}"
+             IsVisible="{Binding !IsClean}" Background="Transparent">
+      <ListBox.ItemTemplate>
+        <DataTemplate>
+          <Grid ColumnDefinitions="72,110,*" Margin="0,3">
+            <Border Grid.Column="0" CornerRadius="3" Padding="6,1" Height="20"
+                    HorizontalAlignment="Left" VerticalAlignment="Top"
+                    Background="{DynamicResource GroupHeaderBackground}">
+              <TextBlock Text="{Binding Severity}" FontSize="10" VerticalAlignment="Center"
+                         Foreground="{DynamicResource TextMuted}" />
+            </Border>
+            <TextBlock Grid.Column="1" Text="{Binding Where}" FontSize="12" VerticalAlignment="Top"
+                       TextTrimming="CharacterEllipsis" Margin="0,2,8,0" />
+            <TextBlock Grid.Column="2" Text="{Binding Message}" TextWrapping="Wrap" FontSize="12" />
+          </Grid>
+        </DataTemplate>
+      </ListBox.ItemTemplate>
+    </ListBox>
+
+  </DockPanel>
+</Window>
