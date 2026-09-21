@@ -110,6 +110,27 @@ Anything you can operate is ringed with a small dot beside its designator, so yo
 remember which parts those are. Turn the rings off with **View > Mark Interactive Parts** once
 they have served their purpose.
 
+### What is this one set to?
+
+Rest the pointer on a part and a card appears beside it: the designator and type, what the part is
+currently showing on the canvas, and the settings it is holding — the same names and values the
+properties panel gives, without selecting anything. On a schematic with eight resistors on it,
+finding the 4k7 is a look rather than eight clicks.
+
+The settings a part marks as **operable** come first, because those are the ones its author singled
+out as the things you work: a generator leads with its frequency, amplitude, offset and duty cycle
+rather than with its small-signal analysis settings. A part with more than seven says how many it
+left out — a card taller than the part it describes has stopped being a glance.
+
+It is also where a part explains itself when it is unhappy. A component used outside its ratings is
+ringed in red on the canvas, which tells you *that* something is wrong but not *what*; the card
+carries the sentence. Hover a thermocouple past its alloy limit, an electrolytic in backwards, or a
+speaker being asked to dissipate more than its rating, and it says so in as many words.
+
+The card keeps out of the way of everything else: it does not appear while you are dragging,
+panning, box-selecting or about to start a wire, and it folds back across the pointer rather than
+running off the edge of the window. **View > Describe Parts on Hover** turns it off.
+
 ### Selecting more than one part
 
 With the **Select** tool, drag a box across empty canvas and everything inside it is selected —
@@ -2538,6 +2559,7 @@ Also available in the app at **Help > Keyboard Shortcuts**.
 | | |
 | --- | --- |
 | `V` | Select tool — drag a part to move it, drag empty canvas to box-select |
+| Hover a part | Describe it where it sits, without selecting it |
 | `W` | Wire tool |
 | `P` | Probe tool |
 | `R` | Rotate selection |
@@ -2553,7 +2575,7 @@ Also available in the app at **Help > Keyboard Shortcuts**.
 | `F5` / `F6` / `F8` | Run-pause / step / reset |
 | `F7` | Frequency response |
 | `F9` / `F10` | Collapse the palette / the properties panel |
-| View menu | **Mark Interactive Parts** rings everything you can double-click |
+| View menu | **Mark Interactive Parts** rings everything you can double-click; **Describe Parts on Hover** turns the hover card off |
 | `Ctrl+N` / `Ctrl+O` / `Ctrl+S` / `Ctrl+Shift+S` | New / open / save / save as |
 | `Ctrl+E` | Export the schematic or the traces as PNG, JPEG, BMP, SVG or PDF |
 | `Ctrl+Shift+E` | Browse the example circuits |

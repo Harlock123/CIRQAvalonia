@@ -108,6 +108,18 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     public partial bool ShowInteractiveMarkers { get; set; } = true;
 
+    /// <summary>
+    /// Whether resting the pointer on a part describes it where it sits.
+    /// <para>
+    /// The question it answers is "what is this one set to?", which otherwise costs a click to
+    /// select the part and a look across at the properties panel — eight clicks to find which of
+    /// eight resistors is the 4k7. On for anyone who has not turned it off, because the cost of it
+    /// being wrong is a card you did not want for as long as the pointer is still.
+    /// </para>
+    /// </summary>
+    [ObservableProperty]
+    public partial bool ShowHoverDetails { get; set; } = true;
+
     [ObservableProperty]
     public partial double GridSize { get; set; } = 10.0;
 

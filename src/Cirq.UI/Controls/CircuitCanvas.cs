@@ -1,3 +1,4 @@
+using System.Globalization;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -5,6 +6,7 @@ using Avalonia.Media;
 using Cirq.Core.Probing;
 using Cirq.Core.Topology;
 using Cirq.UI.Rendering;
+using Cirq.UI.Services;
 using Cirq.UI.ViewModels;
 using CorePoint = Cirq.Core.Primitives.Point;
 
@@ -51,6 +53,9 @@ public class CircuitCanvas : Control
 
     public static readonly StyledProperty<bool> ShowInteractiveMarkersProperty =
         AvaloniaProperty.Register<CircuitCanvas, bool>(nameof(ShowInteractiveMarkers), true);
+
+    public static readonly StyledProperty<bool> ShowHoverDetailsProperty =
+        AvaloniaProperty.Register<CircuitCanvas, bool>(nameof(ShowHoverDetails), true);
 
     public Circuit? Circuit
     {
@@ -108,6 +113,13 @@ public class CircuitCanvas : Control
         set => SetValue(ShowInteractiveMarkersProperty, value);
     }
 
+    /// <summary>Whether resting the pointer on a part describes it without selecting it.</summary>
+    public bool ShowHoverDetails
+    {
+        get => GetValue(ShowHoverDetailsProperty);
+        set => SetValue(ShowHoverDetailsProperty, value);
+    }
+
     // ---- events ----------------------------------------------------------
 
     /// <summary>Raised when components or wires are added or removed, so the engine can recompile.</summary>
@@ -135,6 +147,8 @@ public class CircuitCanvas : Control
     private bool _isPanning;
     private bool _isDraggingComponent;
     private bool _isBanding;
+    private CircuitComponent? _hoverComponent;
+    private Point _hoverPointer;
     private CorePoint _bandStart;
     private CorePoint _bandEnd;
     private readonly List<(CircuitComponent Component, CorePoint Grab)> _dragGroup = [];
@@ -163,7 +177,7 @@ public class CircuitCanvas : Control
     {
         AffectsRender<CircuitCanvas>(
             CircuitProperty, ActiveToolProperty, SelectedComponentProperty,
-            ZoomProperty, GridSizeProperty, ShowGridProperty, PendingItemProperty,
+            ZoomProperty, GridSizeProperty, ShowGridProperty, PendingItemProperty, ShowHoverDetailsProperty,
             ShowInteractiveMarkersProperty);
     }
 
@@ -325,16 +339,22 @@ public class CircuitCanvas : Control
 
         var canvas = new AvaloniaSymbolCanvas(context);
 
-        using var _ = canvas.PushTransform(
-            Matrix.CreateScale(Zoom, Zoom) * Matrix.CreateTranslation(_panOffset.X, _panOffset.Y));
+        using (canvas.PushTransform(
+                   Matrix.CreateScale(Zoom, Zoom) * Matrix.CreateTranslation(_panOffset.X, _panOffset.Y)))
+        {
+            CircuitRenderer.Draw(canvas, circuit,
+                new CircuitRenderOptions(Zoom, SelectedComponent, ShowInteractiveMarkers));
 
-        CircuitRenderer.Draw(canvas, circuit,
-            new CircuitRenderOptions(Zoom, SelectedComponent, ShowInteractiveMarkers));
+            // Editing aids rather than part of the circuit, so they stay here and out of an export.
+            DrawTerminals(canvas, circuit);
+            DrawWireInProgress(canvas);
+            DrawSelectionBand(canvas);
+        }
 
-        // Editing aids rather than part of the circuit, so they stay here and out of an export.
-        DrawTerminals(canvas, circuit);
-        DrawWireInProgress(canvas);
-        DrawSelectionBand(canvas);
+        // Outside the transform, and deliberately: the card is a fixed size on the screen rather
+        // than part of the drawing, so it does not shrink as you zoom out of the circuit it is
+        // describing. Being here also keeps it out of an export, like the grid.
+        DrawHoverCard(context);
     }
 
     /// <summary>The band as a rectangle, however it was dragged — up, down, left or right.</summary>
@@ -356,6 +376,22 @@ public class CircuitCanvas : Control
         var pen = CanvasTheme.Pen(CanvasTheme.SelectionBrush, 1.5, Zoom, new DashStyle([4, 3], 0));
 
         canvas.DrawRectangle(null, pen, band);
+    }
+
+    /// <summary>
+    /// Describes the part under the pointer without selecting it.
+    /// <para>
+    /// Drawn outside the world transform, and deliberately: the card is a fixed size on the
+    /// screen rather than part of the drawing, so it does not shrink as you zoom out of the
+    /// circuit it is describing. Being here also keeps it out of an export, like the grid.
+    /// </para>
+    /// </summary>
+    private void DrawHoverCard(DrawingContext context)
+    {
+        if (!ShowHoverDetails || _hoverComponent is not { } component) return;
+        if (_isPanning || _isBanding || _isDraggingComponent) return;
+
+        HoverCard.Draw(context, ComponentSummary.For(component), _hoverPointer, Bounds.Size);
     }
 
     private void DrawGrid(DrawingContext context)
@@ -591,8 +627,21 @@ public class CircuitCanvas : Control
         _hoverTerminal = TerminalAt(world);
         _wireCursor = Snap(world);
 
-        if (!ReferenceEquals(previousHover, _hoverTerminal) || _wireStart is not null)
+        // The card is for resting the pointer on a part, so it stays out of the way of anything
+        // being done with the pointer held down, and out of the way of a pin about to be wired.
+        var previousComponent = _hoverComponent;
+        var quiet = ActiveTool == EditorTool.Select && _hoverTerminal is null && PendingItem is null;
+
+        _hoverComponent = quiet ? ComponentAt(world) : null;
+        _hoverPointer = screen;
+
+        if (!ReferenceEquals(previousHover, _hoverTerminal)
+            || !ReferenceEquals(previousComponent, _hoverComponent)
+            || (_hoverComponent is not null && ShowHoverDetails)
+            || _wireStart is not null)
+        {
             InvalidateVisual();
+        }
 
         Cursor = new Cursor(ActiveTool switch
         {
@@ -607,9 +656,20 @@ public class CircuitCanvas : Control
         base.OnPointerMoved(e);
     }
 
+    protected override void OnPointerExited(PointerEventArgs e)
+    {
+        _hoverComponent = null;
+        _hoverTerminal = null;
+
+        InvalidateVisual();
+        base.OnPointerExited(e);
+    }
+
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
         Focus();
+
+        _hoverComponent = null;
 
         var screen = e.GetPosition(this);
         var world = ScreenToWorld(screen);

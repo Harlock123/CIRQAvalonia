@@ -24,30 +24,6 @@ public sealed partial class InspectorViewModel : ObservableObject
         nameof(CircuitComponent.Terminals),
     ];
 
-    /// <summary>Units inferred from the property name, so values display as "4.7k&#937;" or "100nF".</summary>
-    private static readonly (string Suffix, string Unit)[] UnitHints =
-    [
-        ("Resistance", "Ω"),
-        ("Capacitance", "F"),
-        ("Inductance", "H"),
-        ("Frequency", "Hz"),
-        ("Voltage", "V"),
-        ("Current", "A"),
-        ("Delay", "s"),
-        ("Time", "s"),
-        ("Temperature", "°C"),
-        ("SlewRate", "V/s"),
-        ("Vcc", "V"),
-        ("Vih", "V"),
-        ("Vil", "V"),
-        ("Voh", "V"),
-        ("Vol", "V"),
-        ("Drop", "V"),
-        ("Threshold", "V"),
-        ("High", "V"),
-        ("Low", "V"),
-    ];
-
     [ObservableProperty]
     public partial CircuitComponent? Component { get; set; }
 
@@ -100,7 +76,7 @@ public sealed partial class InspectorViewModel : ObservableObject
                      .Where(p => !Excluded.Contains(p.Name))
                      .OrderBy(p => p.Name))
         {
-            Add(Parameters, Build(component, property, Humanise(property.Name)));
+            Add(Parameters, Build(component, property, ParameterNaming.Humanise(property.Name)));
         }
 
         foreach (var terminal in component.Terminals)
@@ -129,7 +105,7 @@ public sealed partial class InspectorViewModel : ObservableObject
         var effective = underlying ?? type;
 
         if (effective == typeof(double) || effective == typeof(int))
-            return new NumericParameterViewModel(component, property, label, UnitFor(property.Name), isNullable);
+            return new NumericParameterViewModel(component, property, label, ParameterNaming.UnitFor(property.Name), isNullable);
 
         if (effective == typeof(bool))
             return new BooleanParameterViewModel(component, property, label);
@@ -160,25 +136,6 @@ public sealed partial class InspectorViewModel : ObservableObject
             : null;
     }
 
-    private static string UnitFor(string propertyName)
-    {
-        foreach (var (suffix, unit) in UnitHints)
-            if (propertyName.Contains(suffix, StringComparison.OrdinalIgnoreCase))
-                return unit;
-        return string.Empty;
-    }
-
-    /// <summary>Turns "AmplitudePeakToPeak" into "Amplitude Peak To Peak".</summary>
-    private static string Humanise(string name)
-    {
-        var result = new System.Text.StringBuilder(name.Length + 8);
-        for (var i = 0; i < name.Length; i++)
-        {
-            if (i > 0 && char.IsUpper(name[i]) && !char.IsUpper(name[i - 1])) result.Append(' ');
-            result.Append(name[i]);
-        }
-        return result.ToString();
-    }
 }
 
 /// <summary>A read-only pin listing shown under the editable parameters.</summary>

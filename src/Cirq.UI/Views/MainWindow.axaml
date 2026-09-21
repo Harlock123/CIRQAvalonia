@@ -73,6 +73,9 @@
         <MenuItem Header="Mark _Interactive Parts" ToggleType="CheckBox"
                   IsChecked="{Binding ShowInteractiveMarkers, Mode=TwoWay}"
                   ToolTip.Tip="Ring the parts you can operate by double-clicking them" />
+        <MenuItem Header="Describe Parts on _Hover" ToggleType="CheckBox"
+                  IsChecked="{Binding ShowHoverDetails, Mode=TwoWay}"
+                  ToolTip.Tip="Rest the pointer on a part to see its name, type and settings" />
         <Separator />
         <MenuItem Header="Component _Palette" InputGesture="F9" ToggleType="CheckBox"
                   IsChecked="{Binding IsPaletteExpanded, Mode=TwoWay}" />
@@ -224,6 +227,7 @@
                                 PendingItem="{Binding PendingItem, Mode=TwoWay}"
                                 ShowGrid="{Binding ShowGrid}"
                                 ShowInteractiveMarkers="{Binding ShowInteractiveMarkers}"
+                                ShowHoverDetails="{Binding ShowHoverDetails}"
                                 SnapToGrid="{Binding SnapToGrid}"
                                 GridSize="{Binding GridSize}" />
 

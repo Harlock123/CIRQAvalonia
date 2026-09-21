@@ -32,7 +32,7 @@ Core ← Engine ← Components ← UI, which keeps the whole engine headless-tes
 
 ```bash
 dotnet run --project src/Cirq.UI     # the editor
-dotnet test                          # 1890 tests
+dotnet test                          # 1904 tests
 ./scripts/build-guide.sh             # the user guide as a PDF
 ```
 
@@ -257,6 +257,7 @@ Tests measure the solver against closed-form answers rather than recorded output
 | Settings | Theme round-trips across a restart, corrupt and newer-format preference files fall back to defaults, opening the dialog writes nothing, choosing a theme saves immediately |
 | UI | Background transport, probe decimation, reflection-built inspector, dirty tracking, every example compiles, runs, saves and reopens, and both grouped lists opening one group at a time — starting closed, the open one closing as the next opens, bulk toggles exempt, and a search opening everything it matched and restoring the open group when cleared |
 | Copy and paste | A duplicate carrying every parameter including the model on an op-amp and the input count on a gate, its own designator and identity, a clipboard that survives the original being edited or deleted, repeated pastes cascading rather than stacking, an undoable paste, and every one of the 164 palette parts surviving the round trip |
+| Hover cards | A part described where it sits — designator, type, value, settings in operable-first order, a long list cut with a count, an oversized value shortened, the violations behind a red ring carried as words, and every one of the 164 palette parts describable without throwing |
 | Box selection | A part caught only when wholly inside the box and not when clipped, captions excluded from the test, a group copying with the wires between its members and without the ones leaving it, the copy keeping its shape, two pastes giving two separately wired groups, and a copied divider solving to the same midpoint voltage as the original |
 | Example browser | Every example filed under exactly one group and no group left empty or enormous, the flattened list carrying the group each came from, opening with something already described, searching narrowing to what matches across name, description and group, a search opening whatever it matched, an empty result saying so, selecting one row unmarking the rest, and opening and cancelling each closing with and without a choice |
 | Audio files | A WAV surviving a round trip to sixteen-bit accuracy, loud samples clipped rather than wrapped, 8/16/24/32-bit and stereo files read, a speaker's recording landing on a fixed grid at the frequency and level fed to it whatever the solver did, a microphone playing a clip instead of its tone, an unreadable file reported rather than thrown, and a clip going in one end of an LM386 and coming out the other carrying the gain |
