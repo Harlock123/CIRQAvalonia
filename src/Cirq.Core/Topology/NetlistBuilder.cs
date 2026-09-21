@@ -7,6 +7,14 @@ public static class NetlistBuilder
 {
     public static Netlist Build(IEnumerable<CircuitComponent> components, IEnumerable<WireSegment> wires)
     {
+        // Blocks are opened out before anything else happens. From here down there is no
+        // hierarchy: a subcircuit's contents are simply more components and more wires, which is
+        // exactly what makes a block as accurate as the same parts drawn loose.
+        var top = components.ToList();
+
+        components = Flattening.Flatten(top).ToList();
+        wires = Flattening.FlattenWires(top, wires).ToList();
+
         var terminals = components.SelectMany(c => c.Terminals).ToList();
         var parent = new Dictionary<Terminal, Terminal>();
         foreach (var t in terminals) parent[t] = t;
@@ -42,6 +50,15 @@ public static class NetlistBuilder
                 throw new CircuitTopologyException(
                     $"Wire {w.Id} references terminal '{w.TargetTerminal}' whose component is not in the circuit.");
             Union(w.SourceTerminal, w.TargetTerminal);
+        }
+
+        // Each port joins its pin on the outside to its terminal on the inside. They are the same
+        // point; the block is only a line drawn round part of the drawing.
+        foreach (var (outer, inner) in Flattening.Ports(top))
+        {
+            if (!parent.ContainsKey(outer) || !parent.ContainsKey(inner)) continue;
+
+            Union(outer, inner);
         }
 
         // Then the labels. Every terminal carrying the same name is one net, however far apart

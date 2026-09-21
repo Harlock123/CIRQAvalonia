@@ -48,6 +48,12 @@ public sealed class SimulationState
     /// <summary>Thermal voltage kT/q at the configured temperature.</summary>
     public double ThermalVoltage => PhysicalConstants.Boltzmann * Settings.TemperatureKelvin / PhysicalConstants.ElementaryCharge;
 
+    /// <summary>
+    /// The circuit's temperature in Kelvin. Every junction reads it, so it is a property of the
+    /// run rather than of any one part — which is what "ambient" means.
+    /// </summary>
+    public double TemperatureKelvin => Settings.TemperatureKelvin;
+
     public bool IsTransient => Mode == AnalysisMode.Transient;
 
     /// <summary>

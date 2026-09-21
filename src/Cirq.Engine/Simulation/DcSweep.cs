@@ -22,12 +22,31 @@ namespace Cirq.Engine.Simulation;
 /// <param name="Stop">Last value.</param>
 /// <param name="Points">How many values, counting both ends. Two or more.</param>
 public sealed record SweepTarget(
-    CircuitComponent Component,
+    CircuitComponent? Component,
     string PropertyName,
     double Start,
     double Stop,
     int Points = 51)
 {
+    /// <summary>
+    /// The property name that means the circuit's temperature rather than any part's setting.
+    /// </summary>
+    public const string TemperatureProperty = "#temperature";
+
+    /// <summary>
+    /// A target that sweeps the whole circuit's temperature, in degrees Celsius.
+    /// <para>
+    /// Temperature is not a property of any one part — every junction in the circuit reads it at
+    /// once — so it cannot be reached by the reflection the other targets use. It is the same
+    /// sweep otherwise, and it is the one that shows why a bandgap reference exists.
+    /// </para>
+    /// </summary>
+    public static SweepTarget OverTemperature(double startCelsius, double stopCelsius, int points = 51) =>
+        new(null, TemperatureProperty, startCelsius, stopCelsius, points);
+
+    /// <summary>True when this sweeps the circuit's temperature rather than a part.</summary>
+    public bool IsTemperature => Component is null && PropertyName == TemperatureProperty;
+
     /// <summary>The values this target works out to, first to last inclusive.</summary>
     public IReadOnlyList<double> Values()
     {
@@ -41,7 +60,7 @@ public sealed record SweepTarget(
     }
 
     /// <summary>What to call this on an axis, e.g. "V1 Voltage".</summary>
-    public string Label => $"{Component.Name} {PropertyName}";
+    public string Label => IsTemperature ? "Temperature (°C)" : $"{Component!.Name} {PropertyName}";
 
     /// <summary>
     /// The property itself, or null when the component has no such writable number. Resolved once
@@ -49,6 +68,8 @@ public sealed record SweepTarget(
     /// </summary>
     public PropertyInfo? Resolve()
     {
+        if (IsTemperature || Component is null) return null;
+
         var property = Component.GetType().GetProperty(
             PropertyName, BindingFlags.Public | BindingFlags.Instance);
 
@@ -141,23 +162,27 @@ public sealed class DcSweep
     /// </summary>
     public DcSweepResult Run(DcSweepRequest request, CancellationToken cancellationToken = default)
     {
-        var primary = request.Primary.Resolve()
-            ?? throw new ArgumentException(
-                $"'{request.Primary.Component.Name}' has no writable number called " +
+        var primary = request.Primary.IsTemperature ? null : request.Primary.Resolve();
+
+        if (!request.Primary.IsTemperature && primary is null)
+            throw new ArgumentException(
+                $"'{request.Primary.Component?.Name}' has no writable number called " +
                 $"'{request.Primary.PropertyName}' to sweep.", nameof(request));
 
-        var stepProperty = request.Step?.Resolve();
+        var stepProperty = request.Step is null || request.Step.IsTemperature
+            ? null
+            : request.Step.Resolve();
 
-        if (request.Step is not null && stepProperty is null)
+        if (request.Step is not null && !request.Step.IsTemperature && stepProperty is null)
             throw new ArgumentException(
-                $"'{request.Step.Component.Name}' has no writable number called " +
+                $"'{request.Step.Component?.Name}' has no writable number called " +
                 $"'{request.Step.PropertyName}' to step.", nameof(request));
 
         var x = request.Primary.Values();
         var stepValues = request.Step?.Values() ?? [double.NaN];
 
-        var primaryWas = Read(primary, request.Primary.Component);
-        var stepWas = stepProperty is null ? 0.0 : Read(stepProperty, request.Step!.Component);
+        var primaryWas = ReadKnob(request.Primary, primary);
+        var stepWas = request.Step is null ? 0.0 : ReadKnob(request.Step, stepProperty);
 
         List<DcSweepCurve> curves = [];
 
@@ -167,9 +192,9 @@ public sealed class DcSweep
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                if (stepProperty is not null)
+                if (request.Step is not null && !double.IsNaN(stepValue))
                 {
-                    Write(stepProperty, request.Step!.Component, stepValue);
+                    WriteKnob(request.Step, stepProperty, stepValue);
 
                     // A new curve starts somewhere else entirely, so the previous curve's last
                     // point is a poor guess. Beginning from scratch costs one slow solve and
@@ -177,13 +202,13 @@ public sealed class DcSweep
                     _simulator.System.ResetSolution();
                 }
 
-                curves.Add(SweepOnce(primary, request.Primary.Component, x, stepValue, cancellationToken));
+                curves.Add(SweepOnce(request.Primary, primary, x, stepValue, cancellationToken));
             }
         }
         finally
         {
-            Write(primary, request.Primary.Component, primaryWas);
-            if (stepProperty is not null) Write(stepProperty, request.Step!.Component, stepWas);
+            WriteKnob(request.Primary, primary, primaryWas);
+            if (request.Step is not null) WriteKnob(request.Step, stepProperty, stepWas);
 
             // Back to the circuit's own operating point, whatever happened during the sweep.
             _simulator.System.ResetSolution();
@@ -194,8 +219,8 @@ public sealed class DcSweep
     }
 
     private DcSweepCurve SweepOnce(
-        PropertyInfo property,
-        CircuitComponent component,
+        SweepTarget target,
+        PropertyInfo? property,
         IReadOnlyList<double> x,
         double stepValue,
         CancellationToken cancellationToken)
@@ -207,7 +232,7 @@ public sealed class DcSweep
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            Write(property, component, point);
+            WriteKnob(target, property, point);
 
             var solved = TrySolve();
 
@@ -241,6 +266,28 @@ public sealed class DcSweep
             _simulator.System.ResetSolution();
             return false;
         }
+    }
+
+    /// <summary>
+    /// Reads whatever a target points at — a part's property, or the circuit's temperature.
+    /// </summary>
+    private double ReadKnob(SweepTarget target, PropertyInfo? property)
+    {
+        if (target.IsTemperature)
+            return _simulator.Settings.TemperatureKelvin - 273.15;
+
+        return property is null ? 0.0 : Convert.ToDouble(property.GetValue(target.Component) ?? 0.0);
+    }
+
+    private void WriteKnob(SweepTarget target, PropertyInfo? property, double value)
+    {
+        if (target.IsTemperature)
+        {
+            _simulator.Settings.TemperatureKelvin = value + 273.15;
+            return;
+        }
+
+        if (property is not null) Write(property, target.Component!, value);
     }
 
     private static double Read(PropertyInfo property, CircuitComponent component) =>

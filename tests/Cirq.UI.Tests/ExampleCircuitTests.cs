@@ -144,7 +144,13 @@ public class ExampleCircuitTests
             var component = item.Create();
             viewModel.Circuit.Add(component);
             Assert.False(string.IsNullOrWhiteSpace(component.Name), $"{item.Name} was placed unnamed.");
-            Assert.NotEmpty(component.Terminals);
+
+            // Everything electrical has pins. Annotations are the exception and are meant to be:
+            // a note that can be wired to is a note somebody will wire something to.
+            if (component is Cirq.Core.Topology.IAnnotation)
+                Assert.Empty(component.Terminals);
+            else
+                Assert.NotEmpty(component.Terminals);
         }
 
         // Reference designators must be unique so the netlist can be read.

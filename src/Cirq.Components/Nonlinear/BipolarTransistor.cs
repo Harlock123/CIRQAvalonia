@@ -20,8 +20,28 @@ public sealed record BjtModel(
     double ForwardBeta,
     double ReverseBeta,
     double EarlyVoltage,
-    double EmissionCoefficient = 1.0)
+    double EmissionCoefficient = 1.0,
+    double EnergyGap = 1.11,
+    double TemperatureExponent = 3.0,
+    double BetaTemperatureExponent = 1.5)
 {
+    /// <summary>
+    /// Saturation current at a temperature. This is what makes V<sub>BE</sub> fall about two
+    /// millivolts a degree at a fixed collector current — the fact every bias network, every
+    /// current mirror and every bandgap reference is built around.
+    /// </summary>
+    public double SaturationCurrentAt(double kelvin) =>
+        JunctionTemperature.SaturationCurrentAt(
+            SaturationCurrent, kelvin, EmissionCoefficient, EnergyGap, TemperatureExponent);
+
+    /// <summary>
+    /// Forward gain at a temperature. Beta climbs as the part warms, which is one of the reasons
+    /// a bias network that depends on it is a bias network that drifts — and part of why the
+    /// emitter-resistor arrangement that does not depend on it is the one everybody uses.
+    /// </summary>
+    public double ForwardBetaAt(double kelvin) =>
+        JunctionTemperature.BetaAt(ForwardBeta, kelvin, BetaTemperatureExponent);
+
     public static readonly BjtModel N2N3904 = new("2N3904", BjtPolarity.Npn, 6.734e-15, 200, 4, 74);
     public static readonly BjtModel N2N2222 = new("2N2222", BjtPolarity.Npn, 3.0e-14, 200, 3, 75);
     public static readonly BjtModel Bc547 = new("BC547", BjtPolarity.Npn, 7.05e-15, 250, 5, 62);
@@ -125,7 +145,8 @@ public partial class BipolarTransistor : CircuitComponent, ICurrentReporting
 
         var polarity = Polarity;
         var vt = state.ThermalVoltage * Model.EmissionCoefficient;
-        var vCritical = Junction.CriticalVoltage(Model.SaturationCurrent, vt);
+        var saturation = Model.SaturationCurrentAt(state.TemperatureKelvin);
+        var vCritical = Junction.CriticalVoltage(saturation, vt);
 
         // Mirror into NPN convention, then limit each junction against its previous iterate.
         var rawVbe = polarity * system.IterationVoltageAcross(b, e);
@@ -140,10 +161,10 @@ public partial class BipolarTransistor : CircuitComponent, ICurrentReporting
         _vbe = vbe;
         _vbc = vbc;
 
-        var (forward, gForward) = Junction.Evaluate(vbe, Model.SaturationCurrent, vt);
-        var (reverse, gReverse) = Junction.Evaluate(vbc, Model.SaturationCurrent, vt);
+        var (forward, gForward) = Junction.Evaluate(vbe, saturation, vt);
+        var (reverse, gReverse) = Junction.Evaluate(vbc, saturation, vt);
 
-        var bf = Math.Max(Model.ForwardBeta, 1e-3);
+        var bf = Math.Max(Model.ForwardBetaAt(state.TemperatureKelvin), 1e-3);
         var br = Math.Max(Model.ReverseBeta, 1e-3);
 
         var ic = forward - reverse - reverse / br;
@@ -197,10 +218,10 @@ public partial class BipolarTransistor : CircuitComponent, ICurrentReporting
         _vbe = polarity * (system.NodeVoltage(Base) - system.NodeVoltage(Emitter));
         _vbc = polarity * (system.NodeVoltage(Base) - system.NodeVoltage(Collector));
 
-        var (forward, _) = Junction.Evaluate(_vbe, Model.SaturationCurrent, vt);
-        var (reverse, _) = Junction.Evaluate(_vbc, Model.SaturationCurrent, vt);
+        var (forward, _) = Junction.Evaluate(_vbe, Model.SaturationCurrentAt(state.TemperatureKelvin), vt);
+        var (reverse, _) = Junction.Evaluate(_vbc, Model.SaturationCurrentAt(state.TemperatureKelvin), vt);
 
-        var bf = Math.Max(Model.ForwardBeta, 1e-3);
+        var bf = Math.Max(Model.ForwardBetaAt(state.TemperatureKelvin), 1e-3);
         var br = Math.Max(Model.ReverseBeta, 1e-3);
 
         var transport = forward - reverse - reverse / br;

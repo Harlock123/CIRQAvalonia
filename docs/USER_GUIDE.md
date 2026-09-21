@@ -26,15 +26,18 @@ the [README](../README.md), and what changed between releases is in the
 14. [Reading a bus](#reading-a-bus)
 15. [Measuring between two points, and measuring power](#measuring-between-two-points-and-measuring-power)
 16. [Will it work with the parts you can buy](#will-it-work-with-the-parts-you-can-buy)
-17. [Naming a net instead of drawing it](#naming-a-net-instead-of-drawing-it)
-18. [Checking the circuit](#checking-the-circuit)
-19. [Development boards](#development-boards)
-20. [Saving and loading](#saving-and-loading)
-21. [Exporting](#exporting)
-22. [Appearance](#appearance)
-23. [What version is this](#what-version-is-this)
-24. [Keyboard reference](#keyboard-reference)
-25. [When a circuit will not simulate](#when-a-circuit-will-not-simulate)
+17. [Temperature](#temperature)
+18. [Writing on the schematic](#writing-on-the-schematic)
+19. [Drawing part of a circuit as one block](#drawing-part-of-a-circuit-as-one-block)
+20. [Naming a net instead of drawing it](#naming-a-net-instead-of-drawing-it)
+21. [Checking the circuit](#checking-the-circuit)
+22. [Development boards](#development-boards)
+23. [Saving and loading](#saving-and-loading)
+24. [Exporting](#exporting)
+25. [Appearance](#appearance)
+26. [What version is this](#what-version-is-this)
+27. [Keyboard reference](#keyboard-reference)
+28. [When a circuit will not simulate](#when-a-circuit-will-not-simulate)
 
 This guide is also attached to every [release](../../releases) as a PDF, with a contents page and
 the screenshots in place — the same document, laid out for reading away from the machine. Build it
@@ -80,13 +83,13 @@ at the window edge; click the rail to bring it back.
 
 Click a palette entry, then click the canvas. The part lands where you click, snapped to the grid.
 
-The palette holds **180 components in 16 categories**:
+The palette holds **183 components in 16 categories**:
 
 | Category | Count | Contents |
 | --- | --- | --- |
 | Passive | 11 | Resistor, capacitor, electrolytic capacitor, inductor, transformer, centre-tapped transformer, potentiometer, crystal, ferrite bead, **common-mode choke** and transmission line — see [below](#common-mode-chokes) |
 | Switches | 4 | SPST, SPDT, push button, **8-way DIP switch** |
-| Sources | 8 | Ground, **net label**, DC voltage, DC current, function generator, battery, solar cell, **noise source** — see [below](#naming-a-net-instead-of-drawing-it) |
+| Sources | 11 | Ground, **net label**, DC voltage, DC current, function generator, battery, solar cell, **noise source**, and the three **annotations** — note, heading and area — see [below](#writing-on-the-schematic) |
 | Semiconductors | 13 | 1N4148, 1N4001, Schottky, zeners, **varactor**, **photodiode**, bridge rectifier, SCR, triac, diac, TVS and varistor — see [below](#three-ways-to-measure-light) |
 | Transistors | 11 | NPN and PNP bipolars, N- and P-channel MOSFETs, three JFETs and an **IGBT** — see [below](#the-igbt) |
 | LEDs & Displays | 9 | Six LED colours, seven-segment displays, **HD44780 character LCD** — see [below](#the-character-lcd) |
@@ -3038,6 +3041,123 @@ once; and any filter, whose corner is the same product.
 
 ---
 
+## Temperature
+
+**Simulate > Conditions...** sets the temperature the whole circuit is at. It is saved with the
+file, so a circuit built to show what happens at 85 °C is still at 85 °C when it is opened again,
+and **Simulate > DC Sweep** can sweep it like any other parameter.
+
+Every semiconductor junction reads it, which is why it is one number rather than a property on
+each part. What moves:
+
+- **A silicon diode's forward drop falls about 2 mV/°C.** At a fixed 1 mA a 1N4148 sits at 585 mV
+  at 27 °C, 717 mV at −40 °C and 384 mV at 125 °C. That coefficient is the reason a diode makes a
+  perfectly good thermometer, and the reason every bias circuit that has to hold still over
+  temperature is built around cancelling it.
+- **Saturation current roughly doubles every ten degrees.** This is the same fact from the other
+  side, and it is the one that catches people: a reverse-leakage measurement taken on the bench
+  says almost nothing about the same part in a hot enclosure.
+- **A bipolar's V<sub>BE</sub> falls and its gain climbs.** Beta on a 2N3904 goes from about 145 at
+  −40 °C to about 315 at 125 °C. Both are reasons a bias network that depends on beta is a bias
+  network that drifts, and why the emitter-resistor arrangement that does not is the one everybody
+  uses.
+- **A Schottky falls more gently**, about 1.5 mV/°C, and **LEDs fall faster** — 2.3 mV/°C for a red
+  one and 3.5 for a blue.
+
+### The sign is the whole point
+
+It is worth saying why this is a section rather than a footnote. The thermal voltage *kT/q* rises
+with temperature, obviously and unarguably. A model that varies only that makes a diode's forward
+drop **rise** by about two millivolts a degree — and a real diode's **falls** by about two
+millivolts a degree. The sign is opposite because the saturation current is moving at the same
+time and moving harder. Get one without the other and the answer is not approximately right; it is
+backwards.
+
+With both in place the textbook result falls out of the arithmetic rather than being asserted into
+it: `dVf/dT ≈ (Vf − Eg − 3·Vt) / T`, which for a silicon junction at 0.6 V is −1.99 mV/°C.
+
+### Which parts carry it
+
+Everything built on a semiconductor junction: diodes of every kind — signal, rectifier, Schottky,
+zener, LED — and bipolar transistors, and therefore everything built out of those, from bridge
+rectifiers to optocouplers to Darlington arrays.
+
+**Not everything else.** MOSFET thresholds, op-amp offsets, regulator references and the TL431 do
+not yet move with temperature, and the honest consequence is that they come out of a temperature
+sweep as dead straight lines. That is the model being silent, not the part being stable — a real
+TL431 drifts a few tens of millivolts over the range, and a real MOSFET's threshold falls about
+2 mV/°C like everything else. Do not read flatness in those as a result.
+
+### Worth trying
+
+Sweep the temperature of the **Transistor Switch** example and watch the bias move — that one is
+all diode and bipolar, so all of it is real. Any zener reference shows its own drift for the same
+reason. And a diode fed from a current source is a thermometer: sweep the temperature with a
+voltage probe on it and you have plotted the calibration curve.
+
+---
+
+## Writing on the schematic
+
+Three entries in **Sources** put text on the drawing rather than parts in the circuit.
+
+- **Note** — a block of text. Long text wraps; line breaks you type are kept.
+- **Heading** — the same thing drawn larger, for naming a section.
+- **Area** — a labelled dashed box, drawn *behind* everything, for grouping a region visually.
+
+They connect to nothing, stamp nothing and cannot change an answer. They stay out of the bill of
+materials and the rule check has nothing to say about them. What they do is put the explanation and
+the circuit on the same piece of paper — "this divider sets the threshold", "probe here", "R7 is
+deliberately ten times the others" — and exports carry them, so a schematic saved as a PNG or a PDF
+arrives with its own commentary instead of needing a caption written somewhere else.
+
+A note is deliberately drawn with no border and no background. A note that looks like a component
+is a note somebody will try to wire something to.
+
+---
+
+## Drawing part of a circuit as one block
+
+Select two or more parts and press **Ctrl+G** (or **Edit > Group into Block**). They become one
+symbol with a pin wherever a wire crossed the boundary. **Ctrl+Shift+G** puts them back.
+
+Past a certain size a drawing stops being readable however neatly it is routed, and the answer
+everywhere in engineering is to draw the parts that belong together as one thing and say what it
+does rather than how. A power supply, an input stage, one channel of something there are four of —
+each is a page of detail that is not the point when you are looking at the whole.
+
+### It changes nothing about the circuit
+
+Before anything is solved the hierarchy is **flattened**: the block's contents join everything else
+in one netlist, with each pin and the terminal inside it treated as the same point. A block is
+exactly as accurate as the same parts drawn loose, because it *is* the same parts. Group a divider
+and its midpoint reads the same to the last decimal place.
+
+That is not just a claim about the maths, either. Grouping **moves** the parts inside rather than
+copying them, so:
+
+- a probe attached to something that ends up inside a block goes on reading it;
+- whatever state a part had carries on;
+- ungrouping gives back the *same* parts, not lookalikes.
+
+### The pins
+
+A wire with both ends in the selection goes inside. A wire with neither stays outside. A wire with
+one end in it is crossing the boundary, and that is where a pin goes. Two wires landing on the same
+inner terminal share one pin, because they are one net.
+
+Pins are named after where they came from — `R1.A`, `U2.OUT` — which is far more use from outside
+than P1 through P6.
+
+### Editing the inside
+
+Ungroup it, change it, group it again. There is no separate window for the inside of a block, and
+the round trip is lossless.
+
+Blocks can contain blocks, and the flattening is recursive.
+
+---
+
 ## Naming a net instead of drawing it
 
 Past a certain size a schematic has signals that go everywhere — a supply rail, a reset line, a
@@ -3337,6 +3457,7 @@ Also available in the app at **Help > Keyboard Shortcuts**.
 | `R` | Rotate selection |
 | Drag on empty canvas | Box-select everything wholly inside it |
 | `Ctrl` `C` / `Ctrl` `V` | Copy the selection / paste a duplicate of it |
+| `Ctrl` `G` / `Ctrl` `Shift` `G` | Group the selection into a block / ungroup one |
 | `Ctrl` `Z` / `Ctrl` `Y` | Undo / redo (`Ctrl` `Shift` `Z` redoes as well) |
 | `Delete` | Delete selection |
 | `Ctrl` `+` / `Ctrl` `-` | Zoom in / out (the numeric keypad's `+` and `-` work too) |

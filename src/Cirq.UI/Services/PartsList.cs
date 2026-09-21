@@ -60,7 +60,8 @@ public static class PartsList
     /// mains secondary is part of what the drawing says, and silently dropping it would make the
     /// list disagree with the schematic beside it.
     /// </summary>
-    private static bool IsPart(CircuitComponent component) => component is not Ground;
+    private static bool IsPart(CircuitComponent component) =>
+        component is not Ground and not IAnnotation;
 
     private static string Designator(CircuitComponent component) =>
         string.IsNullOrWhiteSpace(component.Name) ? component.DesignatorPrefix + "?" : component.Name;

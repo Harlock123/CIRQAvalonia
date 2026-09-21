@@ -122,7 +122,14 @@ public static class CircuitRenderer
 
     private static void DrawComponents(ISymbolCanvas canvas, Circuit circuit, CircuitRenderOptions options)
     {
-        foreach (var component in circuit.Components)
+        // Annotations first, so a box drawn round a section ends up behind the parts in it rather
+        // than over the top of them. Ordering them here rather than sorting the circuit keeps the
+        // document's order — which is what undo and the parts list use — unchanged.
+        var ordered = circuit.Components
+            .Where(c => c is IAnnotation)
+            .Concat(circuit.Components.Where(c => c is not IAnnotation));
+
+        foreach (var component in ordered)
         {
             using (canvas.PushTransform(
                        Matrix.CreateRotation(component.RotationDegrees * Math.PI / 180.0) *
@@ -136,7 +143,9 @@ public static class CircuitRenderer
                 SymbolRenderer.Draw(canvas, component, options.Zoom, selected);
             }
 
-            DrawComponentLabels(canvas, component, options);
+            // An annotation says what it says; a designator and a value caption under it would be
+            // repeating its own text back at it under a name nobody chose.
+            if (component is not IAnnotation) DrawComponentLabels(canvas, component, options);
 
             if (options.ShowInteractiveMarkers && component is IInteractiveComponent)
                 DrawInteractiveMarker(canvas, component, options);

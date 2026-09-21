@@ -90,6 +90,7 @@ public partial class MainWindow : Window
         viewModel.RequestSpectrum += async (_, _) => await ShowSpectrumAsync();
         viewModel.RequestBusDecode += async (_, _) => await ShowBusDecodeAsync();
         viewModel.RequestMonteCarlo += async (_, _) => await ShowMonteCarloAsync();
+        viewModel.RequestConditions += async (_, _) => await ShowConditionsAsync();
         viewModel.RequestExamples += async (_, _) => await ShowExamplesAsync();
 
         // Code-drawn surfaces cannot bind to a resource, so they are told to repaint.
@@ -161,6 +162,21 @@ public partial class MainWindow : Window
         {
             DataContext = new SpectrumViewModel(_viewModel.Circuit),
         };
+
+        await dialog.ShowDialog(this);
+    }
+
+    private async Task ShowConditionsAsync()
+    {
+        if (_viewModel is null) return;
+
+        var model = new ConditionsViewModel(_viewModel.Circuit);
+
+        // Temperature is baked into the engine when it is built, so a change is a rebuild rather
+        // than something the next time point picks up.
+        model.Changed += (_, _) => _viewModel.OnConditionsChanged();
+
+        var dialog = new ConditionsWindow { DataContext = model };
 
         await dialog.ShowDialog(this);
     }

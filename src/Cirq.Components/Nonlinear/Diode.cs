@@ -83,7 +83,7 @@ public partial class Diode : TwoTerminalComponent, ICurrentReporting
         _limitedThisIteration = Math.Abs(vd - raw) > 1e-12;
         _previousJunctionVoltage = vd;
 
-        var (current, conductance) = Evaluate(vd, vt);
+        var (current, conductance) = Evaluate(vd, vt, Model.SaturationCurrentAt(state.TemperatureKelvin));
 
         // Companion for the junction: i = Gd·v + Ieq, linearised about vd.
         system.StampNorton(anode, bulk, conductance, current - conductance * vd);
@@ -94,7 +94,7 @@ public partial class Diode : TwoTerminalComponent, ICurrentReporting
     }
 
     /// <summary>Evaluates the model, returning the junction current and its small-signal conductance.</summary>
-    private (double Current, double Conductance) Evaluate(double vd, double vt)
+    private (double Current, double Conductance) Evaluate(double vd, double vt, double saturation)
     {
         var gmin = 1e-12;
 
@@ -106,21 +106,21 @@ public partial class Diode : TwoTerminalComponent, ICurrentReporting
             {
                 // Beyond this the exponential overflows; extrapolate along the tangent instead.
                 var e = Math.Exp(MaxExponent);
-                var g = Model.SaturationCurrent * e / vt;
-                var i = Model.SaturationCurrent * (e - 1.0) + g * (vd - MaxExponent * vt);
+                var g = saturation * e / vt;
+                var i = saturation * (e - 1.0) + g * (vd - MaxExponent * vt);
                 return (i + gmin * vd, g + gmin);
             }
 
             var exp = Math.Exp(x);
-            return (Model.SaturationCurrent * (exp - 1.0) + gmin * vd,
-                    Model.SaturationCurrent * exp / vt + gmin);
+            return (saturation * (exp - 1.0) + gmin * vd,
+                    saturation * exp / vt + gmin);
         }
 
         // Reverse breakdown: the current grows exponentially again past -Bv.
         var over = -(vd + Model.BreakdownVoltage) / vt;
         if (over > MaxExponent) over = MaxExponent;
         var expB = Math.Exp(over);
-        return (-Model.BreakdownCurrent * expB - Model.SaturationCurrent + gmin * vd,
+        return (-Model.BreakdownCurrent * expB - saturation + gmin * vd,
                 Model.BreakdownCurrent * expB / vt + gmin);
     }
 
@@ -173,7 +173,7 @@ public partial class Diode : TwoTerminalComponent, ICurrentReporting
         var vt = state.ThermalVoltage * Model.EmissionCoefficient;
 
         _junctionVoltage = junction;
-        (_current, _) = Evaluate(junction, vt);
+        (_current, _) = Evaluate(junction, vt, Model.SaturationCurrentAt(state.TemperatureKelvin));
     }
 
     public override void ResetState()

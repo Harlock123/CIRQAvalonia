@@ -520,6 +520,22 @@ public class CircuitCanvas : Control
     /// <summary>World-space bounding box of a component, including its pins.</summary>
     public static Rect BoundsOf(CircuitComponent component)
     {
+        // A block states its own size, since its pins sit on its edges rather than defining them.
+        if (component is Cirq.Components.Hierarchy.Subcircuit block)
+        {
+            return new Rect(
+                component.X - block.HalfWidth, component.Y - block.HalfHeight,
+                block.HalfWidth * 2, block.HalfHeight * 2);
+        }
+
+        // An annotation has no pins to infer a size from, so it states its own.
+        if (component is IAnnotation annotation)
+        {
+            return new Rect(
+                component.X - annotation.HalfWidth, component.Y - annotation.HalfHeight,
+                annotation.HalfWidth * 2, annotation.HalfHeight * 2);
+        }
+
         var halfWidth = 26.0;
         var halfHeight = 22.0;
 
@@ -544,6 +560,9 @@ public class CircuitCanvas : Control
     public static Rect VisualBoundsOf(CircuitComponent component)
     {
         var bounds = BoundsOf(component);
+
+        // An annotation carries no captions, so its extents are exactly its own.
+        if (component is IAnnotation) return bounds;
 
         // Captions are centred text of about eleven pixels, drawn at the label offset.
         var caption = SymbolRenderer.LabelOffset(component) + 12;

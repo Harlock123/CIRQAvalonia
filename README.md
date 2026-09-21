@@ -32,7 +32,7 @@ Core ← Engine ← Components ← UI, which keeps the whole engine headless-tes
 
 ```bash
 dotnet run --project src/Cirq.UI     # the editor
-dotnet test                          # 2197 tests
+dotnet test                          # 2262 tests
 ./scripts/build-guide.sh             # the user guide as a PDF
 ```
 
@@ -184,6 +184,19 @@ an **FFT** of whatever has been recorded; and **protocol decoding**, which reads
 I²C, SPI, UART, 1-Wire or CAN rather than as edges. The response and the FFT are easy to confuse
 and should not be: one is a measurement of the circuit, the other a measurement of a signal.
 
+The whole circuit sits at an **ambient temperature**, saved with the file and sweepable like any
+other parameter. Every semiconductor junction reads it, so it moves forward drops, transistor gains
+and leakage together — a silicon diode falls about 2 mV/°C, which is the figure every
+temperature-compensated circuit is built around. Junction-based models carry it; MOSFET
+thresholds, op-amp offsets and regulator references do not yet, and come out of a temperature sweep
+flat because the model is silent rather than because the part is stable.
+
+Part of a circuit can be drawn as a **block**: select it, press Ctrl+G, and it becomes one symbol
+with a pin wherever a wire crossed the boundary. The hierarchy is flattened before anything is
+solved, and the parts are moved inside rather than copied, so a block changes nothing — not the
+answer, not a probe attached to something inside it, and not what you get back on ungrouping.
+**Notes, headings and boxes** can be put on the drawing too, and exports carry them.
+
 Probes measure voltage, current, logic level, the **difference** between two points, or the
 **power** those two things multiply to. And **tolerance analysis** rebuilds the circuit a few
 hundred times with its parts drawn from their tolerance bands, which is the only analysis here
@@ -275,9 +288,12 @@ Tests measure the solver against closed-form answers rather than recorded output
 | Files | Every component type round-trips with its parameters, pins, wires, waypoints and probes; a reloaded circuit solves to the same answer; damaged, unknown and newer-format files are handled without losing the open circuit |
 | Settings | Theme round-trips across a restart, corrupt and newer-format preference files fall back to defaults, opening the dialog writes nothing, choosing a theme saves immediately |
 | UI | Background transport, probe decimation, reflection-built inspector, dirty tracking, every example compiles, runs, saves and reopens, and both grouped lists opening one group at a time — starting closed, the open one closing as the next opens, bulk toggles exempt, and a search opening everything it matched and restoring the open group when cleared |
-| Copy and paste | A duplicate carrying every parameter including the model on an op-amp and the input count on a gate, its own designator and identity, a clipboard that survives the original being edited or deleted, repeated pastes cascading rather than stacking, an undoable paste, and every one of the 180 palette parts surviving the round trip |
-| Hover cards | A part described where it sits — designator, type, value, settings in operable-first order, a long list cut with a count, an oversized value shortened, the violations behind a red ring carried as words, and every one of the 180 palette parts describable without throwing |
+| Copy and paste | A duplicate carrying every parameter including the model on an op-amp and the input count on a gate, its own designator and identity, a clipboard that survives the original being edited or deleted, repeated pastes cascading rather than stacking, an undoable paste, and every one of the 183 palette parts surviving the round trip |
+| Hover cards | A part described where it sits — designator, type, value, settings in operable-first order, a long list cut with a count, an oversized value shortened, the violations behind a red ring carried as words, and every one of the 183 palette parts describable without throwing |
 | Memory and SPI | A memory whose contents are typed in and read back with the circuit's own writes showing, a dump that round-trips and skips runs of zeros, a counter walking its addresses and every stored byte reaching the bus, a reset restoring the preset, a transparent latch that follows while open and holds what it saw, and an SPI converter whose code the master decodes exactly where the datasheet says |
+| Temperature | A silicon diode's forward drop falling about two millivolts a degree and a Schottky's falling less steeply, the same coefficient at both ends of the range rather than only near room temperature, LEDs falling too, saturation current roughly doubling every ten degrees, a bipolar's base-emitter voltage falling while its gain climbs by half again across the range, every parameter exactly nominal at the 27 °C the models are quoted at, a temperature sweep coming out a straight line and putting the circuit back afterwards, and a circuit carrying its own temperature through a save |
+| Blocks | Grouping part of a circuit changing what it solves to by nothing at all, and ungrouping changing it back; a pin appearing wherever a wire crossed the boundary and two wires onto one inner terminal sharing one pin; wires wholly inside moving inside; a non-linear part inside a block still solving as itself; a transient running through one unchanged; a block inside a block flattening the same way; every part appearing exactly once in the flattened list; a probe on a part that goes inside a block still reading it; and all of it surviving a save, nesting included |
+| Annotations | Notes and boxes that change no answer to the last bit, stay out of the bill of materials, wrap on words with the height following, keep explicit line breaks, size themselves where a part is sized by its pins, fall inside the bounds an export frames to, and raise nothing in the rule check |
 | Protocol decoding | Synthetic transactions decoded back to the bytes they were built from, and then the shipped examples decoded to what they actually contain: the EEPROM example's whole conversation including the restart between the write and the read and the master's deliberate NACK on the last byte, the SPI converter's answer arriving underneath the question with the ten-bit code landing where the knob is, the serial link's text, and a DS18B20's SKIP ROM and WRITE SCRATCHPAD with its three configuration bytes. Plus the refusals: a capture too coarse to decode reported rather than turned into shifted bytes, a CAN trace carrying no frame reported rather than parsed into one, a wrong bit rate caught by bit stuffing's own invariant, and the clock edge that sets up an I²C stop condition not counted as a ninth data bit |
 | Derived probes | A differential probe reading between its two points and reversing sign when they swap, a shunt high in a 24 V rail readable differentially where a plain probe sees only the rail, power as the voltage across times the current through with I²R checked both ways, a supply delivering exactly what the resistors between them dissipate, and a reference that survives a save and reload |
 | Tolerance analysis | A divider's spread staying inside what the tolerance arithmetic allows and reaching its corners, a wider band giving a wider spread, the same seed giving the same run and a different seed not, every varied part put back at its marked value, the worst departure reported as a fraction of nominal, a histogram bucketing every reading exactly once, and a bridge of four 5 % resistors reading hundreds of millivolts where nominally it reads nothing at all |
@@ -389,7 +405,7 @@ toolbar used to show: active tool, simulation speed, elapsed time and solver rat
 `Help > Keyboard Shortcuts` lists everything below, and the
 [User Guide](docs/USER_GUIDE.md) walks through building a circuit from an empty canvas.
 
-The palette holds 180 components in 16 collapsible categories:
+The palette holds 183 components in 16 collapsible categories:
 
 ![The component palette showing all sixteen categories with their counts — passive, switches, sources, semiconductors, transistors, LEDs and displays, power, analog ICs, logic gates, 74xx series, 40xx series, buses, digital I/O, sensors and actuators, switching and isolation, and dev boards — with the Passive group open](docs/images/02-palette.png)
 

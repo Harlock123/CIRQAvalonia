@@ -25,7 +25,7 @@ public class DocumentedAnalysisTests
         var model = new DcSweepViewModel(vm.Circuit);
 
         model.Sweep = model.Options.Single(o =>
-            o.Component.Name == part && o.PropertyName == property);
+            o.Component?.Name == part && o.PropertyName == property);
 
         model.Start = start;
         model.Stop = stop;

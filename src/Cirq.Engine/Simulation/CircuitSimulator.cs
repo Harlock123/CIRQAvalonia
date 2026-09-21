@@ -68,7 +68,9 @@ public sealed class CircuitSimulator
         _components.Clear();
         _nonlinear.Clear();
         _breakpointSources.Clear();
-        _components.AddRange(Circuit.Components);
+        // Blocks are flattened for the solve: their contents stamp into the same matrix as
+        // everything else, and in the same order they were drawn.
+        _components.AddRange(Flattening.Flatten(Circuit.Components));
 
         Netlist = Circuit.BuildNetlist();
         if (Netlist.GroundNet is null && Netlist.NodeCount > 0)

@@ -2,6 +2,7 @@ using System.Collections.Specialized;
 using Cirq.Core.Probing;
 using Cirq.Core.Simulation;
 using Cirq.Core.Topology;
+using Cirq.Components.Hierarchy;
 using Cirq.Components.Passive;
 using Cirq.Components.Serialization;
 using Cirq.UI.Services;
@@ -452,6 +453,9 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     /// <summary>Raised when the tolerance analysis window should be opened.</summary>
     public event EventHandler? RequestMonteCarlo;
 
+    /// <summary>Raised when the run-conditions window should be opened.</summary>
+    public event EventHandler? RequestConditions;
+
     /// <summary>Raised when the example browser should be opened.</summary>
     public event EventHandler? RequestExamples;
 
@@ -517,6 +521,88 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
     [RelayCommand]
     private void DeleteSelection() => RequestDeleteSelection?.Invoke(this, EventArgs.Empty);
+
+    /// <summary>
+    /// Groups the selection into a block: one symbol on the sheet, with a pin wherever a wire
+    /// crossed the boundary.
+    /// <para>
+    /// The parts are moved inside rather than copied, so probes on them keep reading them and
+    /// ungrouping gives back the same parts. Nothing about the circuit changes — the hierarchy is
+    /// flattened before anything is solved.
+    /// </para>
+    /// </summary>
+    [RelayCommand]
+    private void GroupSelection()
+    {
+        var components = Selection();
+
+        if (components.Count < 2)
+        {
+            StatusMessage = "Select two or more parts to group into a block.";
+            return;
+        }
+
+        var block = Grouping.Group(Circuit, components, "Block");
+
+        if (block is null)
+        {
+            StatusMessage = "Those parts cannot be grouped.";
+            return;
+        }
+
+        SelectedComponent = block;
+        foreach (var component in Circuit.Components) component.IsSelected = false;
+
+        Simulation.InvalidateTopology();
+        IsModified = true;
+        RequestRedraw?.Invoke(this, EventArgs.Empty);
+
+        StatusMessage =
+            $"Grouped {Describe(block.InnerComponents.Count)} into {block.Name}, " +
+            $"with {Describe(block.Ports.Count, "pin")}";
+    }
+
+    /// <summary>
+    /// Puts a block's contents back on the sheet. This is also how you edit what is inside one:
+    /// ungroup it, change it, group it again.
+    /// </summary>
+    [RelayCommand]
+    private void UngroupSelection()
+    {
+        var block = Selection().OfType<Subcircuit>().FirstOrDefault()
+                    ?? SelectedComponent as Subcircuit;
+
+        if (block is null)
+        {
+            StatusMessage = "Select a block to ungroup.";
+            return;
+        }
+
+        var released = Grouping.Ungroup(Circuit, block);
+
+        SelectedComponent = null;
+        foreach (var component in Circuit.Components)
+            component.IsSelected = released.Contains(component);
+
+        Simulation.InvalidateTopology();
+        IsModified = true;
+        RequestRedraw?.Invoke(this, EventArgs.Empty);
+
+        StatusMessage = $"Ungrouped {Describe(released.Count)} back onto the sheet";
+    }
+
+    /// <summary>
+    /// What is selected: the band's catch if there is one, otherwise the single part the inspector
+    /// is on. The same rule copy uses.
+    /// </summary>
+    private List<CircuitComponent> Selection()
+    {
+        var components = Circuit.Components.Where(c => c.IsSelected).ToList();
+
+        if (components.Count == 0 && SelectedComponent is { } single) components.Add(single);
+
+        return components;
+    }
 
     /// <summary>The clipboard, which holds one part between a copy and a paste.</summary>
     public ComponentClipboard Clipboard { get; } = new();
@@ -647,6 +733,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         Edit
           Ctrl+Z       Undo
           Ctrl+Y       Redo (Ctrl+Shift+Z works too)
+          Ctrl+G       Group the selection into a block
+          Ctrl+Shift+G Ungroup a block back onto the sheet
 
         Tools
           V            Select
@@ -740,6 +828,22 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     /// </summary>
     [RelayCommand]
     private void ShowMonteCarlo() => RequestMonteCarlo?.Invoke(this, EventArgs.Empty);
+
+    /// <summary>
+    /// Opens the run conditions, which at present means the temperature the whole circuit is at.
+    /// </summary>
+    [RelayCommand]
+    private void ShowConditions() => RequestConditions?.Invoke(this, EventArgs.Empty);
+
+    /// <summary>
+    /// Called when a run condition changes. It is a change to the document as much as a change to
+    /// the engine — a circuit saved at 85 °C should reopen at 85 °C — so it marks the file dirty.
+    /// </summary>
+    public void OnConditionsChanged()
+    {
+        Simulation.InvalidateTopology();
+        IsModified = true;
+    }
 
     /// <summary>
     /// Selects the parts a rule-check finding is about. The inspector follows a single one, as it

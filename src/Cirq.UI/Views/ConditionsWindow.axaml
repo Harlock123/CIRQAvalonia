@@ -1,0 +1,29 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:Cirq.UI.ViewModels"
+        x:Class="Cirq.UI.Views.ConditionsWindow"
+        x:DataType="vm:ConditionsViewModel"
+        Title="Conditions"
+        Width="520" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource PanelBackground}">
+
+  <StackPanel Margin="18" Spacing="12">
+
+    <TextBlock Text="Ambient temperature" FontWeight="SemiBold" />
+
+    <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+      <Slider Width="300" Minimum="-55" Maximum="175" TickFrequency="5" IsSnapToTickEnabled="True"
+              Value="{Binding AmbientCelsius, Mode=TwoWay}" VerticalAlignment="Center" />
+      <TextBox Width="72" Text="{Binding AmbientCelsius, Mode=TwoWay}" VerticalAlignment="Center" />
+      <TextBlock Text="°C" VerticalAlignment="Center" Opacity="0.7" />
+      <Button Content="27 °C" Command="{Binding ResetCommand}" Padding="10,4" />
+    </StackPanel>
+
+    <TextBlock Text="{Binding Note}" TextWrapping="Wrap" Opacity="0.8" />
+
+    <TextBlock TextWrapping="Wrap" Opacity="0.65" FontSize="12"
+               Text="Every semiconductor junction in the circuit reads this, so it moves diode drops, transistor gains and leakage together. It is saved with the circuit, and Simulate &gt; DC Sweep can sweep it. Press Reset afterwards to rebuild at the new temperature." />
+
+  </StackPanel>
+</Window>

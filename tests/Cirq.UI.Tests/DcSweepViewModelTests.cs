@@ -199,17 +199,44 @@ public class DcSweepViewModelTests
         Assert.Equal(1e3, top.Resistance);
     }
 
+    /// <summary>
+    /// An empty canvas still has one thing that can be swept — its temperature, which belongs to
+    /// the circuit rather than to any part — but nothing to measure, and it says so.
+    /// </summary>
     [Fact]
     public void AnEmptyCircuitIsReportedRatherThanThrown()
     {
         var model = new DcSweepViewModel(new Circuit());
 
-        Assert.False(model.HasOptions);
+        var only = Assert.Single(model.Options);
+        Assert.True(only.IsTemperature);
 
         model.Run();
 
         Assert.Empty(model.Curves);
         Assert.NotEmpty(model.Status);
+    }
+
+    [Fact]
+    public void TheCircuitsTemperatureIsOfferedAlongsideThePartsAndDefaultsToItsSpecifiedRange()
+    {
+        var (circuit, _, _) = Divider();
+
+        var model = new DcSweepViewModel(circuit);
+
+        var temperature = Assert.Single(model.Options, o => o.IsTemperature);
+
+        Assert.Equal("Circuit · Temperature", temperature.Display);
+        Assert.Equal(27.0, temperature.Current);
+
+        // Selecting it offers the range parts are specified over rather than zero to a bit above.
+        model.Sweep = temperature;
+
+        Assert.Equal(-40, model.Start);
+        Assert.Equal(125, model.Stop);
+
+        // And a source is still what it starts on, because that is what "DC sweep" means.
+        Assert.False(new DcSweepViewModel(circuit).Sweep!.IsTemperature);
     }
 }
 

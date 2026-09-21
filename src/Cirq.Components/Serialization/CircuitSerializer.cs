@@ -4,6 +4,7 @@ using System.Text.Json;
 using Cirq.Components.Digital;
 using Cirq.Core.Primitives;
 using Cirq.Core.Probing;
+using Cirq.Components.Hierarchy;
 using Cirq.Core.Topology;
 
 namespace Cirq.Components.Serialization;
@@ -117,10 +118,33 @@ public static class CircuitSerializer
             SavedUtc = DateTimeOffset.UtcNow,
         };
 
-        foreach (var component in circuit.Components)
-            document.Components.Add(ToRecord(component));
+        // Flattened: a block's contents are written out alongside everything else, and the block
+        // itself carries a small record saying which of them are its.
+        foreach (var component in Flattening.Flatten(circuit.Components))
+        {
+            var record = ToRecord(component);
 
-        foreach (var wire in circuit.Wires)
+            if (component is ISubcircuit block)
+            {
+                record.Block = new BlockRecord
+                {
+                    Components = [.. block.InnerComponents.Select(c => c.Id)],
+                    Wires = [.. block.InnerWires.Select(w => w.Id)],
+                    Ports =
+                    [
+                        .. block.Ports.Select(port => new PortRecord
+                        {
+                            Name = port.Outer.Name,
+                            Inner = Reference(port.Inner),
+                        }),
+                    ],
+                };
+            }
+
+            document.Components.Add(record);
+        }
+
+        foreach (var wire in Flattening.FlattenWires(circuit.Components, circuit.Wires))
         {
             if (wire.SourceTerminal?.Owner is null || wire.TargetTerminal?.Owner is null) continue;
 
@@ -134,6 +158,11 @@ public static class CircuitSerializer
                     : [.. wire.Waypoints.Select(p => new PointRecord(p.X, p.Y))],
             });
         }
+
+        // Only when it is not the default, so an ordinary circuit's file does not grow a line
+        // saying it is at room temperature.
+        if (Math.Abs(circuit.AmbientTemperatureCelsius - 27.0) > 1e-9)
+            document.AmbientTemperatureCelsius = circuit.AmbientTemperatureCelsius;
 
         foreach (var probe in circuit.Probes)
         {
@@ -273,16 +302,66 @@ public static class CircuitSerializer
             byId[record.Id] = placed;
         }
 
+        // Blocks get their pins back before any wire is resolved, because the wires outside a
+        // block were saved against those pins. Rebuilding them in the saved order is what makes
+        // the pin ids line up again.
+        foreach (var record in document.Components)
+        {
+            if (record.Block is not { } blockRecord) continue;
+            if (!byId.TryGetValue(record.Id, out var placed)) continue;
+            if (placed is not Subcircuit block) continue;
+
+            foreach (var port in blockRecord.Ports)
+            {
+                var inner = Resolve(port.Inner, byId, result.Warnings);
+                if (inner is null) continue;
+
+                block.AddPort(port.Name, inner);
+            }
+        }
+
+        var wiresById = new Dictionary<Guid, WireSegment>();
+
         foreach (var record in document.Wires)
         {
             var from = Resolve(record.From, byId, result.Warnings);
             var to = Resolve(record.To, byId, result.Warnings);
             if (from is null || to is null) continue;
 
-            var wire = new WireSegment { SourceTerminal = from, TargetTerminal = to };
+            var wire = new WireSegment { Id = record.Id, SourceTerminal = from, TargetTerminal = to };
             foreach (var point in record.Waypoints ?? []) wire.Waypoints.Add(new Point(point.X, point.Y));
+
             circuit.Wires.Add(wire);
+            wiresById[record.Id] = wire;
         }
+
+        // And now the contents move inside, off the sheet. Deepest blocks first, so a block that
+        // is itself inside another has already taken its own contents before it is moved.
+        foreach (var record in document.Components.AsEnumerable().Reverse())
+        {
+            if (record.Block is not { } blockRecord) continue;
+            if (!byId.TryGetValue(record.Id, out var placed)) continue;
+            if (placed is not Subcircuit block) continue;
+
+            foreach (var id in blockRecord.Components)
+            {
+                if (!byId.TryGetValue(id, out var inner)) continue;
+
+                block.AddInner(inner);
+                circuit.Components.Remove(inner);
+            }
+
+            foreach (var id in blockRecord.Wires)
+            {
+                if (!wiresById.TryGetValue(id, out var inner)) continue;
+
+                block.AddInnerWire(inner);
+                circuit.Wires.Remove(inner);
+            }
+        }
+
+        if (document.AmbientTemperatureCelsius is { } ambient)
+            circuit.AmbientTemperatureCelsius = ambient;
 
         foreach (var record in document.Probes)
         {

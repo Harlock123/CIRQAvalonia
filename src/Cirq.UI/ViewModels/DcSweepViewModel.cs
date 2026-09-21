@@ -12,17 +12,33 @@ namespace Cirq.UI.ViewModels;
 /// <summary>
 /// One thing on the canvas that can be swept: a component and one of its numbers.
 /// </summary>
-public sealed record SweepOption(CircuitComponent Component, string PropertyName, string Unit)
+public sealed record SweepOption(CircuitComponent? Component, string PropertyName, string Unit)
 {
+    /// <summary>
+    /// The circuit's temperature, which belongs to no part — every junction reads it at once — and
+    /// so cannot be found by looking at components' properties the way the rest are.
+    /// </summary>
+    public static SweepOption Temperature(Circuit circuit) =>
+        new(null, SweepTarget.TemperatureProperty, "°C") { Circuit = circuit };
+
+    /// <summary>Set only on the temperature option, so it can read the circuit's current value.</summary>
+    public Circuit? Circuit { get; init; }
+
+    public bool IsTemperature => Component is null;
+
     /// <summary>What the picker shows, e.g. "V1 · Voltage".</summary>
-    public string Display => $"{Component.Name} · {ParameterNaming.Humanise(PropertyName)}";
+    public string Display => IsTemperature
+        ? "Circuit · Temperature"
+        : $"{Component!.Name} · {ParameterNaming.Humanise(PropertyName)}";
 
     /// <summary>Whatever it is set to now, which is where the range defaults are taken from.</summary>
     public double Current
     {
         get
         {
-            var property = Component.GetType().GetProperty(PropertyName);
+            if (IsTemperature) return Circuit?.AmbientTemperatureCelsius ?? 27.0;
+
+            var property = Component!.GetType().GetProperty(PropertyName);
             return property is null ? 0.0 : Convert.ToDouble(property.GetValue(Component) ?? 0.0);
         }
     }
@@ -61,10 +77,15 @@ public sealed partial class DcSweepViewModel : ObservableObject
     {
         _circuit = circuit;
 
+        // Temperature first: it is the one that is not a part, and it is the sweep people come
+        // looking for once they know it is there.
+        Options.Add(SweepOption.Temperature(circuit));
+
         foreach (var option in Discover(circuit)) Options.Add(option);
 
         // A source is what anybody means by "DC sweep", so start on one if there is one.
-        Sweep = Options.FirstOrDefault(IsSource) ?? Options.FirstOrDefault();
+        Sweep = Options.FirstOrDefault(IsSource) ?? Options.FirstOrDefault(o => !o.IsTemperature)
+                ?? Options.FirstOrDefault();
 
         ResetRangeFromSelection();
     }
@@ -147,6 +168,15 @@ public sealed partial class DcSweepViewModel : ObservableObject
     {
         if (Sweep is null) return;
 
+        // The range a part is specified over, rather than zero to a bit past where it sits — a
+        // temperature sweep from 0 °C would leave out half of what makes it interesting.
+        if (Sweep.IsTemperature)
+        {
+            Start = -40;
+            Stop = 125;
+            return;
+        }
+
         var current = Sweep.Current;
 
         Start = 0;
@@ -199,11 +229,15 @@ public sealed partial class DcSweepViewModel : ObservableObject
         simulator.SolveOperatingPoint();
         simulator.ResolveProbes();
 
-        var primary = new SweepTarget(
-            Sweep.Component, Sweep.PropertyName, Start, Stop, Math.Max(Points, 2));
+        SweepTarget Build(SweepOption option, double start, double stop, int points) =>
+            option.IsTemperature
+                ? SweepTarget.OverTemperature(start, stop, Math.Max(points, 2))
+                : new SweepTarget(option.Component, option.PropertyName, start, stop, Math.Max(points, 2));
+
+        var primary = Build(Sweep, Start, Stop, Points);
 
         SweepTarget? step = IsStepping && Step is not null
-            ? new SweepTarget(Step.Component, Step.PropertyName, StepStart, StepStop, Math.Max(StepCount, 2))
+            ? Build(Step, StepStart, StepStop, StepCount)
             : null;
 
         var result = new DcSweep(simulator).Run(new DcSweepRequest(primary, step));
@@ -217,7 +251,8 @@ public sealed partial class DcSweepViewModel : ObservableObject
             // thing telling one from another.
             var label = double.IsNaN(curve.StepValue)
                 ? trace.Label
-                : $"{trace.Label} @ {Step!.Component.Name} = {SiPrefix.Format(curve.StepValue, Step.Unit)}";
+                : $"{trace.Label} @ {(Step!.IsTemperature ? "T" : Step.Component!.Name)} = " +
+                  $"{SiPrefix.Format(curve.StepValue, Step.Unit)}";
 
             Curves.Add(new SweepCurve(label, trace.Kind, result.X, trace.Values));
         }
@@ -253,7 +288,8 @@ public sealed partial class DcSweepViewModel : ObservableObject
 
             var unit = curve.Kind == ProbeKind.Current ? "A" : "V";
             parts.Add($"{curve.Label} peaks at {SiPrefix.Format(curve.Y[best], unit)} " +
-                      $"where {Sweep!.Component.Name} = {SiPrefix.Format(result.X[best], Sweep.Unit)}");
+                      $"where {(Sweep!.IsTemperature ? "T" : Sweep.Component!.Name)} = " +
+                      $"{SiPrefix.Format(result.X[best], Sweep.Unit)}");
         }
 
         if (result.FailedPoints > 0)
@@ -283,7 +319,7 @@ public sealed partial class DcSweepViewModel : ObservableObject
     }
 
     private static bool IsSource(SweepOption option) =>
-        option.Component.DesignatorPrefix is "V" or "I" &&
+        option.Component?.DesignatorPrefix is "V" or "I" &&
         option.PropertyName is "Voltage" or "Current";
 
     private static string Describe(Exception ex) => ex switch

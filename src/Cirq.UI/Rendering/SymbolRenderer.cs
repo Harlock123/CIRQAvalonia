@@ -4,7 +4,9 @@ using Avalonia.Media;
 using Cirq.Components.Boards;
 using Cirq.Components.Bridges;
 using Cirq.Components.Passive;
+using Cirq.Components.Annotations;
 using Cirq.Components.Buses;
+using Cirq.Components.Hierarchy;
 using Cirq.Components.Digital;
 using Cirq.Components.Electromechanical;
 using Cirq.Components.Ics;
@@ -81,6 +83,9 @@ public static class SymbolRenderer
             case Transformer: DrawTransformer(context, pen, thin); break;
             case CentreTappedTransformer: DrawCentreTappedTransformer(context, pen, thin); break;
             case Potentiometer: DrawPotentiometer(context, pen); break;
+            case Subcircuit block: DrawSubcircuit(context, pen, zoom, block); break;
+            case SchematicBox box: DrawSchematicBox(context, pen, zoom, box); break;
+            case SchematicNote note: DrawSchematicNote(context, zoom, note); break;
             case NetLabel label: DrawNetLabel(context, pen, zoom, label); break;
             case Ground: DrawGround(context, pen); break;
             case DcVoltageSource: DrawVoltageSource(context, pen, zoom); break;
@@ -354,6 +359,90 @@ public static class SymbolRenderer
         {
             context.DrawLine(pen, new Point(-18, 0), new Point(18, 0));
         }
+    }
+
+    /// <summary>
+    /// A block: a plain rectangle with its name across the middle and its pins named beside them.
+    /// <para>
+    /// Deliberately featureless. Every other symbol in the library says what the part is by its
+    /// shape, and a block's whole point is that what is inside it is not the question at the level
+    /// you are looking at.
+    /// </para>
+    /// </summary>
+    private static void DrawSubcircuit(
+        ISymbolCanvas context, IPen pen, double zoom, Subcircuit block)
+    {
+        var body = new Rect(-block.HalfWidth, -block.HalfHeight,
+            block.HalfWidth * 2, block.HalfHeight * 2);
+
+        context.DrawRectangle(CanvasTheme.SymbolFill, pen, new RoundedRect(body, 4));
+
+        // Pin legs, and the name of each beside it on the inside.
+        foreach (var terminal in block.Terminals)
+        {
+            var offset = terminal.CanvasOffset;
+            var onLeft = offset.X < 0;
+            var inner = onLeft ? body.Left + 10 : body.Right - 10;
+
+            context.DrawLine(pen, new Point(offset.X, offset.Y), new Point(inner, offset.Y));
+
+            if (zoom <= 0.55) continue;
+
+            DrawCenteredText(
+                context, terminal.Name,
+                new Point(inner + (onLeft ? 26 : -26), offset.Y), 8, zoom, CanvasTheme.LabelBrush);
+        }
+
+        // The name only. The part count is the block's value label and is already drawn as a
+        // caption underneath it, along with its designator.
+        DrawCenteredText(context, block.BlockName, new Point(0, 0), 11, zoom, CanvasTheme.SymbolBrush);
+    }
+
+    /// <summary>
+    /// A block of text. No border and no background: a note that looks like a component is a note
+    /// somebody will try to wire something to.
+    /// </summary>
+    private static void DrawSchematicNote(ISymbolCanvas context, double zoom, SchematicNote note)
+    {
+        if (zoom < 0.3) return;
+
+        var lines = note.Lines();
+        var size = note.EffectiveTextSize;
+        var step = size * 1.25;
+
+        // Laid out from the middle, because that is where the component's own origin is and
+        // where dragging it takes hold.
+        var top = -((lines.Count - 1) * step) / 2.0;
+
+        var brush = note.IsHeading ? CanvasTheme.SymbolBrush : CanvasTheme.LabelBrush;
+
+        for (var i = 0; i < lines.Count; i++)
+            DrawCenteredText(context, lines[i], new Point(0, top + (i * step)), size * zoom, zoom, brush);
+    }
+
+    /// <summary>
+    /// A labelled rectangle round a section. Dashed, because a solid one reads as a shield or a
+    /// package outline — something electrical — and this is neither.
+    /// </summary>
+    private static void DrawSchematicBox(
+        ISymbolCanvas context, IPen pen, double zoom, SchematicBox box)
+    {
+        var rect = new Rect(-box.HalfWidth, -box.HalfHeight, box.HalfWidth * 2, box.HalfHeight * 2);
+
+        var outline = CanvasTheme.Pen(CanvasTheme.SymbolBrush, 1.2, zoom, new DashStyle([5, 4], 0));
+
+        context.DrawRectangle(
+            box.IsShaded ? CanvasTheme.SymbolFill : null, outline, new RoundedRect(rect, 6));
+
+        var caption = box.Caption?.Trim() ?? string.Empty;
+
+        if (zoom < 0.35 || caption.Length == 0) return;
+
+        // Top left, inside the border, where a section heading goes on any drawing.
+        DrawCenteredText(
+            context, caption,
+            new Point(-box.HalfWidth + 14 + (caption.Length * 3.2), -box.HalfHeight + 12),
+            12, zoom, CanvasTheme.LabelBrush);
     }
 
     /// <summary>
@@ -2452,6 +2541,9 @@ public static class SymbolRenderer
 
         // The flag is 10 either side of centre and the caption would sit on top of the name.
         NetLabel => 24.0,
+
+        // A block states its own height, and its designator goes below whatever that is.
+        Subcircuit block => block.HalfHeight + 14,
 
         // Drawn as a DIP-14 rather than as four triangles, so it needs a DIP's clearance.
         QuadOpAmp => DipPackage.BodyHeight(14) / 2 + 16,

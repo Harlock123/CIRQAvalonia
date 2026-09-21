@@ -48,6 +48,11 @@
         <MenuItem Header="_Copy" InputGesture="Ctrl+C" Command="{Binding CopySelectionCommand}" />
         <MenuItem Header="{Binding PasteMenuText}" InputGesture="Ctrl+V" Command="{Binding PasteCommand}" />
         <Separator />
+        <MenuItem Header="_Group into Block" InputGesture="Ctrl+G"
+                  Command="{Binding GroupSelectionCommand}" />
+        <MenuItem Header="_Ungroup Block" InputGesture="Ctrl+Shift+G"
+                  Command="{Binding UngroupSelectionCommand}" />
+        <Separator />
         <MenuItem Header="_Rotate" InputGesture="R" Command="{Binding RotateSelectionCommand}" />
         <MenuItem Header="_Delete" InputGesture="Delete" Command="{Binding DeleteSelectionCommand}" />
       </MenuItem>
@@ -87,6 +92,8 @@
         <MenuItem Header="_Run / Pause" InputGesture="F5" Command="{Binding PlayPauseCommand}" />
         <MenuItem Header="_Step" InputGesture="F6" Command="{Binding StepCommand}" />
         <MenuItem Header="Re_set" InputGesture="F8" Command="{Binding ResetSimulationCommand}" />
+        <Separator />
+        <MenuItem Header="C_onditions..." Command="{Binding ShowConditionsCommand}" />
         <Separator />
         <MenuItem Header="_Frequency Response..." InputGesture="F7"
                   Command="{Binding ShowFrequencyResponseCommand}" />

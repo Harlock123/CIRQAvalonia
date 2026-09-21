@@ -16,6 +16,20 @@ public partial class Circuit : ObservableObject
 
     public ObservableCollection<SignalProbe> Probes { get; } = [];
 
+    /// <summary>
+    /// The temperature everything in this circuit is at, in degrees Celsius. 27 °C is what every
+    /// model in the library is characterised at, and what a datasheet means by "room temperature".
+    /// <para>
+    /// It belongs to the circuit rather than to the application, because it is part of the
+    /// experiment: a circuit saved to show what happens at 85 °C should still be at 85 °C when it
+    /// is opened again. Every semiconductor junction reads it, so changing it moves diode drops,
+    /// transistor gains and leakage together — which is why it is one number rather than a
+    /// property on each part.
+    /// </para>
+    /// </summary>
+    [ObservableProperty]
+    public partial double AmbientTemperatureCelsius { get; set; } = 27.0;
+
     /// <summary>Adds a component, auto-naming it with the next free reference designator.</summary>
     public T Add<T>(T component) where T : CircuitComponent
     {

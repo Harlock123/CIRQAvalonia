@@ -1,4 +1,5 @@
 using Cirq.Components.Electromechanical;
+using Cirq.Components.Annotations;
 using Cirq.Components.Boards;
 using Cirq.Components.Bridges;
 using Cirq.Components.Buses;
@@ -98,6 +99,12 @@ public static class ComponentCatalog
             new("Ground", "Explicit 0 V reference", () => new Ground()),
             new("Net Label", "Names a net — two labels with the same name are one net, with no wire between them",
                 () => new NetLabel()),
+            new("Note", "A block of text on the drawing. Connects to nothing and is carried into exports",
+                () => new SchematicNote("Double-click the text in the properties panel")),
+            new("Heading", "A larger note, for naming a section of the schematic",
+                () => new SchematicNote("Section") { IsHeading = true }),
+            new("Area", "A labelled box drawn behind a group of parts, for saying what a section does",
+                () => new SchematicBox()),
             new("DC Voltage", "Independent voltage source", () => new DcVoltageSource(5.0)),
             new("DC Current", "Independent current source", () => new DcCurrentSource(1e-3)),
             new("Battery", "A cell that sags under load and runs down — 9 V alkaline by default",

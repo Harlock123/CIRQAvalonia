@@ -20,6 +20,13 @@ public sealed class CircuitDocument
     public List<WireRecord> Wires { get; set; } = [];
 
     public List<ProbeRecord> Probes { get; set; } = [];
+
+    /// <summary>
+    /// The circuit's ambient temperature in degrees Celsius. Null in every file written before
+    /// temperature was a circuit property, which is why it is optional rather than defaulted to a
+    /// sentinel — an old file means "room temperature", not "zero".
+    /// </summary>
+    public double? AmbientTemperatureCelsius { get; set; }
 }
 
 /// <summary>One placed component: what it is, where it sits, and its parameters.</summary>
@@ -45,6 +52,40 @@ public sealed class ComponentRecord
     public Dictionary<string, JsonElement>? Construction { get; set; }
 
     public Dictionary<string, JsonElement> Parameters { get; set; } = [];
+
+    /// <summary>
+    /// Set only on a block, and only describing its <i>structure</i>. What is inside a block is
+    /// written out at the top level along with everything else — a block's contents are ordinary
+    /// components and ordinary wires — and this says which of them belong to it and where its pins
+    /// go. Saving it that way means the nesting costs one small record rather than a second copy
+    /// of the whole file format.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public BlockRecord? Block { get; set; }
+}
+
+/// <summary>The structure of a subcircuit: what is inside it, and what its pins stand for.</summary>
+public sealed class BlockRecord
+{
+    /// <summary>Ids of the components inside, which appear at the top level of the document.</summary>
+    public List<Guid> Components { get; set; } = [];
+
+    /// <summary>Ids of the wires inside.</summary>
+    public List<Guid> Wires { get; set; } = [];
+
+    /// <summary>
+    /// The pins, in the order they were made. Order matters: a pin's id is its position, and the
+    /// wires outside the block were saved against those ids.
+    /// </summary>
+    public List<PortRecord> Ports { get; set; } = [];
+}
+
+/// <summary>One pin of a block and the terminal inside that it stands for.</summary>
+public sealed class PortRecord
+{
+    public string Name { get; set; } = string.Empty;
+
+    public TerminalReference Inner { get; set; } = new();
 }
 
 /// <summary>

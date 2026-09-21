@@ -100,6 +100,11 @@ public sealed partial class SimulationController : ObservableObject, IDisposable
         {
             try
             {
+                // The circuit owns its temperature; the engine reads it from the settings. This
+                // is where the two are joined, on every rebuild, so changing the ambient and
+                // pressing Reset is all it takes.
+                Settings.TemperatureKelvin = Circuit.AmbientTemperatureCelsius + 273.15;
+
                 Simulator = new CircuitSimulator(Circuit, Settings);
                 Simulator.Reset();
                 Simulator.SolveOperatingPoint();
