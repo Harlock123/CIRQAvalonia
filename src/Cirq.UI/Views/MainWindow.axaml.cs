@@ -53,6 +53,16 @@ public partial class MainWindow : Window
         viewModel.RequestZoomToFit += (_, _) => Dispatcher.UIThread.Post(() => _canvas?.RequestFit());
         viewModel.RequestZoomBy += (_, factor) => Dispatcher.UIThread.Post(() => _canvas?.ZoomBy(factor));
 
+        // Posted rather than called straight: Ctrl+F may have just opened the palette, and the
+        // box cannot take focus until the layout that reveals it has run.
+        viewModel.FocusPaletteSearchRequested += (_, _) => Dispatcher.UIThread.Post(() =>
+        {
+            var box = this.FindControl<TextBox>("PaletteSearchBox");
+
+            box?.Focus();
+            box?.SelectAll();
+        });
+
         Dispatcher.UIThread.Post(() =>
         {
             _canvas?.RequestFit();
@@ -365,6 +375,10 @@ public partial class MainWindow : Window
                     return;
                 case Key.V:
                     _viewModel?.PasteCommand.Execute(null);
+                    e.Handled = true;
+                    return;
+                case Key.F:
+                    _viewModel?.FocusPaletteSearchCommand.Execute(null);
                     e.Handled = true;
                     return;
             }

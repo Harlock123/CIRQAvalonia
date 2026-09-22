@@ -29,9 +29,14 @@ public sealed record PaletteCategory(string Name, IReadOnlyList<PaletteItem> Ite
 public sealed partial class PaletteCategoryViewModel : ObservableObject, IExpandableGroup
 {
     public PaletteCategoryViewModel(PaletteCategory category, bool isExpanded)
+        : this(category.Name, category.Items, isExpanded)
     {
-        Name = category.Name;
-        Items = category.Items;
+    }
+
+    public PaletteCategoryViewModel(string name, IReadOnlyList<PaletteItem> items, bool isExpanded)
+    {
+        Name = name;
+        Items = items;
         IsExpanded = isExpanded;
     }
 

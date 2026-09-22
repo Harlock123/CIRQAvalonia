@@ -114,8 +114,30 @@ reaching the fifth means scrolling past the ones you have finished with. Kept to
 and its count stays in view and the palette is something to look down rather than scroll through.
 All of them start closed.
 
-**All** in the palette header is the way out of that, and toggles every group at
-once — useful when you are hunting for a part and do not remember which group it is in.
+### Finding a part
+
+Better than hunting: there is a **Find a part** box at the top of the palette. Type into it and the
+list narrows to what matches, with every group that still has something in it opened — a match
+folded inside a closed group is the same as no match at all.
+
+It looks at three things, and the second is the one that earns its keep:
+
+- **The name**, so `555`, `4017` and `74164` go straight to the chip.
+- **What the part does**, so `shift register` finds the 74164 even though the words appear nowhere
+  in its name, and `galvanically` finds the optocouplers. People look for what a part is *for* at
+  least as often as for the number printed on it.
+- **The group**, so `logic` gives you the logic gates, not one of which has the word in its name.
+
+`Ctrl+F` puts the caret in the box, opening the palette first if it was collapsed. **Enter** arms
+the first match, so a part can be found and placed without the mouse going near the sidebar: type,
+Enter, click where it goes. **Escape** clears the box.
+
+Clearing a search puts the palette back as it was, including whichever group you had open before
+you started typing — a search opens every group it matched, so what is on screen during one says
+nothing about what you chose.
+
+**All** in the palette header toggles every group at once, which is the other way through a long
+list.
 
 Switches, push buttons and logic toggles are operated by **double-clicking them on the canvas**,
 not through the properties panel. A push button is momentary; a switch latches. LDRs and

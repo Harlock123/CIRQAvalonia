@@ -8,6 +8,14 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**Find a part.** The palette has a search box. 183 components in 16 collapsible groups is more than
+anybody browses, and browsing only worked if you already knew that a 4017 lives under "40xx Series"
+and an optocoupler under "Switching & Isolation". Type `555`, or `shift register`, or `logic`, and
+the list narrows — it matches the name, what the part does, and the group, because people look for
+what a part is *for* at least as often as for the number printed on it. `Ctrl+F` puts the caret in
+the box, Enter arms the first match so a part can be found and placed without the mouse, Escape
+clears it.
+
 **Circuits travel.** A saved circuit now carries the SPICE cards for any imported models it uses,
 so a `.cirq` file opens complete on a machine that has never seen them. Until now it opened with
 the *default* part in place of the one you chose — a different forward drop, different answers, one

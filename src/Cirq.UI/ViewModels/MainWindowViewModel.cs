@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using Cirq.Core.Probing;
 using Cirq.Core.Simulation;
@@ -21,7 +22,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         Scope = new ScopeViewModel(Circuit);
         Inspector = new InspectorViewModel();
 
-        _paletteAccordion.Track(Palette);
+        RebuildPalette();
 
         Scope.SamplingChanged += (_, _) => ApplyScopeSampling();
         Inspector.ParameterChanged += (_, structural) =>
@@ -72,14 +73,129 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     public ControlPanelViewModel ControlPanel { get; }
 
     /// <summary>
-    /// Palette groups, each collapsible. They all start closed so every heading is on screen at
-    /// short; the rest are one click away.
+    /// Palette groups, each collapsible, narrowing to what a search matches. They all start closed
+    /// so every heading is on screen at once; the rest are one click away.
     /// </summary>
-    public IReadOnlyList<PaletteCategoryViewModel> Palette { get; } =
-        [.. ComponentCatalog.Categories.Select(c => new PaletteCategoryViewModel(c, isExpanded: false))];
+    public ObservableCollection<PaletteCategoryViewModel> Palette { get; } = [];
+
+    /// <summary>
+    /// What is typed in the palette's search box. Empty shows everything.
+    /// <para>
+    /// There are 183 parts in sixteen groups, and browsing only works if you already know which
+    /// group a part lives in — that a 4017 is under "40xx Series" and an optocoupler under
+    /// "Switching &amp; Isolation". Somebody who knows they want a 555 should not have to guess.
+    /// </para>
+    /// </summary>
+    [ObservableProperty]
+    public partial string PaletteSearch { get; set; } = string.Empty;
+
+    /// <summary>How the palette describes what it is showing, under the search box.</summary>
+    public string PaletteSummary => PaletteSearch.Trim().Length == 0
+        ? $"{PaletteTotalCount} parts in {ComponentCatalog.Categories.Count} groups"
+        : $"{PaletteMatchCount} of {PaletteTotalCount} match";
+
+    /// <summary>True when a search has hidden everything, so the panel can say so.</summary>
+    public bool IsPaletteEmpty => Palette.Count == 0;
+
+    /// <summary>True while a search is narrowing the list, which shows the clear button.</summary>
+    public bool IsPaletteSearching => PaletteSearch.Trim().Length > 0;
+
+    private int PaletteMatchCount => Palette.Sum(c => c.Count);
+
+    private static int PaletteTotalCount { get; } = ComponentCatalog.Categories.Sum(c => c.Items.Count);
 
     /// <summary>Keeps one palette group open at a time.</summary>
     private readonly Accordion _paletteAccordion = new();
+
+    /// <summary>
+    /// The group that was open before a search started. It cannot be read off the list while one
+    /// is running, because a search opens every group it matched and that is the search's doing
+    /// rather than the person's.
+    /// </summary>
+    private string? _openPaletteGroup;
+
+    private bool _wasSearchingPalette;
+
+    partial void OnPaletteSearchChanged(string value) => RebuildPalette();
+
+    /// <summary>
+    /// Rebuilds the palette for the current search.
+    /// <para>
+    /// A search opens every group that still has something in it, the way the example browser
+    /// does: leaving a match folded inside a closed group is the same as not matching at all.
+    /// Clearing the search puts back the one group that was open before it started.
+    /// </para>
+    /// </summary>
+    private void RebuildPalette()
+    {
+        var term = PaletteSearch.Trim();
+        var searching = term.Length > 0;
+
+        // Only believe what is on screen when the person put it there.
+        if (!_wasSearchingPalette) _openPaletteGroup = Palette.FirstOrDefault(c => c.IsExpanded)?.Name;
+
+        _wasSearchingPalette = searching;
+
+        Palette.Clear();
+
+        foreach (var category in ComponentCatalog.Categories)
+        {
+            IReadOnlyList<PaletteItem> matching = !searching
+                ? category.Items
+                : [.. category.Items.Where(i => Matches(i, category.Name, term))];
+
+            if (matching.Count == 0) continue;
+
+            Palette.Add(new PaletteCategoryViewModel(
+                category.Name, matching, isExpanded: searching || category.Name == _openPaletteGroup));
+        }
+
+        // The groups are new objects each time round, so the accordion is pointed at the new ones.
+        _paletteAccordion.Track(Palette);
+
+        OnPropertyChanged(nameof(IsPaletteEmpty));
+        OnPropertyChanged(nameof(IsPaletteSearching));
+        OnPropertyChanged(nameof(PaletteSummary));
+    }
+
+    /// <summary>
+    /// Matches on the name, the description and the group.
+    /// <para>
+    /// The description matters as much as the name: people look for what a part <i>does</i> — a
+    /// "shift register", something "optical", a "crystal" — at least as often as they look for
+    /// the number printed on it. And the group counts, so typing "logic" gives you the logic
+    /// gates even though not one of them has the word in its name.
+    /// </para>
+    /// </summary>
+    private static bool Matches(PaletteItem item, string category, string term) =>
+        item.Name.Contains(term, StringComparison.OrdinalIgnoreCase)
+        || item.Description.Contains(term, StringComparison.OrdinalIgnoreCase)
+        || category.Contains(term, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Puts the search back to nothing, which is what the little cross does.</summary>
+    [RelayCommand]
+    private void ClearPaletteSearch() => PaletteSearch = string.Empty;
+
+    /// <summary>
+    /// Arms the first part the search matched, so a part can be found and placed without the mouse
+    /// ever leaving the keyboard: Ctrl+F, type, Enter, click where it goes.
+    /// </summary>
+    [RelayCommand]
+    private void ChooseFirstMatch()
+    {
+        if (Palette.FirstOrDefault()?.Items.FirstOrDefault() is { } first) ChoosePaletteItem(first);
+    }
+
+    /// <summary>Raised when the palette's search box should take the keyboard.</summary>
+    public event EventHandler? FocusPaletteSearchRequested;
+
+    /// <summary>Opens the palette if it is collapsed and puts the caret in the search box.</summary>
+    [RelayCommand]
+    private void FocusPaletteSearch()
+    {
+        IsPaletteExpanded = true;
+        FocusPaletteSearchRequested?.Invoke(this, EventArgs.Empty);
+    }
 
 
     [ObservableProperty]
