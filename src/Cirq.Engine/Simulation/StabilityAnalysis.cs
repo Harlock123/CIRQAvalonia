@@ -115,10 +115,23 @@ public sealed class StabilityAnalysis
         var previousOmega = state.AngularFrequency;
         var previousInjection = request.Probe.Injection;
 
+        // Everything else that drives a sweep is silenced for the length of this one. A loop gain
+        // is the ratio either side of the break, and another source pushing the circuit at the
+        // same time adds its own response to both — which does not look like an error, it looks
+        // like a different and plausible answer. A follower measured with a generator still
+        // connected reads 6 dB where it has 106.
+        var others = _simulator.Circuit.Components
+            .OfType<IAcExcitation>()
+            .Where(s => s.AcMagnitude != 0)
+            .Select(s => (Source: s, Was: s.AcMagnitude))
+            .ToList();
+
         List<Complex> gains = [];
 
         try
         {
+            foreach (var (source, _) in others) source.AcMagnitude = 0;
+
             state.Mode = AnalysisMode.SmallSignal;
             request.Probe.Injection = 1.0;
 
@@ -162,6 +175,8 @@ public sealed class StabilityAnalysis
         }
         finally
         {
+            foreach (var (source, was) in others) source.AcMagnitude = was;
+
             request.Probe.Injection = previousInjection;
             state.Mode = previousMode;
             state.AngularFrequency = previousOmega;

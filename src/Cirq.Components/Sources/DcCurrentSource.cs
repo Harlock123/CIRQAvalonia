@@ -6,7 +6,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 namespace Cirq.Components.Sources;
 
 /// <summary>Independent DC current source. Current flows through the device from + to -.</summary>
-public partial class DcCurrentSource : TwoTerminalComponent
+public partial class DcCurrentSource : TwoTerminalComponent, IAcExcitation
 {
     public DcCurrentSource(double current = 1e-3) : base("+", "-")
     {

@@ -250,6 +250,91 @@ public partial class DocumentationTests
         Assert.Contains($"{groups} categories", Guide, StringComparison.Ordinal);
     }
 
+    // ---- the pictures ------------------------------------------------------
+
+    /// <summary>
+    /// Every picture either document points at is actually there. A missing image is a broken
+    /// box on GitHub and a gap in the PDF, and neither shows up in a diff.
+    /// </summary>
+    [Fact]
+    public void EveryImageReferencedExists()
+    {
+        var missing = new List<string>();
+
+        foreach (var (document, prefix) in Documents())
+        {
+            foreach (Match match in ImagePattern().Matches(document))
+            {
+                var relative = match.Groups[2].Value;
+
+                // A badge lives on somebody else's server and is not ours to check.
+                if (relative.StartsWith("http", StringComparison.OrdinalIgnoreCase)) continue;
+
+                if (!File.Exists(Path.Combine(Root, prefix, relative))) missing.Add(relative);
+            }
+        }
+
+        Assert.True(missing.Count == 0, "images that are not there: " + string.Join(", ", missing.Distinct()));
+    }
+
+    /// <summary>
+    /// And every picture on disk is pointed at by something. An image nobody references is either
+    /// a section that was deleted without its illustration, or a file somebody forgot to wire in.
+    /// </summary>
+    [Fact]
+    public void EveryImageOnDiskIsUsed()
+    {
+        var referenced = Documents()
+            .SelectMany(d => ImagePattern().Matches(d.Document).Select(m => m.Groups[2].Value))
+            .Where(r => !r.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+            .Select(Path.GetFileName)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var orphans = Directory.GetFiles(Path.Combine(Root, "docs", "images"), "*.png")
+            .Select(Path.GetFileName)
+            .Where(f => f is not null && !referenced.Contains(f))
+            .ToList();
+
+        Assert.True(orphans.Count == 0, "images nothing references: " + string.Join(", ", orphans));
+    }
+
+    /// <summary>
+    /// Every picture describes itself. The alt text is what a screen reader says, what shows when
+    /// the image will not load, and what a reader of the PDF's contents has to go on — and a
+    /// picture in a technical guide that says nothing is a picture that only works for people who
+    /// can already see it.
+    /// </summary>
+    [Fact]
+    public void EveryImageSaysWhatItShows()
+    {
+        var thin = new List<string>();
+
+        foreach (var (document, _) in Documents())
+        {
+            foreach (Match match in ImagePattern().Matches(document))
+            {
+                if (match.Groups[2].Value.StartsWith("http", StringComparison.OrdinalIgnoreCase)) continue;
+
+                var alt = match.Groups[1].Value.Trim();
+
+                // Long enough to be a description rather than a label. Every one in these
+                // documents describes what is in the picture, which is the standard being kept.
+                if (alt.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length < 8)
+                    thin.Add($"{match.Groups[2].Value}: \"{alt}\"");
+            }
+        }
+
+        Assert.True(thin.Count == 0, "pictures that do not describe themselves: " + string.Join("; ", thin));
+    }
+
+    /// <summary>
+    /// Each document with the directory its relative links resolve against — the guide lives in
+    /// <c>docs/</c> and writes <c>images/x.png</c>, the README lives at the root and writes
+    /// <c>docs/images/x.png</c>, and both mean the same file.
+    /// </summary>
+    private static (string Document, string Prefix)[] Documents() =>
+        [(Guide, "docs"), (Readme, ".")];
+
     // ---- patterns ----------------------------------------------------------
 
     /// <summary>
@@ -283,6 +368,9 @@ public partial class DocumentationTests
 
     [GeneratedRegex(@"<MenuItem Header=""([^""]+)\.\.\.""")]
     private static partial Regex DialogPattern();
+
+    [GeneratedRegex(@"!\[([^\]]*)\]\(([^)]+)\)")]
+    private static partial Regex ImagePattern();
 
     [GeneratedRegex(@"[^\w\s-]")]
     private static partial Regex PunctuationPattern();

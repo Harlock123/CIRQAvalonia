@@ -22,6 +22,13 @@ carries the SPICE cards for its imported models, so the file is the only copy of
 was. The snapshot is discarded as soon as you save for real, and as soon as the question has been
 answered either way.
 
+**Stability was measuring the wrong thing when anything else drove the circuit.** A loop gain is a
+ratio either side of the break, so a function generator still connected added its own response to
+both ends — and the failure was silent, because the numbers stayed plausible. The guide's own
+illustration of the analysis read 6 dB of loop gain for a follower that has 106, which is how it
+was found. Every other small-signal source is now silenced for the length of a stability sweep and
+put back afterwards.
+
 **Stability.** `Ctrl+F7` measures how much gain goes round a feedback loop and how close it is to
 going round it the wrong way: loop gain, phase margin, gain margin and crossover, with the verdict
 in words as well as figures. This answers "will it oscillate", which is the single most common

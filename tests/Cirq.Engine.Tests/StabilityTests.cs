@@ -299,4 +299,52 @@ public class StabilityTests
         Assert.Null(result.PhaseMarginDegrees);
         Assert.Contains("never reaches one", result.Verdict);
     }
+
+    /// <summary>
+    /// A stability sweep is the only thing driving the circuit while it runs.
+    /// <para>
+    /// A loop gain is a ratio either side of the break, so another source pushing the circuit at
+    /// the same time adds its own response to both ends and the ratio is not a loop gain at all.
+    /// The failure is silent — the numbers stay plausible — which is how it survived: the guide's
+    /// own illustration of this analysis read 6 dB of loop gain for a follower that has 106, and
+    /// nothing said so until somebody noticed a follower cannot have 6 dB.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void AnotherSourceDrivingTheCircuitDoesNotChangeTheAnswer()
+    {
+        var quiet = Loop(9e3, 1e3);
+        var expected = Measure(quiet.Sim, quiet.Probe);
+
+        // The same circuit with a generator hanging off the input, as any real one would have.
+        var (sim, probe, _, _) = Loop(9e3, 1e3);
+
+        var amp = sim.Circuit.Components.OfType<OperationalAmplifier>().Single();
+        var ground = sim.Circuit.Components.OfType<Ground>().First();
+
+        var generator = sim.Circuit.Add(new FunctionGenerator(Waveform.Sine, 1e3, 1.0));
+
+        Assert.NotEqual(0, generator.AcMagnitude);
+
+        sim.Circuit.Wires.Remove(sim.Circuit.Wires.Single(w =>
+            w.SourceTerminal == amp.NonInverting || w.TargetTerminal == amp.NonInverting));
+
+        sim.Circuit.Connect(generator.Return, ground.Pin);
+        sim.Circuit.Connect(generator.Output, amp.NonInverting);
+
+        var rebuilt = new CircuitSimulator(sim.Circuit);
+        rebuilt.Reset();
+        rebuilt.SolveOperatingPoint();
+
+        var measured = Measure(rebuilt, probe);
+
+        Assert.NotNull(expected.LowFrequencyDecibels);
+        Assert.NotNull(measured.LowFrequencyDecibels);
+
+        Assert.Equal(expected.LowFrequencyDecibels.Value, measured.LowFrequencyDecibels.Value, 0.5);
+        Assert.Equal(expected.PhaseMarginDegrees!.Value, measured.PhaseMarginDegrees!.Value, 2.0);
+
+        // And the generator is left driving again afterwards, since the circuit still needs it.
+        Assert.NotEqual(0, generator.AcMagnitude);
+    }
 }

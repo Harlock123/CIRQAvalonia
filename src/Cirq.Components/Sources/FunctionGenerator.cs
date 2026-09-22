@@ -10,7 +10,7 @@ namespace Cirq.Components.Sources;
 /// time-varying voltage source. Square and sawtooth edges are given a finite transition time and
 /// are registered as solver breakpoints, so the transient loop always places a time point on them.
 /// </summary>
-public partial class FunctionGenerator : TwoTerminalComponent, IBreakpointSource
+public partial class FunctionGenerator : TwoTerminalComponent, IBreakpointSource, IAcExcitation
 {
     public FunctionGenerator(Waveform shape = Waveform.Sine, double frequency = 1e3, double amplitudePeakToPeak = 2.0)
         : base("OUT", "GND")

@@ -6,7 +6,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 namespace Cirq.Components.Sources;
 
 /// <summary>Independent DC voltage source with optional series (output) resistance.</summary>
-public partial class DcVoltageSource : TwoTerminalComponent
+public partial class DcVoltageSource : TwoTerminalComponent, IAcExcitation
 {
     public DcVoltageSource(double voltage = 5.0) : base("+", "-")
     {

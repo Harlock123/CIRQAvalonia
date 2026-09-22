@@ -12,39 +12,40 @@ the [README](../README.md), and what changed between releases is in the
 
 1. [Running it](#running-it)
 2. [The window](#the-window)
-3. [Placing components](#placing-components)
-4. [Working a running circuit](#working-a-running-circuit)
-5. [Wiring](#wiring)
-6. [Setting values](#setting-values)
-7. [Probes and the oscilloscope](#probes-and-the-oscilloscope)
-8. [Running a simulation](#running-a-simulation)
-9. [Worked example: an RC low-pass](#worked-example-an-rc-low-pass)
-10. [Digital and mixed-signal circuits](#digital-and-mixed-signal-circuits)
-11. [Measuring what is on the scope](#measuring-what-is-on-the-scope)
-12. [DC sweeps and the curve tracer](#dc-sweeps-and-the-curve-tracer)
-13. [What is in a signal](#what-is-in-a-signal)
-14. [Stability](#stability)
-15. [Noise](#noise)
-16. [Reading a bus](#reading-a-bus)
-17. [Measuring between two points, and measuring power](#measuring-between-two-points-and-measuring-power)
-18. [Will it work with the parts you can buy](#will-it-work-with-the-parts-you-can-buy)
-19. [Temperature](#temperature)
-20. [Writing on the schematic](#writing-on-the-schematic)
-21. [Drawing part of a circuit as one block](#drawing-part-of-a-circuit-as-one-block)
-22. [Reusing a block](#reusing-a-block)
-23. [Plotting one trace against another](#plotting-one-trace-against-another)
-24. [Importing a SPICE model](#importing-a-spice-model)
-25. [Comparing and computing traces](#comparing-and-computing-traces)
-26. [Naming a net instead of drawing it](#naming-a-net-instead-of-drawing-it)
-27. [Checking the circuit](#checking-the-circuit)
-28. [Development boards](#development-boards)
-29. [Saving and loading](#saving-and-loading)
-30. [Printing](#printing)
-31. [Exporting](#exporting)
-32. [Appearance](#appearance)
-33. [What version is this](#what-version-is-this)
-34. [Keyboard reference](#keyboard-reference)
-35. [When a circuit will not simulate](#when-a-circuit-will-not-simulate)
+3. [Which analysis answers which question](#which-analysis-answers-which-question)
+4. [Placing components](#placing-components)
+5. [Working a running circuit](#working-a-running-circuit)
+6. [Wiring](#wiring)
+7. [Setting values](#setting-values)
+8. [Probes and the oscilloscope](#probes-and-the-oscilloscope)
+9. [Running a simulation](#running-a-simulation)
+10. [Worked example: an RC low-pass](#worked-example-an-rc-low-pass)
+11. [Digital and mixed-signal circuits](#digital-and-mixed-signal-circuits)
+12. [Measuring what is on the scope](#measuring-what-is-on-the-scope)
+13. [DC sweeps and the curve tracer](#dc-sweeps-and-the-curve-tracer)
+14. [What is in a signal](#what-is-in-a-signal)
+15. [Stability](#stability)
+16. [Noise](#noise)
+17. [Reading a bus](#reading-a-bus)
+18. [Measuring between two points, and measuring power](#measuring-between-two-points-and-measuring-power)
+19. [Will it work with the parts you can buy](#will-it-work-with-the-parts-you-can-buy)
+20. [Temperature](#temperature)
+21. [Writing on the schematic](#writing-on-the-schematic)
+22. [Drawing part of a circuit as one block](#drawing-part-of-a-circuit-as-one-block)
+23. [Reusing a block](#reusing-a-block)
+24. [Plotting one trace against another](#plotting-one-trace-against-another)
+25. [Importing a SPICE model](#importing-a-spice-model)
+26. [Comparing and computing traces](#comparing-and-computing-traces)
+27. [Naming a net instead of drawing it](#naming-a-net-instead-of-drawing-it)
+28. [Checking the circuit](#checking-the-circuit)
+29. [Development boards](#development-boards)
+30. [Saving and loading](#saving-and-loading)
+31. [Printing](#printing)
+32. [Exporting](#exporting)
+33. [Appearance](#appearance)
+34. [What version is this](#what-version-is-this)
+35. [Keyboard reference](#keyboard-reference)
+36. [When a circuit will not simulate](#when-a-circuit-will-not-simulate)
 
 This guide is also attached to every [release](../../releases) as a PDF, with a contents page and
 the screenshots in place — the same document, laid out for reading away from the machine. Build it
@@ -84,9 +85,44 @@ at the window edge; click the rail to bring it back.
 
 ---
 
+## Which analysis answers which question
+
+There are a dozen analyses here and they answer genuinely different questions. This is the map;
+each row links to the section that explains it.
+
+| You want to know | Use | Key |
+| --- | --- | --- |
+| What does this circuit **do over time** | the oscilloscope, and just run it — see [Probes and the oscilloscope](#probes-and-the-oscilloscope) | `F5` |
+| What does it do to **each frequency** | [Frequency response](#frequency-response) — a Bode plot of gain and phase | `F7` |
+| What does this **part's curve** look like | [DC sweep](#dc-sweeps-and-the-curve-tracer) — a diode's exponential, a transistor's fan | `Shift` `F7` |
+| How does the answer change if I **try other values** | [Step a parameter](#stepping-a-parameter-across-a-transient) — one whole run per value, overlaid | `Ctrl` `Shift` `F7` |
+| What **frequencies are in** this waveform | [Spectrum](#what-is-in-a-signal) — the FFT of what was recorded | `F3` |
+| How **distorted** is my amplifier | [Distortion](#distortion), under the spectrum — THD, THD+N and the harmonics | `F3` |
+| **Will it oscillate** | [Stability](#stability) — loop gain, phase margin, gain margin | `Ctrl` `F7` |
+| How much **noise** does it make, and from what | [Noise](#noise) — density, RMS, and a ranking of every generator | `Shift` `F5` |
+| What are these **digital lines saying** | [Reading a bus](#reading-a-bus) — I²C, SPI, UART, 1-Wire, CAN | `Shift` `F3` |
+| Will it work with the **parts I can buy** | [Tolerance analysis](#will-it-work-with-the-parts-you-can-buy) — hundreds of builds from the bands | `Shift` `F4` |
+| What have I **wired wrong** | [Check circuit](#checking-the-circuit) — the mistakes no part can report about itself | `F4` |
+| What does **temperature** do to it | [Temperature](#temperature) — set it, or sweep it like any other parameter | — |
+| Is this **better than what I had** | [Keep a reference](#comparing-and-computing-traces), change the circuit, compare | — |
+
+Three of those are worth separating, because they are easy to confuse:
+
+- **Frequency response** asks what the circuit does to a signal. **Spectrum** asks what is in a
+  signal the circuit produced. One is a property of the circuit, the other of a waveform.
+- **DC sweep** steps a parameter and records where the circuit *settles* at each value.
+  **Step a parameter** runs the whole transient at each value and records how it *gets* there.
+- **Stability** and **frequency response** both sweep and both draw gain and phase — but the
+  response is of the closed circuit, and stability is of the loop with the feedback opened. A
+  circuit can have a perfectly flat response and no phase margin at all.
+
+---
+
+---
+
 ## Placing components
 
-![The component palette showing all sixteen categories with their counts — passive, switches, sources, semiconductors, transistors, LEDs and displays, power, analog ICs, logic gates, 74xx series, 40xx series, buses, digital I/O, sensors and actuators, switching and isolation, and dev boards — every one of them closed, so all sixteen headings fit on screen at once](images/02-palette.png)
+![The component palette: a Find a part box at the top, "184 parts in 16 groups" under it, and the sixteen categories with their counts — passive 11, switches 4, sources 12, semiconductors 13, transistors 11, LEDs and displays 9, power 10, analog ICs 13, logic gates 7, 74xx series 21, 40xx series 15, buses 17, digital I/O 8, sensors and actuators 18, switching and isolation 11, dev boards 4 — every group closed, so all sixteen headings fit on screen at once](images/02-palette.png)
 
 Click a palette entry, then click the canvas. The part lands where you click, snapped to the grid.
 
@@ -336,6 +372,8 @@ The oscilloscope answers "what does this circuit do over time". **Simulate > Fre
 (F7) answers the other question: what does it do to a **sine at each frequency**, from one end of a
 span to the other. It is the second way of looking at a circuit, and a great many things that are
 tedious to establish in the time domain are one picture here.
+
+![A Bode plot of a 1 kilohm and 100 nF low-pass: the gain flat to about a kilohertz then falling at twenty decibels a decade, and below it the phase going from zero to minus ninety degrees, passing through minus forty-five at the 1.59 kHz corner where the gain is three decibels down](images/15-frequency-response.png)
 
 Put a probe where you want the answer, open the window, and it sweeps. The traces are your probes,
 so nothing else has to be set up. Magnitude in decibels goes on top, phase in degrees below, and
@@ -2814,6 +2852,8 @@ is the same machinery and is there for free. The range defaults to something the
 actually do rather than to 0–5 whatever was picked, since a base current lives in microamps and a
 mains source in hundreds of volts.
 
+![A transistor's output characteristics: four curves of collector current against collector voltage, one for each of 10, 20, 30 and 40 microamps of base current, each rising steeply from the origin and then flattening into a nearly horizontal line — the fan on the front of every transistor datasheet](images/16-curve-tracer.png)
+
 Things worth sweeping, all of them already in the examples:
 
 | Load this | Sweep | And you get |
@@ -2822,6 +2862,8 @@ Things worth sweeping, all of them already in the examples:
 | **Rail to Rail** | `FG1 Dc Offset` −3 → 9 V | Three transfer curves, each flattening at its own headroom |
 | **Solar Panel** | `RV1 Position` 0.02 → 1 | The panel's voltage and its current against the load, and the knee between them |
 | **Noise and Hysteresis** | `FG1 Dc Offset` 0 → 5, then 5 → 0 | A comparator switching in two different places |
+
+![A diode's forward curve swept from zero to 0.8 volts: nothing measurable until about 0.4 volts, then a current rising ever more steeply — the exponential every diode is specified by](images/22-diode-curve.png)
 
 The **Rail to Rail** one is the clearest of them. On a single 5 V supply, with the input driven
 from −5.5 V to +6.5 V, the three followers come out as:
@@ -2884,6 +2926,8 @@ back, and try to remember what the last one looked like.
 
 Laying them on one set of axes is the whole point — what you are looking for is the *difference*
 between the curves, and four separate pictures cannot show it.
+
+![Four step responses of the same RC on one set of axes, one per capacitor value from 500 nF to 4 microfarads, each rising towards the same final voltage but taking proportionally longer to get there](images/21-stepped-transient.png)
 
 Pick something to step, give it a range and a number of runs, say how long each should be, and
 press Run. It starts on a capacitor or inductor if the circuit has one, because a reactive value
@@ -2994,6 +3038,8 @@ A square wave shows why there are two. Its harmonics are the odd ones, the nth a
 for ever — so nine harmonics account for √(1/3² + 1/5² + 1/7² + 1/9²) = 42.9 %, and that is all THD
 can ever report. The true figure is √(π²/8 − 1) = 48.3 %, and THD+N finds most of it unaided.
 
+![The spectrum of a clipped sine, with the fundamental and its harmonics ringed: the odd harmonics stand well above the floor and the even ones are absent, which is what symmetric clipping looks like, and the caption gives the total harmonic distortion](images/17-distortion.png)
+
 **Which harmonics is the diagnosis; the number is only the symptom.**
 
 - **Odd harmonics** mean the distortion is **symmetric** — the waveform is bent but not lopsided.
@@ -3027,6 +3073,8 @@ This answers **"will it oscillate"**, which is the single most common reason a c
 correct on paper does not work on a bench. A regulator that rings, an amplifier that sings at two
 megahertz, a servo that hunts: all the same question, and none of them answerable by looking at
 gain alone. A loop with plenty of gain and no phase margin is an oscillator.
+
+![The loop gain of a follower with 100 nF on its output: the gain starting at 106 decibels and falling to cross zero at 145 kilohertz, and below it the phase falling past minus ninety and on towards minus one hundred and eighty, leaving only eight degrees of margin where the gain crosses one](images/18-stability.png)
 
 ### Putting the probe in
 
@@ -3098,6 +3146,8 @@ draws a clean curve however noisy the circuit actually is, because neither of th
 it. But it is what decides the smallest signal a circuit can be asked to handle, and it is the one
 property that cannot be improved by being careful.
 
+![Output noise density against frequency for an inverting amplifier, on logarithmic axes: a rise towards the low-frequency end where flicker noise dominates, flattening out above a few hundred hertz onto the white floor](images/19-noise.png)
+
 Pick the output probe, give it a band, press Measure. You get the **output noise density** in volts
 per root hertz across the band — the unit every datasheet quotes, and the only one comparable
 between circuits — the **total in volts RMS** over that band, and a ranking of every generator by
@@ -3156,6 +3206,8 @@ fifty ohms it is not.
 
 "This circuit makes 12 µV" is a number. "…and 80 % of it is R3" is an instruction. It is almost
 always one part, and it is almost always not the one people guess.
+
+![A bar chart of where the noise comes from: the op-amp's own voltage noise accounting for about seventy percent of it, the feedback resistor about twenty-three, and the op-amp's current noise and the other resistor the small remainder](images/20-noise-ranking.png)
 
 Two results worth knowing, both of which this will show you:
 
@@ -3327,6 +3379,8 @@ value written on it. A divider of two 5 % resistors is not a divider by two; a 5
 20 % ceramic is not a precision timer. Whether that matters depends entirely on the circuit, and
 this is how you find out which kind you have.
 
+![A histogram of four hundred builds of a divider made from two five percent resistors: a rough bell centred on the nominal five volts, with the extremes reaching about four and a half percent either side](images/23-tolerance.png)
+
 Resistors, capacitors and inductors have a **Tolerance** in the properties panel, as a fraction —
 0.05 for a five percent part. The defaults are what the ordinary part is: 5 % for a resistor, 20 %
 for a ceramic capacitor, 10 % for a wound inductor. Set one to zero to treat it as exact.
@@ -3392,6 +3446,8 @@ and **Simulate > DC Sweep** can sweep it like any other parameter.
 
 Every semiconductor junction reads it, which is why it is one number rather than a property on
 each part. What moves:
+
+![A TL431's reference swept from minus forty to a hundred and twenty-five degrees: an arch peaking near thirty degrees, with both ends of the range several millivolts below the middle — a bandgap is bowed rather than sloped](images/24-bandgap.png)
 
 - **A silicon diode's forward drop falls about 2 mV/°C.** At a fixed 1 mA a 1N4148 sits at 585 mV
   at 27 °C, 717 mV at −40 °C and 384 mV at 125 °C. That coefficient is the reason a diode makes a
@@ -4146,7 +4202,9 @@ Also available in the app at **Help > Keyboard Shortcuts**.
 | Middle-drag / space-drag | Pan |
 | Double-click | Operate a switch, push button or logic toggle |
 | `F5` / `F6` / `F8` | Run-pause / step / reset |
-| `F7` | Frequency response — what the circuit does to each frequency |
+| `F7` | Frequency response — what the circuit does to each frequency
+
+![A Bode plot of a 1 kOhm and 100 nF low-pass: the gain flat to about a kilohertz then falling at twenty decibels a decade, and below it the phase going from zero to minus ninety degrees, passing through minus forty-five at the 1.59 kHz corner where the gain is three decibels down](images/15-frequency-response.png) |
 | `Shift` `F7` | DC sweep — step a parameter and plot the curve |
 | `Ctrl` `Shift` `F7` | Step a parameter across a transient — one run per value, overlaid |
 | `Ctrl` `F7` | Stability — loop gain, phase margin and gain margin at a Loop Probe |
