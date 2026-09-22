@@ -3012,6 +3012,93 @@ panel says so rather than guessing. Slow the timebase until it has something to 
 
 ---
 
+## Noise
+
+**Simulate > Noise...** (`Shift+F5`) measures the floor under everything: how much noise a circuit
+makes at a node, and — the half that changes what you do — which part is making it.
+
+Noise is invisible in every other analysis here. A transient draws a clean line and a Bode plot
+draws a clean curve however noisy the circuit actually is, because neither of them has any noise in
+it. But it is what decides the smallest signal a circuit can be asked to handle, and it is the one
+property that cannot be improved by being careful.
+
+Pick the output probe, give it a band, press Measure. You get the **output noise density** in volts
+per root hertz across the band — the unit every datasheet quotes, and the only one comparable
+between circuits — the **total in volts RMS** over that band, and a ranking of every generator by
+what it contributed.
+
+### Where noise comes from
+
+| Part | Generator | Which is |
+| --- | --- | --- |
+| Resistor | Johnson (thermal) | `4kT/R` — every resistance of the same value at the same temperature makes exactly this and no more |
+| Diode | Shot, plus thermal in its bulk resistance | `2qI` across the junction |
+| Bipolar | Shot in **both** the base and collector currents | `2qIb` and `2qIc` |
+| MOSFET | Channel thermal | `4kT·(2/3)·gm` |
+
+Thermal noise depends on temperature and not on current. Shot noise depends on current and **not on
+temperature** — it exists because charge arrives one electron at a time, so a steady current is
+steady only on average. Two different mechanisms, and telling them apart is most of what a noise
+analysis is for.
+
+Everything else is treated as silent. That is right for an ideal source or a switch, and it is an
+approximation everywhere else — see the honest notes at the end.
+
+### The ranking is the answer
+
+"This circuit makes 12 µV" is a number. "…and 80 % of it is R3" is an instruction. It is almost
+always one part, and it is almost always not the one people guess.
+
+Two results worth knowing, both of which this will show you:
+
+- **A divider fed from a stiff source is, to noise, its two resistors in parallel.** The source end
+  is an AC ground. So the noise is √(4kT·R∥) and it is the *smaller* resistor that dominates — a
+  100 kΩ beside a 1 kΩ contributes one part in a hundred and one. Making the big one bigger changes
+  nothing you can measure.
+- **An RC filled with its own resistor's noise settles at √(kT/C), whatever the resistor is.** A
+  bigger resistor makes more noise per root hertz and rolls it off proportionally sooner, and the
+  two cancel exactly. If that number is too big, the only thing that helps is a bigger capacitor.
+
+For a bipolar, the ranking shows the trade that decides how a front end is biased. Driven from a
+current source the base sees an infinite source impedance, so its shot noise goes in and comes out
+multiplied by beta and leads by that factor. Drive the same transistor from something stiff and the
+base's noise is shunted away before it can be amplified, leaving the collector's own generator in
+charge. Same transistor, same current, opposite answer — which is why "is this part noisy" is not a
+question that can be asked about a part on its own.
+
+### Reading the band
+
+The total is an integral of the density **in linear frequency**, whatever spacing the points are
+drawn on. That matters more than it looks: a decade from 10 kHz to 100 kHz carries ninety thousand
+hertz of noise power and a decade from 1 Hz to 10 Hz carries nine. A wide-band circuit's noise is
+almost entirely decided by its top octave, and the way to make it quieter is nearly always to
+bandwidth-limit it rather than to change a part.
+
+### What this does not model
+
+Stated plainly, because a noise figure that quietly leaves things out is worse than none:
+
+- **No flicker (1/f) noise.** A real MOSFET's 1/f noise is usually the larger of the two below a
+  few kilohertz, and a bipolar has some too. It is a process parameter rather than something
+  derivable from the models here, so it is left out rather than invented — which means the figure
+  at low frequencies is **optimistic**.
+- **No op-amp input noise.** An op-amp's own voltage and current noise are usually the dominant
+  terms in a circuit built around one, so a noise figure on an op-amp circuit here is the
+  *resistors'* contribution and not the whole story.
+- **The MOSFET's 2/3 is the long-channel value.** A short-channel part is worse, sometimes several
+  times worse.
+- **Everything is referred to one output and one bias point.** Like the frequency response, this
+  linearises about the operating point and says nothing about large signals.
+
+### Worth trying
+
+Open the **Inverting Amplifier** and measure its output: the feedback resistors are the whole of
+what this can see, and the ranking will say which. Then put a 1 MΩ in place of the 10 kΩ and watch
+the figure go up by ten. Or take any RC low-pass, measure it across three decades of resistor
+value, and watch the total refuse to move — which is √(kT/C) doing what it does.
+
+---
+
 ## Reading a bus
 
 **Simulate > Decode Bus...** (`Shift+F3`) reads the traces the scope has captured as a protocol
@@ -3871,6 +3958,7 @@ Also available in the app at **Help > Keyboard Shortcuts**.
 | Edit > Block Library | Save a block for reuse, or place a copy of a saved one |
 | Edit > Import SPICE Model | Paste a `.model` card from a datasheet and get a part |
 | Simulate > Step a Parameter | Run the same transient once per value of something and overlay them |
+| Simulate > Noise | How much noise the circuit makes at a node, and which part is making it |
 | Scope layout > Xy | Plot one trace against another instead of against time |
 | `Ctrl` `Z` / `Ctrl` `Y` | Undo / redo (`Ctrl` `Shift` `Z` redoes as well) |
 | `Delete` | Delete selection |

@@ -151,7 +151,7 @@ public sealed record MosfetModel(
 /// way real silicon does rather than producing an unbounded spike. The gate draws no current.
 /// </para>
 /// </summary>
-public partial class Mosfet : CircuitComponent, ICurrentReporting
+public partial class Mosfet : CircuitComponent, ICurrentReporting, INoiseSource
 {
     /// <summary>Saturation current of the body diode.</summary>
     private const double BodyDiodeSaturationCurrent = 1e-14;
@@ -190,6 +190,12 @@ public partial class Mosfet : CircuitComponent, ICurrentReporting
 
     /// <summary>Drain current at the converged solution, in amps.</summary>
     public double DrainCurrent { get; private set; }
+
+    /// <summary>
+    /// The channel's transconductance at the last solved point, in siemens. What the noise
+    /// analysis measures the channel's thermal noise against.
+    /// </summary>
+    public double Transconductance { get; private set; }
 
     /// <summary>Gate-source voltage in the device's own polarity convention.</summary>
     public double Vgs { get; private set; }
@@ -230,6 +236,10 @@ public partial class Mosfet : CircuitComponent, ICurrentReporting
         var vds = Math.Abs(vdsNominal);
 
         var (id, gm, gds) = Evaluate(vgs, vds);
+
+        // Kept for the noise analysis, which needs the slope the channel settled at rather than
+        // anything it can work out from the terminal voltages.
+        Transconductance = gm;
 
         // The equivalent current is mirrored back into the device's real polarity; the
         // conductances are polarity independent.
@@ -369,4 +379,32 @@ public partial class Mosfet : CircuitComponent, ICurrentReporting
     }
 
     partial void OnModelChanged(MosfetModel value) => NotifyValueChanged();
+
+    /// <summary>
+    /// Channel thermal noise: <c>4kT·(2/3)·gm</c>.
+    /// <para>
+    /// The channel is a resistor the gate is squeezing, so what comes out of it is ordinary
+    /// thermal noise — but of a resistance that is none of the terminal resistances, which is why
+    /// it is written against the transconductance instead. The 2/3 is the long-channel value; a
+    /// short-channel part is worse, sometimes several times worse, and this does not model that.
+    /// </para>
+    /// <para>
+    /// No flicker term. A MOSFET's 1/f noise is usually the larger of the two below a few
+    /// kilohertz and it is a process parameter rather than something derivable from the model
+    /// here, so it is left out rather than invented — which means a noise figure at low
+    /// frequencies is optimistic, and deliberately says so rather than looking authoritative.
+    /// </para>
+    /// </summary>
+    public IEnumerable<NoiseEmission> NoiseSources(MnaSystem system, SimulationState state, double hertz)
+    {
+        ArgumentNullException.ThrowIfNull(system);
+        ArgumentNullException.ThrowIfNull(state);
+
+        var density = NoisePhysics.Channel(Transconductance, state.TemperatureKelvin);
+
+        if (density <= 0) yield break;
+
+        yield return new NoiseEmission(
+            $"{Name} channel", system.Node(Drain), system.Node(Source), density);
+    }
 }

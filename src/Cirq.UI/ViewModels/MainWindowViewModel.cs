@@ -566,6 +566,9 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     /// <summary>Raised when the parameter-step window should be opened.</summary>
     public event EventHandler? RequestTransientStep;
 
+    /// <summary>Raised when the noise window should be opened.</summary>
+    public event EventHandler? RequestNoise;
+
     /// <summary>Raised when the rule-check window should be opened.</summary>
     public event EventHandler? RequestRuleCheck;
 
@@ -1006,6 +1009,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
           F7           Frequency response
           Shift+F7     DC sweep
           Ctrl+Shift+F7 Step a parameter across a transient
+          Shift+F5     Noise
           F3           Spectrum of the traces
           Shift+F3     Decode the traces as a bus
           F4           Check circuit
@@ -1057,6 +1061,13 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     /// </summary>
     [RelayCommand]
     private void ShowTransientStep() => RequestTransientStep?.Invoke(this, EventArgs.Empty);
+
+    /// <summary>
+    /// Opens the noise window, which measures the floor under everything — how much noise the
+    /// circuit makes at a node, and which part is making it.
+    /// </summary>
+    [RelayCommand]
+    private void ShowNoise() => RequestNoise?.Invoke(this, EventArgs.Empty);
 
     /// <summary>
     /// Opens the rule check, which looks for the mistakes no component can report about itself

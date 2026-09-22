@@ -14,7 +14,7 @@ namespace Cirq.Components.Nonlinear;
 /// exponential from overflowing when an early iterate overshoots.
 /// </para>
 /// </summary>
-public partial class Diode : TwoTerminalComponent, ICurrentReporting
+public partial class Diode : TwoTerminalComponent, ICurrentReporting, INoiseSource
 {
     /// <summary>Largest exponent evaluated before the model falls back to a linear extrapolation.</summary>
     private const double MaxExponent = 80.0;
@@ -185,4 +185,35 @@ public partial class Diode : TwoTerminalComponent, ICurrentReporting
     }
 
     partial void OnModelChanged(DiodeModel value) => NotifyValueChanged();
+
+    /// <summary>
+    /// Shot noise across the junction, and Johnson noise in the bulk resistance.
+    /// <para>
+    /// Shot noise is <c>2qI</c> and is a different beast from thermal noise: it does not depend on
+    /// temperature, and it is not there at all when no current flows. It exists because charge
+    /// arrives one electron at a time and the arrivals are independent — a steady current is
+    /// steady only on average.
+    /// </para>
+    /// <para>
+    /// The series resistance is an ordinary resistor and makes ordinary thermal noise, between the
+    /// anode and the internal node the stamp already carries for it.
+    /// </para>
+    /// </summary>
+    public IEnumerable<NoiseEmission> NoiseSources(MnaSystem system, SimulationState state, double hertz)
+    {
+        ArgumentNullException.ThrowIfNull(system);
+        ArgumentNullException.ThrowIfNull(state);
+
+        // The junction is between the anode and the internal node, and the bulk resistance
+        // between that node and the cathode — the order the stamp puts them in. Getting the two
+        // the wrong way round puts each generator across the other one's impedance, which on a
+        // conducting diode is a factor of eighty.
+        var bulk = system.InternalNode(this);
+
+        var shot = NoisePhysics.Shot(Current);
+        if (shot > 0) yield return new NoiseEmission($"{Name} shot", system.Node(A), bulk, shot);
+
+        var thermal = NoisePhysics.Thermal(Model.SeriesResistance, state.TemperatureKelvin);
+        if (thermal > 0) yield return new NoiseEmission($"{Name} bulk", bulk, system.Node(B), thermal);
+    }
 }

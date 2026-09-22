@@ -104,6 +104,8 @@
                   Command="{Binding ShowDcSweepCommand}" />
         <MenuItem Header="Step a _Parameter..." InputGesture="Ctrl+Shift+F7"
                   Command="{Binding ShowTransientStepCommand}" />
+        <MenuItem Header="_Noise..." InputGesture="Shift+F5"
+                  Command="{Binding ShowNoiseCommand}" />
         <MenuItem Header="_Spectrum..." InputGesture="F3"
                   Command="{Binding ShowSpectrumCommand}" />
         <MenuItem Header="Decode _Bus..." InputGesture="Shift+F3"

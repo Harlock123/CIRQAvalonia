@@ -8,6 +8,19 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**Noise.** `Shift+F5` measures the floor under everything: output noise density in volts per root
+hertz across a band, the total in RMS, and a ranking of every generator in the circuit by what it
+put on the output.
+
+The ranking is the half that changes what you do. "This makes 12 µV" is a number; "and 80 % of it
+is R3" is an instruction — and it is almost always one part, and almost always not the one people
+guess. Resistors contribute Johnson noise, diodes and bipolars shot noise in every current that
+crosses a junction, MOSFETs their channel noise.
+
+It is honest about what it leaves out: no flicker noise and no op-amp input noise, both of which
+are often dominant, so the figure is optimistic at low frequencies and incomplete on a circuit
+built around an op-amp. The guide says so rather than letting the number look complete.
+
 **Click a wire and the net lights up.** Every wire on it, a dot on every pin on it, and the status
 bar naming the net and what is on it.
 

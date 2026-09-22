@@ -139,7 +139,7 @@ public sealed record BjtModel(
 /// output conductance, which is what sets a common-emitter stage's gain.
 /// </para>
 /// </summary>
-public partial class BipolarTransistor : CircuitComponent, ICurrentReporting
+public partial class BipolarTransistor : CircuitComponent, ICurrentReporting, INoiseSource
 {
     private double _vbe;
     private double _vbc;
@@ -321,4 +321,30 @@ public partial class BipolarTransistor : CircuitComponent, ICurrentReporting
     }
 
     partial void OnModelChanged(BjtModel value) => NotifyValueChanged();
+
+    /// <summary>
+    /// Shot noise in both currents that cross a junction — the base current and the collector
+    /// current.
+    /// <para>
+    /// Which is the whole of why a bipolar front end is a trade rather than a choice. The
+    /// collector's shot noise, referred back to the input, falls as the current rises; the base's
+    /// rises with it. There is an optimum, it depends on the source impedance, and it is the
+    /// reason a microphone preamp and a photodiode preamp are biased nothing like each other.
+    /// </para>
+    /// </summary>
+    public IEnumerable<NoiseEmission> NoiseSources(MnaSystem system, SimulationState state, double hertz)
+    {
+        ArgumentNullException.ThrowIfNull(system);
+        ArgumentNullException.ThrowIfNull(state);
+
+        var b = system.Node(Base);
+        var c = system.Node(Collector);
+        var e = system.Node(Emitter);
+
+        var baseShot = NoisePhysics.Shot(BaseCurrent);
+        if (baseShot > 0) yield return new NoiseEmission($"{Name} shot (base)", b, e, baseShot);
+
+        var collectorShot = NoisePhysics.Shot(CollectorCurrent);
+        if (collectorShot > 0) yield return new NoiseEmission($"{Name} shot (collector)", c, e, collectorShot);
+    }
 }

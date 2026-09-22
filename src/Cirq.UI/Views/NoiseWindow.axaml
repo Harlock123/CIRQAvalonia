@@ -1,0 +1,80 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:sp="clr-namespace:ScottPlot.Avalonia;assembly=ScottPlot.Avalonia"
+        xmlns:vm="clr-namespace:Cirq.UI.ViewModels"
+        x:Class="Cirq.UI.Views.NoiseWindow"
+        x:DataType="vm:NoiseViewModel"
+        Title="Noise"
+        Width="980" Height="700"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource PanelBackground}">
+
+  <DockPanel>
+
+    <Border DockPanel.Dock="Top" Padding="14,12"
+            Background="{DynamicResource PanelBackground}"
+            BorderBrush="{DynamicResource PanelBorder}" BorderThickness="0,0,0,1">
+      <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+        <TextBlock Text="Output" VerticalAlignment="Center" />
+        <ComboBox Width="180" ItemsSource="{Binding Outputs}"
+                  SelectedItem="{Binding Output, Mode=TwoWay}"
+                  ToolTip.Tip="The node whose noise is being measured. Every generator in the circuit is referred to this point." />
+
+        <TextBlock Text="from" VerticalAlignment="Center" Opacity="0.7" />
+        <TextBox Width="90" Text="{Binding StartHz, Mode=TwoWay}" />
+        <TextBlock Text="to" VerticalAlignment="Center" Opacity="0.7" />
+        <TextBox Width="90" Text="{Binding StopHz, Mode=TwoWay}" />
+        <TextBlock Text="Hz" VerticalAlignment="Center" Opacity="0.7" />
+
+        <TextBlock Text="at" VerticalAlignment="Center" Opacity="0.7" />
+        <TextBox Width="52" Text="{Binding PointsPerDecade, Mode=TwoWay}" />
+        <TextBlock Text="per decade" VerticalAlignment="Center" Opacity="0.7" />
+
+        <Button Content="Measure" Command="{Binding RunCommand}" IsEnabled="{Binding !IsBusy}"
+                Padding="18,5" />
+      </StackPanel>
+    </Border>
+
+    <!-- The ranking. The curve says how much; this says which part, which is the half that
+         changes what you do about it. -->
+    <Border DockPanel.Dock="Right" Width="330" Padding="12,10"
+            BorderBrush="{DynamicResource PanelBorder}" BorderThickness="1,0,0,0">
+      <DockPanel>
+        <TextBlock DockPanel.Dock="Top" Text="WHERE IT COMES FROM" Classes="heading" />
+
+        <TextBlock DockPanel.Dock="Top" FontSize="10" Opacity="0.5" Margin="0,0,0,6"
+                   TextWrapping="Wrap"
+                   Text="Each generator's own contribution to the output, across the whole band." />
+
+        <ScrollViewer>
+          <ItemsControl ItemsSource="{Binding Contributors}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:NoiseRow">
+                <Grid ColumnDefinitions="*,Auto" Margin="0,3">
+                  <StackPanel Spacing="1">
+                    <TextBlock Text="{Binding Name}" FontSize="12" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="{Binding Bar}" FontSize="9" LineHeight="10"
+                               Foreground="{DynamicResource NetHighlight}" />
+                  </StackPanel>
+                  <StackPanel Grid.Column="1" HorizontalAlignment="Right" Spacing="1">
+                    <TextBlock Text="{Binding Percent}" FontSize="12" HorizontalAlignment="Right" />
+                    <TextBlock Text="{Binding Contribution}" FontSize="10" Opacity="0.6"
+                               HorizontalAlignment="Right" />
+                  </StackPanel>
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </ScrollViewer>
+      </DockPanel>
+    </Border>
+
+    <Border DockPanel.Dock="Bottom" Padding="14,9"
+            BorderBrush="{DynamicResource PanelBorder}" BorderThickness="0,1,0,0">
+      <TextBlock Text="{Binding Status}" TextWrapping="Wrap" Opacity="0.85" />
+    </Border>
+
+    <sp:AvaPlot Name="Plot" />
+
+  </DockPanel>
+</Window>

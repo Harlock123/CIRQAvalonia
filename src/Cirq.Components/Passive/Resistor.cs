@@ -7,7 +7,7 @@ using Cirq.Core.Topology;
 namespace Cirq.Components.Passive;
 
 /// <summary>Ideal linear resistor.</summary>
-public partial class Resistor : TwoTerminalComponent, ICurrentReporting, IToleranced
+public partial class Resistor : TwoTerminalComponent, ICurrentReporting, IToleranced, INoiseSource
 {
     public Resistor(double resistance = 1e3)
     {
@@ -51,4 +51,30 @@ public partial class Resistor : TwoTerminalComponent, ICurrentReporting, ITolera
         CurrentIntoPin(terminal, VoltageAcross(system, A, B) / Math.Max(Resistance, 1e-12));
 
     partial void OnResistanceChanged(double value) => NotifyValueChanged();
+
+    /// <summary>
+    /// Johnson noise: <c>4kT/R</c>, and nothing else.
+    /// <para>
+    /// Every resistance of the same value at the same temperature makes exactly this much. It is
+    /// not a property of the make or the material and there is nothing to be done about it but
+    /// use a smaller resistance, or a colder one. A 1 kΩ at room temperature is 4 nV/√Hz.
+    /// </para>
+    /// <para>
+    /// Which is why a low-noise design is mostly an argument about resistor values, and why the
+    /// ranking this feeds is usually more useful than the total: the answer is nearly always one
+    /// resistor, and nearly always not the one people guess.
+    /// </para>
+    /// </summary>
+    public IEnumerable<NoiseEmission> NoiseSources(MnaSystem system, SimulationState state, double hertz)
+    {
+        ArgumentNullException.ThrowIfNull(system);
+        ArgumentNullException.ThrowIfNull(state);
+
+        var density = NoisePhysics.Thermal(Resistance, state.TemperatureKelvin);
+
+        if (density <= 0) yield break;
+
+        yield return new NoiseEmission(
+            $"{Name} thermal", system.Node(A), system.Node(B), density);
+    }
 }
