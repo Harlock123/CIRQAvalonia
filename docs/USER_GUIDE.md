@@ -2863,6 +2863,51 @@ millivolts from where it already is converges in two iterations.
 The circuit is put back exactly as it was afterwards — every swept property restored, and the bias
 point re-solved, so the canvas is not left showing the last point of the sweep.
 
+### Stepping a parameter across a transient
+
+**Simulate > Step a Parameter...** (`Ctrl+Shift+F7`) is the other half of the same idea, and the
+one people reach for more often. A DC sweep tells you where a circuit **settles** for each value of
+something. This runs the whole transient once per value and lays the results on top of each other,
+so it tells you how it **gets** there.
+
+That is the question nearly everybody actually has. Try three capacitor values and watch the
+ringing change. Try four gate resistors and watch the switching edge. Find the feedback resistor
+where the step response stops overshooting. None of that is a family of bias points; it is a family
+of transients, and until now the only way to get one was to change a value, run, look, change it
+back, and try to remember what the last one looked like.
+
+Laying them on one set of axes is the whole point — what you are looking for is the *difference*
+between the curves, and four separate pictures cannot show it.
+
+Pick something to step, give it a range and a number of runs, say how long each should be, and
+press Run. It starts on a capacitor or inductor if the circuit has one, because a reactive value
+decides the *shape* of a transient rather than its size.
+
+Every pass starts from the same conditions — reset, bias point, then the run. That is the opposite
+of what the DC sweep does, and deliberately: there, the previous point is the best possible
+starting guess; here it would be contamination, and every curve after the first would be a
+different experiment.
+
+The status line says where each run ended up, and its **overshoot** against that — which is the
+number you are usually stepping a damping element to change.
+
+A few worth trying:
+
+| Load this | Step | And you get |
+| --- | --- | --- |
+| **RC Low-Pass** | `C1 Capacitance` over a decade | The same edge arriving at four different speeds |
+| **Buck Converter** | `L1 Inductance` | Ripple current against how quickly it answers a load step |
+| **Gate Driver** | the gate resistor | The switching edge, and the loss that comes with slowing it |
+| **Relay Driver** | the coil's inductance | How long the flyback takes to die away |
+
+Keep the number of runs small. This costs a full transient per value — the price of the question —
+and more than about six curves on one set of axes stops being readable anyway.
+
+One thing to watch, the same one the spectrum window has: a probe keeps ten thousand points, so
+the sampling is worked out from the run length rather than left at the scope's. A very long run is
+recorded more coarsely; that is the only way to keep its beginning, which on a step response is the
+part you wanted.
+
 ---
 
 ## What is in a signal
@@ -3803,6 +3848,7 @@ Also available in the app at **Help > Keyboard Shortcuts**.
 | `Ctrl` `G` / `Ctrl` `Shift` `G` | Group the selection into a block / ungroup one |
 | Edit > Block Library | Save a block for reuse, or place a copy of a saved one |
 | Edit > Import SPICE Model | Paste a `.model` card from a datasheet and get a part |
+| Simulate > Step a Parameter | Run the same transient once per value of something and overlay them |
 | Scope layout > Xy | Plot one trace against another instead of against time |
 | `Ctrl` `Z` / `Ctrl` `Y` | Undo / redo (`Ctrl` `Shift` `Z` redoes as well) |
 | `Delete` | Delete selection |

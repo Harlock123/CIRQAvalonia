@@ -8,6 +8,16 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**Step a parameter across a transient.** `Ctrl+Shift+F7` runs the whole circuit once per value of
+something and lays the results on one set of axes. The DC sweep already stepped a parameter, but it
+records an *operating point* at each value — where the circuit settles. This records how it gets
+there, which is the question people actually have: try three capacitor values and watch the ringing
+change, try four gate resistors and watch the switching edge.
+
+Every pass starts from the same conditions, so the curves differ only by the value. The status line
+gives each run's settling value and its overshoot, which is usually the number you are stepping a
+damping element to change.
+
 **Distortion.** The spectrum window now measures THD and THD+N, and lists the harmonics in dB
 relative to the carrier. This is the number an amplifier is sold on and the one thing in that
 window you cannot get by eye: a stage at one percent distortion looks exactly like a sine.

@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using Cirq.Components.Hierarchy;
 using Cirq.Components.Serialization;
 using Cirq.Core.Probing;
 using Cirq.Core.Topology;
@@ -44,6 +45,33 @@ public sealed record SweepOption(CircuitComponent? Component, string PropertyNam
     }
 
     public override string ToString() => Display;
+
+    /// <summary>
+    /// Everything varyable in a circuit: the same properties the inspector shows, filtered to the
+    /// ones that are writable numbers. Taking the inspector's list rather than every public
+    /// property keeps the picker to things a person would recognise as a setting.
+    /// </summary>
+    public static IEnumerable<SweepOption> Discover(Circuit circuit)
+    {
+        ArgumentNullException.ThrowIfNull(circuit);
+
+        foreach (var component in Flattening.Flatten(circuit.Components))
+        foreach (var property in ComponentReflection.EditableProperties(component.GetType()))
+        {
+            if (property.PropertyType != typeof(double) && property.PropertyType != typeof(int))
+                continue;
+
+            // Placement is not a circuit parameter, and varying it would just move the part.
+            if (property.Name is "X" or "Y" or "RotationDegrees") continue;
+
+            yield return new SweepOption(component, property.Name, ParameterNaming.UnitFor(property.Name));
+        }
+    }
+
+    /// <summary>A supply or a current source, which is what anybody means by "sweep this".</summary>
+    public static bool IsSource(SweepOption option) =>
+        option?.Component?.DesignatorPrefix is "V" or "I" &&
+        option.PropertyName is "Voltage" or "Current";
 }
 
 /// <summary>One curve to draw: a probe, within one value of the stepped parameter.</summary>
@@ -81,10 +109,10 @@ public sealed partial class DcSweepViewModel : ObservableObject
         // looking for once they know it is there.
         Options.Add(SweepOption.Temperature(circuit));
 
-        foreach (var option in Discover(circuit)) Options.Add(option);
+        foreach (var option in SweepOption.Discover(circuit)) Options.Add(option);
 
         // A source is what anybody means by "DC sweep", so start on one if there is one.
-        Sweep = Options.FirstOrDefault(IsSource) ?? Options.FirstOrDefault(o => !o.IsTemperature)
+        Sweep = Options.FirstOrDefault(SweepOption.IsSource) ?? Options.FirstOrDefault(o => !o.IsTemperature)
                 ?? Options.FirstOrDefault();
 
         ResetRangeFromSelection();
@@ -297,30 +325,6 @@ public sealed partial class DcSweepViewModel : ObservableObject
 
         return string.Join("   ·   ", parts);
     }
-
-    /// <summary>
-    /// Everything sweepable in the circuit: the same properties the inspector shows, filtered to
-    /// the ones that are writable numbers. Taking the inspector's list rather than every public
-    /// property keeps the picker to things a person would recognise as a setting.
-    /// </summary>
-    private static IEnumerable<SweepOption> Discover(Circuit circuit)
-    {
-        foreach (var component in circuit.Components)
-        foreach (var property in ComponentReflection.EditableProperties(component.GetType()))
-        {
-            if (property.PropertyType != typeof(double) && property.PropertyType != typeof(int))
-                continue;
-
-            // Placement is not a circuit parameter, and sweeping it would just move the part.
-            if (property.Name is "X" or "Y" or "RotationDegrees") continue;
-
-            yield return new SweepOption(component, property.Name, ParameterNaming.UnitFor(property.Name));
-        }
-    }
-
-    private static bool IsSource(SweepOption option) =>
-        option.Component?.DesignatorPrefix is "V" or "I" &&
-        option.PropertyName is "Voltage" or "Current";
 
     private static string Describe(Exception ex) => ex switch
     {

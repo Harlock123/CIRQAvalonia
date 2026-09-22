@@ -563,6 +563,9 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     /// <summary>Raised when the DC sweep window should be opened.</summary>
     public event EventHandler? RequestDcSweep;
 
+    /// <summary>Raised when the parameter-step window should be opened.</summary>
+    public event EventHandler? RequestTransientStep;
+
     /// <summary>Raised when the rule-check window should be opened.</summary>
     public event EventHandler? RequestRuleCheck;
 
@@ -995,12 +998,14 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
           Wheel        Zoom at the cursor
           Middle drag  Pan (or hold Space and drag)
           F9 / F10     Collapse the palette / properties panel
+          Ctrl+F       Find a part in the palette
 
         Simulation
           F5           Run or pause
           F6           Single step
           F7           Frequency response
           Shift+F7     DC sweep
+          Ctrl+Shift+F7 Step a parameter across a transient
           F3           Spectrum of the traces
           Shift+F3     Decode the traces as a bus
           F4           Check circuit
@@ -1044,6 +1049,14 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     /// </summary>
     [RelayCommand]
     private void ShowDcSweep() => RequestDcSweep?.Invoke(this, EventArgs.Empty);
+
+    /// <summary>
+    /// Opens the parameter-step window, which runs the whole transient once per value of
+    /// something and lays the results on top of each other. Where the DC sweep answers what a
+    /// circuit settles at, this answers how it gets there.
+    /// </summary>
+    [RelayCommand]
+    private void ShowTransientStep() => RequestTransientStep?.Invoke(this, EventArgs.Empty);
 
     /// <summary>
     /// Opens the rule check, which looks for the mistakes no component can report about itself

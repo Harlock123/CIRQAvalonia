@@ -97,6 +97,7 @@ public partial class MainWindow : Window
         viewModel.RequestAbout += async (_, _) => await ShowAboutAsync();
         viewModel.RequestFrequencyResponse += async (_, _) => await ShowFrequencyResponseAsync();
         viewModel.RequestDcSweep += async (_, _) => await ShowDcSweepAsync();
+        viewModel.RequestTransientStep += async (_, _) => await ShowTransientStepAsync();
         viewModel.RequestRuleCheck += async (_, _) => await ShowRuleCheckAsync();
         viewModel.RequestSpectrum += async (_, _) => await ShowSpectrumAsync();
         viewModel.RequestBusDecode += async (_, _) => await ShowBusDecodeAsync();
@@ -162,6 +163,18 @@ public partial class MainWindow : Window
         var dialog = new DcSweepWindow
         {
             DataContext = new DcSweepViewModel(_viewModel.Circuit),
+        };
+
+        await dialog.ShowDialog(this);
+    }
+
+    private async Task ShowTransientStepAsync()
+    {
+        if (_viewModel is null) return;
+
+        var dialog = new TransientStepWindow
+        {
+            DataContext = new TransientStepViewModel(_viewModel.Circuit),
         };
 
         await dialog.ShowDialog(this);
