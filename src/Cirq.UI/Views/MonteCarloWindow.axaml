@@ -35,6 +35,9 @@
 
         <Button Content="Run" Command="{Binding RunCommand}" IsEnabled="{Binding !IsBusy}"
                 Padding="20,5" />
+
+        <Button Content="Worst case" Command="{Binding FindCornersCommand}" Padding="14,5"
+                ToolTip.Tip="The worst this circuit can ever be, rather than the worst these trials happened to be. Random sampling essentially never lands on the corner where every part is at its extreme the same way — that is one combination out of two to the number of parts." />
       </StackPanel>
     </Border>
 
@@ -42,6 +45,18 @@
             BorderBrush="{DynamicResource PanelBorder}" BorderThickness="0,1,0,0">
       <StackPanel Spacing="4">
         <TextBlock Text="{Binding Summary}" TextWrapping="Wrap" Opacity="0.85" />
+
+        <TextBlock Text="{Binding CornerSummary}" TextWrapping="Wrap" Opacity="0.85"
+                   IsVisible="{Binding CornerSummary, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+        <ItemsControl ItemsSource="{Binding Corners}" IsVisible="{Binding HasCorners}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <TextBlock Text="{Binding}" FontSize="11" Opacity="0.75" FontFamily="monospace" />
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
         <ItemsControl ItemsSource="{Binding Varied}" IsVisible="{Binding HasRows}">
           <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate><WrapPanel Orientation="Horizontal" /></ItemsPanelTemplate>

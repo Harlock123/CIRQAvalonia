@@ -17,6 +17,20 @@ namespace Cirq.UI.Views;
 public partial class NoiseWindow : Window
 {
     private AvaPlot? _plot;
+    private PlotReadout? _readout;
+
+    /// <summary>The noise density at the frequency under the pointer.</summary>
+    private string? Describe(double logHertz)
+    {
+        if (DataContext is not NoiseViewModel model || !model.HasResult) return null;
+
+        var index = PlotReadout.Nearest([.. model.Frequencies.Select(Math.Log10)], logHertz);
+
+        if (index < 0) return null;
+
+        return $"{Cirq.Core.Units.SiPrefix.Format(model.Frequencies[index], "Hz")}:  " +
+               $"{Cirq.Core.Units.SiPrefix.Format(model.Density[index], "V/√Hz")}";
+    }
 
     public NoiseWindow()
     {
@@ -41,6 +55,8 @@ public partial class NoiseWindow : Window
 
         model.ResultChanged -= OnResultChanged;
         model.ResultChanged += OnResultChanged;
+
+        _readout ??= new PlotReadout(_plot!, Describe, text => model.Readout = text);
 
         // Measured on opening: it is one bias point and a couple of solves per frequency, so the
         // window arrives with an answer rather than a blank grid.

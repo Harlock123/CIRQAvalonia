@@ -19,6 +19,24 @@ namespace Cirq.UI.Views;
 public partial class StabilityWindow : Window
 {
     private AvaPlot? _plot;
+    private PlotReadout? _readout;
+
+    /// <summary>
+    /// What the loop is doing at the frequency under the pointer — both the gain and the phase,
+    /// because on this plot the two are read together or not at all.
+    /// </summary>
+    private string? Describe(double logHertz)
+    {
+        if (DataContext is not StabilityViewModel model || !model.HasResult) return null;
+
+        var index = PlotReadout.Nearest(
+            [.. model.Frequencies.Select(Math.Log10)], logHertz);
+
+        if (index < 0) return null;
+
+        return $"{Cirq.Core.Units.SiPrefix.Format(model.Frequencies[index], "Hz")}:  " +
+               $"{model.Decibels[index]:0.0} dB  ·  {model.Degrees[index]:0.0}°";
+    }
 
     public StabilityWindow()
     {
@@ -43,6 +61,8 @@ public partial class StabilityWindow : Window
 
         model.ResultChanged -= OnResultChanged;
         model.ResultChanged += OnResultChanged;
+
+        _readout ??= new PlotReadout(_plot!, Describe, text => model.Readout = text);
 
         model.RunCommand.Execute(null);
     }

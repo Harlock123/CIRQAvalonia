@@ -53,6 +53,21 @@
                   Padding="18,5" />
         </StackPanel>
 
+        <!-- The same sweep, worked backwards. Every other analysis asks what the circuit does
+             given these parts; this asks what part gives that answer, which is the question
+             somebody actually has in front of them. -->
+        <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+          <TextBlock Text="Solve" Width="52" VerticalAlignment="Center"
+                     ToolTip.Tip="Find the value of the swept parameter that makes the first probe read what you want. It searches the range above." />
+          <TextBlock Text="for a reading of" VerticalAlignment="Center" Opacity="0.7" />
+          <TextBox Width="84" Text="{Binding TargetValue, Mode=TwoWay}" />
+          <Button Content="Find the value" Command="{Binding SolveForValueCommand}" Padding="14,5" />
+
+          <TextBlock Text="{Binding SolveResult}" VerticalAlignment="Center" FontSize="11"
+                     Opacity="0.85" TextWrapping="Wrap" MaxWidth="520"
+                     IsVisible="{Binding HasSolveResult}" />
+        </StackPanel>
+
       </StackPanel>
     </Border>
 

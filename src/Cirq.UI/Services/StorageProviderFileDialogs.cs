@@ -103,6 +103,8 @@ public sealed class StorageProviderFileDialogs : ICircuitFileDialogs
             { Patterns = ["*.cir", "*.net", "*.sp"], MimeTypes = ["text/plain"] },
         ExportFormat.Csv => new FilePickerFileType("Comma-separated values")
             { Patterns = ["*.csv"], MimeTypes = ["text/csv"] },
+        ExportFormat.Bom => new FilePickerFileType("Parts list")
+            { Patterns = ["*.csv"], MimeTypes = ["text/csv"] },
         _ => new FilePickerFileType("PDF document")
             { Patterns = ["*.pdf"], MimeTypes = ["application/pdf"] },
     };
@@ -133,6 +135,7 @@ public sealed class StorageProviderFileDialogs : ICircuitFileDialogs
                 "PDF  —  vector, for documents and printing",
                 "SPICE netlist  —  the circuit as text, for ngspice or LTspice",
                 "CSV  —  the recorded traces as numbers, for a spreadsheet",
+                "Parts list  —  a bill of materials, as CSV",
             },
             SelectedIndex = 0,
             HorizontalAlignment = HorizontalAlignment.Stretch,
@@ -209,6 +212,9 @@ public sealed class StorageProviderFileDialogs : ICircuitFileDialogs
                     "buses, sensors — are named in the file as comments rather than left out.",
                 ExportFormat.Csv =>
                     "Writes everything the probes have recorded, not just the window on screen.",
+                ExportFormat.Bom =>
+                    "A bill of materials: one line per part and value, with the designators that " +
+                    "share it. The circuit already knows all of this.",
                 _ => string.Empty,
             };
 

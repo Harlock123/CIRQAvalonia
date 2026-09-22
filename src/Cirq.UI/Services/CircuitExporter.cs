@@ -23,6 +23,16 @@ public enum ExportFormat
 
     /// <summary>The recorded traces as comma-separated values, for a spreadsheet or a script.</summary>
     Csv,
+
+    /// <summary>
+    /// The parts list as comma-separated values — a bill of materials.
+    /// <para>
+    /// The circuit already knows every part in it and what each is set to, and the printed sheet
+    /// has shown that list for a while. This is the same thing in the form somebody ordering the
+    /// parts actually wants: a file a spreadsheet opens, not a page to read off.
+    /// </para>
+    /// </summary>
+    Bom,
 }
 
 /// <summary>What goes in the export.</summary>
@@ -108,6 +118,30 @@ public static class CircuitExporter
             var result = Cirq.Components.Spice.SpiceNetlistWriter.Write(circuit);
 
             File.WriteAllText(path, result.Netlist);
+            return path;
+        }
+
+        if (options.Format == ExportFormat.Bom)
+        {
+            var rows = PartsList.For(circuit);
+
+            if (rows.Count == 0)
+                throw new InvalidOperationException("There is nothing on the schematic to list.");
+
+            var bom = new System.Text.StringBuilder();
+
+            bom.AppendLine("Quantity,Designators,Part,Value");
+
+            foreach (var row in rows)
+            {
+                bom.Append(row.Quantity.ToString(System.Globalization.CultureInfo.InvariantCulture))
+                   .Append(',').Append(Quote(row.Designators))
+                   .Append(',').Append(Quote(row.Part))
+                   .Append(',').Append(Quote(row.Value))
+                   .AppendLine();
+            }
+
+            File.WriteAllText(path, bom.ToString());
             return path;
         }
 
@@ -296,6 +330,7 @@ public static class CircuitExporter
 
     public static string Extension(ExportFormat format) => format switch
     {
+        ExportFormat.Bom => ".csv",
         ExportFormat.Png => ".png",
         ExportFormat.Jpeg => ".jpg",
         ExportFormat.Bmp => ".bmp",
@@ -310,7 +345,18 @@ public static class CircuitExporter
     /// canvas the picture formats share, and they ignore everything about layout.
     /// </summary>
     public static bool IsText(ExportFormat format) =>
-        format is ExportFormat.Netlist or ExportFormat.Csv;
+        format is ExportFormat.Netlist or ExportFormat.Csv or ExportFormat.Bom;
+
+    /// <summary>True for the formats that have a resolution rather than being drawn as shapes.</summary>
+    /// <summary>
+    /// A CSV field, quoted when it has to be. A designator list is "R1, R2, R3" — commas and all
+    /// — so getting this wrong would put the parts in the wrong columns of every row that has
+    /// more than one of something.
+    /// </summary>
+    private static string Quote(string value) =>
+        value.Contains(',', StringComparison.Ordinal) || value.Contains('"', StringComparison.Ordinal)
+            ? $"\"{value.Replace("\"", "\"\"", StringComparison.Ordinal)}\""
+            : value;
 
     /// <summary>True for the formats that have a resolution rather than being drawn as shapes.</summary>
     public static bool IsRaster(ExportFormat format) =>

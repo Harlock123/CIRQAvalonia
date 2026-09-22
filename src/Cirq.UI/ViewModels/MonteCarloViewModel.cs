@@ -136,6 +136,74 @@ public sealed partial class MonteCarloViewModel : ObservableObject
 
     public bool HasSensitivity => Sensitivity.Count > 0;
 
+    /// <summary>
+    /// The worst the circuit can ever be, found directly rather than sampled towards.
+    /// <para>
+    /// Sampling answers "what will most of them do"; this answers "what is the worst this can
+    /// <i>ever</i> be", which is the question a specification is written from. Random trials
+    /// essentially never land on the corner where every part is at its extreme in the same
+    /// direction — that is one combination out of 2ⁿ — so the sampled spread is always the
+    /// narrower of the two.
+    /// </para>
+    /// </summary>
+    public ObservableCollection<string> Corners { get; } = [];
+
+    public bool HasCorners => Corners.Count > 0;
+
+    [ObservableProperty]
+    public partial string CornerSummary { get; private set; } = string.Empty;
+
+    /// <summary>
+    /// Finds both extremes and how to reach them. Its own command rather than part of the trial
+    /// run, because it is a different question and costs a different amount: a solve per part and
+    /// a couple more, against several hundred for the trials.
+    /// </summary>
+    [RelayCommand]
+    public void FindCorners()
+    {
+        Corners.Clear();
+        CornerSummary = string.Empty;
+
+        var probe = Selected?.Trace is { } trace
+            ? _circuit.Probes.FirstOrDefault(p => p.Label == trace.Label)
+            : _circuit.Probes.FirstOrDefault();
+
+        CornerResult result;
+
+        try
+        {
+            result = new CornerAnalysis(_circuit).Run(new CornerRequest(probe));
+        }
+        catch (Exception ex) when (ex is CircuitTopologyException or ConvergenceException)
+        {
+            CornerSummary = $"The corners could not be found: {ex.Message}";
+            OnPropertyChanged(nameof(HasCorners));
+            return;
+        }
+
+        if (!result.IsUsable)
+        {
+            CornerSummary = result.Problem ?? "Nothing to report.";
+            OnPropertyChanged(nameof(HasCorners));
+            return;
+        }
+
+        var unit = probe?.Unit ?? "V";
+
+        Corners.Add($"Highest  {SiPrefix.Format(result.Highest!.Value, unit)}   " +
+                    $"with {result.Highest.Describe()}");
+
+        Corners.Add($"Lowest   {SiPrefix.Format(result.Lowest!.Value, unit)}   " +
+                    $"with {result.Lowest.Describe()}");
+
+        CornerSummary =
+            $"{result.Label}: nominal {SiPrefix.Format(result.Nominal, unit)}, " +
+            $"worst {result.WorstFractionalError:P2} out, spread {result.Spread:P2} — " +
+            $"found in {result.Solves} solves rather than {Math.Pow(2, result.Varied):N0} corners";
+
+        OnPropertyChanged(nameof(HasCorners));
+    }
+
     /// <summary>Raised when new results are ready, so the view can redraw the histogram.</summary>
     public event EventHandler? ResultsChanged;
 

@@ -54,7 +54,11 @@
                      MaxWidth="470" Opacity="0.85" />
         </StackPanel>
 
-        <TextBlock Text="{Binding Status}" TextWrapping="Wrap" Opacity="0.6" FontSize="11" />
+        <StackPanel Orientation="Horizontal" Spacing="16">
+          <TextBlock Text="{Binding Status}" TextWrapping="Wrap" Opacity="0.6" FontSize="11" />
+          <TextBlock Text="{Binding Readout}" FontSize="11" FontFamily="monospace"
+                     Foreground="{DynamicResource NetHighlight}" VerticalAlignment="Center" />
+        </StackPanel>
       </StackPanel>
     </Border>
 

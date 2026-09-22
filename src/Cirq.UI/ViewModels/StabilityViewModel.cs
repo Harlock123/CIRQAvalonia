@@ -63,6 +63,13 @@ public sealed partial class StabilityViewModel : ObservableObject
     [ObservableProperty]
     public partial bool IsBusy { get; set; }
 
+    /// <summary>
+    /// What the curves read wherever the pointer is. Empty when it is not over the plot, so a
+    /// stale reading is never left sitting under a pointer that has moved away.
+    /// </summary>
+    [ObservableProperty]
+    public partial string Readout { get; set; } = string.Empty;
+
     /// <summary>True when the circuit has nowhere to break a loop.</summary>
     public bool HasProbes => Probes.Count > 0;
 

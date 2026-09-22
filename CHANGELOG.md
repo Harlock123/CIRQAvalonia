@@ -22,6 +22,29 @@ carries the SPICE cards for its imported models, so the file is the only copy of
 was. The snapshot is discarded as soon as you save for real, and as soon as the question has been
 answered either way.
 
+**Worst case, beside the tolerance analysis.** Sampling answers "what will most of them do"; this
+answers "what is the worst this can ever be", which is the question a specification is written
+from. The corner where every part sits at its extreme the same way is one combination out of 2ⁿ,
+and random trials essentially never land on it — so the sampled spread is always the narrower and
+always optimistic. It finds the corner directly: a solve per part to learn which way each one
+pushes, then two more, and it reports the recipe for each extreme as well as the number.
+
+**The DC sweep runs backwards.** Say what reading you want and it finds the value that gives it —
+plus the nearest E24 part you can actually buy and what that one achieves, because the exact answer
+is usually not a thing anybody sells.
+
+**A parts list export.** `Ctrl+E` will now write the bill of materials as CSV. The circuit already
+knew every part and value; this is that list in the form somebody ordering them wants.
+
+**A readout on the analysis plots.** Move the pointer across a loop gain or a noise curve and the
+line underneath says what it reads there. The scope keeps its draggable cursors, which are right
+for measuring an interval; a Bode plot wants one reading at one frequency instead.
+
+**Two examples for analyses that had none.** Crossover Distortion is a class-B pair and the notch
+it puts in everything — open the spectrum and read the THD, which comes out odd-harmonic because
+the notch is symmetric. Low-Noise Preamp is the same gain built twice, from big resistors and from
+small, so the noise window has something to compare.
+
 **SPICE subcircuits import.** A `.model` card describes one device, which is why importing has
 only ever reached diodes, bipolars and MOSFETs. Everything more interesting than a transistor is
 published as a `.subckt` — a pin list and a little netlist — and one now comes in as a block, which

@@ -211,6 +211,88 @@ public sealed partial class DcSweepViewModel : ObservableObject
         Stop = Math.Abs(current) < 1e-12 ? 5.0 : current * 1.2;
     }
 
+    /// <summary>
+    /// The reading to aim for when solving backwards, in the probe's own units.
+    /// </summary>
+    [ObservableProperty]
+    public partial double TargetValue { get; set; } = 5.0;
+
+    /// <summary>What the search found, or why it found nothing.</summary>
+    [ObservableProperty]
+    public partial string SolveResult { get; private set; } = string.Empty;
+
+    public bool HasSolveResult => SolveResult.Length > 0;
+
+    partial void OnSolveResultChanged(string value) => OnPropertyChanged(nameof(HasSolveResult));
+
+    /// <summary>
+    /// Works the sweep backwards: what value of the swept parameter gives the target reading.
+    /// <para>
+    /// Every analysis here asks the same question in the same direction — given these parts, what
+    /// does the circuit do. This is the one people actually have in front of them: the output has
+    /// to be five volts, so <i>what resistor</i>. It searches the range the sweep is already set
+    /// to, because that is the range somebody has already decided is sensible.
+    /// </para>
+    /// </summary>
+    [RelayCommand]
+    public void SolveForValue()
+    {
+        SolveResult = string.Empty;
+
+        if (Sweep is null)
+        {
+            SolveResult = "Nothing on the canvas has a number that can be varied.";
+            return;
+        }
+
+        var probe = _circuit.Probes.FirstOrDefault();
+
+        if (probe is null)
+        {
+            SolveResult = "Nothing to measure — put a probe on the node you want the value for.";
+            return;
+        }
+
+        try
+        {
+            var simulator = new CircuitSimulator(_circuit);
+
+            simulator.Reset();
+            simulator.SolveOperatingPoint();
+            simulator.ResolveProbes();
+
+            var target = Sweep.IsTemperature
+                ? SweepTarget.OverTemperature(Start, Stop)
+                : new SweepTarget(Sweep.Component, Sweep.PropertyName, Start, Stop);
+
+            var result = new ValueSolver(simulator).Run(new ValueSearch(target, probe, TargetValue));
+
+            if (!result.IsUsable)
+            {
+                SolveResult = result.Problem ?? "No value was found.";
+                return;
+            }
+
+            var name = Sweep.IsTemperature ? "the temperature" : Sweep.Component!.Name;
+            var unit = Sweep.Unit;
+
+            var line = $"{name} = {SiPrefix.Format(result.Value, unit)} gives " +
+                       $"{SiPrefix.Format(result.Achieved, probe.Unit)} at {probe.Label}";
+
+            if (result.Nearest is { } nearest && result.NearestAchieved is { } achieved)
+            {
+                line += $"   ·   nearest E24 part {SiPrefix.Format(nearest, unit)} gives " +
+                        $"{SiPrefix.Format(achieved, probe.Unit)} ({result.NearestError:P1} out)";
+            }
+
+            SolveResult = line;
+        }
+        catch (Exception ex)
+        {
+            SolveResult = Describe(ex);
+        }
+    }
+
     [RelayCommand]
     public void Run()
     {

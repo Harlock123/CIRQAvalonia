@@ -105,6 +105,8 @@ each row links to the section that explains it.
 | What have I **wired wrong** | [Check circuit](#checking-the-circuit) — the mistakes no part can report about itself | `F4` |
 | What does **temperature** do to it | [Temperature](#temperature) — set it, or sweep it like any other parameter | — |
 | Is this **better than what I had** | [Keep a reference](#comparing-and-computing-traces), change the circuit, compare | — |
+| What is the **worst it can ever be** | [Worst case](#the-worst-it-can-ever-be), in the tolerance window — the corner, not a sample of it | `Shift` `F4` |
+| **What value** gives me this answer | [Solve](#working-it-backwards), in the DC sweep window | `Shift` `F7` |
 
 Three of those are worth separating, because they are easy to confuse:
 
@@ -2852,6 +2854,28 @@ is the same machinery and is there for free. The range defaults to something the
 actually do rather than to 0–5 whatever was picked, since a base current lives in microamps and a
 mains source in hundreds of volts.
 
+### Working it backwards
+
+Every analysis in this guide asks the same question in the same direction: given these parts, what
+does the circuit do. **Solve** asks the one people actually have in front of them — the output has
+to be five volts, so *what resistor*.
+
+Type the reading you want beside **Solve**, press **Find the value**, and it searches the range the
+sweep is already set to. It is a bisection, deliberately: a circuit's response to a component value
+is monotonic far more often than it is smooth — a diode comes on, a transistor saturates, a
+comparator flips — and a cleverer method on a curve with a corner in it runs away, where bisection
+cannot.
+
+It also gives the nearest **E24 preferred value** and what *that* one achieves, because the exact
+answer is usually not a thing you can buy. Resistors are not made in every value: they are made a
+couple of dozen to a decade, spaced so each one's tolerance band meets the next. Being told
+"2.5 kΩ, and the 2.4 kΩ you can actually get gives you 1.94 V" is a decision; being told "2.5 kΩ"
+is homework.
+
+If the target is outside what the range can reach, it says what the range *can* do — which tells
+you which way to widen it.
+
+
 ![A transistor's output characteristics: four curves of collector current against collector voltage, one for each of 10, 20, 30 and 40 microamps of base current, each rising steeply from the origin and then flattening into a nearly horizontal line — the fan on the front of every transistor datasheet](images/16-curve-tracer.png)
 
 Things worth sweeping, all of them already in the examples:
@@ -3104,6 +3128,11 @@ stays the one the working circuit has and nothing saturates.
 
 The window says the verdict in words as well as figures, because a margin only means something
 against those thresholds and expecting everybody to carry them around is how a plot gets misread.
+
+**Move the pointer across the plot** and the line underneath says the gain and the phase at that
+frequency. The scope has draggable cursors because what you want from a waveform is the interval
+between two instants; what you want from a loop gain is one reading at one frequency, which is
+worth having the moment the pointer is over it rather than after dragging something there.
 
 ### What it will tell you
 
@@ -3378,6 +3407,32 @@ Every other analysis here uses the value written on the schematic. No resistor h
 value written on it. A divider of two 5 % resistors is not a divider by two; a 555 built round a
 20 % ceramic is not a precision timer. Whether that matters depends entirely on the circuit, and
 this is how you find out which kind you have.
+
+### The worst it can ever be
+
+**Run** samples: it builds the circuit a few hundred times from parts drawn at random and reports
+the spread. That answers "what will most of them do".
+
+**Worst case** answers the other question, and it is the one a specification is written from: what
+is the worst this can *ever* be. Random trials essentially never land on the corner where every
+part is at its extreme in the same direction — that is one combination out of 2ⁿ, so four hundred
+trials of ten parts explores well under a thousandth of the space. The sampled spread is always
+the narrower of the two, and always optimistic.
+
+It finds the corner directly rather than trying them all. Each part is nudged once to see which
+way it pushes the answer — that is n solves, not 2ⁿ — and then every part is put at the end of its
+band that pushes the same way. Two solves later you have both extremes, **and the recipe for
+each**: "highest with R1 low, R2 high" is a thing you can go and check on a bench.
+
+One assumption, stated plainly: it assumes the answer moves **monotonically** with each part. That
+is true of almost every circuit — more resistance here means more output, always — and false where
+a circuit has an internal maximum, such as a matched pair or a tuned load. Where it is false the
+corner it finds is still a real combination and a real answer; it is simply not guaranteed to be
+the worst one, and the sampled spread is the better tool.
+
+A part the answer does not depend on is left at its marked value rather than pushed anywhere,
+because putting it somewhere would be noise in the recipe rather than part of it.
+
 
 ![A histogram of four hundred builds of a divider made from two five percent resistors: a rough bell centred on the nominal five volts, with the extremes reaching about four and a half percent either side](images/23-tolerance.png)
 
@@ -4258,7 +4313,7 @@ Also available in the app at **Help > Keyboard Shortcuts**.
 | View menu | **Mark Interactive Parts** rings everything you can double-click; **Describe Parts on Hover** turns the hover card off |
 | `Ctrl+N` / `Ctrl+O` / `Ctrl+S` / `Ctrl+Shift+S` | New / open / save / save as |
 | `Ctrl+P` | Print — a sheet each for the schematic, the traces and the parts list |
-| `Ctrl+E` | Export — PNG, JPEG, BMP, SVG, PDF, a SPICE netlist or the traces as CSV |
+| `Ctrl+E` | Export — PNG, JPEG, BMP, SVG, PDF, a SPICE netlist, the traces as CSV, or the parts list as a BOM |
 | `Ctrl+Shift+E` | Browse the example circuits |
 | `Help > About` | Version, and the libraries this is built on — with a button that copies the lot |
 

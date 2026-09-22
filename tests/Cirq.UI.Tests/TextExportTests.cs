@@ -189,11 +189,26 @@ public class TextExportTests : IDisposable
     public void EveryFormatStillHasAnExtensionOfItsOwn()
     {
         var extensions = Enum.GetValues<ExportFormat>()
-            .Select(CircuitExporter.Extension)
-            .ToList();
+            .ToDictionary(f => f, CircuitExporter.Extension);
 
-        Assert.Equal(extensions.Count, extensions.Distinct().Count());
-        Assert.All(extensions, e => Assert.StartsWith(".", e));
+        Assert.All(extensions.Values, e => Assert.StartsWith(".", e));
+
+        // Not all distinct any more, and they should not be: a bill of materials is a CSV file
+        // like the traces are, and giving it another extension to keep a test happy would make a
+        // spreadsheet refuse to open it.
+        //
+        // What actually matters is that nothing falls through to the default. PDF is the only
+        // format entitled to .pdf, so a new one arriving without a case of its own shows up here
+        // rather than quietly writing a .pdf full of text.
+        foreach (var (format, extension) in extensions)
+        {
+            if (format == ExportFormat.Pdf) continue;
+
+            Assert.NotEqual(".pdf", extension);
+        }
+
+        Assert.Equal(".csv", extensions[ExportFormat.Csv]);
+        Assert.Equal(".csv", extensions[ExportFormat.Bom]);
     }
 
     /// <summary>

@@ -56,6 +56,10 @@ public static class Examples
             new("Inverting Amplifier", "LM741 with a gain of -10", LoadInvertingAmplifier),
             new("Loop Stability", "A follower with a loop probe in it — open Simulate > Stability, then add the capacitive load and watch the phase margin go",
                 LoadLoopStability),
+            new("Crossover Distortion", "A class-B pair and the notch it puts in every waveform — open Simulate > Spectrum and read the THD",
+                LoadCrossoverDistortion),
+            new("Low-Noise Preamp", "The same gain from big resistors and from small ones — open Simulate > Noise and see which part is making it",
+                LoadLowNoisePreamp),
             new("Comparator Trigger", "LM311 squaring up a sine wave", LoadComparatorTrigger),
             new("Window Detector", "LM339 outputs wired together to flag an out-of-range voltage",
                 LoadWindowDetector),
@@ -412,6 +416,135 @@ public static class Examples
         vm.Scope.VoltsPerDivision = 0.5;
         vm.Scope.AddProbe(opamp.NonInverting, "Input");
         vm.Scope.AddProbe(opamp.Output, "Output");
+    }
+
+    /// <summary>
+    /// A class-B output pair, which is the classic distortion to look at.
+    /// <para>
+    /// Two transistors, one for each half of the waveform, and neither conducts until its
+    /// base-emitter junction is forward biased. So there is a band around zero — about 1.2 V wide,
+    /// two junction drops — where <i>neither</i> is on and the output does not move at all. That
+    /// is the crossover notch, and it is why every real class-B stage is biased slightly on.
+    /// </para>
+    /// <para>
+    /// Worth doing with this one: run it, open <b>Simulate &gt; Spectrum</b>, and read the THD. The
+    /// harmonics are the <i>odd</i> ones, because the notch is symmetric — the same distortion on
+    /// both halves. Then look at the waveform: the notch is visible, which makes this the rare
+    /// case where the distortion can be seen as well as measured.
+    /// </para>
+    /// </summary>
+    public static void LoadCrossoverDistortion(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "Class-B crossover distortion";
+
+        var positive = Place(circuit, new DcVoltageSource(12.0), -180, -220);
+        var negative = Place(circuit, new DcVoltageSource(-12.0), -180, 220);
+
+        // Well above the two junction drops, so the notch is a fraction of the swing rather than
+        // the whole of it — a stage that never leaves the notch is not distorting, it is off.
+        // With a real output resistance, because a class-B pair driven from an ideal source is a
+        // short through whichever base-emitter junction is forward biased — and the solver is
+        // right to refuse it.
+        var generator = Place(circuit, new FunctionGenerator(Waveform.Sine, 1e3, 8.0)
+        {
+            OutputResistance = 50.0,
+        }, -360, 0);
+
+        var drive = Place(circuit, new Resistor(220), -180, 0);
+
+        var npn = Place(circuit, new BipolarTransistor(BjtModel.Bc547), 40, -90);
+        var pnp = Place(circuit, new BipolarTransistor(BjtModel.Bc557), 40, 90);
+
+        var load = Place(circuit, new Resistor(1e3), 260, 60);
+
+        var ground = Place(circuit, new Ground(), -360, 140);
+        var ground2 = Place(circuit, new Ground(), -60, -220);
+        var ground3 = Place(circuit, new Ground(), -60, 220);
+        var ground4 = Place(circuit, new Ground(), 260, 200);
+
+        load.RotationDegrees = 90;
+
+        circuit.Connect(generator.Return, ground.Pin);
+        circuit.Connect(generator.Output, drive.A);
+        circuit.Connect(drive.B, npn.Base);
+        circuit.Connect(npn.Base, pnp.Base);
+
+        circuit.Connect(positive.Positive, npn.Collector);
+        circuit.Connect(positive.Negative, ground2.Pin);
+        circuit.Connect(negative.Positive, pnp.Collector);
+        circuit.Connect(negative.Negative, ground3.Pin);
+
+        circuit.Connect(npn.Emitter, pnp.Emitter);
+        circuit.Connect(npn.Emitter, load.A);
+        circuit.Connect(load.B, ground4.Pin);
+
+        vm.Scope.TimebasePerDivision = 200e-6;
+        vm.Scope.VoltsPerDivision = 2.0;
+        vm.Scope.AddProbe(drive.A, "Input");
+        vm.Scope.AddProbe(load.A, "Output");
+    }
+
+    /// <summary>
+    /// The same amplifier twice, once from a high-impedance feedback network and once from a low
+    /// one — set up for <b>Simulate &gt; Noise</b>.
+    /// <para>
+    /// Both stages have a gain of ten and both give the same answer to every other analysis here.
+    /// They do not make the same noise: the one built from megohms is far worse, because a
+    /// resistor's noise goes as the square root of its value and because the amplifier's own
+    /// current noise has somewhere to develop across. Measure each in turn and read the ranking.
+    /// </para>
+    /// </summary>
+    public static void LoadLowNoisePreamp(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "The same gain, from big resistors and from small";
+
+        var positive = Place(circuit, new DcVoltageSource(15.0), -320, -260);
+        var negative = Place(circuit, new DcVoltageSource(-15.0), -320, 260);
+
+        var ground = Place(circuit, new Ground(), -180, -260);
+        var ground2 = Place(circuit, new Ground(), -180, 260);
+
+        // Two identical stages, differing only in the size of the feedback network.
+        var quiet = Stage(circuit, "Quiet", -60, -140, 1e3, 9e3, positive, negative);
+        var noisy = Stage(circuit, "Noisy", -60, 140, 100e3, 900e3, positive, negative);
+
+        circuit.Connect(positive.Negative, ground.Pin);
+        circuit.Connect(negative.Negative, ground2.Pin);
+
+        vm.Scope.TimebasePerDivision = 200e-6;
+        vm.Scope.VoltsPerDivision = 1.0;
+        vm.Scope.AddProbe(quiet, "Quiet out");
+        vm.Scope.AddProbe(noisy, "Noisy out");
+    }
+
+    /// <summary>One non-inverting stage of gain ten, and the terminal its output comes from.</summary>
+    private static Terminal Stage(
+        Circuit circuit, string name, double x, double y, double lower, double upper,
+        DcVoltageSource positive, DcVoltageSource negative)
+    {
+        var amp = Place(circuit, new OpAmp741 { Name = $"U{name}" }, x, y);
+        var gain = Place(circuit, new Resistor(lower), x - 60, y + 90);
+        var feedback = Place(circuit, new Resistor(upper), x + 20, y - 90);
+        var ground = Place(circuit, new Ground(), x - 60, y + 180);
+        var input = Place(circuit, new Ground(), x - 200, y + 40);
+
+        gain.RotationDegrees = 90;
+
+        circuit.Connect(amp.PositiveSupply, positive.Positive);
+        circuit.Connect(amp.NegativeSupply, negative.Positive);
+
+        // Driven from ground: a noise measurement is about what the circuit makes, not about what
+        // it is being given, so there is nothing at the input on purpose.
+        circuit.Connect(amp.NonInverting, input.Pin);
+
+        circuit.Connect(amp.Output, feedback.A);
+        circuit.Connect(feedback.B, amp.Inverting);
+        circuit.Connect(amp.Inverting, gain.A);
+        circuit.Connect(gain.B, ground.Pin);
+
+        return amp.Output;
     }
 
     public static void LoadRectifier(MainWindowViewModel vm)
