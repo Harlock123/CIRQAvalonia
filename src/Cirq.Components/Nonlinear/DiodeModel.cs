@@ -76,19 +76,41 @@ public sealed record DiodeModel(
     public static DiodeModel Zener(double breakdownVoltage) =>
         new($"Zener {breakdownVoltage:0.#}V", 1e-14, 1.0, 1.0, breakdownVoltage);
 
-    private static readonly List<DiodeModel> Models =
+    private static readonly IReadOnlyList<DiodeModel> BuiltIn =
     [
         D1N4148, D1N4001, D1N5817,
         LedRed, LedAmber, LedYellow, LedGreen, LedBlue, LedWhite,
         Zener(3.3), Zener(5.1), Zener(9.1), Zener(12.0),
     ];
 
+    /// <summary>Models brought in from SPICE cards, which shadow a built-in of the same name.</summary>
+    private static readonly List<DiodeModel> ImportedModels = [];
+
     /// <summary>
     /// Every model the application knows, built in or imported. A saved circuit names its model
     /// and finds it again in here, so anything imported has to be registered before a circuit
     /// using it is opened.
     /// </summary>
-    public static IReadOnlyList<DiodeModel> Library => Models;
+    public static IReadOnlyList<DiodeModel> Library
+    {
+        get
+        {
+            if (ImportedModels.Count == 0) return BuiltIn;
+
+            // An import shadows a built-in of the same name rather than replacing it, which is
+            // what lets the import be removed again and the built-in come back. Somebody
+            // importing a card called 1N4148 — much the likeliest name there is — should not be
+            // able to delete the one that shipped.
+            List<DiodeModel> library = [.. BuiltIn.Select(
+                m => ImportedModels.FirstOrDefault(
+                    i => string.Equals(i.Name, m.Name, StringComparison.OrdinalIgnoreCase)) ?? m)];
+
+            library.AddRange(ImportedModels.Where(
+                i => !BuiltIn.Any(m => string.Equals(m.Name, i.Name, StringComparison.OrdinalIgnoreCase))));
+
+            return library;
+        }
+    }
 
     /// <summary>
     /// Adds a model, replacing any with the same name. Used by the SPICE importer; a part brought
@@ -98,13 +120,16 @@ public sealed record DiodeModel(
     {
         ArgumentNullException.ThrowIfNull(model);
 
-        Models.RemoveAll(m => string.Equals(m.Name, model.Name, StringComparison.OrdinalIgnoreCase));
-        Models.Add(model);
+        ImportedModels.RemoveAll(m => string.Equals(m.Name, model.Name, StringComparison.OrdinalIgnoreCase));
+        ImportedModels.Add(model);
     }
 
-    /// <summary>Removes an imported model by name.</summary>
+    /// <summary>
+    /// Removes an imported model by name. Built-in models are not removable — an import of the
+    /// same name was shadowing one, and taking the import away brings it back.
+    /// </summary>
     public static bool Unregister(string name) =>
-        Models.RemoveAll(m => string.Equals(m.Name, name, StringComparison.OrdinalIgnoreCase)) > 0;
+        ImportedModels.RemoveAll(m => string.Equals(m.Name, name, StringComparison.OrdinalIgnoreCase)) > 0;
 
     public override string ToString() => Name;
 }

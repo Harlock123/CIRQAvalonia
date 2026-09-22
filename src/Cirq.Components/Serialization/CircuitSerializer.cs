@@ -188,6 +188,25 @@ public static class CircuitSerializer
     public static string ToJson(Circuit circuit) =>
         JsonSerializer.Serialize(ToDocument(circuit), WriteOptions);
 
+    /// <summary>
+    /// The same JSON with the save time left out, for comparing two states of a document.
+    /// <para>
+    /// A saved file wants to say when it was saved. A <i>snapshot</i> does not, and the timestamp
+    /// actively gets in the way: two serialisations of an unchanged circuit differ in it, so
+    /// anything comparing them to ask "did this actually change" always gets yes. The undo history
+    /// asks exactly that, to avoid charging somebody a keystroke for an edit that set a value to
+    /// what it already was.
+    /// </para>
+    /// </summary>
+    public static string ToComparableJson(Circuit circuit)
+    {
+        var document = ToDocument(circuit);
+
+        document.SavedUtc = default;
+
+        return JsonSerializer.Serialize(document, WriteOptions);
+    }
+
     public static void Save(Circuit circuit, string path)
     {
         var directory = Path.GetDirectoryName(Path.GetFullPath(path));

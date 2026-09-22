@@ -21,8 +21,16 @@ namespace Cirq.UI.Services;
 /// </summary>
 public sealed partial class UndoHistory : ObservableObject
 {
-    /// <summary>One point in the document's history, and what produced it.</summary>
-    private readonly record struct Snapshot(string Json, string Label);
+    /// <summary>
+    /// One point in the document's history, and what produced it.
+    /// <para>
+    /// <paramref name="Comparable"/> is the same document without its save timestamp. Restoring
+    /// uses the full form; deciding whether anything actually changed uses this one, because two
+    /// serialisations of an unchanged circuit differ in the timestamp and would always look like
+    /// an edit.
+    /// </para>
+    /// </summary>
+    private readonly record struct Snapshot(string Json, string Comparable, string Label);
 
     private readonly List<Snapshot> _undo = [];
     private readonly List<Snapshot> _redo = [];
@@ -64,7 +72,7 @@ public sealed partial class UndoHistory : ObservableObject
     {
         _undo.Clear();
         _redo.Clear();
-        _current = new Snapshot(CircuitSerializer.ToJson(circuit), string.Empty);
+        _current = Take(circuit, string.Empty);
         NotifyState();
     }
 
@@ -76,21 +84,69 @@ public sealed partial class UndoHistory : ObservableObject
     {
         if (IsSuspended) return;
 
-        var json = CircuitSerializer.ToJson(circuit);
+        var snapshot = Take(circuit, label);
 
         // Nothing actually changed — a property set to the value it already had, or a
         // notification raised for its own sake. Recording it would cost the user a keystroke of
         // undo that appears to do nothing.
-        if (json == _current.Json) return;
+        if (snapshot.Comparable == _current.Comparable) return;
 
         _undo.Add(_current);
         if (_undo.Count > Depth) _undo.RemoveAt(0);
 
-        _current = new Snapshot(json, label);
+        _current = snapshot;
 
         // A new edit is a new branch: whatever was undone cannot be redone onto it.
         _redo.Clear();
         NotifyState();
+    }
+
+    /// <summary>
+    /// Records a whole gesture as one step, however many mutations it takes.
+    /// <para>
+    /// This exists because a snapshot history is driven by change notifications, and some edits
+    /// are several changes that only make sense together. Grouping a selection into a block
+    /// removes each part and then adds the block: three notifications, three steps, and one undo
+    /// lands on the middle one — the parts removed, the block not yet added. That state never
+    /// existed and the parts are simply gone from it. It was silent data loss.
+    /// </para>
+    /// <para>
+    /// Inside the scope nothing is recorded; on leaving it, one step is pushed with the state from
+    /// before the gesture began, which is where an undo has to come back to. Nested scopes are
+    /// safe: only the outermost records, so a gesture built out of other gestures still costs one
+    /// step, and a gesture inside a restore records nothing at all.
+    /// </para>
+    /// </summary>
+    public IDisposable Gesture(Circuit circuit, string label) => new GestureScope(this, circuit, label);
+
+    private sealed class GestureScope : IDisposable
+    {
+        private readonly UndoHistory _history;
+        private readonly Circuit _circuit;
+        private readonly string _label;
+        private readonly bool _outermost;
+
+        public GestureScope(UndoHistory history, Circuit circuit, string label)
+        {
+            _history = history;
+            _circuit = circuit;
+            _label = label;
+
+            // Whether this scope is the one that will do the recording has to be decided before
+            // suspending, since suspending is what makes it look nested.
+            _outermost = !history.IsSuspended;
+
+            history.Suspend();
+        }
+
+        public void Dispose()
+        {
+            if (_history._suspended > 0) _history._suspended--;
+
+            // Only the outermost scope records, and only when nothing above it is holding the
+            // history suspended for its own reasons.
+            if (_outermost && !_history.IsSuspended) _history.Capture(_circuit, _label);
+        }
     }
 
     /// <summary>
@@ -108,7 +164,7 @@ public sealed partial class UndoHistory : ObservableObject
         if (_suspended > 0) _suspended--;
         if (IsSuspended) return;
 
-        _current = _current with { Json = CircuitSerializer.ToJson(circuit) };
+        _current = Take(circuit, _current.Label);
         NotifyState();
     }
 
@@ -139,6 +195,11 @@ public sealed partial class UndoHistory : ObservableObject
         NotifyState();
         return _current.Json;
     }
+
+    private static Snapshot Take(Circuit circuit, string label) => new(
+        CircuitSerializer.ToJson(circuit),
+        CircuitSerializer.ToComparableJson(circuit),
+        label);
 
     private void NotifyState()
     {

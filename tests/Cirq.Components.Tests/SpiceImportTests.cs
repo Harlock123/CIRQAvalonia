@@ -243,6 +243,50 @@ public class SpiceImportTests
         Assert.Equal(before, DiodeModel.Library.Count);
     }
 
+    /// <summary>
+    /// An import of a built-in's name shadows it rather than replacing it, and removing the
+    /// import brings the built-in back. 1N4148 is much the likeliest name anybody will paste, and
+    /// losing the shipped one until restart would be a poor trade.
+    /// </summary>
+    [Fact]
+    public void AnImportCannotDestroyABuiltInOfTheSameName()
+    {
+        var shipped = DiodeModel.Library.Single(m => m.Name == "1N4148");
+        var before = DiodeModel.Library.Count;
+
+        SpiceModelImport.Register(
+            SpiceModelReader.Parse(".model 1N4148 D(Is=9.9n N=1.1 Rs=2)").Cards[0]);
+
+        try
+        {
+            // Shadowed: the name appears once, and it is the imported one.
+            var shadowing = Assert.Single(DiodeModel.Library, m => m.Name == "1N4148");
+
+            Assert.Equal(9.9e-9, shadowing.SaturationCurrent, 15);
+            Assert.Equal(before, DiodeModel.Library.Count);
+        }
+        finally
+        {
+            Assert.True(DiodeModel.Unregister("1N4148"));
+        }
+
+        // And the shipped one is back, unchanged.
+        var restored = Assert.Single(DiodeModel.Library, m => m.Name == "1N4148");
+
+        Assert.Equal(shipped.SaturationCurrent, restored.SaturationCurrent, 15);
+        Assert.Equal(before, DiodeModel.Library.Count);
+    }
+
+    [Fact]
+    public void ABuiltInModelCannotBeRemoved()
+    {
+        Assert.False(DiodeModel.Unregister("1N4001"));
+        Assert.Contains(DiodeModel.Library, m => m.Name == "1N4001");
+
+        Assert.False(BjtModel.Unregister("2N3904"));
+        Assert.False(MosfetModel.Unregister("IRF540"));
+    }
+
     [Fact]
     public void ImportingTheSameNameTwiceReplacesRatherThanDuplicates()
     {

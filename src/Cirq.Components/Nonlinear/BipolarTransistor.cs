@@ -51,24 +51,49 @@ public sealed record BjtModel(
     public static readonly BjtModel Bc557 = new("BC557", BjtPolarity.Pnp, 1.0e-14, 200, 5, 60);
     public static readonly BjtModel Tip32C = new("TIP32C", BjtPolarity.Pnp, 1.0e-13, 100, 2, 100);
 
-    private static readonly List<BjtModel> Models =
+    private static readonly IReadOnlyList<BjtModel> BuiltIn =
         [N2N3904, N2N2222, Bc547, Tip31C, P2N3906, Bc557, Tip32C];
 
+    /// <summary>Models brought in from SPICE cards, which shadow a built-in of the same name.</summary>
+    private static readonly List<BjtModel> ImportedModels = [];
+
     /// <summary>Every model the application knows, built in or imported.</summary>
-    public static IReadOnlyList<BjtModel> Library => Models;
+    public static IReadOnlyList<BjtModel> Library
+    {
+        get
+        {
+            if (ImportedModels.Count == 0) return BuiltIn;
+
+            // An import shadows a built-in of the same name rather than replacing it, which is
+            // what lets the import be removed again and the built-in come back. Somebody
+            // importing a card called 1N4148 — much the likeliest name there is — should not be
+            // able to delete the one that shipped.
+            List<BjtModel> library = [.. BuiltIn.Select(
+                m => ImportedModels.FirstOrDefault(
+                    i => string.Equals(i.Name, m.Name, StringComparison.OrdinalIgnoreCase)) ?? m)];
+
+            library.AddRange(ImportedModels.Where(
+                i => !BuiltIn.Any(m => string.Equals(m.Name, i.Name, StringComparison.OrdinalIgnoreCase))));
+
+            return library;
+        }
+    }
 
     /// <summary>Adds a model, replacing any with the same name.</summary>
     public static void Register(BjtModel model)
     {
         ArgumentNullException.ThrowIfNull(model);
 
-        Models.RemoveAll(m => string.Equals(m.Name, model.Name, StringComparison.OrdinalIgnoreCase));
-        Models.Add(model);
+        ImportedModels.RemoveAll(m => string.Equals(m.Name, model.Name, StringComparison.OrdinalIgnoreCase));
+        ImportedModels.Add(model);
     }
 
-    /// <summary>Removes an imported model by name.</summary>
+    /// <summary>
+    /// Removes an imported model by name. Built-in models are not removable — an import of the
+    /// same name was shadowing one, and taking the import away brings it back.
+    /// </summary>
     public static bool Unregister(string name) =>
-        Models.RemoveAll(m => string.Equals(m.Name, name, StringComparison.OrdinalIgnoreCase)) > 0;
+        ImportedModels.RemoveAll(m => string.Equals(m.Name, name, StringComparison.OrdinalIgnoreCase)) > 0;
 
     public override string ToString() => Name;
 }

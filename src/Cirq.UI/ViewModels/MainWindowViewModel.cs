@@ -506,15 +506,30 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         return true;
     }
 
-    /// <summary>Suspends recording for the span of a gesture, so a drag costs one undo step.</summary>
+    /// <summary>
+    /// Suspends recording for the span of a gesture, so a drag across the canvas costs one undo
+    /// step rather than one per pointer movement.
+    /// <para>
+    /// The same scope grouping uses, held open between the two calls instead of wrapped round a
+    /// block, because a drag begins and ends on separate input events. It records on <i>exit</i>,
+    /// which is what makes the step's before-state the one from before the gesture.
+    /// </para>
+    /// </summary>
     public void BeginInteractiveEdit(string label)
     {
-        History.Capture(Circuit, label);
-        History.Suspend();
+        // A gesture already in progress stays in charge; a pointer-down during one would
+        // otherwise end it early and split it in two.
+        _gesture ??= History.Gesture(Circuit, label);
     }
 
     /// <summary>Ends a gesture begun with <see cref="BeginInteractiveEdit"/>.</summary>
-    public void EndInteractiveEdit() => History.Resume(Circuit);
+    public void EndInteractiveEdit()
+    {
+        _gesture?.Dispose();
+        _gesture = null;
+    }
+
+    private IDisposable? _gesture;
 
     [RelayCommand]
     private void RotateSelection() => RequestRotateSelection?.Invoke(this, EventArgs.Empty);
@@ -542,7 +557,15 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             return;
         }
 
-        var block = Grouping.Group(Circuit, components, "Block");
+        // One undo step for the whole gesture. Grouping removes each part and then adds the
+        // block, and recorded as separate steps a single undo lands between them — the parts
+        // removed, the block not yet added, and the parts gone.
+        Subcircuit? block;
+
+        using (History.Gesture(Circuit, "Group into Block"))
+        {
+            block = Grouping.Group(Circuit, components, "Block");
+        }
 
         if (block is null)
         {
@@ -578,7 +601,12 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             return;
         }
 
-        var released = Grouping.Ungroup(Circuit, block);
+        IReadOnlyList<CircuitComponent> released;
+
+        using (History.Gesture(Circuit, "Ungroup Block"))
+        {
+            released = Grouping.Ungroup(Circuit, block);
+        }
 
         SelectedComponent = null;
         foreach (var component in Circuit.Components)
@@ -668,7 +696,12 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         block.X = bounds.X;
         block.Y = bounds.Y;
 
-        Circuit.Components.Add(block);
+        // One step, as for grouping: a placed block brings its contents with it, and the parts
+        // inside it are named as it is added.
+        using (History.Gesture(Circuit, $"Place {name}"))
+        {
+            Circuit.Components.Add(block);
+        }
 
         SelectedComponent = block;
         foreach (var component in Circuit.Components) component.IsSelected = false;

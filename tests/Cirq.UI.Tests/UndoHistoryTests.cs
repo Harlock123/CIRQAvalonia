@@ -142,6 +142,31 @@ public class UndoHistoryTests
     /// A drag moves a component on every pointer movement. Each gesture has to cost one step, or
     /// undoing a drag across the canvas would take a hundred keystrokes.
     /// </summary>
+    /// <summary>
+    /// And a value set to what it already was costs nothing, so an undo never appears to do
+    /// nothing. This is the guard that used to be defeated by the save timestamp in the snapshot.
+    /// </summary>
+    [Fact]
+    public void SettingAValueToWhatItAlreadyWasCostsNoUndoStep()
+    {
+        using var vm = Fresh();
+        var part = vm.Circuit.Add(new Resistor(1e3));
+
+        var depth = 0;
+        while (vm.History.CanUndo && depth < 20) { vm.History.Undo(); depth++; }
+
+        // Back to a settled state, then a run of writes that change nothing at all.
+        vm.History.Reset(vm.Circuit);
+
+        for (var i = 0; i < 10; i++)
+        {
+            part.Resistance = 1e3;
+            part.X = part.X;
+        }
+
+        Assert.False(vm.History.CanUndo);
+    }
+
     [Fact]
     public void ADragCostsOneUndoStepRatherThanOnePerMovement()
     {
