@@ -8,15 +8,64 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
-**Netlist and CSV export.** `Ctrl+E` gains two formats that are text rather than pictures. A
-**SPICE netlist** writes the circuit as a deck — so an analysis this engine does not do can be run
-somewhere that does — naming the parts it could not carry rather than omitting them silently. And
-**CSV** writes the recorded traces as numbers, everything captured rather than the window on
-screen, for a spreadsheet or a script.
+## [0.30.0] - 2026-09-21
 
-Function generators are carried across as SPICE sources with their waveform, including the shapes
-SPICE has no element for: a triangle is a PULSE that spends its whole period rising and falling.
-Without that an exported analog circuit had nothing driving it.
+Export stops being only pictures. Two text formats, so a circuit drawn here can be handed to
+another tool rather than only looked at. 183 components in 16 categories, 84 worked examples,
+2411 tests.
+
+**A SPICE netlist.** `Ctrl+E` and pick *SPICE netlist*, and the circuit comes out as a deck.
+There are analyses this engine does not do — noise, distortion, pole-zero — and a deck ngspice or
+LTspice can read is the way to them. Together with the model import added in 0.29.0 that makes
+this a front end you can leave: a card off a datasheet comes in, and a circuit built round it
+goes out.
+
+Resistors, capacitors, inductors, sources, function generators, diodes and transistors all have
+direct equivalents. Models are written out alongside the elements, so the deck stands on its own
+rather than depending on a library the reader has not got. A net you have named keeps its name, so
+the file reads as your circuit rather than as a list of numbered nodes. A block's contents appear
+as the ordinary parts they are.
+
+**And it tells you what it could not carry.** A 7400, an I²C master, an ultrasonic ranger: those
+are modelled here by event-driven code rather than by a netlist, and there is no honest
+translation. They appear in the deck as comments naming the part, under a line saying the circuit
+is incomplete where they were. A netlist that quietly omits half a circuit is worse than one that
+says so.
+
+**CSV of the traces.** A header naming each column with its unit, then a row per sample — for a
+spreadsheet to fit a curve, a script to compare two runs, or a report that wants the figures
+rather than a picture of them.
+
+It writes everything recorded rather than the window on screen, because a file is not a screen.
+The probes do not share a time axis — each records when the solver accepted a time point, and one
+attached halfway through a run starts halfway through — so the rows are the union of their sample
+times, with each column interpolated where it has no sample of its own, and a probe that did not
+exist yet left blank rather than given a reading nobody took. Long runs decimate evenly across the
+whole run rather than being truncated to the first fraction of it.
+
+Both live in the same export dialog as the image formats, where the layout, resolution and
+background settings grey out — they have no use for them — and a line appears saying what the
+chosen format actually does.
+
+### Also
+
+Two things turned up while exporting the shipped examples, which is why it was worth doing rather
+than testing the writer against waveforms of its own:
+
+- **Function generators were left out of the deck entirely**, which for most of the analog examples
+  meant exporting a circuit with nothing driving it. SPICE has exactly that element: a sine becomes
+  `SIN`, and the shapes it has no element for become `PULSE` — a triangle is a pulse that spends
+  its whole period rising and falling, which is the same waveform rather than an approximation
+  of it.
+- **An LED came out named `DED1`**, because stripping a designator's prefix assumed one letter.
+  Element names are now allocated rather than computed, and a part whose designator already starts
+  with the right type letter reserves it first — so a source called `V1` stays `V1` instead of
+  losing it to an `FG1` that happens to sort earlier.
+
+One caution, stated plainly: the decks are verified by structure, and by reading their own model
+cards back through the SPICE importer — two independent pieces of code agreeing, which is a real
+check. They have **not** been run through ngspice, which is not installed on the machine this was
+built on. Expect them to be right; do not expect them to be certified.
 
 ## [0.29.0] - 2026-09-21
 
