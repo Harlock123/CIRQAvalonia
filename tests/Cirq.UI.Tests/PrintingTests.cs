@@ -375,4 +375,86 @@ public class PrintingTests : IDisposable
         Assert.Contains(path, outcome.Message);
         Assert.Equal(path, outcome.Path);
     }
+
+    /// <summary>
+    /// The ink palette must be readable from any thread.
+    /// <para>
+    /// A plain <c>SolidColorBrush</c> is an <c>AvaloniaObject</c>, and an AvaloniaObject verifies
+    /// the calling thread on every property read — so a palette built on one thread and drawn
+    /// from another threw <c>InvalidOperationException</c> on the first stroke. Exporting catches
+    /// that exception, so what it actually looked like was an export that wrote a file and then
+    /// quietly did nothing else, once in every few runs, in whichever test happened to be
+    /// rendering while another was printing.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void TheInkPaletteCanBeReadFromAnyThread()
+    {
+        using var ink = Cirq.UI.Rendering.CanvasTheme.ForPrinting();
+
+        Exception? thrown = null;
+
+        var reader = new Thread(() =>
+        {
+            try
+            {
+                foreach (var brush in new[]
+                {
+                    Cirq.UI.Rendering.CanvasTheme.BackgroundBrush,
+                    Cirq.UI.Rendering.CanvasTheme.SymbolBrush,
+                    Cirq.UI.Rendering.CanvasTheme.SymbolFill,
+                    Cirq.UI.Rendering.CanvasTheme.LabelBrush,
+                    Cirq.UI.Rendering.CanvasTheme.ValueBrush,
+                    Cirq.UI.Rendering.CanvasTheme.SelectionBrush,
+                    Cirq.UI.Rendering.CanvasTheme.WireBrush,
+                    Cirq.UI.Rendering.CanvasTheme.TerminalBrush,
+                    Cirq.UI.Rendering.CanvasTheme.TerminalHoverBrush,
+                    Cirq.UI.Rendering.CanvasTheme.ProbeBrush,
+                    Cirq.UI.Rendering.CanvasTheme.ErrorBrush,
+                })
+                {
+                    // What the renderer does with every one of them, on whatever thread it is on.
+                    _ = ((Avalonia.Media.ISolidColorBrush)brush).Color;
+                    _ = brush.Opacity;
+                }
+            }
+            catch (Exception ex)
+            {
+                thrown = ex;
+            }
+        });
+
+        reader.Start();
+        Assert.True(reader.Join(TimeSpan.FromSeconds(10)), "the reading thread did not finish");
+
+        Assert.Null(thrown);
+    }
+
+    /// <summary>
+    /// And structurally, which is the reason rather than the symptom: nothing in the palette is
+    /// thread-affine, so no future colour can quietly reintroduce the same fault.
+    /// </summary>
+    [Fact]
+    public void NothingInTheInkPaletteIsAnAvaloniaObject()
+    {
+        using var ink = Cirq.UI.Rendering.CanvasTheme.ForPrinting();
+
+        foreach (var brush in new[]
+        {
+            Cirq.UI.Rendering.CanvasTheme.BackgroundBrush,
+            Cirq.UI.Rendering.CanvasTheme.SymbolBrush,
+            Cirq.UI.Rendering.CanvasTheme.SymbolFill,
+            Cirq.UI.Rendering.CanvasTheme.LabelBrush,
+            Cirq.UI.Rendering.CanvasTheme.ValueBrush,
+            Cirq.UI.Rendering.CanvasTheme.SelectionBrush,
+            Cirq.UI.Rendering.CanvasTheme.WireBrush,
+            Cirq.UI.Rendering.CanvasTheme.TerminalBrush,
+            Cirq.UI.Rendering.CanvasTheme.TerminalHoverBrush,
+            Cirq.UI.Rendering.CanvasTheme.ProbeBrush,
+            Cirq.UI.Rendering.CanvasTheme.ErrorBrush,
+        })
+        {
+            Assert.IsNotAssignableFrom<Avalonia.AvaloniaObject>(brush);
+        }
+    }
 }

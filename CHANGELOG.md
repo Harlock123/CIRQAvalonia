@@ -36,6 +36,12 @@ limiter overshot the active region entirely and was thrown back past it on the n
 setpoint of 2.490 V would not solve while 2.495 V solved immediately, for no reason anybody could
 see. It now limits its step the way the diode limits its junction voltage.
 
+**Printing in ink was not thread-safe.** The palette printing swaps in was built from ordinary
+Avalonia brushes, which check the calling thread on every read — so drawing it from anywhere but
+the thread that made it threw on the first stroke, and an export catches that and reports it. The
+visible symptom was an export that wrote its file and then quietly did nothing else. The palette
+is immutable now.
+
 **Printing.** `Ctrl+P` lays the schematic, the traces and the parts list onto real sheets — a page
 each, fitted inside the margins, with a header naming the circuit and the date. Choose the paper
 size and orientation; a large schematic scales down to fit, and a small one is left at the size it

@@ -1,4 +1,5 @@
 using Avalonia.Media;
+using Avalonia.Media.Immutable;
 using Cirq.UI.Services;
 
 namespace Cirq.UI.Rendering;
@@ -68,6 +69,13 @@ public static class CanvasTheme
     /// well is its own question: a pale value colour that reads nicely against a light background
     /// on a screen is not necessarily legible on paper through a printer nobody has calibrated.
     /// </para>
+    /// <para>
+    /// They are <b>immutable</b> brushes, which matters more than it looks. A plain
+    /// <see cref="SolidColorBrush"/> is an <c>AvaloniaObject</c>, and an AvaloniaObject checks the
+    /// calling thread every time a property is read — so a palette built on one thread and drawn
+    /// from another throws on the first stroke. An export is not inherently a UI-thread job, and
+    /// the whole point of this palette is that something other than the canvas is drawing.
+    /// </para>
     /// </summary>
     public static IDisposable ForPrinting() => new PrintPalette();
 
@@ -77,20 +85,20 @@ public static class CanvasTheme
 
         public PrintPalette()
         {
-            var ink = new SolidColorBrush(Color.FromRgb(0x1A, 0x1A, 0x1A));
+            var ink = new ImmutableSolidColorBrush(Color.FromRgb(0x1A, 0x1A, 0x1A));
 
             _cached = new Palette(
                 Background: Brushes.White,
                 Symbol: ink,
                 SymbolFill: Brushes.White,
-                Label: new SolidColorBrush(Color.FromRgb(0x44, 0x44, 0x44)),
-                Value: new SolidColorBrush(Color.FromRgb(0x22, 0x44, 0x88)),
+                Label: new ImmutableSolidColorBrush(Color.FromRgb(0x44, 0x44, 0x44)),
+                Value: new ImmutableSolidColorBrush(Color.FromRgb(0x22, 0x44, 0x88)),
                 Selection: ink,
                 Wire: ink,
                 Terminal: ink,
                 TerminalHover: ink,
-                Probe: new SolidColorBrush(Color.FromRgb(0x88, 0x22, 0x22)),
-                Error: new SolidColorBrush(Color.FromRgb(0xAA, 0x00, 0x00)),
+                Probe: new ImmutableSolidColorBrush(Color.FromRgb(0x88, 0x22, 0x22)),
+                Error: new ImmutableSolidColorBrush(Color.FromRgb(0xAA, 0x00, 0x00)),
                 GridDot: Color.FromRgb(0xDD, 0xDD, 0xDD),
                 GridMajor: Color.FromRgb(0xCC, 0xCC, 0xCC),
                 SegmentUnlit: Color.FromRgb(0xE4, 0xE4, 0xE4));

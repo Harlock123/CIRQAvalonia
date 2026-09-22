@@ -426,12 +426,19 @@ public class ExportCommandTests : IDisposable
         var vm = new MainWindowViewModel();
         var path = TempPath(".svg");
 
-        vm.FileDialogs = new FakeFileDialogs
+        var dialogs = new FakeFileDialogs
         {
             ExportRequest = new ExportRequest(path, new ExportOptions(ExportFormat.Svg)),
         };
 
+        vm.FileDialogs = dialogs;
+
         await vm.ExportCommand.ExecuteAsync(null);
+
+        // Checked before the status, because a failed export reports and leaves the status alone
+        // — so a test that only looked at the file and the status could watch an export throw and
+        // call it a pass with the message still saying "Ready".
+        Assert.Empty(dialogs.Reports);
 
         Assert.True(File.Exists(path));
         Assert.Contains("Exported", vm.StatusMessage);
