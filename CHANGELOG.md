@@ -8,6 +8,131 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+## [0.29.0] - 2026-09-21
+
+The release where the app stopped being only a simulator and became something you can measure
+with. Four new analyses, protocol decoding, hierarchy, tolerances and SPICE model import. 183
+components in 16 categories, 84 worked examples, 2366 tests.
+
+### Four ways to ask a question
+
+**DC sweep** (`Shift+F7`) steps a parameter, re-solves the operating point at every value, and
+plots the result. It is how you draw the curves parts are actually specified by — a diode's
+exponential, a panel's maximum power point, an amplifier's transfer characteristic — and none of
+them were visible before without building a ramp generator and squinting at a transient. Tick
+**Step** for a second parameter and it becomes a curve tracer: the **Curve Tracer** example sweeps
+a transistor's collector voltage while stepping its base current, and the fan off the front of
+every datasheet comes out, evenly spaced, tilting upward with the Early effect.
+
+**Spectrum** (`F3`) transforms the traces the scope has already recorded. This is not the frequency
+response and the difference matters: the response measures what the circuit *does* to each
+frequency, and this measures what is *in* a signal. Half of what the examples teach lives here and
+was invisible — the sidebands that are what AM is, the harmonics that make a full-wave rectifier's
+ripple easier to filter than a half-wave one's, the odd harmonics of a square wave.
+
+**Tolerance analysis** (`Shift+F4`) builds the circuit a few hundred times with its parts drawn
+from their tolerance bands. Every other analysis uses the value written on the schematic, and no
+resistor has ever had the value written on it. Resistors, capacitors and inductors now have a
+tolerance — 5 %, 20 % and 10 % by default, which is what the ordinary part is. Beside the histogram
+is the other half of the question: **which part is to blame**, ranked, with each part's band next
+to what the circuit does with it. A megohm across a 2 kΩ divider can have twenty times the
+tolerance of everything else and still be the least of your worries.
+
+**Temperature.** The whole circuit sits at an ambient temperature, saved with the file and
+sweepable like any other parameter. A silicon diode's forward drop falls about 2 mV/°C, a power
+MOSFET's on-resistance climbs about 80 % from 25 °C to 125 °C, and a bipolar's gain roughly doubles
+across its range. The **Diode Thermometer** example is a diode at constant current waiting for a
+temperature sweep. (Junctions, MOSFETs and op-amps carry temperature; regulator references and the
+TL431 do not yet, and come out of a sweep flat because the model is silent rather than because the
+part is stable — the guide says so plainly rather than letting you read it as a result.)
+
+### Reading a bus
+
+**Decode Bus** (`Shift+F3`) reads the recorded traces as **I²C, SPI, UART, 1-Wire or CAN** instead
+of as edges. Open it on any of the bus examples and it is already set up. The EEPROM example comes
+back as its whole conversation on one line — address, restart, the three bytes that spell `HI!`,
+and the NACK the master sends on purpose to stop the device sending more. The SPI converter's
+answer arrives *underneath* the question, which is what full duplex means and what a picture of
+three wiggly lines cannot show.
+
+It also refuses rather than guessing. A capture too coarse to decode is rejected with a reason: a
+pulse that fell between two samples is not a short pulse, it is an absent one, and every bit after
+it has moved. A trace carrying no frame is not parsed into one.
+
+### Measuring
+
+The scope gained **automatic readouts** — peak to peak, mean, RMS, frequency, period, duty cycle,
+10–90 % rise time — and two **draggable cursors** with the gap between them, its reciprocal, and
+what each trace did there. The periodic figures are left out rather than guessed when there is not
+enough signal to support them.
+
+**XY mode** plots one trace against another instead of against time. That draws an I-V curve or a
+transfer characteristic while the circuit runs, and it draws **hysteresis as the loop it actually
+is** — which a sweep cannot do, because a sweep only goes one way. The **Hysteresis Loop** example
+opens with the scope already in XY.
+
+**Probes** now measure the **difference** between two points, or the **power** those two things
+multiply to. A CAN pair, a high-side shunt and a bridge sensor are all defined as a difference and
+could not honestly be shown any other way; power is what a regulator is burning and what a resistor
+has to be rated for. Shift-click a terminal with the probe tool to set the second point.
+
+### Drawing
+
+**Blocks.** Select two or more parts and press `Ctrl+G`: they become one symbol with a pin wherever
+a wire crossed the boundary. The hierarchy is flattened before anything is solved, so a block is
+exactly as accurate as the parts inside it — because it *is* the parts inside it, moved rather than
+copied, so a probe attached to one keeps reading it. `Ctrl+Shift+G` puts them back. **Edit > Block
+Library** saves a block by name so it can be placed again, in this circuit or the next.
+
+**Net labels.** Two labels with the same name are one net, with no wire between them. Past a
+certain size a drawing has signals that go everywhere, and routing each of them to every place it
+is needed hides the circuit it is meant to show.
+
+**Notes, headings and boxes** go on the drawing without being in the circuit, and exports carry
+them. A schematic is a document as much as a description.
+
+### Checking
+
+**Check Circuit** (`F4`) looks for the mistakes that are silent, because they are about how the
+parts are joined rather than about any one of them: no ground, a shorted source, a supply pin on
+the ground net, an unwired supply, a floating input, two driven outputs sharing a net, a mistyped
+net label. Every rule in it is one that caught something real during development. Select a finding
+and the parts it is about are selected on the canvas.
+
+### Anything with a datasheet
+
+**Edit > Import SPICE Model** takes a `.model` card and turns it into a part. Diodes, bipolars and
+MOSFETs; the parameters map across because both this simulator and SPICE come from the same
+formulation. Imported models are offered wherever built-in ones are and kept between runs.
+Parameters this simulator has nowhere to put are **named rather than dropped**, so nobody comes
+away believing a part is modelled more closely than it is.
+
+### New parts
+
+Nineteen new palette entries, 164 to 183. Four of them are the net label and annotations above;
+the rest are parts for things the palette could not show at all: a **74245** bus transceiver and
+**74373** latch, a **74161** synchronous counter, a **CAN transceiver**, an **IGBT**, a
+**photodiode**, **2K×8 SRAM and ROM** whose contents you type in and read back, an **MCP3008** SPI
+converter, a **solid-state relay** that waits for the mains to cross zero, an **A4988**
+microstepping driver that regulates coil current rather than applying a voltage, an **LM324** quad
+op-amp, a **MAX232** that makes its own ±8.5 V from a 5 V rail, a **resettable PPTC fuse** that
+heats rather than opening, and a **bipolar stepper** wiring for the driver to drive.
+
+### Also
+
+- **Hover a part** and it describes itself — designator, type, value and relevant settings —
+  without your having to select it. Turn it off in the View menu.
+- Four new **Measurement** examples, each set up so the analysis it demonstrates works immediately
+  with nothing to change first.
+- **Fixed: undo after grouping lost the parts.** Group two components, press `Ctrl+Z`, and they
+  were gone — the history recorded grouping as three separate steps and one undo landed between
+  them. Ungrouping and placing a block had the same fault.
+- **Fixed: the 1-Wire example could not be decoded at its own timebase.** Its pulses are six
+  microseconds and the scope was sampling too slowly to see them.
+- **Fixed: an op-amp's input offset had never had any effect.** It was added to the input stage's
+  differential voltage and then subtracted back out by the linearisation, cancelling exactly.
+- **Fixed: importing a SPICE card named after a built-in part could delete the built-in.**
+
 ## [0.28.0] - 2026-09-20
 
 An editing release. The schematic gains the gesture it was missing — select, copy, paste — and the
