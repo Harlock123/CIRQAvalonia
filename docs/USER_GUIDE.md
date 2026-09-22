@@ -2321,6 +2321,76 @@ the input changed; the only difference is whether the threshold moved out of the
 
 ---
 
+## Stability
+
+**Simulate > Stability...** (`Ctrl+F7`) measures how much gain goes round a feedback loop and how
+close it is to going round it the wrong way.
+
+This answers **"will it oscillate"**, which is the single most common reason a circuit that is
+correct on paper does not work on a bench. A regulator that rings, an amplifier that sings at two
+megahertz, a servo that hunts: all the same question, and none of them answerable by looking at
+gain alone. A loop with plenty of gain and no phase margin is an oscillator.
+
+### Putting the probe in
+
+The analysis needs to know **where** to break the loop, because that is a judgement the circuit
+cannot make for itself and it changes the answer. So it is a part: **Loop Probe**, in Sources. Put
+one in the feedback path — between a divider's tap and the input it feeds, or between an error
+amplifier and whatever it drives.
+
+Break it where **the impedance looking forward is much higher than the impedance looking back**. An
+op-amp input is ideal, at megohms; an op-amp output is not, at tens of ohms. Get that the wrong way
+round and the injection loads the loop it is measuring.
+
+Everywhere else the probe is a piece of wire — zero volts across it, at DC and in a transient
+alike — so having one in a circuit changes no answer the circuit would otherwise give. It becomes
+a break only while this window is sweeping, and only for small signals, so the operating point
+stays the one the working circuit has and nothing saturates.
+
+### Reading the three numbers
+
+- **Phase margin** is how much phase is left at the frequency where the loop gain passes through
+  one: 180° + ∠T. It is the number that matters. Over 60° is comfortable, 45° is the usual target,
+  under 30° rings hard, and at or below zero it does not stop.
+- **Gain margin** is how many decibels below one the loop gain is where the phase reaches −180°.
+  Often there isn't one, and that is not a fault: a single-pole loop never gets to −180° at all.
+- **Crossover** is where the loop runs out of gain, and it is also the closed-loop bandwidth. More
+  feedback buys a higher crossover and costs margin.
+
+The window says the verdict in words as well as figures, because a margin only means something
+against those thresholds and expecting everybody to carry them around is how a plot gets misread.
+
+### What it will tell you
+
+Open the **Loop Stability** example. It is a follower — which surprises people by being the
+*hardest* configuration to keep stable, not the easiest. A follower feeds all of its output back,
+so it has the most loop gain of any configuration and the furthest-out crossover, right at the
+amplifier's gain-bandwidth product where the most phase has already gone.
+
+Measure it as drawn and you get a usable margin. Then close SW1, putting a 100 nF load on the
+output, and measure again: the capacitor works against the amplifier's output resistance to make a
+**second pole inside the loop**, and a second pole is what eats phase margin. Watch it fall.
+
+That is the whole of why a follower driving a cable can start to sing, and it is also the pairing
+worth understanding: read the margin here, then take the same circuit to
+[Step a Parameter](#stepping-a-parameter-across-a-transient) and step the load capacitance across a
+square wave. One window is the cause and the other is the symptom, and the two together are the
+lesson.
+
+### Two closed forms to check it against
+
+A single-pole op-amp in a feedback network has a loop gain you can work out on paper, and the
+window agrees with it:
+
+- The **DC loop gain** is the open-loop gain times the feedback fraction. A gain-of-ten amplifier
+  from a part with an Aol of 200 000 has 20 000 of loop gain — 86 dB.
+- The **crossover** is the gain-bandwidth product times that same fraction, which is another way of
+  saying a closed-loop gain of ten out of a 1 MHz part turns over at 100 kHz.
+- And a **single pole can only ever cost ninety degrees**, which is what "unconditionally stable"
+  means and why an internally compensated op-amp is sold as being it.
+
+---
+
 ## Noise, and why hysteresis exists
 
 Every circuit in this guide so far has been perfectly clean, and that is the one way in which none
@@ -3994,6 +4064,7 @@ Also available in the app at **Help > Keyboard Shortcuts**.
 | Edit > Import SPICE Model | Paste a `.model` card from a datasheet and get a part |
 | Simulate > Step a Parameter | Run the same transient once per value of something and overlay them |
 | Simulate > Noise | How much noise the circuit makes at a node, and which part is making it |
+| Simulate > Stability | Loop gain, phase margin and gain margin, measured at a Loop Probe |
 | Scope layout > Xy | Plot one trace against another instead of against time |
 | `Ctrl` `Z` / `Ctrl` `Y` | Undo / redo (`Ctrl` `Shift` `Z` redoes as well) |
 | `Delete` | Delete selection |

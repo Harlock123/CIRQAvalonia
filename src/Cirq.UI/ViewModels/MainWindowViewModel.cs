@@ -569,6 +569,9 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     /// <summary>Raised when the noise window should be opened.</summary>
     public event EventHandler? RequestNoise;
 
+    /// <summary>Raised when the stability window should be opened.</summary>
+    public event EventHandler? RequestStability;
+
     /// <summary>Raised when the rule-check window should be opened.</summary>
     public event EventHandler? RequestRuleCheck;
 
@@ -1010,6 +1013,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
           Shift+F7     DC sweep
           Ctrl+Shift+F7 Step a parameter across a transient
           Shift+F5     Noise
+          Ctrl+F7      Stability — loop gain and phase margin
           F3           Spectrum of the traces
           Shift+F3     Decode the traces as a bus
           F4           Check circuit
@@ -1068,6 +1072,13 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     /// </summary>
     [RelayCommand]
     private void ShowNoise() => RequestNoise?.Invoke(this, EventArgs.Empty);
+
+    /// <summary>
+    /// Opens the stability window, which measures how much gain goes round a feedback loop and
+    /// how close it is to going round it the wrong way.
+    /// </summary>
+    [RelayCommand]
+    private void ShowStability() => RequestStability?.Invoke(this, EventArgs.Empty);
 
     /// <summary>
     /// Opens the rule check, which looks for the mistakes no component can report about itself

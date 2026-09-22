@@ -54,6 +54,8 @@ public static class Examples
         new("Analog",
         [
             new("Inverting Amplifier", "LM741 with a gain of -10", LoadInvertingAmplifier),
+            new("Loop Stability", "A follower with a loop probe in it — open Simulate > Stability, then add the capacitive load and watch the phase margin go",
+                LoadLoopStability),
             new("Comparator Trigger", "LM311 squaring up a sine wave", LoadComparatorTrigger),
             new("Window Detector", "LM339 outputs wired together to flag an out-of-range voltage",
                 LoadWindowDetector),
@@ -352,6 +354,63 @@ public static class Examples
         vm.Scope.TimebasePerDivision = 200e-6;
         vm.Scope.VoltsPerDivision = 2.0;
         vm.Scope.AddProbe(rin.A, "Input");
+        vm.Scope.AddProbe(opamp.Output, "Output");
+    }
+
+    /// <summary>
+    /// A follower with a break point in its feedback path, set up for
+    /// <b>Simulate &gt; Stability</b>.
+    /// <para>
+    /// A follower is the hardest configuration to keep stable, which surprises people: it has the
+    /// most feedback of any, so its loop gain is the highest and its crossover the furthest out —
+    /// which is exactly where the second pole a capacitive load makes is waiting. The capacitor is
+    /// on the drawing and switched out; close SW1 and watch ninety degrees of phase margin turn
+    /// into something that rings.
+    /// </para>
+    /// </summary>
+    public static void LoadLoopStability(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "Loop gain and phase margin";
+
+        var positive = Place(circuit, new DcVoltageSource(15.0), 60, -200);
+        var negative = Place(circuit, new DcVoltageSource(-15.0), 60, 200);
+        var opamp = Place(circuit, new OpAmp741(), 60, 0);
+        var generator = Place(circuit, new FunctionGenerator(Waveform.Square, 5e3, 1.0), -280, -40);
+
+        // The break, in the one place it belongs: between the output's return path and the input
+        // it feeds. Looking forward is an op-amp input at two megohms; looking back is the output
+        // at seventy-five. That ratio is what makes the injection honest.
+        var probe = Place(circuit, new LoopProbe(), 60, 160);
+
+        var load = Place(circuit, new Capacitor(100e-9), 320, 60);
+        var switched = Place(circuit, new ToggleSwitch { IsClosed = false }, 320, -60);
+
+        var ground = Place(circuit, new Ground(), -280, 100);
+        var ground2 = Place(circuit, new Ground(), 320, 180);
+        var ground3 = Place(circuit, new Ground(), 160, -200);
+        var ground4 = Place(circuit, new Ground(), 160, 200);
+
+        circuit.Connect(generator.Return, ground.Pin);
+        circuit.Connect(generator.Output, opamp.NonInverting);
+
+        // Output back round to the inverting input, through the probe.
+        circuit.Connect(opamp.Output, probe.From);
+        circuit.Connect(probe.To, opamp.Inverting);
+
+        // The load, behind a switch so the effect can be turned on and off while it runs.
+        circuit.Connect(opamp.Output, switched.A);
+        circuit.Connect(switched.B, load.A);
+        circuit.Connect(load.B, ground2.Pin);
+
+        circuit.Connect(positive.Positive, opamp.PositiveSupply);
+        circuit.Connect(positive.Negative, ground3.Pin);
+        circuit.Connect(negative.Positive, opamp.NegativeSupply);
+        circuit.Connect(negative.Negative, ground4.Pin);
+
+        vm.Scope.TimebasePerDivision = 20e-6;
+        vm.Scope.VoltsPerDivision = 0.5;
+        vm.Scope.AddProbe(opamp.NonInverting, "Input");
         vm.Scope.AddProbe(opamp.Output, "Output");
     }
 

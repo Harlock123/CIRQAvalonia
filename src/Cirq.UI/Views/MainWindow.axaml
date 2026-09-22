@@ -106,6 +106,8 @@
                   Command="{Binding ShowTransientStepCommand}" />
         <MenuItem Header="_Noise..." InputGesture="Shift+F5"
                   Command="{Binding ShowNoiseCommand}" />
+        <MenuItem Header="Stabi_lity..." InputGesture="Ctrl+F7"
+                  Command="{Binding ShowStabilityCommand}" />
         <MenuItem Header="_Spectrum..." InputGesture="F3"
                   Command="{Binding ShowSpectrumCommand}" />
         <MenuItem Header="Decode _Bus..." InputGesture="Shift+F3"

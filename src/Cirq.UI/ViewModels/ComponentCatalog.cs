@@ -104,6 +104,8 @@ public static class ComponentCatalog
             new("Ground", "Explicit 0 V reference", () => new Ground()),
             new("Net Label", "Names a net — two labels with the same name are one net, with no wire between them",
                 () => new NetLabel()),
+            new("Loop Probe", "A break point in a feedback loop — a wire everywhere except in Simulate > Stability, where the loop gain and phase margin are measured across it",
+                () => new LoopProbe()),
             new("Note", "A block of text on the drawing. Connects to nothing and is carried into exports",
                 () => new SchematicNote("Double-click the text in the properties panel")),
             new("Heading", "A larger note, for naming a section of the schematic",

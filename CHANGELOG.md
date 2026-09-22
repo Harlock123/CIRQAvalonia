@@ -8,6 +8,21 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**Stability.** `Ctrl+F7` measures how much gain goes round a feedback loop and how close it is to
+going round it the wrong way: loop gain, phase margin, gain margin and crossover, with the verdict
+in words as well as figures. This answers "will it oscillate", which is the single most common
+reason a circuit that is correct on paper does not work on a bench.
+
+Where to break the loop is a judgement the circuit cannot make for itself, so it is a part: a
+**Loop Probe**, placed in the feedback path. Everywhere else it is a piece of wire — zero volts
+across it at DC and in a transient alike — and it becomes a break only while the sweep is running,
+and only for small signals, so the operating point stays the one the working circuit has.
+
+The new **Loop Stability** example is a follower, which surprises people by being the hardest
+configuration to keep stable rather than the easiest: it has the most loop gain and the
+furthest-out crossover. Close its switch to put a capacitive load on the output and watch the
+margin go.
+
 **Noise.** `Shift+F5` measures the floor under everything: output noise density in volts per root
 hertz across a band, the total in RMS, and a ranking of every generator in the circuit by what it
 put on the output.

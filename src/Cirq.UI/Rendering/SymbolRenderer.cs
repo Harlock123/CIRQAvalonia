@@ -87,6 +87,7 @@ public static class SymbolRenderer
             case SchematicBox box: DrawSchematicBox(context, pen, zoom, box); break;
             case SchematicNote note: DrawSchematicNote(context, zoom, note); break;
             case NetLabel label: DrawNetLabel(context, pen, zoom, label); break;
+            case LoopProbe: DrawLoopProbe(context, pen, zoom); break;
             case Ground: DrawGround(context, pen); break;
             case DcVoltageSource: DrawVoltageSource(context, pen, zoom); break;
             case DcCurrentSource: DrawCurrentSource(context, pen); break;
@@ -449,6 +450,26 @@ public static class SymbolRenderer
     /// A net label: the flag shape every schematic tool draws, with the name inside it. The point
     /// is sharp and on the left, at the terminal, so it reads as pointing at the wire it names.
     /// </summary>
+    /// <summary>
+    /// A break in the wire with a circled arrow over it: a piece of wire that can be opened. The
+    /// gap is drawn even though the part is electrically a short, because what it marks is the
+    /// place the loop <i>can</i> be broken, and a symbol that looked like plain wire would be
+    /// invisible on a schematic where the whole point is knowing where it is.
+    /// </summary>
+    private static void DrawLoopProbe(ISymbolCanvas context, IPen pen, double zoom)
+    {
+        // The two stubs, with a gap between them.
+        context.DrawLine(pen, new Point(-20, 0), new Point(-7, 0));
+        context.DrawLine(pen, new Point(7, 0), new Point(20, 0));
+
+        context.DrawEllipse(null, pen, new Point(0, 0), 7, 7);
+
+        // An arrow through it, left to right: the direction the loop is measured in.
+        context.DrawLine(pen, new Point(-4, 0), new Point(4, 0));
+        context.DrawLine(pen, new Point(1, -3), new Point(4, 0));
+        context.DrawLine(pen, new Point(1, 3), new Point(4, 0));
+    }
+
     private static void DrawNetLabel(
         ISymbolCanvas context, IPen pen, double zoom, NetLabel label)
     {
