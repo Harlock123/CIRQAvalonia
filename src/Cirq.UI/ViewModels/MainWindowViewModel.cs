@@ -1136,6 +1136,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
           Ctrl+O       Open
           Ctrl+S       Save
           Ctrl+Shift+S Save as
+          Ctrl+E       Export — pictures, a SPICE netlist, or the traces as CSV
           Ctrl+P       Print
 
         Canvas

@@ -23,25 +23,28 @@ the [README](../README.md), and what changed between releases is in the
 11. [Measuring what is on the scope](#measuring-what-is-on-the-scope)
 12. [DC sweeps and the curve tracer](#dc-sweeps-and-the-curve-tracer)
 13. [What is in a signal](#what-is-in-a-signal)
-14. [Reading a bus](#reading-a-bus)
-15. [Measuring between two points, and measuring power](#measuring-between-two-points-and-measuring-power)
-16. [Will it work with the parts you can buy](#will-it-work-with-the-parts-you-can-buy)
-17. [Temperature](#temperature)
-18. [Writing on the schematic](#writing-on-the-schematic)
-19. [Drawing part of a circuit as one block](#drawing-part-of-a-circuit-as-one-block)
-20. [Reusing a block](#reusing-a-block)
-21. [Plotting one trace against another](#plotting-one-trace-against-another)
-22. [Importing a SPICE model](#importing-a-spice-model)
-23. [Naming a net instead of drawing it](#naming-a-net-instead-of-drawing-it)
-24. [Checking the circuit](#checking-the-circuit)
-25. [Development boards](#development-boards)
-26. [Saving and loading](#saving-and-loading)
-27. [Printing](#printing)
-28. [Exporting](#exporting)
-29. [Appearance](#appearance)
-30. [What version is this](#what-version-is-this)
-31. [Keyboard reference](#keyboard-reference)
-32. [When a circuit will not simulate](#when-a-circuit-will-not-simulate)
+14. [Stability](#stability)
+15. [Noise](#noise)
+16. [Reading a bus](#reading-a-bus)
+17. [Measuring between two points, and measuring power](#measuring-between-two-points-and-measuring-power)
+18. [Will it work with the parts you can buy](#will-it-work-with-the-parts-you-can-buy)
+19. [Temperature](#temperature)
+20. [Writing on the schematic](#writing-on-the-schematic)
+21. [Drawing part of a circuit as one block](#drawing-part-of-a-circuit-as-one-block)
+22. [Reusing a block](#reusing-a-block)
+23. [Plotting one trace against another](#plotting-one-trace-against-another)
+24. [Importing a SPICE model](#importing-a-spice-model)
+25. [Comparing and computing traces](#comparing-and-computing-traces)
+26. [Naming a net instead of drawing it](#naming-a-net-instead-of-drawing-it)
+27. [Checking the circuit](#checking-the-circuit)
+28. [Development boards](#development-boards)
+29. [Saving and loading](#saving-and-loading)
+30. [Printing](#printing)
+31. [Exporting](#exporting)
+32. [Appearance](#appearance)
+33. [What version is this](#what-version-is-this)
+34. [Keyboard reference](#keyboard-reference)
+35. [When a circuit will not simulate](#when-a-circuit-will-not-simulate)
 
 This guide is also attached to every [release](../../releases) as a PDF, with a contents page and
 the screenshots in place — the same document, laid out for reading away from the machine. Build it
@@ -314,6 +317,9 @@ The scope controls, left to right:
 | **Layout** | *Unified* overlays all traces, *Stacked* offsets them into lanes, *Tiled* gives each its own axes |
 | **AC couple** | Subtracts each trace's DC average before display |
 | **Auto-scroll** | Follows the newest data instead of holding at t = 0 |
+| **Measure** / **Cursors** | Readouts per trace, and two draggable time cursors — see [below](#measuring-what-is-on-the-scope) |
+| **Expression box** | Arithmetic on the traces: `Out / In` is a gain — see [below](#comparing-and-computing-traces) |
+| **Keep as reference** | A copy of what is on screen now, kept drawn while you change the circuit |
 | **Clear traces** | Empties the buffers without resetting the circuit |
 
 Each trace in the list has a checkbox to hide it, a live readout of its present value, and an `×`
@@ -2321,76 +2327,6 @@ the input changed; the only difference is whether the threshold moved out of the
 
 ---
 
-## Stability
-
-**Simulate > Stability...** (`Ctrl+F7`) measures how much gain goes round a feedback loop and how
-close it is to going round it the wrong way.
-
-This answers **"will it oscillate"**, which is the single most common reason a circuit that is
-correct on paper does not work on a bench. A regulator that rings, an amplifier that sings at two
-megahertz, a servo that hunts: all the same question, and none of them answerable by looking at
-gain alone. A loop with plenty of gain and no phase margin is an oscillator.
-
-### Putting the probe in
-
-The analysis needs to know **where** to break the loop, because that is a judgement the circuit
-cannot make for itself and it changes the answer. So it is a part: **Loop Probe**, in Sources. Put
-one in the feedback path — between a divider's tap and the input it feeds, or between an error
-amplifier and whatever it drives.
-
-Break it where **the impedance looking forward is much higher than the impedance looking back**. An
-op-amp input is ideal, at megohms; an op-amp output is not, at tens of ohms. Get that the wrong way
-round and the injection loads the loop it is measuring.
-
-Everywhere else the probe is a piece of wire — zero volts across it, at DC and in a transient
-alike — so having one in a circuit changes no answer the circuit would otherwise give. It becomes
-a break only while this window is sweeping, and only for small signals, so the operating point
-stays the one the working circuit has and nothing saturates.
-
-### Reading the three numbers
-
-- **Phase margin** is how much phase is left at the frequency where the loop gain passes through
-  one: 180° + ∠T. It is the number that matters. Over 60° is comfortable, 45° is the usual target,
-  under 30° rings hard, and at or below zero it does not stop.
-- **Gain margin** is how many decibels below one the loop gain is where the phase reaches −180°.
-  Often there isn't one, and that is not a fault: a single-pole loop never gets to −180° at all.
-- **Crossover** is where the loop runs out of gain, and it is also the closed-loop bandwidth. More
-  feedback buys a higher crossover and costs margin.
-
-The window says the verdict in words as well as figures, because a margin only means something
-against those thresholds and expecting everybody to carry them around is how a plot gets misread.
-
-### What it will tell you
-
-Open the **Loop Stability** example. It is a follower — which surprises people by being the
-*hardest* configuration to keep stable, not the easiest. A follower feeds all of its output back,
-so it has the most loop gain of any configuration and the furthest-out crossover, right at the
-amplifier's gain-bandwidth product where the most phase has already gone.
-
-Measure it as drawn and you get a usable margin. Then close SW1, putting a 100 nF load on the
-output, and measure again: the capacitor works against the amplifier's output resistance to make a
-**second pole inside the loop**, and a second pole is what eats phase margin. Watch it fall.
-
-That is the whole of why a follower driving a cable can start to sing, and it is also the pairing
-worth understanding: read the margin here, then take the same circuit to
-[Step a Parameter](#stepping-a-parameter-across-a-transient) and step the load capacitance across a
-square wave. One window is the cause and the other is the symptom, and the two together are the
-lesson.
-
-### Two closed forms to check it against
-
-A single-pole op-amp in a feedback network has a loop gain you can work out on paper, and the
-window agrees with it:
-
-- The **DC loop gain** is the open-loop gain times the feedback fraction. A gain-of-ten amplifier
-  from a part with an Aol of 200 000 has 20 000 of loop gain — 86 dB.
-- The **crossover** is the gain-bandwidth product times that same fraction, which is another way of
-  saying a closed-loop gain of ten out of a 1 MHz part turns over at 100 kHz.
-- And a **single pole can only ever cost ninety degrees**, which is what "unconditionally stable"
-  means and why an internally compensated op-amp is sold as being it.
-
----
-
 ## Noise, and why hysteresis exists
 
 Every circuit in this guide so far has been perfectly clean, and that is the one way in which none
@@ -3079,6 +3015,76 @@ One thing to watch: a probe keeps **ten thousand points**, so how much *time* it
 entirely on how finely the scope is sampling. At a fast timebase that is a few milliseconds, which
 is six cycles of a kilohertz tone — not enough resolution to separate the fundamental from DC. The
 panel says so rather than guessing. Slow the timebase until it has something to work with.
+
+---
+
+## Stability
+
+**Simulate > Stability...** (`Ctrl+F7`) measures how much gain goes round a feedback loop and how
+close it is to going round it the wrong way.
+
+This answers **"will it oscillate"**, which is the single most common reason a circuit that is
+correct on paper does not work on a bench. A regulator that rings, an amplifier that sings at two
+megahertz, a servo that hunts: all the same question, and none of them answerable by looking at
+gain alone. A loop with plenty of gain and no phase margin is an oscillator.
+
+### Putting the probe in
+
+The analysis needs to know **where** to break the loop, because that is a judgement the circuit
+cannot make for itself and it changes the answer. So it is a part: **Loop Probe**, in Sources. Put
+one in the feedback path — between a divider's tap and the input it feeds, or between an error
+amplifier and whatever it drives.
+
+Break it where **the impedance looking forward is much higher than the impedance looking back**. An
+op-amp input is ideal, at megohms; an op-amp output is not, at tens of ohms. Get that the wrong way
+round and the injection loads the loop it is measuring.
+
+Everywhere else the probe is a piece of wire — zero volts across it, at DC and in a transient
+alike — so having one in a circuit changes no answer the circuit would otherwise give. It becomes
+a break only while this window is sweeping, and only for small signals, so the operating point
+stays the one the working circuit has and nothing saturates.
+
+### Reading the three numbers
+
+- **Phase margin** is how much phase is left at the frequency where the loop gain passes through
+  one: 180° + ∠T. It is the number that matters. Over 60° is comfortable, 45° is the usual target,
+  under 30° rings hard, and at or below zero it does not stop.
+- **Gain margin** is how many decibels below one the loop gain is where the phase reaches −180°.
+  Often there isn't one, and that is not a fault: a single-pole loop never gets to −180° at all.
+- **Crossover** is where the loop runs out of gain, and it is also the closed-loop bandwidth. More
+  feedback buys a higher crossover and costs margin.
+
+The window says the verdict in words as well as figures, because a margin only means something
+against those thresholds and expecting everybody to carry them around is how a plot gets misread.
+
+### What it will tell you
+
+Open the **Loop Stability** example. It is a follower — which surprises people by being the
+*hardest* configuration to keep stable, not the easiest. A follower feeds all of its output back,
+so it has the most loop gain of any configuration and the furthest-out crossover, right at the
+amplifier's gain-bandwidth product where the most phase has already gone.
+
+Measure it as drawn and you get a usable margin. Then close SW1, putting a 100 nF load on the
+output, and measure again: the capacitor works against the amplifier's output resistance to make a
+**second pole inside the loop**, and a second pole is what eats phase margin. Watch it fall.
+
+That is the whole of why a follower driving a cable can start to sing, and it is also the pairing
+worth understanding: read the margin here, then take the same circuit to
+[Step a Parameter](#stepping-a-parameter-across-a-transient) and step the load capacitance across a
+square wave. One window is the cause and the other is the symptom, and the two together are the
+lesson.
+
+### Two closed forms to check it against
+
+A single-pole op-amp in a feedback network has a loop gain you can work out on paper, and the
+window agrees with it:
+
+- The **DC loop gain** is the open-loop gain times the feedback fraction. A gain-of-ten amplifier
+  from a part with an Aol of 200 000 has 20 000 of loop gain — 86 dB.
+- The **crossover** is the gain-bandwidth product times that same fraction, which is another way of
+  saying a closed-loop gain of ten out of a 1 MHz part turns over at 100 kHz.
+- And a **single pole can only ever cost ninety degrees**, which is what "unconditionally stable"
+  means and why an internally compensated op-amp is sold as being it.
 
 ---
 
@@ -4130,10 +4136,8 @@ Also available in the app at **Help > Keyboard Shortcuts**.
 | `Ctrl` `G` / `Ctrl` `Shift` `G` | Group the selection into a block / ungroup one |
 | Edit > Block Library | Save a block for reuse, or place a copy of a saved one |
 | Edit > Import SPICE Model | Paste a `.model` card from a datasheet and get a part |
-| Simulate > Step a Parameter | Run the same transient once per value of something and overlay them |
-| Simulate > Noise | How much noise the circuit makes at a node, and which part is making it |
-| Simulate > Stability | Loop gain, phase margin and gain margin, measured at a Loop Probe |
 | Scope layout > Xy | Plot one trace against another instead of against time |
+| `Ctrl` `F` | Find a part — type into the palette's search box, Enter arms the first match |
 | `Ctrl` `Z` / `Ctrl` `Y` | Undo / redo (`Ctrl` `Shift` `Z` redoes as well) |
 | `Delete` | Delete selection |
 | `Ctrl` `+` / `Ctrl` `-` | Zoom in / out (the numeric keypad's `+` and `-` work too) |
@@ -4144,16 +4148,20 @@ Also available in the app at **Help > Keyboard Shortcuts**.
 | `F5` / `F6` / `F8` | Run-pause / step / reset |
 | `F7` | Frequency response — what the circuit does to each frequency |
 | `Shift` `F7` | DC sweep — step a parameter and plot the curve |
-| `F3` | Spectrum — what frequencies are in the traces |
+| `Ctrl` `Shift` `F7` | Step a parameter across a transient — one run per value, overlaid |
+| `Ctrl` `F7` | Stability — loop gain, phase margin and gain margin at a Loop Probe |
+| `Shift` `F5` | Noise — how much the circuit makes, and which part is making it |
+| `F3` | Spectrum — what frequencies are in the traces, and the distortion in them |
 | `Shift` `F3` | Decode bus — read the traces as I²C, SPI, UART, 1-Wire or CAN |
 | `F4` | Check circuit — the wiring mistakes no part can report about itself |
 | `Shift` `F4` | Tolerance analysis — will it work with the parts you can buy |
 | Shift-click with the probe tool | Set the selected probe's second point, for a differential or power measurement |
+| Click a wire or a pin | Light up the whole net it is on, and say what is joined to it |
 | `F9` / `F10` | Collapse the palette / the properties panel |
 | View menu | **Mark Interactive Parts** rings everything you can double-click; **Describe Parts on Hover** turns the hover card off |
 | `Ctrl+N` / `Ctrl+O` / `Ctrl+S` / `Ctrl+Shift+S` | New / open / save / save as |
 | `Ctrl+P` | Print — a sheet each for the schematic, the traces and the parts list |
-| `Ctrl+E` | Export the schematic or the traces as PNG, JPEG, BMP, SVG or PDF |
+| `Ctrl+E` | Export — PNG, JPEG, BMP, SVG, PDF, a SPICE netlist or the traces as CSV |
 | `Ctrl+Shift+E` | Browse the example circuits |
 | `Help > About` | Version, and the libraries this is built on — with a button that copies the lot |
 
