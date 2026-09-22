@@ -33,6 +33,48 @@ public sealed record SpiceModelCard(
 
     /// <summary>True when the card mentions any of these parameters.</summary>
     public bool Has(params string[] names) => names.Any(Parameters.ContainsKey);
+
+    /// <summary>
+    /// The card written back out as SPICE text, which <see cref="SpiceModelReader.Parse"/> reads
+    /// to exactly this card again.
+    /// <para>
+    /// Regenerated rather than kept verbatim, deliberately. A card that came in wrapped over five
+    /// continuation lines with a manufacturer's header comment goes back out as one line, and two
+    /// cards that say the same thing in different layouts come out identical — which is what makes
+    /// an embedded model comparable to the one already in a library, and keeps a saved circuit
+    /// diffable.
+    /// </para>
+    /// <para>
+    /// Only what was read is written. A card carrying transit times and capacitances loses them
+    /// here, and so it should: they were never used, and writing them back out would imply they
+    /// had been.
+    /// </para>
+    /// </summary>
+    public string ToCard()
+    {
+        var type = Kind switch
+        {
+            SpiceDeviceKind.Diode => "D",
+            SpiceDeviceKind.Npn => "NPN",
+            SpiceDeviceKind.Pnp => "PNP",
+            SpiceDeviceKind.NChannelMosfet => "NMOS",
+            _ => "PMOS",
+        };
+
+        var parameters = Parameters
+            .OrderBy(p => p.Key, StringComparer.OrdinalIgnoreCase)
+            .Select(p => $"{p.Key.ToUpperInvariant()}={Number(p.Value)}");
+
+        return $".model {Name} {type}({string.Join(' ', parameters)})";
+    }
+
+    /// <summary>
+    /// A number SPICE will read back unchanged. Exponential form throughout, because SPICE's
+    /// suffixes are a trap — <c>M</c> is milli and <c>MEG</c> is mega — and round-tripping a value
+    /// matters more here than looking like a datasheet.
+    /// </summary>
+    private static string Number(double value) =>
+        value.ToString("G17", System.Globalization.CultureInfo.InvariantCulture);
 }
 
 /// <summary>

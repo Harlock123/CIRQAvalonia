@@ -5,6 +5,7 @@ using Cirq.Components.Digital;
 using Cirq.Core.Primitives;
 using Cirq.Core.Probing;
 using Cirq.Components.Hierarchy;
+using Cirq.Components.Spice;
 using Cirq.Core.Topology;
 
 namespace Cirq.Components.Serialization;
@@ -182,7 +183,44 @@ public static class CircuitSerializer
             });
         }
 
+        document.Models = EmbeddedModels(circuit);
+
         return document;
+    }
+
+    /// <summary>
+    /// The cards for every imported model the circuit uses, so the file carries its own parts.
+    /// <para>
+    /// Only what is <i>used</i>, and only what was <i>imported</i>. A file does not copy somebody's
+    /// whole library into itself — that would make every saved circuit an unasked-for export of
+    /// everything on the machine that wrote it — and it does not copy built-ins, which are the
+    /// same everywhere and already travel.
+    /// </para>
+    /// </summary>
+    private static List<ModelRecord>? EmbeddedModels(Circuit circuit)
+    {
+        var names = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var component in Flattening.Flatten(circuit.Components))
+        {
+            foreach (var property in ComponentReflection.EditableProperties(component.GetType()))
+            {
+                if (!ComponentReflection.IsModelProperty(property)) continue;
+
+                if (property.GetValue(component)?.ToString() is { Length: > 0 } name) names.Add(name);
+            }
+        }
+
+        List<ModelRecord> records = [];
+
+        foreach (var name in names)
+        {
+            if (SpiceModelImport.CardFor(name) is not { } card) continue;
+
+            records.Add(new ModelRecord { Name = card.Name, Card = card.ToCard() });
+        }
+
+        return records.Count == 0 ? null : records;
     }
 
     public static string ToJson(Circuit circuit) =>
@@ -297,10 +335,60 @@ public static class CircuitSerializer
         return FromJson(File.ReadAllText(path));
     }
 
+    /// <summary>
+    /// Registers the models a file brought with it, so the components in it resolve.
+    /// <para>
+    /// A name already in a library <b>wins</b>. Opening a file must not quietly rewrite somebody's
+    /// parts: if their 2N3904 and the file's disagree, theirs is the one they trimmed against
+    /// every other circuit on the machine, and silently swapping it would change answers in
+    /// circuits they were not even looking at. The disagreement is reported instead, which is the
+    /// one thing that lets it be sorted out.
+    /// </para>
+    /// <para>
+    /// What is registered stays registered for the session, and shows up in the parts library
+    /// alongside everything else — but it is not written to the machine's own imported models. The
+    /// file is where it lives; closing the file is where it goes.
+    /// </para>
+    /// </summary>
+    private static void RegisterEmbeddedModels(CircuitDocument document, ICollection<string> warnings)
+    {
+        if (document.Models is not { Count: > 0 } models) return;
+
+        foreach (var record in models)
+        {
+            var parsed = SpiceModelReader.Parse(record.Card);
+
+            foreach (var problem in parsed.Problems)
+                warnings.Add($"model '{record.Name}' saved in this file: {problem}");
+
+            foreach (var card in parsed.Cards)
+            {
+                var existing = SpiceModelImport.Existing(card.Name, card.Kind);
+
+                if (existing is null)
+                {
+                    SpiceModelImport.Register(card);
+                    continue;
+                }
+
+                if (!Equals(existing, SpiceModelImport.Build(card)))
+                {
+                    warnings.Add(
+                        $"'{card.Name}' is saved in this file but a different model of that name " +
+                        "is already here; the one already here was used.");
+                }
+            }
+        }
+    }
+
     private static CircuitLoadResult Rebuild(CircuitDocument document)
     {
         var circuit = new Circuit { Title = document.Title };
         var result = new CircuitLoadResult { Circuit = circuit, Document = document };
+
+        // Before any component is built: a component's model is resolved by name as it is created.
+        RegisterEmbeddedModels(document, result.Warnings);
+
         var byId = new Dictionary<Guid, CircuitComponent>();
 
         foreach (var record in document.Components)

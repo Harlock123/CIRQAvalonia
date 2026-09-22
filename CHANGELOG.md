@@ -8,6 +8,34 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**Circuits travel.** A saved circuit now carries the SPICE cards for any imported models it uses,
+so a `.cirq` file opens complete on a machine that has never seen them. Until now it opened with
+the *default* part in place of the one you chose — a different forward drop, different answers, one
+line in a dialog and nothing on the schematic to say so.
+
+Only what the circuit uses, and only what was imported: built-in parts mean the same thing in every
+copy, so an ordinary circuit's file is unchanged. And a model you already have wins — opening
+somebody's file never rewrites your own parts, it reports the disagreement instead. If you want to
+keep a model a file brought with it, the SPICE import window has a button for that.
+
+**The TL431 and regulators carry temperature.** A regulator's output falls about a millivolt a
+degree, and the die's temperature is the room plus whatever it is dissipating through its own
+thermal resistance — so a part idling in a hot enclosure and one working hard on a bench land in
+the same place, which is the point. The LM317's reference drifts several times less than a 7805's,
+which is a good part of what you pay for.
+
+The TL431's bandgap is **bowed rather than sloped**: both ends of the range sit below the middle.
+That is what a bandgap is — a junction drop falling two millivolts a degree added to a difference
+between two junctions rising, flat to first order with the second-order term left over — and it is
+why the datasheet quotes a deviation band rather than a figure in ppm per degree. Sweep one from
+−40 °C to 125 °C and you get an arch, not a line.
+
+Along the way the TL431 stopped failing to converge at certain setpoints. It has ten siemens of
+transconductance through a sigmoid a couple of millivolts wide, and Newton walking that without a
+limiter overshot the active region entirely and was thrown back past it on the next step — so a
+setpoint of 2.490 V would not solve while 2.495 V solved immediately, for no reason anybody could
+see. It now limits its step the way the diode limits its junction voltage.
+
 **Printing.** `Ctrl+P` lays the schematic, the traces and the parts list onto real sheets — a page
 each, fitted inside the margins, with a header naming the circuit and the date. Choose the paper
 size and orientation; a large schematic scales down to fit, and a small one is left at the size it

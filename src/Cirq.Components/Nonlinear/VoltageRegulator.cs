@@ -16,18 +16,47 @@ public sealed record RegulatorModel(
     double OutputResistance,
     double ThermalResistance,
     bool IsAdjustable,
-    double AdjustPinCurrent = 0)
+    double AdjustPinCurrent = 0,
+    double ReferenceTempcoPerKelvin = -1e-3)
 {
+    /// <summary>
+    /// The reference at a temperature, in volts.
+    /// <para>
+    /// A regulator's output is only as steady as the reference inside it, and that reference
+    /// moves. A 78xx drifts about a millivolt a degree, which over a commercial range is some
+    /// tens of millivolts — small against five volts, and not small against the tolerance
+    /// somebody quoted for the thing it is powering. It is quoted on the datasheet as an output
+    /// voltage drift, and it is the reason a supply measured on the bench is not the supply the
+    /// board sees in a warm enclosure.
+    /// </para>
+    /// <para>
+    /// Applied about the reference's own sign, so a negative regulator's output drifts towards
+    /// zero as it warms just as a positive one does rather than away from it.
+    /// </para>
+    /// </summary>
+    public double ReferenceAt(double celsius)
+    {
+        var drift = ReferenceTempcoPerKelvin * (celsius - 25.0);
+
+        return ReferenceVoltage + (Math.Sign(ReferenceVoltage) * drift);
+    }
+
     public static readonly RegulatorModel Lm7805 = new("LM7805", 5.0, 2.0, 1.5, 5e-3, 0.02, 50, false);
     public static readonly RegulatorModel Lm7809 = new("LM7809", 9.0, 2.0, 1.5, 5e-3, 0.02, 50, false);
     public static readonly RegulatorModel Lm7812 = new("LM7812", 12.0, 2.0, 1.5, 5e-3, 0.02, 50, false);
     public static readonly RegulatorModel Lm7905 = new("LM7905", -5.0, 2.0, 1.5, 5e-3, 0.02, 50, false);
 
     /// <summary>Adjustable regulator: holds 1.25 V between OUT and ADJ.</summary>
-    public static readonly RegulatorModel Lm317 = new("LM317", 1.25, 2.0, 1.5, 5e-3, 0.02, 50, true, 50e-6);
+    public static readonly RegulatorModel Lm317 = new(
+        "LM317", 1.25, 2.0, 1.5, 5e-3, 0.02, 50, true, 50e-6,
+        // Specified as a fraction of the reference rather than in millivolts, which on 1.25 V is
+        // a far tighter figure in absolute terms than a 78xx's.
+        ReferenceTempcoPerKelvin: -1.25 * 1e-4);
 
     /// <summary>Low-dropout 3.3 V regulator.</summary>
-    public static readonly RegulatorModel Ld1117 = new("LD1117-3.3", 3.3, 1.1, 0.8, 5e-3, 0.02, 60, false);
+    public static readonly RegulatorModel Ld1117 = new(
+        "LD1117-3.3", 3.3, 1.1, 0.8, 5e-3, 0.02, 60, false,
+        ReferenceTempcoPerKelvin: -0.4e-3);
 
     public static readonly IReadOnlyList<RegulatorModel> Library =
         [Lm7805, Lm7809, Lm7812, Lm7905, Lm317, Ld1117];
@@ -81,9 +110,16 @@ public partial class VoltageRegulator : CircuitComponent
     [ObservableProperty]
     public partial RegulatorModel Model { get; set; }
 
-    /// <summary>Ambient temperature in degrees Celsius, used for the thermal model.</summary>
-    [ObservableProperty]
-    public partial double AmbientTemperature { get; set; } = 25.0;
+    /// <summary>
+    /// Ambient temperature in degrees Celsius, as the circuit's own setting had it at the last
+    /// solve. Read-only here: it is a property of the run rather than of this part, and having
+    /// two ambient temperatures in one circuit is a way to be wrong twice.
+    /// <para>
+    /// Set it under <b>Simulate &gt; Conditions</b>, where every other junction in the circuit
+    /// reads it from as well.
+    /// </para>
+    /// </summary>
+    public double AmbientTemperature { get; private set; } = 27.0;
 
     /// <summary>Junction temperature at which the regulator shuts down, in degrees Celsius.</summary>
     [ObservableProperty]
@@ -197,7 +233,9 @@ public partial class VoltageRegulator : CircuitComponent
     /// </summary>
     private (double Voltage, double Slope) RegulatedVoltage(double headroom)
     {
-        var nominal = Model.ReferenceVoltage;
+        // At the junction's temperature rather than the room's: the reference is on the die, and
+        // on a regulator dropping several watts the die is the part that is hot.
+        var nominal = Model.ReferenceAt(JunctionTemperature);
         var passThrough = headroom - Math.Sign(nominal) * Model.DropoutVoltage;
 
         if (nominal < 0)
@@ -280,6 +318,11 @@ public partial class VoltageRegulator : CircuitComponent
 
         PowerDissipation = Math.Abs(vin - vout) * Math.Abs(OutputCurrent)
                            + Math.Abs(vin - common) * Model.QuiescentCurrent;
+
+        // The circuit's ambient, not a figure of this part's own: a regulator in an enclosure at
+        // 60 degrees starts 60 degrees up before it has dissipated anything, which is most of
+        // what decides whether it reaches shutdown.
+        AmbientTemperature = state.TemperatureKelvin - 273.15;
 
         // Where the junction would end up if this power were held indefinitely.
         var steady = AmbientTemperature + PowerDissipation * Model.ThermalResistance;

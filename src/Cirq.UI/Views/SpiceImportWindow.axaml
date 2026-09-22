@@ -23,6 +23,9 @@
         <StackPanel Orientation="Horizontal" Spacing="8">
           <Button Content="Import" Command="{Binding ImportCommand}" Padding="18,5" />
           <Button Content="Paste an example" Command="{Binding UseSampleCommand}" Padding="14,5" />
+          <Button Content="Keep the open circuit's models"
+                  Command="{Binding KeepFromCircuitCommand}" Padding="14,5"
+                  ToolTip.Tip="A circuit carries the imported models it uses, so it opens complete anywhere. This puts them in your library as well, for the next circuit." />
         </StackPanel>
       </StackPanel>
     </Border>

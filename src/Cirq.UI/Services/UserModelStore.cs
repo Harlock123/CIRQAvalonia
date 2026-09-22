@@ -1,6 +1,7 @@
 using System.Text.Json;
-using Cirq.Components.Nonlinear;
+using Cirq.Components.Serialization;
 using Cirq.Components.Spice;
+using Cirq.Core.Topology;
 
 namespace Cirq.UI.Services;
 
@@ -81,6 +82,60 @@ public sealed class UserModelStore
         return (imported, parsed.Problems);
     }
 
+    /// <summary>
+    /// Takes into the store every model a circuit brought with it that is not already there.
+    /// <para>
+    /// A circuit carries the cards for the imported models it uses, so it opens complete on a
+    /// machine that never saw them — but opening a file does not silently add parts to somebody's
+    /// library, because a file is not an installer. This is the deliberate act that does: you
+    /// opened somebody's circuit, you liked their part, and now it is yours.
+    /// </para>
+    /// <para>
+    /// Anything already in the store is left exactly as it is, including a model of the same name
+    /// that differs. That disagreement was reported when the file was opened, and resolving it by
+    /// overwriting what somebody already had is not this button's decision to make.
+    /// </para>
+    /// </summary>
+    /// <returns>The names taken in, in the order they were found.</returns>
+    public IReadOnlyList<string> KeepUsedBy(Circuit circuit)
+    {
+        ArgumentNullException.ThrowIfNull(circuit);
+
+        List<string> kept = [];
+
+        foreach (var name in ModelNamesUsedBy(circuit))
+        {
+            if (_models.Any(m => string.Equals(m.Name, name, StringComparison.OrdinalIgnoreCase)))
+                continue;
+
+            if (SpiceModelImport.CardFor(name) is not { } card) continue;
+
+            _models.Insert(0, new UserModel(card.Name, card.Kind, card.ToCard(), DateTimeOffset.UtcNow));
+            kept.Add(card.Name);
+        }
+
+        if (kept.Count > 0) Flush();
+
+        return kept;
+    }
+
+    /// <summary>Every device-model name the circuit's parts refer to, blocks included.</summary>
+    private static IEnumerable<string> ModelNamesUsedBy(Circuit circuit)
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var component in Flattening.Flatten(circuit.Components))
+        {
+            foreach (var property in ComponentReflection.EditableProperties(component.GetType()))
+            {
+                if (!ComponentReflection.IsModelProperty(property)) continue;
+
+                if (property.GetValue(component)?.ToString() is { Length: > 0 } name && seen.Add(name))
+                    yield return name;
+            }
+        }
+    }
+
     /// <summary>Takes an imported model out of the library and out of the store.</summary>
     public bool Remove(string name)
     {
@@ -91,12 +146,7 @@ public sealed class UserModelStore
 
         _models.Remove(model);
 
-        switch (model.Kind)
-        {
-            case SpiceDeviceKind.Diode: DiodeModel.Unregister(model.Name); break;
-            case SpiceDeviceKind.Npn or SpiceDeviceKind.Pnp: BjtModel.Unregister(model.Name); break;
-            default: MosfetModel.Unregister(model.Name); break;
-        }
+        SpiceModelImport.Unregister(model.Name, model.Kind);
 
         Flush();
         return true;

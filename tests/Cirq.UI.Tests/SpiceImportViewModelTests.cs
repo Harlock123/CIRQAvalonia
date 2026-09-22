@@ -185,4 +185,76 @@ public class SpiceImportViewModelTests : IDisposable
         Assert.Equal("TESTROUNDTRIP", reloaded.Model.Name);
         Assert.Equal(4e-9, reloaded.Model.SaturationCurrent, 15);
     }
+
+    // ---- keeping what a circuit brought with it ----------------------------
+
+    /// <summary>
+    /// A circuit carries the imported models it uses, so it opens complete anywhere — but opening
+    /// somebody's file does not add parts to your library, because a file is not an installer.
+    /// This is the deliberate act that does.
+    /// </summary>
+    [Fact]
+    public void KeepingTheOpenCircuitsModelsPutsThemInTheLibrary()
+    {
+        // Imported here, saved, and then forgotten — which is the state a colleague's machine is
+        // in when the file lands on it.
+        var store = new UserModelStore(_path);
+        store.Import(Card("TESTKEPT", "D(Is=6.8n N=1.44)"));
+
+        var circuit = new Cirq.Core.Topology.Circuit();
+        circuit.Add(new Diode(DiodeModel.Library.Single(m => m.Name == "TESTKEPT")));
+
+        var json = Cirq.Components.Serialization.CircuitSerializer.ToJson(circuit);
+
+        store.Remove("TESTKEPT");
+        Assert.DoesNotContain(DiodeModel.Library, m => m.Name == "TESTKEPT");
+
+        var opened = Cirq.Components.Serialization.CircuitSerializer.FromJson(json).Circuit;
+
+        // Registered for the session by the file, but not in the store on disk.
+        Assert.Contains(DiodeModel.Library, m => m.Name == "TESTKEPT");
+        Assert.DoesNotContain(store.Models, m => m.Name == "TESTKEPT");
+
+        var vm = new SpiceImportViewModel(store, opened);
+        vm.KeepFromCircuitCommand.Execute(null);
+
+        Assert.Contains(store.Models, m => m.Name == "TESTKEPT");
+        Assert.Contains(vm.Imported, m => m.Name == "TESTKEPT");
+        Assert.Contains("TESTKEPT", vm.Status);
+
+        // And it survives a restart, which is the whole of what "kept" means.
+        Assert.Contains(new UserModelStore(_path).Models, m => m.Name == "TESTKEPT");
+    }
+
+    /// <summary>Keeping a model that is already there changes nothing and says so.</summary>
+    [Fact]
+    public void KeepingAModelAlreadyInTheLibraryLeavesItAlone()
+    {
+        var store = new UserModelStore(_path);
+        store.Import(Card("TESTALREADY", "D(Is=1.1n N=1.2)"));
+
+        var circuit = new Cirq.Core.Topology.Circuit();
+        circuit.Add(new Diode(DiodeModel.Library.Single(m => m.Name == "TESTALREADY")));
+
+        var vm = new SpiceImportViewModel(store, circuit);
+        vm.KeepFromCircuitCommand.Execute(null);
+
+        Assert.Single(store.Models, m => m.Name == "TESTALREADY");
+        Assert.Contains("not already here", vm.Status);
+    }
+
+    /// <summary>A circuit of built-in parts has nothing to keep, and the button says as much.</summary>
+    [Fact]
+    public void ACircuitOfBuiltInPartsHasNothingToKeep()
+    {
+        // A built-in nothing in this suite ever shadows. The model registries are static, so a
+        // part whose name another test imports over is not a built-in for the length of that test.
+        var circuit = new Cirq.Core.Topology.Circuit();
+        circuit.Add(new Diode(DiodeModel.D1N5817));
+
+        var vm = new SpiceImportViewModel(new UserModelStore(_path), circuit);
+        vm.KeepFromCircuitCommand.Execute(null);
+
+        Assert.Contains("not already here", vm.Status);
+    }
 }

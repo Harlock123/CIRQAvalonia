@@ -321,9 +321,17 @@ public class NewExampleTests
     }
 
     /// <summary>
-    /// The whole supply end to end, at five settings of the knob. A 7805 holds five volts above
+    /// The whole supply end to end, at five settings of the knob. A 7805 holds its reference above
     /// its own GND pin, so lifting that pin through R1 and the potentiometer lifts the output with
-    /// it: V = 5 + R2·(5/R1 + Iq), which with 220 Ω and a 470 Ω pot runs from 5 V to 18 V.
+    /// it: V = Vref·(1 + R2/R1) + Iq·R2, which with 220 Ω and a 470 Ω pot runs from 5 V to 18 V.
+    /// <para>
+    /// The nominal figures are that formula with the reference at its 25 °C value. A working part
+    /// is not at 25 °C — it is at the room plus whatever it is dissipating — and a 7805's
+    /// reference falls about a millivolt a degree, so the real output sits a little <i>under</i>
+    /// the nominal, multiplied up by the gain of the adjustment network. Both are checked: the
+    /// divider law exactly, against the reference the die is actually at, and the drift as a
+    /// bounded amount in the right direction.
+    /// </para>
     /// </summary>
     [Theory]
     [InlineData(0.0, 5.00)]
@@ -344,7 +352,22 @@ public class NewExampleTests
         var sim = vm.Simulation.Simulator!;
         sim.Run(0.4);
 
-        Assert.Equal(expected, sim.NodeVoltage(regulator.Output), 0.05);
+        var measured = sim.NodeVoltage(regulator.Output);
+
+        const double setter = 220.0;
+        var rheostat = pot.Resistance * position;
+
+        var reference = regulator.Model.ReferenceAt(regulator.JunctionTemperature);
+        var predicted = (reference * (1 + (rheostat / setter)))
+                        + (regulator.Model.QuiescentCurrent * rheostat);
+
+        Assert.Equal(predicted, measured, 0.05);
+
+        // Warmer than the 25 °C the nominal figure assumes, so below it — but only by the drift,
+        // never by more than a couple of hundred millivolts at the top of the range.
+        Assert.InRange(measured, expected - 0.25, expected + 0.01);
+        Assert.True(regulator.JunctionTemperature > 25.0,
+            $"the die should be above 25 °C, not {regulator.JunctionTemperature:F1}");
     }
 
     /// <summary>

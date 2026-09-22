@@ -175,7 +175,7 @@ public partial class MainWindow : Window
 
         var dialog = new SpiceImportWindow
         {
-            DataContext = new SpiceImportViewModel(_viewModel.UserModels),
+            DataContext = new SpiceImportViewModel(_viewModel.UserModels, _viewModel.Circuit),
         };
 
         await dialog.ShowDialog(this);

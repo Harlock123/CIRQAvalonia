@@ -25,6 +25,11 @@ public partial class ShuntReference : CircuitComponent
     /// <summary>Current at which the transition from off to conducting is centred, in amps.</summary>
     private const double MaximumSink = 0.1;
 
+    /// <summary>The reference error the last iteration was linearised at. NaN before the first.</summary>
+    private double _previousError = double.NaN;
+
+    private bool _limitedThisIteration;
+
     public ShuntReference()
     {
         Cathode = new Terminal("k", "K", TerminalType.Passive, new Point(0, -40));
@@ -44,6 +49,40 @@ public partial class ShuntReference : CircuitComponent
     /// <summary>The internal bandgap the reference pin is held at, in volts.</summary>
     [ObservableProperty]
     public partial double SetpointVoltage { get; set; } = 2.495;
+
+    /// <summary>
+    /// How far the reference bows over temperature, in volts per degree squared.
+    /// <para>
+    /// A bandgap reference does not drift <b>linearly</b>, and that is the entire point of one.
+    /// It is built by adding two voltages that move opposite ways — a junction drop falling about
+    /// two millivolts a degree, and a difference between two junctions rising — so the sum is
+    /// flat to first order and what is left is the second-order term. The curve has a shallow
+    /// maximum and falls away either side of it.
+    /// </para>
+    /// <para>
+    /// Which is why the datasheet quotes a <i>deviation band</i> over a range rather than a
+    /// coefficient in ppm per degree: there is no single slope to quote. Modelling it as a
+    /// straight line would get the ends roughly right and the middle wrong, and would lose the
+    /// reason anybody pays for a bandgap rather than using a zener.
+    /// </para>
+    /// </summary>
+    [ObservableProperty]
+    public partial double CurvaturePerKelvinSquared { get; set; } = 8e-7;
+
+    /// <summary>
+    /// Where the bow peaks, in degrees Celsius. Trimmed in manufacture to put the flat part of
+    /// the curve in the middle of the range the part is sold for.
+    /// </summary>
+    [ObservableProperty]
+    public partial double CurvaturePeakCelsius { get; set; } = 30.0;
+
+    /// <summary>The reference at a temperature, in volts.</summary>
+    public double SetpointAt(double celsius)
+    {
+        var offset = celsius - CurvaturePeakCelsius;
+
+        return SetpointVoltage - (Math.Max(CurvaturePerKelvinSquared, 0) * offset * offset);
+    }
 
     /// <summary>
     /// Transconductance in amps per volt of reference error. High, because the open-loop gain of a
@@ -107,6 +146,9 @@ public partial class ShuntReference : CircuitComponent
         }
     }
 
+    /// <summary>How wide the sigmoid is: the slope through the setpoint is the transconductance.</summary>
+    private double ErrorWidth => MaximumSink / (4.0 * Math.Max(Transconductance, 1e-6));
+
     /// <summary>
     /// How hard it wants to conduct for a given reference error, and the slope of that.
     /// <para>
@@ -117,8 +159,7 @@ public partial class ShuntReference : CircuitComponent
     /// </summary>
     private (double Current, double Slope) Demand(double error)
     {
-        // Width chosen so the slope through the setpoint is exactly the stated transconductance.
-        var width = MaximumSink / (4.0 * Math.Max(Transconductance, 1e-6));
+        var width = ErrorWidth;
 
         // The error is never linearised far out on the sigmoid's tails. Out there the curve is
         // flat, so the Jacobian carries no feedback at all and the device linearises as a plain
@@ -141,8 +182,15 @@ public partial class ShuntReference : CircuitComponent
         // The reference pin's own bias current.
         system.StampResistor(reference, anode, Math.Max(ReferenceResistance, 1.0));
 
-        var vref = system.IterationVoltageAcross(reference, anode);
-        var (demand, slope) = Demand(vref - SetpointVoltage);
+        var setpoint = SetpointAt(state.TemperatureKelvin - 273.15);
+        var error = LimitError(system.IterationVoltageAcross(reference, anode) - setpoint);
+
+        // The reference voltage the linearisation was actually taken at, which after limiting is
+        // not the one the matrix asked for. The companion's constant term has to use this one or
+        // it describes a tangent at a different place from where it was measured.
+        var vref = setpoint + error;
+
+        var (demand, slope) = Demand(error);
 
         // Never linearised at a negative cathode voltage. Like the optocoupler's output, this is
         // close to a current sink once it is conducting, so the solve overshoots past zero; taken
@@ -170,14 +218,79 @@ public partial class ShuntReference : CircuitComponent
         ReferenceVoltage = system.NodeVoltage(Reference) - system.NodeVoltage(Anode);
         CathodeVoltage = system.NodeVoltage(Cathode) - system.NodeVoltage(Anode);
 
-        var (demand, _) = Demand(ReferenceVoltage - SetpointVoltage);
+        var (demand, _) = Demand(ReferenceVoltage - SetpointAt(state.TemperatureKelvin - 273.15));
         var saturation = 1.0 - Math.Exp(-Math.Max(CathodeVoltage, 0.0) / Math.Max(MinimumCathodeVoltage, 1e-3));
 
         CathodeCurrent = demand * saturation;
     }
 
+    /// <summary>
+    /// Holds the reference error to a step at a time, the way the diode limits its junction
+    /// voltage.
+    /// <para>
+    /// This part is a very high-gain nonlinearity: ten siemens through a sigmoid a couple of
+    /// millivolts wide, which is the whole of what makes it a useful reference. Newton walking
+    /// that without a limit overshoots the active region entirely, lands far out on a tail where
+    /// the slope is nearly nothing, and is thrown back past the setpoint on the next step — so
+    /// for certain setpoints it oscillates and never converges, while neighbouring ones a
+    /// millivolt away solve immediately. It was a knife edge, and which side of it a circuit fell
+    /// on had no relation to anything a person could see.
+    /// </para>
+    /// <para>
+    /// Limiting the step keeps every iterate inside the region where there is a gradient to
+    /// follow. As with the diode, an iteration that had to be limited is not a converged one, so
+    /// the solver is told to keep going.
+    /// </para>
+    /// </summary>
+    private double LimitError(double error)
+    {
+        _limitedThisIteration = false;
+
+        if (double.IsNaN(_previousError))
+        {
+            _previousError = error;
+            return error;
+        }
+
+        // Only the active region is worth policing. Out on the tails the sigmoid is clamped flat,
+        // so a volt of movement out there changes nothing the solver can see, and holding it back
+        // a few millivolts at a time would just burn iterations until the solver gave up — which
+        // is what a plain step limit did. Both iterates are therefore measured by where they sit
+        // *within* the band, and a step outside it costs nothing.
+        var band = ErrorWidth * 6.0;
+        var step = ErrorWidth * 2.0;
+
+        var previous = Math.Clamp(_previousError, -band, band);
+        var wanted = Math.Clamp(error, -band, band);
+        var limited = Math.Clamp(wanted, previous - step, previous + step);
+
+        // Held back: the iterate is the in-band value, so an approach from far away lands on the
+        // edge of the region rather than being dragged in millivolt by millivolt from a volt out.
+        if (Math.Abs(limited - wanted) > 1e-15)
+        {
+            _limitedThisIteration = true;
+            _previousError = limited;
+
+            return limited;
+        }
+
+        _previousError = error;
+
+        return error;
+    }
+
+    /// <summary>
+    /// A limited iteration has not reached the point the matrix asked for, so the solve cannot be
+    /// declared finished on it.
+    /// </summary>
+    public override bool HasConverged(MnaSystem system, SimulationState state) =>
+        !_limitedThisIteration;
+
     public override void ResetState()
     {
+        _previousError = double.NaN;
+        _limitedThisIteration = false;
+
         CathodeCurrent = 0;
         ReferenceVoltage = 0;
         CathodeVoltage = 0;

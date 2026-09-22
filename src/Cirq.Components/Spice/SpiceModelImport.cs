@@ -54,12 +54,93 @@ public static class SpiceModelImport
     };
 
     /// <summary>
+    /// The card behind every imported model, by name.
+    /// <para>
+    /// Kept because a model is only half of what an imported part is: the other half is the card
+    /// it came from, and without that a circuit using the part cannot be saved in a form that
+    /// opens anywhere else. This is what a saved file copies into itself.
+    /// </para>
+    /// </summary>
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, SpiceModelCard> Cards =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// The card an imported model was built from, or null for a built-in.
+    /// <para>
+    /// Checked against the library rather than trusted: a model can be taken out through its own
+    /// library directly, and a card left behind for a name that has since gone back to meaning
+    /// the built-in would have a saved circuit carrying a definition of a part it is not using.
+    /// A card that no longer describes what the name resolves to is not a card.
+    /// </para>
+    /// </summary>
+    public static SpiceModelCard? CardFor(string? name)
+    {
+        if (name is null || !Cards.TryGetValue(name, out var card)) return null;
+
+        if (Equals(Existing(name, card.Kind), Build(card))) return card;
+
+        Cards.TryRemove(name, out _);
+        return null;
+    }
+
+    /// <summary>Every imported model's card, by the order they were brought in.</summary>
+    public static IReadOnlyCollection<SpiceModelCard> ImportedCards => [.. Cards.Values];
+
+    /// <summary>
+    /// The model a card would build, without registering it — so an incoming card can be compared
+    /// against what a library already holds under that name.
+    /// </summary>
+    public static object Build(SpiceModelCard card) => card.Kind switch
+    {
+        SpiceDeviceKind.Diode => ToDiode(card),
+        SpiceDeviceKind.Npn or SpiceDeviceKind.Pnp => ToBipolar(card),
+        _ => ToMosfet(card),
+    };
+
+    /// <summary>
+    /// The model of that name already in the relevant library, built in or imported, or null when
+    /// nothing goes by it.
+    /// </summary>
+    public static object? Existing(string? name, SpiceDeviceKind kind)
+    {
+        if (name is null) return null;
+
+        bool Matches(object model) =>
+            string.Equals(model.ToString(), name, StringComparison.OrdinalIgnoreCase);
+
+        return kind switch
+        {
+            SpiceDeviceKind.Diode => DiodeModel.Library.FirstOrDefault(m => Matches(m)),
+            SpiceDeviceKind.Npn or SpiceDeviceKind.Pnp => BjtModel.Library.FirstOrDefault(m => Matches(m)),
+            _ => MosfetModel.Library.FirstOrDefault(m => Matches(m)),
+        };
+    }
+
+    /// <summary>
+    /// Takes an imported model out of its library and forgets its card. Built-in models are not
+    /// removable; an import of the same name was shadowing one, and this brings it back.
+    /// </summary>
+    public static bool Unregister(string name, SpiceDeviceKind kind)
+    {
+        Cards.TryRemove(name, out _);
+
+        return kind switch
+        {
+            SpiceDeviceKind.Diode => DiodeModel.Unregister(name),
+            SpiceDeviceKind.Npn or SpiceDeviceKind.Pnp => BjtModel.Unregister(name),
+            _ => MosfetModel.Unregister(name),
+        };
+    }
+
+    /// <summary>
     /// Converts a card and adds the result to the relevant library, replacing anything of the
     /// same name.
     /// </summary>
     public static ImportedModel Register(SpiceModelCard card)
     {
         ArgumentNullException.ThrowIfNull(card);
+
+        Cards[card.Name] = card;
 
         var known = Understood[card.Kind];
 

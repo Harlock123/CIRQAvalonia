@@ -157,37 +157,172 @@ public class TemperatureTests
         Assert.Equal(millivolts, sim.NodeVoltage(diode.Anode) * 1000, 2.0);
     }
 
+    // ---- the bandgap reference --------------------------------------------
+
+    private static double Reference(double celsius, double curvature = 8e-7)
+    {
+        var circuit = new Circuit();
+        var supply = circuit.Add(new DcVoltageSource(12.0));
+        var series = circuit.Add(new Resistor(1e3));
+        var shunt = circuit.Add(new ShuntReference { CurvaturePerKelvinSquared = curvature });
+        var ground = circuit.Add(new Ground());
+
+        circuit.Connect(supply.Negative, ground.Pin);
+        circuit.Connect(supply.Positive, series.A);
+        circuit.Connect(series.B, shunt.Cathode);
+        circuit.Connect(shunt.Anode, ground.Pin);
+        circuit.Connect(shunt.Reference, shunt.Cathode);
+
+        var sim = new CircuitSimulator(circuit);
+        sim.Settings.TemperatureKelvin = celsius + 273.15;
+        sim.Reset();
+        sim.SolveOperatingPoint();
+
+        return sim.NodeVoltage(series.B);
+    }
+
     /// <summary>
-    /// The guide says plainly that only junction-based models carry temperature, and that the
-    /// others come out of a sweep as straight lines because they are silent rather than stable.
-    /// If that ever stops being true the guide is wrong, so it is asserted here.
+    /// The one thing a bandgap does that a zener does not: it is <b>bowed</b>, not sloped. Both
+    /// ends of the range sit below the middle, which no straight line can do — and it is the whole
+    /// reason the part costs more than a zener and why its datasheet quotes a deviation band
+    /// rather than a coefficient in ppm per degree.
     /// </summary>
     [Fact]
-    public void ThePartsTheGuideSaysDoNotCarryTemperatureStillDoNot()
+    public void TheReferenceBowsOverTemperatureRatherThanDrifting()
     {
-        double Reference(double celsius)
-        {
-            var circuit = new Circuit();
-            var supply = circuit.Add(new DcVoltageSource(12.0));
-            var series = circuit.Add(new Resistor(1e3));
-            var shunt = circuit.Add(new ShuntReference());
-            var ground = circuit.Add(new Ground());
+        var cold = Reference(-40);
+        var peak = Reference(30);
+        var hot = Reference(125);
 
-            circuit.Connect(supply.Negative, ground.Pin);
-            circuit.Connect(supply.Positive, series.A);
-            circuit.Connect(series.B, shunt.Cathode);
-            circuit.Connect(shunt.Anode, ground.Pin);
-            circuit.Connect(shunt.Reference, shunt.Cathode);
+        Assert.True(cold < peak, $"cold {cold:F5} should sit below the peak {peak:F5}");
+        Assert.True(hot < peak, $"hot {hot:F5} should sit below the peak {peak:F5}");
+    }
 
-            var sim = new CircuitSimulator(circuit);
-            sim.Settings.TemperatureKelvin = celsius + 273.15;
-            sim.Reset();
-            sim.SolveOperatingPoint();
+    /// <summary>
+    /// Flat to first order at the trim point — five degrees either side of it move the reference
+    /// by less than a tenth of what the far end of the range does.
+    /// </summary>
+    [Fact]
+    public void TheReferenceIsFlatAroundTheTrimPoint()
+    {
+        var peak = Reference(30);
 
-            return sim.NodeVoltage(series.B);
-        }
+        var nearby = Math.Abs(Reference(25) - peak);
+        var faraway = Math.Abs(Reference(125) - peak);
 
-        Assert.Equal(Reference(-40), Reference(125), 6);
+        Assert.True(nearby * 10 < faraway,
+            $"{nearby * 1e3:F3} mV over five degrees against {faraway * 1e3:F3} mV over ninety-five");
+    }
+
+    /// <summary>
+    /// The datasheet quotes the deviation over the commercial range as a band of a few tens of
+    /// millivolts. A model that wandered further than that would be a worse reference than the
+    /// part, and one that never moved would be a better one.
+    /// </summary>
+    [Fact]
+    public void TheReferenceStaysInsideItsDeviationBandAcrossTheWholeRange()
+    {
+        var samples = new[] { -40.0, 0, 25, 30, 60, 85, 125 }.Select(t => Reference(t)).ToArray();
+        var band = samples.Max() - samples.Min();
+
+        Assert.InRange(band, 1e-3, 25e-3);
+    }
+
+    /// <summary>The curve is the only temperature term in the part: switch it off and it is flat.</summary>
+    [Fact]
+    public void TurningTheCurvatureOffMakesTheReferenceTemperatureIndependent()
+    {
+        Assert.Equal(Reference(-40, curvature: 0), Reference(125, curvature: 0), 6);
+    }
+
+    // ---- regulators --------------------------------------------------------
+
+    private static (double Output, double Junction, double Ambient) Regulated(
+        double celsius, double load, RegulatorModel? model = null)
+    {
+        var circuit = new Circuit();
+        var supply = circuit.Add(new DcVoltageSource(12.0));
+        var regulator = circuit.Add(new VoltageRegulator(model ?? RegulatorModel.Lm7805));
+        var resistor = circuit.Add(new Resistor(load));
+        var ground = circuit.Add(new Ground());
+
+        circuit.Connect(supply.Negative, ground.Pin);
+        circuit.Connect(supply.Positive, regulator.Input);
+        circuit.Connect(regulator.Common, ground.Pin);
+        circuit.Connect(regulator.Output, resistor.A);
+        circuit.Connect(resistor.B, ground.Pin);
+
+        var sim = new CircuitSimulator(circuit);
+        sim.Settings.TemperatureKelvin = celsius + 273.15;
+        sim.Reset();
+        sim.SolveOperatingPoint();
+        sim.Run(200e-3);          // long enough for the die to reach its steady temperature
+
+        return (sim.NodeVoltage(regulator.Output), regulator.JunctionTemperature,
+            regulator.AmbientTemperature);
+    }
+
+    /// <summary>
+    /// A 7805's output falls as it warms: the datasheet quotes about −1.1 mV per degree. Lightly
+    /// loaded the die sits at ambient, so the whole of the shift is the reference drifting.
+    /// </summary>
+    [Fact]
+    public void TheRegulatorsOutputFallsAsItWarms()
+    {
+        var cold = Regulated(-40, load: 10e3);
+        var warm = Regulated(25, load: 10e3);
+        var hot = Regulated(85, load: 10e3);
+
+        Assert.True(cold.Output > warm.Output && warm.Output > hot.Output,
+            $"{cold.Output:F4} / {warm.Output:F4} / {hot.Output:F4} is not falling");
+
+        var perDegree = (cold.Output - hot.Output) / (hot.Ambient - cold.Ambient);
+
+        Assert.InRange(perDegree, 0.4e-3, 2e-3);
+    }
+
+    /// <summary>The ambient a regulator works at is the circuit's, not a fixed room temperature.</summary>
+    [Fact]
+    public void TheRegulatorTakesItsAmbientFromTheSimulation()
+    {
+        Assert.Equal(85.0, Regulated(85, load: 10e3).Ambient, 3);
+    }
+
+    /// <summary>
+    /// Self-heating and ambient add. A part working hard in a hot room reaches a junction
+    /// temperature neither on its own explains, and the output follows the junction rather than
+    /// the room.
+    /// </summary>
+    [Fact]
+    public void SelfHeatingAddsToAmbientAndTheOutputFollowsTheJunction()
+    {
+        var idleHot = Regulated(85, load: 10e3);
+        var workingCool = Regulated(25, load: 100);
+        var workingHot = Regulated(85, load: 100);
+
+        Assert.True(workingHot.Junction > idleHot.Junction + 10,
+            $"working {workingHot.Junction:F1} against idling {idleHot.Junction:F1}");
+        Assert.True(workingHot.Junction > workingCool.Junction + 50,
+            $"hot room {workingHot.Junction:F1} against cool {workingCool.Junction:F1}");
+
+        // Under load the die runs above the room, so the output sits below where the same ambient
+        // gave it when idling.
+        Assert.True(workingHot.Output < idleHot.Output,
+            $"{workingHot.Output:F4} should be below {idleHot.Output:F4}");
+    }
+
+    /// <summary>
+    /// The LM317's reference is the better one, and that is most of what you buy with it: over the
+    /// same span it moves a fraction of what a 7805 does.
+    /// </summary>
+    [Fact]
+    public void TheAdjustableRegulatorsReferenceDriftsLessThanAFixedOnes()
+    {
+        double Drift(RegulatorModel model) =>
+            Math.Abs(model.ReferenceAt(-40) - model.ReferenceAt(125)) / Math.Abs(model.ReferenceVoltage);
+
+        Assert.True(Drift(RegulatorModel.Lm317) < Drift(RegulatorModel.Lm7805) / 2,
+            $"{Drift(RegulatorModel.Lm317):P2} against {Drift(RegulatorModel.Lm7805):P2}");
     }
 
     // ---- transistors -------------------------------------------------------

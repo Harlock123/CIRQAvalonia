@@ -27,6 +27,29 @@ public sealed class CircuitDocument
     /// sentinel — an old file means "room temperature", not "zero".
     /// </summary>
     public double? AmbientTemperatureCelsius { get; set; }
+
+    /// <summary>
+    /// The SPICE cards for any imported models the circuit uses, carried in the file so it opens
+    /// complete somewhere else.
+    /// <para>
+    /// A part built in to this library is named and looked up. An imported one has nowhere to be
+    /// looked up <i>from</i> on a machine that never imported it, so the card comes along. Null
+    /// when the circuit uses nothing but built-in models, which is nearly every circuit — an
+    /// ordinary file is byte-for-byte what it always was.
+    /// </para>
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<ModelRecord>? Models { get; set; }
+}
+
+/// <summary>One imported device model, as the card that defines it.</summary>
+public sealed class ModelRecord
+{
+    /// <summary>The model's name, as components refer to it.</summary>
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>The <c>.model</c> card, which is the whole of the definition.</summary>
+    public string Card { get; set; } = string.Empty;
 }
 
 /// <summary>One placed component: what it is, where it sits, and its parameters.</summary>

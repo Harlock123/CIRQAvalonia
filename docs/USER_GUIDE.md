@@ -3123,17 +3123,31 @@ it: `dVf/dT ≈ (Vf − Eg − 3·Vt) / T`, which for a silicon junction at 0.6 
 
 Everything built on a semiconductor junction — diodes of every kind, and bipolars, and therefore
 everything built out of those from bridge rectifiers to optocouplers to Darlington arrays — plus
-MOSFETs and op-amps.
+MOSFETs, op-amps, regulators and the TL431.
 
-**Not regulator references or the TL431.** Those do not yet move with temperature, and the honest
-consequence is that they come out of a temperature sweep as dead straight lines. That is the model
-being silent, not the part being stable: a real TL431 drifts a few tens of millivolts over the
-range. Do not read flatness in those as a result.
+**A regulator answers to two temperatures.** Its reference drifts with the *junction*, and the
+junction is the room plus whatever the part is dissipating through its own thermal resistance. A
+7805 idling in a 60 °C enclosure and a 7805 working hard on a bench are at the same junction
+temperature and give the same output, which is the point: the ambient under **Simulate > Conditions**
+sets the starting point, and the load decides how far above it the die settles. A 7805 falls about
+1.1 mV/°C, as its datasheet says; an LM317's reference is several times better, and that is a good
+part of what you are buying.
+
+**The TL431 is bowed, not sloped**, and this is worth understanding rather than memorising. A
+bandgap is built by adding two voltages that move opposite ways — a junction drop falling about
+2 mV/°C, and a difference between two junctions rising — so the sum is flat *to first order* and
+what survives is the second-order term. The curve therefore has a shallow maximum, trimmed in
+manufacture to sit in the middle of the range the part is sold for, and falls away on **both**
+sides of it. Sweep one from −40 °C to 125 °C and you get an arch, not a line. That is also why the
+datasheet quotes a deviation band over a range rather than a figure in ppm per degree: there is no
+single slope to quote.
 
 ### Worth trying
 
 Sweep the temperature of the **Transistor Switch** example and watch the bias move. Any zener
-reference shows its own drift for the same reason. A diode fed from a current source is a
+reference shows its own drift for the same reason — and put a voltage probe on a **TL431** and
+sweep it the same way for the contrast: the zener slopes, the bandgap arches, and the picture
+makes the case for the more expensive part better than any number does. A diode fed from a current source is a
 thermometer: sweep the temperature with a voltage probe on it and you have plotted the calibration
 curve. And put a current probe on a **MOSFET Driver**'s switch and sweep it to 125 °C — the
 conduction loss is most of the way to double.
@@ -3298,11 +3312,39 @@ because the letter that matters is the first one after the digits.
 Continuation lines starting with `+` are joined on, `*` comment lines and anything after a `;` are
 dropped, and several cards can be pasted at once.
 
-### A caution about sharing
+### Circuits travel
 
-A circuit that uses an imported model names it in the saved file. Opened on a machine that has not
-imported it, the circuit still loads — but with the default model and a warning saying so. The
-model travels with the person, not with the file.
+A saved circuit carries the cards for the imported models it uses, so it opens complete on a
+machine that has never seen them. Send somebody a `.cirq` file and they get your circuit, not an
+approximation of it.
+
+That is worth spelling out, because the alternative is quietly awful. A circuit naming a model
+nobody has loads with the *default* part in its place: a diode with different saturation current
+and a different forward drop, which is to say a different circuit giving different answers, with
+one line in a dialog to say so and nothing on the schematic at all. The numbers come out plausible
+and wrong, which is the worst kind.
+
+Three rules keep it honest:
+
+- **Only what the circuit uses.** A file is not an export of your library. One imported diode in
+  the circuit puts one card in the file, not the forty you happened to import that week.
+- **Only what was imported.** Built-in parts mean the same thing in every copy of the application,
+  so they are named, not copied, and an ordinary circuit's file is byte-for-byte what it always
+  was.
+- **What you already have wins.** Opening a file does not rewrite your parts. If your `2N3904` and
+  the file's disagree, yours is used and the disagreement is reported — because yours is the one
+  every other circuit on your machine was built against, and swapping it would change answers in
+  circuits you did not have open.
+
+A model that arrives in a file is registered for the session and shows up in the parts library
+alongside everything else, but it is *not* added to your own imported models — a file is not an
+installer. If you want to keep it, **Edit > Import SPICE Model...** has a button that takes the
+open circuit's models into your library, where they will be there for the next circuit too.
+
+Blocks need none of this: grouping a selection moves the parts inside rather than pointing at a
+definition elsewhere, so a block in a saved circuit is already the whole thing. The library under
+**Edit > Block Library...** is a convenience for placing one again, not something a file depends
+on.
 
 ---
 
@@ -3481,6 +3523,10 @@ still opens. Only a malformed file, or one written by a newer format version, is
 
 Saves are written to a temporary file and moved into place, so an interrupted write cannot destroy
 the file you already had.
+
+A file also carries the SPICE cards for any imported models it uses, so a circuit sent to somebody
+else opens as the circuit you saved rather than as an approximation of it. The rules that keeps
+honest are under [Circuits travel](#importing-a-spice-model).
 
 ---
 

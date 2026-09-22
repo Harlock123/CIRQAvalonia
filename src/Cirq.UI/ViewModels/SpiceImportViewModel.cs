@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using Cirq.Core.Topology;
 using Cirq.UI.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -17,10 +18,13 @@ namespace Cirq.UI.ViewModels;
 public sealed partial class SpiceImportViewModel : ObservableObject
 {
     private readonly UserModelStore _store;
+    private readonly Circuit? _circuit;
 
-    public SpiceImportViewModel(UserModelStore store)
+    public SpiceImportViewModel(UserModelStore store, Circuit? circuit = null)
     {
         _store = store;
+        _circuit = circuit;
+
         Refresh();
     }
 
@@ -87,6 +91,28 @@ public sealed partial class SpiceImportViewModel : ObservableObject
 
         Status = $"Removed '{name}'. Circuits already using it will load with the default model " +
                  "and say so.";
+    }
+
+    /// <summary>
+    /// Takes the models the open circuit brought with it into the library, so they are here for
+    /// the next circuit too.
+    /// </summary>
+    [RelayCommand]
+    public void KeepFromCircuit()
+    {
+        if (_circuit is null)
+        {
+            Status = "No circuit is open.";
+            return;
+        }
+
+        var kept = _store.KeepUsedBy(_circuit);
+
+        Refresh();
+
+        Status = kept.Count == 0
+            ? "The open circuit uses no imported models that are not already here."
+            : $"Kept {string.Join(", ", kept)}. They are in the library now, for any circuit.";
     }
 
     [RelayCommand]

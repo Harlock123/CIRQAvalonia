@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Reflection;
@@ -100,26 +101,30 @@ public sealed partial class ControlPanelViewModel : ObservableObject, IDisposabl
     /// <summary>
     /// The operable properties of a type, declared order. Cached because the panel is rebuilt
     /// every time a component is placed or removed, and reflection is not free.
+    /// <para>
+    /// Concurrent because the cache is static and the method is public: the panel itself only
+    /// ever asks from the UI thread, but nothing stops another caller — a headless run, a test
+    /// collection — from asking at the same moment, and a plain dictionary written from two
+    /// threads at once corrupts its own buckets rather than losing an entry.
+    /// </para>
     /// </summary>
-    private static readonly Dictionary<Type, IReadOnlyList<(PropertyInfo, OperableAttribute)>> Cache = [];
+    private static readonly ConcurrentDictionary<Type, IReadOnlyList<(PropertyInfo, OperableAttribute)>> Cache = [];
 
-    public static IReadOnlyList<(PropertyInfo Property, OperableAttribute Operable)> OperableProperties(Type type)
-    {
-        if (Cache.TryGetValue(type, out var cached)) return cached;
-
-        List<(PropertyInfo, OperableAttribute)> found = [];
-
-        foreach (var property in type.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+    public static IReadOnlyList<(PropertyInfo Property, OperableAttribute Operable)> OperableProperties(Type type) =>
+        Cache.GetOrAdd(type, static t =>
         {
-            var operable = property.GetCustomAttribute<OperableAttribute>();
-            if (operable is null || !property.CanWrite || !property.CanRead) continue;
+            List<(PropertyInfo, OperableAttribute)> found = [];
 
-            found.Add((property, operable));
-        }
+            foreach (var property in t.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+            {
+                var operable = property.GetCustomAttribute<OperableAttribute>();
+                if (operable is null || !property.CanWrite || !property.CanRead) continue;
 
-        Cache[type] = found;
-        return found;
-    }
+                found.Add((property, operable));
+            }
+
+            return found;
+        });
 
     public void Dispose()
     {
