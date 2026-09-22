@@ -19,6 +19,14 @@ public interface ICircuitFileDialogs
     Task ReportAsync(string title, string message);
 
     /// <summary>
+    /// Asks whether to bring back a circuit that was being worked on when the application last
+    /// stopped. False throws it away.
+    /// </summary>
+    /// <param name="name">What the circuit was called, or "an unsaved circuit".</param>
+    /// <param name="age">How long ago the snapshot was taken, in words.</param>
+    Task<bool> ConfirmRecoveryAsync(string name, string age);
+
+    /// <summary>
     /// Asks what to export and where to put it; null when the user cancels either question.
     /// </summary>
     /// <param name="suggestedFileName">The circuit's name, without an extension.</param>

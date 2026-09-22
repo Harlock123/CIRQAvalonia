@@ -36,6 +36,36 @@ public enum ScopeLayout
 /// The oscilloscope panel's state: which probes are shown, the timebase and vertical scaling, and
 /// the sample interval the engine should decimate its probe recording to.
 /// </summary>
+/// <summary>
+/// A trace as it was at some moment, kept to compare against.
+/// </summary>
+/// <param name="Label">The probe it came from.</param>
+/// <param name="Color">The probe's colour, so a reference is recognisably the same signal.</param>
+/// <param name="Samples">What was recorded at the moment it was taken.</param>
+/// <param name="TakenUtc">When, so several references can be told apart.</param>
+public sealed record ReferenceTrace(
+    string Label,
+    Cirq.Core.Primitives.Color Color,
+    IReadOnlyList<Cirq.Core.Primitives.DataPoint> Samples,
+    DateTimeOffset TakenUtc)
+{
+    /// <summary>What the legend calls it.</summary>
+    public string LegendText => $"{Label} (ref)";
+
+    /// <summary>What the list of references calls it.</summary>
+    public string Summary => $"{Label} · {Samples.Count} points at {TakenUtc.LocalDateTime:HH:mm:ss}";
+}
+
+/// <summary>A trace worked out from the others rather than recorded.</summary>
+/// <param name="Label">What to call it.</param>
+/// <param name="Expression">The arithmetic, over the other traces' labels.</param>
+/// <param name="Color">What to draw it in.</param>
+public sealed record ComputedTrace(
+    string Label, string Expression, Cirq.Core.Primitives.Color Color)
+{
+    public string LegendText => $"{Label} = {Expression}";
+}
+
 public sealed partial class ScopeViewModel : ObservableObject
 {
     /// <summary>Horizontal divisions on the scope face, matching a real bench instrument.</summary>
@@ -53,6 +83,183 @@ public sealed partial class ScopeViewModel : ObservableObject
     }
 
     public ObservableCollection<SignalProbe> Probes { get; }
+
+    /// <summary>
+    /// Traces captured earlier, drawn behind the live ones to compare against.
+    /// <para>
+    /// "Is that better than what I had" is the question after every edit, and until now the only
+    /// way to answer it was to remember what the last one looked like. Two pictures side by side
+    /// tell you much less than two curves on the same axes, because what you are looking for is
+    /// the difference between them.
+    /// </para>
+    /// </summary>
+    public ObservableCollection<ReferenceTrace> References { get; } = [];
+
+    /// <summary>
+    /// Traces worked out from the recorded ones: a ratio, a difference, a power, an efficiency.
+    /// <para>
+    /// The scope already has probe kinds for a difference and a power, because those were common
+    /// enough to be worth their own. But every such kind is a guess at what somebody will want and
+    /// the list has no end, so this covers the rest at the cost of one feature rather than a dozen.
+    /// </para>
+    /// </summary>
+    public ObservableCollection<ComputedTrace> Computed { get; } = [];
+
+    public bool HasComputed => Computed.Count > 0;
+
+    /// <summary>What is typed in the expression box.</summary>
+    [ObservableProperty]
+    public partial string ExpressionText { get; set; } = string.Empty;
+
+    /// <summary>What to call the result, or blank to use the expression itself.</summary>
+    [ObservableProperty]
+    public partial string ExpressionLabel { get; set; } = string.Empty;
+
+    /// <summary>What is wrong with what has been typed, or empty when nothing is.</summary>
+    [ObservableProperty]
+    public partial string ExpressionProblem { get; private set; } = string.Empty;
+
+    public bool HasExpressionProblem => ExpressionProblem.Length > 0;
+
+    partial void OnExpressionTextChanged(string value)
+    {
+        ExpressionProblem = value.Trim().Length == 0
+            ? string.Empty
+            : TraceExpression.Validate(value, Probes.Select(p => p.Label)) ?? string.Empty;
+
+        OnPropertyChanged(nameof(HasExpressionProblem));
+    }
+
+    /// <summary>
+    /// Adds the expression as a trace. Refused rather than added broken: a computed trace that
+    /// cannot be worked out would be an empty line on the plot with nothing to say why.
+    /// </summary>
+    [RelayCommand]
+    private void AddComputed()
+    {
+        var expression = ExpressionText.Trim();
+
+        if (expression.Length == 0)
+        {
+            ExpressionProblem = "Type an expression — Out / In, or {DC out} - {AC in}.";
+            OnPropertyChanged(nameof(HasExpressionProblem));
+            return;
+        }
+
+        if (TraceExpression.Validate(expression, Probes.Select(p => p.Label)) is { } problem)
+        {
+            ExpressionProblem = problem;
+            OnPropertyChanged(nameof(HasExpressionProblem));
+            return;
+        }
+
+        var label = ExpressionLabel.Trim();
+        if (label.Length == 0) label = expression;
+
+        Computed.Add(new ComputedTrace(label, expression, NextComputedColour()));
+
+        ExpressionText = string.Empty;
+        ExpressionLabel = string.Empty;
+        ExpressionProblem = string.Empty;
+
+        OnPropertyChanged(nameof(HasComputed));
+        OnPropertyChanged(nameof(HasExpressionProblem));
+    }
+
+    [RelayCommand]
+    private void RemoveComputed(ComputedTrace? trace)
+    {
+        if (trace is null || !Computed.Remove(trace)) return;
+
+        OnPropertyChanged(nameof(HasComputed));
+    }
+
+    /// <summary>
+    /// Works out one computed trace against what the probes have recorded. Empty when it cannot
+    /// be — a trace it needs may have been removed since it was added.
+    /// </summary>
+    public IReadOnlyList<Cirq.Core.Primitives.DataPoint> Samples(ComputedTrace trace)
+    {
+        ArgumentNullException.ThrowIfNull(trace);
+
+        var traces = Probes.ToDictionary(
+            p => p.Label,
+            p => (IReadOnlyList<Cirq.Core.Primitives.DataPoint>)p.HistoryBuffer.ToArray(),
+            StringComparer.OrdinalIgnoreCase);
+
+        try
+        {
+            return TraceExpression.Evaluate(trace.Expression, traces);
+        }
+        catch (ExpressionException)
+        {
+            return [];
+        }
+    }
+
+    /// <summary>
+    /// Colours that are not any probe's, so a computed trace never looks like a recorded one.
+    /// </summary>
+    private Cirq.Core.Primitives.Color NextComputedColour()
+    {
+        Cirq.Core.Primitives.Color[] palette =
+        [
+            new(0xFF, 0xFF, 0xFF, 0xFF),
+            new(0xFF, 0xB8, 0x92, 0xFF),
+            new(0xFF, 0x7F, 0xFF, 0xD4),
+            new(0xFF, 0xFF, 0xC4, 0x7F),
+        ];
+
+        return palette[Computed.Count % palette.Length];
+    }
+
+    public bool HasReferences => References.Count > 0;
+
+    /// <summary>What the toolbar button says about them.</summary>
+    public string ReferenceSummary => References.Count switch
+    {
+        0 => "No reference",
+        1 => "1 reference",
+        var n => $"{n} references",
+    };
+
+    /// <summary>
+    /// Takes a copy of every visible trace as it stands. Copied rather than referenced: the
+    /// probes keep recording, and a reference that moved with them would not be one.
+    /// </summary>
+    [RelayCommand]
+    private void CaptureReference()
+    {
+        var taken = DateTimeOffset.UtcNow;
+        var added = 0;
+
+        foreach (var probe in Probes.Where(p => p.IsVisible))
+        {
+            var samples = probe.HistoryBuffer.ToArray();
+            if (samples.Length < 2) continue;
+
+            References.Add(new ReferenceTrace(probe.Label, probe.TraceColor, samples, taken));
+            added++;
+        }
+
+        if (added > 0) ReferencesChanged();
+    }
+
+    /// <summary>Throws the captured traces away.</summary>
+    [RelayCommand]
+    private void ClearReferences()
+    {
+        if (References.Count == 0) return;
+
+        References.Clear();
+        ReferencesChanged();
+    }
+
+    private void ReferencesChanged()
+    {
+        OnPropertyChanged(nameof(HasReferences));
+        OnPropertyChanged(nameof(ReferenceSummary));
+    }
 
     /// <summary>Layout choices offered by the scope toolbar.</summary>
     public static IReadOnlyList<ScopeLayout> LayoutOptions { get; } =

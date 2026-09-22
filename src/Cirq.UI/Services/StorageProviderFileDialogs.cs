@@ -323,6 +323,14 @@ public sealed class StorageProviderFileDialogs : ICircuitFileDialogs
             confirmText: "Discard",
             cancelText: "Cancel");
 
+    public Task<bool> ConfirmRecoveryAsync(string name, string age) =>
+        ShowDialogAsync(
+            "Recover unsaved work",
+            $"CirqAvalonia was working on {name} when it last stopped, and kept a copy from " +
+            $"{age}." + "\n\nOpen it?",
+            confirmText: "Recover",
+            cancelText: "Discard");
+
     public async Task ReportAsync(string title, string message) =>
         await ShowDialogAsync(title, message, confirmText: "OK", cancelText: null);
 

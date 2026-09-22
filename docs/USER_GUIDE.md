@@ -87,13 +87,13 @@ at the window edge; click the rail to bring it back.
 
 Click a palette entry, then click the canvas. The part lands where you click, snapped to the grid.
 
-The palette holds **183 components in 16 categories**:
+The palette holds **184 components in 16 categories**:
 
 | Category | Count | Contents |
 | --- | --- | --- |
 | Passive | 11 | Resistor, capacitor, electrolytic capacitor, inductor, transformer, centre-tapped transformer, potentiometer, crystal, ferrite bead, **common-mode choke** and transmission line — see [below](#common-mode-chokes) |
 | Switches | 4 | SPST, SPDT, push button, **8-way DIP switch** |
-| Sources | 11 | Ground, **net label**, DC voltage, DC current, function generator, battery, solar cell, **noise source**, and the three **annotations** — note, heading and area — see [below](#writing-on-the-schematic) |
+| Sources | 12 | Ground, **net label**, **loop probe**, DC voltage, DC current, function generator, battery, solar cell, **noise source**, and the three **annotations** — note, heading and area — see [below](#writing-on-the-schematic) |
 | Semiconductors | 13 | 1N4148, 1N4001, Schottky, zeners, **varactor**, **photodiode**, bridge rectifier, SCR, triac, diac, TVS and varistor — see [below](#three-ways-to-measure-light) |
 | Transistors | 11 | NPN and PNP bipolars, N- and P-channel MOSFETs, three JFETs and an **IGBT** — see [below](#the-igbt) |
 | LEDs & Displays | 9 | Six LED colours, seven-segment displays, **HD44780 character LCD** — see [below](#the-character-lcd) |
@@ -3654,6 +3654,58 @@ on.
 
 ---
 
+## Comparing and computing traces
+
+Two things on the scope's toolbar that both answer questions about what is already recorded.
+
+### Keeping a reference
+
+**Keep as reference** takes a copy of what is on screen now. It stays drawn — dashed and faded, in
+the same colour as the probe it came from — while you change the circuit, so you can see whether
+what you did helped.
+
+"Is that better than what I had" is the question after every edit, and until now the only way to
+answer it was to remember what the last one looked like. Two separate pictures tell you much less
+than two curves on the same axes, because what you are looking for is the *difference* between
+them.
+
+It is a copy, not a link: the probes keep recording and the reference does not move. Keep several
+if you want, and the button beside it throws them all away.
+
+A reference is not re-processed with settings that were not in force when it was taken — so a
+reference taken before you switched a trace to AC coupling is still what was on the screen then,
+which is what makes it a record rather than another live trace.
+
+### Working one out from the others
+
+The box next to it takes **arithmetic on the recorded traces** and adds the result as its own
+trace. `Out / In` is a gain. `{DC out} - {AC in}` is a difference. `I ^ 2 * 220` is a dissipation.
+
+The scope already has probe kinds for a difference and a power, because those were common enough
+to be worth their own. But every such kind is a guess at what somebody will want and the list has
+no end — a ratio, an envelope, an efficiency, the error between a reference and a feedback — so
+this covers the rest at the cost of one feature rather than a dozen.
+
+- Operators are `+ - * / ^` with brackets, and `^` is right associative as powers are.
+- Functions are `abs`, `sqrt`, `log`, `log10`, `db`, `exp`, `sin`, `cos`, `sign`. `db(Out / In)` is
+  a gain in decibels, which is usually what you wanted next.
+- A trace whose label has spaces in it goes in **braces**: `{DC out}`, `{AC in}`. Most labels do.
+- Names are matched without regard to case.
+
+The box checks as you type and says what is wrong before you press the button. A bad expression is
+refused rather than added, because a computed trace that cannot be worked out would be an empty
+line on the plot with nothing to say why.
+
+Two details worth knowing. **Dividing by zero leaves a gap** rather than a spike to infinity — a
+gain plot with a hole in it is more useful, and a denominator passing through zero is ordinary.
+And traces sampled at different times are **interpolated onto the union** of their sample times
+rather than the intersection, so nothing is quietly dropped.
+
+Computed traces are never stacked, even in stacked layout: a ratio has no volts in it, and giving
+it a slot on a voltage axis would be a promise the number cannot keep.
+
+---
+
 ## Naming a net instead of drawing it
 
 Past a certain size a schematic has signals that go everywhere — a supply rail, a reset line, a
@@ -3853,7 +3905,23 @@ Saves are written to a temporary file and moved into place, so an interrupted wr
 the file you already had.
 
 A file also carries the SPICE cards for any imported models it uses, so a circuit sent to somebody
-else opens as the circuit you saved rather than as an approximation of it. The rules that keeps
+else opens as the circuit you saved rather than as an approximation of it.
+
+### If something goes wrong
+
+A copy of the circuit is written every minute while there are unsaved changes, so a crash, a power
+cut or a closed lid costs the last few minutes rather than the afternoon. Start the application
+again and it offers to bring it back, saying what it was called and how long ago the copy was
+taken.
+
+The copy lives beside the application's other settings rather than next to your file, so a
+recovered circuit never appears in the folder you are working in and never gets picked up as a real
+file by mistake. It is thrown away as soon as you save for real — the file on disk is a better copy
+than any snapshot — and also as soon as the question has been answered either way, because a
+recovery prompt that keeps appearing is one people learn to dismiss without reading.
+
+A recovered circuit remembers where it belonged, so saving puts it back. It stays marked as
+modified, because what has been recovered is by definition not what is in that file. The rules that keeps
 honest are under [Circuits travel](#importing-a-spice-model).
 
 ---

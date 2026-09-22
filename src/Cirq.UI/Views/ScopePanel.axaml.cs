@@ -151,11 +151,29 @@ public partial class ScopePanel : UserControl, Cirq.UI.Services.IScopeSource
 
         var slot = scope.VoltsPerDivision * 2.0;
 
+        // References first, so a live trace is drawn over its own reference rather than under it.
+        // The comparison is between the two, and the one you are working on should be on top.
+        foreach (var reference in scope.References)
+        {
+            var index = probes.FindIndex(p => p.Label == reference.Label);
+            if (index < 0) continue;
+
+            var offset = stacked ? (probes.Count - 1 - index) * slot - (probes.Count - 1) * slot / 2.0 : 0.0;
+
+            AddReference(plot, reference, start, window, scale, offset);
+        }
+
         for (var i = 0; i < probes.Count; i++)
         {
             var offset = stacked ? (probes.Count - 1 - i) * slot - (probes.Count - 1) * slot / 2.0 : 0.0;
             AddTrace(plot, probes[i], start, window, scale, offset);
         }
+
+        // Computed traces last and unstacked: they are a different quantity from the ones they
+        // were worked out from — a ratio has no volts in it — so a slot on a voltage axis would
+        // be a promise the number cannot keep.
+        foreach (var computed in scope.Computed)
+            AddComputed(plot, scope, computed, start, window, scale);
 
         plot.Axes.SetLimitsX(start * scale.Factor, (start + window) * scale.Factor);
 
@@ -459,6 +477,91 @@ public partial class ScopePanel : UserControl, Cirq.UI.Services.IScopeSource
         trace.LineWidth = 1.6f;
         trace.MarkerSize = 0;
         trace.LegendText = probe.Label;
+    }
+
+    /// <summary>
+    /// Draws a captured trace behind the live ones: the probe's own colour, so it is recognisably
+    /// the same signal, but dashed and faded so there is never a question about which is which.
+    /// <para>
+    /// A reference is not AC coupled even when the probe it came from now is. It is a record of
+    /// what was on the screen, and re-processing it with settings that were not in force when it
+    /// was taken would make it a different measurement.
+    /// </para>
+    /// </summary>
+    private static void AddReference(
+        Plot plot, ReferenceTrace reference, double start, double window, TimeScale scale,
+        double offset)
+    {
+        var samples = reference.Samples;
+        if (samples.Count < 2) return;
+
+        var end = start + window;
+
+        List<double> xs = [];
+        List<double> ys = [];
+
+        foreach (var sample in samples)
+        {
+            if (sample.Time < start) continue;
+            if (sample.Time > end) break;
+
+            xs.Add(sample.Time * scale.Factor);
+            ys.Add(sample.Value + offset);
+        }
+
+        if (xs.Count < 2) return;
+
+        var colour = Color.FromARGB(unchecked((uint)(
+            (reference.Color.A << 24) | (reference.Color.R << 16) |
+            (reference.Color.G << 8) | reference.Color.B)));
+
+        var trace = plot.Add.ScatterLine(xs.ToArray(), ys.ToArray(), colour.WithAlpha(0.45));
+
+        trace.LineWidth = 1.3f;
+        trace.MarkerSize = 0;
+        trace.LinePattern = LinePattern.Dashed;
+        trace.LegendText = reference.LegendText;
+    }
+
+    /// <summary>
+    /// Draws a trace worked out from the others. Solid like a recorded one, because it is a
+    /// measurement rather than a memory, but in a colour no probe uses.
+    /// </summary>
+    private static void AddComputed(
+        Plot plot, ScopeViewModel scope, ComputedTrace computed, double start, double window,
+        TimeScale scale)
+    {
+        var samples = scope.Samples(computed);
+        if (samples.Count < 2) return;
+
+        var end = start + window;
+
+        List<double> xs = [];
+        List<double> ys = [];
+
+        foreach (var sample in samples)
+        {
+            if (sample.Time < start) continue;
+            if (sample.Time > end) break;
+
+            xs.Add(sample.Time * scale.Factor);
+
+            // NaN is how a division by zero is recorded, and ScottPlot draws a break in the line
+            // rather than a spike — which is right, because a gap is what happened.
+            ys.Add(sample.Value);
+        }
+
+        if (xs.Count < 2) return;
+
+        var colour = Color.FromARGB(unchecked((uint)(
+            (computed.Color.A << 24) | (computed.Color.R << 16) |
+            (computed.Color.G << 8) | computed.Color.B)));
+
+        var trace = plot.Add.ScatterLine(xs.ToArray(), ys.ToArray(), colour);
+
+        trace.LineWidth = 1.4f;
+        trace.MarkerSize = 0;
+        trace.LegendText = computed.LegendText;
     }
 
     /// <summary>Index of the last sample at or before <paramref name="time"/>, via binary search.</summary>

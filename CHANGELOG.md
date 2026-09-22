@@ -8,6 +8,20 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**Keep a reference, and compute new traces.** The scope can take a copy of what is on screen and
+keep drawing it — dashed and faded — while you change the circuit, because "is that better than
+what I had" is the question after every edit and two separate pictures cannot answer it. And the
+box beside it takes arithmetic on the recorded traces: `Out / In` is a gain, `db(Out / In)` is that
+in decibels, `I ^ 2 * 220` is a dissipation. The scope already had probe kinds for a difference and
+a power; every such kind is a guess at what somebody will want, and this covers the rest at the
+cost of one feature rather than a dozen.
+
+**Autosave and recovery.** A copy of the circuit is written every minute while there are unsaved
+changes, and offered back on the next start. It matters more than it did: a saved circuit now
+carries the SPICE cards for its imported models, so the file is the only copy of more than it once
+was. The snapshot is discarded as soon as you save for real, and as soon as the question has been
+answered either way.
+
 **Stability.** `Ctrl+F7` measures how much gain goes round a feedback loop and how close it is to
 going round it the wrong way: loop gain, phase margin, gain margin and crossover, with the verdict
 in words as well as figures. This answers "will it oscillate", which is the single most common

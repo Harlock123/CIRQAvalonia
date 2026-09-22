@@ -63,10 +63,17 @@ public partial class MainWindow : Window
             box?.SelectAll();
         });
 
-        Dispatcher.UIThread.Post(() =>
+        Dispatcher.UIThread.Post(async () =>
         {
             _canvas?.RequestFit();
             _canvas?.Focus();
+
+            // Asked once the window is up rather than during construction, so the prompt has a
+            // parent to be modal to — and before the timer starts, so answering it does not race
+            // the first snapshot.
+            await viewModel.OfferRecoveryAsync();
+
+            viewModel.StartAutosave();
         });
     }
 

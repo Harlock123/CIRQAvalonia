@@ -61,6 +61,33 @@
 
         <Separator Classes="vertical" />
 
+        <TextBox Width="150" FontSize="11" Padding="6,3" MinHeight="0"
+                 Text="{Binding ExpressionText, Mode=TwoWay}"
+                 PlaceholderText="Out / In"
+                 ToolTip.Tip="Arithmetic on the recorded traces: a ratio, a difference, a power. Use + - * / ^, brackets, and abs sqrt log log10 db exp sin cos sign. A label with spaces in it goes in braces: {DC out} - {AC in}.">
+          <TextBox.KeyBindings>
+            <KeyBinding Gesture="Enter" Command="{Binding AddComputedCommand}" />
+          </TextBox.KeyBindings>
+        </TextBox>
+        <Button Classes="toolbar" Content="Add trace" Command="{Binding AddComputedCommand}" />
+
+        <TextBlock Classes="label" VerticalAlignment="Center" MaxWidth="260"
+                   TextTrimming="CharacterEllipsis"
+                   IsVisible="{Binding HasExpressionProblem}"
+                   Foreground="{DynamicResource TextError}"
+                   Text="{Binding ExpressionProblem}" />
+
+        <Separator Classes="vertical" />
+
+        <Button Classes="toolbar" Content="Keep as reference" Command="{Binding CaptureReferenceCommand}"
+                ToolTip.Tip="Take a copy of what is on screen now. It stays drawn, dashed and faded, while you change the circuit — so you can see whether what you did helped." />
+        <Button Classes="toolbar" Content="{Binding ReferenceSummary}"
+                IsVisible="{Binding HasReferences}"
+                Command="{Binding ClearReferencesCommand}"
+                ToolTip.Tip="Throw the kept traces away" />
+
+        <Separator Classes="vertical" />
+
         <Button Classes="toolbar" Content="Clear traces" Command="{Binding ClearTracesCommand}" />
       </StackPanel>
       </WrapPanel>

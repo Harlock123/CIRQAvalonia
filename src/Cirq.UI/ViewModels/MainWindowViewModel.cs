@@ -313,6 +313,107 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     /// <summary>Dialog provider, supplied by the window. Absent in tests unless one is injected.</summary>
     public ICircuitFileDialogs? FileDialogs { get; set; }
 
+    /// <summary>
+    /// Where a copy of the circuit is kept while it is being worked on, so a crash costs the last
+    /// few minutes rather than the afternoon.
+    /// </summary>
+    public AutosaveStore Autosave { get; set; } = new();
+
+    /// <summary>
+    /// How often to take that copy. A minute is often enough to be worth having and rare enough
+    /// that nobody notices it happening.
+    /// </summary>
+    public TimeSpan AutosaveInterval { get; set; } = TimeSpan.FromMinutes(1);
+
+    private System.Timers.Timer? _autosaveTimer;
+
+    /// <summary>
+    /// Starts taking snapshots. Called by the window rather than by the constructor, so a view
+    /// model built in a test does not quietly start writing to somebody's application data.
+    /// </summary>
+    public void StartAutosave()
+    {
+        _autosaveTimer?.Dispose();
+
+        _autosaveTimer = new System.Timers.Timer(AutosaveInterval.TotalMilliseconds)
+        {
+            AutoReset = true,
+        };
+
+        _autosaveTimer.Elapsed += (_, _) => AutosaveNow();
+        _autosaveTimer.Start();
+    }
+
+    /// <summary>
+    /// Takes a snapshot if there is anything worth snapshotting.
+    /// <para>
+    /// Nothing is written when the document has no unsaved changes: the file on disk is already a
+    /// better copy than any snapshot, and writing one anyway would mean a recovery prompt on the
+    /// next start offering to restore something that was never lost.
+    /// </para>
+    /// </summary>
+    public bool AutosaveNow()
+    {
+        if (!IsModified) return false;
+
+        return Autosave.Write(Circuit, CurrentFilePath);
+    }
+
+    /// <summary>
+    /// Offers whatever was left behind by a previous run, and throws it away either way.
+    /// <para>
+    /// Either way, because a snapshot that outlived its question would be offered again on the
+    /// next start — and a recovery prompt that keeps appearing is one people learn to dismiss
+    /// without reading.
+    /// </para>
+    /// </summary>
+    public async Task<bool> OfferRecoveryAsync()
+    {
+        if (FileDialogs is null) return false;
+        if (Autosave.Pending() is not { } pending) return false;
+
+        var wanted = await FileDialogs.ConfirmRecoveryAsync(pending.Name, pending.Age);
+
+        Autosave.Discard();
+
+        if (!wanted) return false;
+
+        try
+        {
+            var result = CircuitSerializer.FromJson(pending.Json);
+
+            Simulation.Pause();
+            ReplaceCircuitWith(result.Circuit);
+
+            History.Reset(Circuit);
+            Simulation.InvalidateTopology();
+            Simulation.Rebuild();
+
+            RequestZoomToFit?.Invoke(this, EventArgs.Empty);
+            RequestRedraw?.Invoke(this, EventArgs.Empty);
+
+            // Its original path comes back with it, so saving puts it where it belonged — but it
+            // stays marked as modified, because what has been recovered is by definition not what
+            // is in that file.
+            CurrentFilePath = pending.OriginalPath;
+            IsModified = true;
+
+            StatusMessage = result.IsClean
+                ? $"Recovered {pending.Name} from {pending.Age}"
+                : $"Recovered {pending.Name} with {result.Warnings.Count} warning(s)";
+
+            if (!result.IsClean)
+                await FileDialogs.ReportAsync("Recovered with warnings", string.Join("\n", result.Warnings));
+
+            return true;
+        }
+        catch (Exception ex) when (ex is CircuitFormatException or System.Text.Json.JsonException)
+        {
+            StatusMessage = "The recovered circuit could not be read.";
+            return false;
+        }
+    }
+
     /// <summary>Path this circuit was last opened from or saved to, if any.</summary>
     [ObservableProperty]
     public partial string? CurrentFilePath { get; private set; }
@@ -382,6 +483,11 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
         CurrentFilePath = path;
         IsModified = false;
+
+        // The file on disk is now a better copy than any snapshot, and one left behind would be
+        // offered on the next start as though something had been lost.
+        Autosave.Discard();
+
         History.Reset(Circuit);
         Simulation.InvalidateTopology();
         Simulation.Rebuild();
@@ -520,6 +626,10 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
         CurrentFilePath = path;
         IsModified = false;
+
+        // Saved for real, so the snapshot has nothing left to protect.
+        Autosave.Discard();
+
         StatusMessage = $"Saved {Path.GetFileName(path)}";
         return true;
     }
@@ -1415,6 +1525,9 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
     public void Dispose()
     {
+        _autosaveTimer?.Dispose();
+        _autosaveTimer = null;
+
         ControlPanel.Dispose();
         Simulation.Dispose();
     }

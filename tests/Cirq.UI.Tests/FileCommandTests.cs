@@ -15,6 +15,18 @@ internal sealed class FakeFileDialogs : ICircuitFileDialogs
 
     public bool AllowDiscard { get; set; } = true;
 
+    /// <summary>What to answer when asked whether to bring back an autosave.</summary>
+    public bool AllowRecovery { get; set; }
+
+    /// <summary>How many times recovery was offered, so a test can check it was asked once.</summary>
+    public int RecoveryPrompts { get; private set; }
+
+    public Task<bool> ConfirmRecoveryAsync(string name, string age)
+    {
+        RecoveryPrompts++;
+        return Task.FromResult(AllowRecovery);
+    }
+
     public int DiscardPrompts { get; private set; }
 
     public List<(string Title, string Message)> Reports { get; } = [];
