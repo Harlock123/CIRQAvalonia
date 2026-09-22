@@ -99,6 +99,10 @@ public sealed class StorageProviderFileDialogs : ICircuitFileDialogs
             { Patterns = ["*.bmp"], MimeTypes = ["image/bmp"] },
         ExportFormat.Svg => new FilePickerFileType("SVG drawing")
             { Patterns = ["*.svg"], MimeTypes = ["image/svg+xml"] },
+        ExportFormat.Netlist => new FilePickerFileType("SPICE netlist")
+            { Patterns = ["*.cir", "*.net", "*.sp"], MimeTypes = ["text/plain"] },
+        ExportFormat.Csv => new FilePickerFileType("Comma-separated values")
+            { Patterns = ["*.csv"], MimeTypes = ["text/csv"] },
         _ => new FilePickerFileType("PDF document")
             { Patterns = ["*.pdf"], MimeTypes = ["application/pdf"] },
     };
@@ -127,6 +131,8 @@ public sealed class StorageProviderFileDialogs : ICircuitFileDialogs
                 "BMP  —  image, uncompressed",
                 "SVG  —  vector, scales and stays editable",
                 "PDF  —  vector, for documents and printing",
+                "SPICE netlist  —  the circuit as text, for ngspice or LTspice",
+                "CSV  —  the recorded traces as numbers, for a spreadsheet",
             },
             SelectedIndex = 0,
             HorizontalAlignment = HorizontalAlignment.Stretch,
@@ -148,11 +154,27 @@ public sealed class StorageProviderFileDialogs : ICircuitFileDialogs
                 "A table of what the circuit is made of: quantity, designators, part and value",
         };
 
+        var contentPanel = new StackPanel
+        {
+            Spacing = 4,
+            Children = { Caption("What to export"), schematicOnly, tracesOnly, both },
+        };
+
         var layoutPanel = new StackPanel
         {
             Spacing = 4,
             IsEnabled = false,
             Children = { Caption("When exporting both"), oneFile, separate },
+        };
+
+        // A sentence about whichever format is chosen, for the two whose behaviour is not obvious
+        // from the name.
+        var note = new TextBlock
+        {
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+            Opacity = 0.75,
+            FontSize = 12,
+            IsVisible = false,
         };
 
         var scalePanel = new StackPanel
@@ -163,14 +185,34 @@ public sealed class StorageProviderFileDialogs : ICircuitFileDialogs
 
         void Refresh()
         {
-            layoutPanel.IsEnabled = both.IsChecked == true;
+            var chosenFormat = (ExportFormat)format.SelectedIndex;
+            var text = CircuitExporter.IsText(chosenFormat);
 
-            var raster = CircuitExporter.IsRaster((ExportFormat)format.SelectedIndex);
-            scalePanel.IsEnabled = raster;
+            // A text export has no layout, no resolution and no background, and what it contains
+            // is decided by which of the two it is rather than by the content buttons: there is no
+            // such thing as a netlist of an oscilloscope. So the rest of the dialog goes quiet
+            // rather than offering settings that would be ignored.
+            contentPanel.IsEnabled = !text;
+            layoutPanel.IsEnabled = !text && both.IsChecked == true;
+            scalePanel.IsEnabled = !text && CircuitExporter.IsRaster(chosenFormat);
+
+            partsList.IsEnabled = !text;
 
             // JPEG has no alpha channel at all, so offering the option would be a lie.
-            transparent.IsEnabled = (ExportFormat)format.SelectedIndex != ExportFormat.Jpeg;
+            transparent.IsEnabled = !text && chosenFormat != ExportFormat.Jpeg;
             if (!transparent.IsEnabled) transparent.IsChecked = false;
+
+            note.Text = chosenFormat switch
+            {
+                ExportFormat.Netlist =>
+                    "Writes the circuit as a SPICE deck. Parts with no SPICE equivalent — logic, " +
+                    "buses, sensors — are named in the file as comments rather than left out.",
+                ExportFormat.Csv =>
+                    "Writes everything the probes have recorded, not just the window on screen.",
+                _ => string.Empty,
+            };
+
+            note.IsVisible = note.Text.Length > 0;
         }
 
         foreach (var button in new[] { schematicOnly, tracesOnly, both })
@@ -231,17 +273,14 @@ public sealed class StorageProviderFileDialogs : ICircuitFileDialogs
             Spacing = 16,
             Children =
             {
-                new StackPanel
-                {
-                    Spacing = 4,
-                    Children = { Caption("What to export"), schematicOnly, tracesOnly, both },
-                },
+                contentPanel,
                 layoutPanel,
                 new StackPanel
                 {
                     Spacing = 4,
                     Children = { Caption("Format"), format },
                 },
+                note,
                 scalePanel,
                 transparent,
                 partsList,

@@ -357,12 +357,18 @@ public class ExportTests : IDisposable
         Assert.Equal(2, System.Text.RegularExpressions.Regex.Matches(pdf, @"/Type\s*/Page[^s]").Count);
     }
 
+    /// <summary>
+    /// The drawing formats. The text ones are deliberately excluded: a small circuit's netlist is
+    /// legitimately under two hundred bytes, and a CSV needs recorded traces that this rig has
+    /// none of. Both are covered by <c>TextExportTests</c> against what they actually contain,
+    /// which is a better check than a size floor anyway.
+    /// </summary>
     [Fact]
-    public void EveryFormatWritesSomethingWorthOpening()
+    public void EveryDrawingFormatWritesSomethingWorthOpening()
     {
         var circuit = Rig();
 
-        foreach (var format in Enum.GetValues<ExportFormat>())
+        foreach (var format in Enum.GetValues<ExportFormat>().Where(f => !CircuitExporter.IsText(f)))
         {
             var path = Path_("all" + CircuitExporter.Extension(format));
 

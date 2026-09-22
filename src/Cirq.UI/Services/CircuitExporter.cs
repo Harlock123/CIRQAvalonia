@@ -14,6 +14,15 @@ public enum ExportFormat
     Bmp,
     Svg,
     Pdf,
+
+    /// <summary>
+    /// A SPICE deck. Text rather than a picture, and the one export another tool can act on
+    /// rather than only look at.
+    /// </summary>
+    Netlist,
+
+    /// <summary>The recorded traces as comma-separated values, for a spreadsheet or a script.</summary>
+    Csv,
 }
 
 /// <summary>What goes in the export.</summary>
@@ -85,6 +94,46 @@ public interface IScopeSource
 /// </summary>
 public static class CircuitExporter
 {
+    /// <summary>
+    /// Writes one of the text formats and returns the path.
+    /// <para>
+    /// A netlist describes the circuit and a CSV describes the traces, so each ignores the
+    /// content setting: there is no such thing as a netlist of an oscilloscope.
+    /// </para>
+    /// </summary>
+    private static string WriteText(Circuit circuit, string path, ExportOptions options)
+    {
+        if (options.Format == ExportFormat.Netlist)
+        {
+            var result = Cirq.Components.Spice.SpiceNetlistWriter.Write(circuit);
+
+            File.WriteAllText(path, result.Netlist);
+            return path;
+        }
+
+        if (circuit.Probes.Count == 0)
+            throw new InvalidOperationException(
+                "There are no traces to export. Attach a probe and run first.");
+
+        var samples = circuit.Probes
+            .Where(p => p.IsVisible)
+            .SelectMany(p => p.HistoryBuffer.ToArray())
+            .ToList();
+
+        if (samples.Count == 0)
+            throw new InvalidOperationException(
+                "The probes have recorded nothing yet. Run the circuit first.");
+
+        // Everything recorded, rather than the window on screen: a file is not a screen, and
+        // somebody exporting data wants the run rather than the part of it currently in view.
+        File.WriteAllText(
+            path,
+            Cirq.Core.Probing.TraceCsv.Write(
+                circuit.Probes, samples.Min(s => s.Time), samples.Max(s => s.Time)));
+
+        return path;
+    }
+
     /// <summary>Margin left around the schematic, in schematic units.</summary>
     private const double Margin = 28.0;
 
@@ -103,8 +152,17 @@ public static class CircuitExporter
         ExportFormat.Jpeg => ".jpg",
         ExportFormat.Bmp => ".bmp",
         ExportFormat.Svg => ".svg",
+        ExportFormat.Netlist => ".cir",
+        ExportFormat.Csv => ".csv",
         _ => ".pdf",
     };
+
+    /// <summary>
+    /// True for the formats that are text rather than a drawing. They do not go through the Skia
+    /// canvas the picture formats share, and they ignore everything about layout.
+    /// </summary>
+    public static bool IsText(ExportFormat format) =>
+        format is ExportFormat.Netlist or ExportFormat.Csv;
 
     /// <summary>True for the formats that have a resolution rather than being drawn as shapes.</summary>
     public static bool IsRaster(ExportFormat format) =>
@@ -122,6 +180,9 @@ public static class CircuitExporter
     {
         ArgumentNullException.ThrowIfNull(circuit);
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
+
+        // The text formats are not drawings and share none of the layout below.
+        if (IsText(options.Format)) return [WriteText(circuit, path, options)];
 
         var wantsTraces = options.Content is ExportContent.Traces or ExportContent.Both;
         var hasTraces = wantsTraces && scope is { HasTraces: true };

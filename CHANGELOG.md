@@ -8,6 +8,16 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**Netlist and CSV export.** `Ctrl+E` gains two formats that are text rather than pictures. A
+**SPICE netlist** writes the circuit as a deck — so an analysis this engine does not do can be run
+somewhere that does — naming the parts it could not carry rather than omitting them silently. And
+**CSV** writes the recorded traces as numbers, everything captured rather than the window on
+screen, for a spreadsheet or a script.
+
+Function generators are carried across as SPICE sources with their waveform, including the shapes
+SPICE has no element for: a triangle is a PULSE that spends its whole period rising and falling.
+Without that an exported analog circuit had nothing driving it.
+
 ## [0.29.0] - 2026-09-21
 
 The release where the app stopped being only a simulator and became something you can measure

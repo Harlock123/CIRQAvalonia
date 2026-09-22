@@ -3485,8 +3485,8 @@ the file you already had.
 
 ## Exporting
 
-`File > Export...`, or `Ctrl+E`, writes the schematic and the traces out as a picture. It asks
-three things.
+`File > Export...`, or `Ctrl+E`, writes the schematic and the traces out — as a picture, or as
+text. It asks three things.
 
 ![The export dialog over the schematic: What to export with Schematic selected and Oscilloscope traces and Both beneath it, a greyed When exporting both section offering one file or a file each plus a combined PDF, a Format list showing PNG, a Resolution list showing 2x, and checkboxes for a transparent background and a parts list](images/10-export-dialog.png)
 
@@ -3541,6 +3541,43 @@ The colours are the ones on screen, so an export made in the dark theme is dark.
 light theme first (`File > Settings`) if it is going into a document.
 
 ---
+
+### Two of the formats are text, not pictures
+
+The five image formats are a picture of the circuit. These two are the circuit, in a form something
+else can act on.
+
+**SPICE netlist** (`.cir`) writes the circuit as a deck. There are analyses this engine does not
+do — noise, distortion, pole-zero — and a deck ngspice or LTspice can read means a circuit drawn
+here is not trapped here. Resistors, capacitors, inductors, sources, function generators, diodes
+and transistors all have direct equivalents, models are written out with them so the deck stands on
+its own, and a net you have named keeps its name so the file is readable.
+
+**It says what it could not carry.** A 7400, an I²C master, an ultrasonic ranger: those are
+modelled here by event-driven code rather than by a netlist, and there is no honest translation.
+They appear in the deck as comments naming the part, under a line saying the circuit is incomplete
+where they were. A netlist that quietly omits half a circuit is worse than one that tells you.
+
+One caution, stated plainly: the decks are checked by structure and by reading their own model
+cards back through the [SPICE importer](#importing-a-spice-model), which is a real check — two
+independent pieces of code agreeing. They have **not** been run through ngspice, because it is not
+installed on the machine this was built on. Expect them to be right; do not expect them to be
+certified.
+
+**CSV** (`.csv`) writes the recorded traces as numbers — a header naming each column with its
+unit, then a row per sample. For a spreadsheet to fit a curve, a script to compare two runs, or a
+report that wants figures rather than a picture of them.
+
+Two things about it are worth knowing. It writes **everything recorded**, not the window on screen:
+a file is not a screen, and somebody exporting data wants the run. And because the probes do not
+share a time axis — each records when the solver accepted a time point, and one attached later
+starts later — the rows are the union of every probe's sample times, with each column interpolated
+where it has no sample of its own. A probe that was not attached yet is left blank rather than
+given a reading nobody measured.
+
+Very long runs are decimated evenly to twenty thousand rows. Spread across the whole run, not
+truncated: a file cut short at the limit would silently be a file of the first fraction of it.
+
 
 ## Appearance
 
