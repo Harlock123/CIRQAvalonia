@@ -144,6 +144,73 @@ public class MonteCarloViewModelTests
     }
 
     /// <summary>
+    /// The other half of the question: not how far the answer moves, but which part moved it.
+    /// </summary>
+    [Fact]
+    public void TheWindowAlsoSaysWhereTheSpreadComesFrom()
+    {
+        var circuit = new Circuit();
+        var supply = circuit.Add(new DcVoltageSource(10.0));
+        var loose = circuit.Add(new Resistor(1e3) { Tolerance = 0.20 });
+        var tight = circuit.Add(new Resistor(1e3) { Tolerance = 0.01 });
+        var ground = circuit.Add(new Ground());
+
+        circuit.Connect(supply.Negative, ground.Pin);
+        circuit.Connect(supply.Positive, loose.A);
+        circuit.Connect(loose.B, tight.A);
+        circuit.Connect(tight.B, ground.Pin);
+
+        circuit.Probes.Add(new SignalProbe("Mid", loose.B, Color.ProbePalette[0]));
+
+        var model = new MonteCarloViewModel(circuit) { Trials = 200 };
+        model.Run();
+
+        Assert.True(model.HasSensitivity);
+        Assert.Equal(2, model.Sensitivity.Count);
+
+        // The wider part first, taking nearly all the blame, with its band and elasticity beside
+        // it so the reason is visible rather than just the ranking.
+        var worst = model.Sensitivity[0];
+
+        Assert.Equal(loose.Name, worst.Part);
+        Assert.Contains("20", worst.Tolerance);
+        Assert.True(worst.Weight > 0.9);
+        Assert.NotEmpty(worst.Elasticity);
+    }
+
+    [Fact]
+    public void ChoosingADifferentTraceRanksThatOne()
+    {
+        var circuit = new Circuit();
+        var supply = circuit.Add(new DcVoltageSource(10.0));
+        var top = circuit.Add(new Resistor(1e3) { Tolerance = 0.05 });
+        var bottom = circuit.Add(new Resistor(1e3) { Tolerance = 0.05 });
+        var ground = circuit.Add(new Ground());
+
+        circuit.Connect(supply.Negative, ground.Pin);
+        circuit.Connect(supply.Positive, top.A);
+        circuit.Connect(top.B, bottom.A);
+        circuit.Connect(bottom.B, ground.Pin);
+
+        circuit.Probes.Add(new SignalProbe("Mid", top.B, Color.ProbePalette[0]));
+        circuit.Probes.Add(new SignalProbe("Rail", top.A, Color.ProbePalette[1]));
+
+        var model = new MonteCarloViewModel(circuit) { Trials = 100 };
+        model.Run();
+
+        Assert.Equal(2, model.Rows.Count);
+
+        model.Selected = model.Rows.Single(r => r.Label == "Rail");
+
+        // The rail is the supply; no resistor moves it, so nothing takes any of the blame.
+        Assert.All(model.Sensitivity, r => Assert.Equal(0.0, r.Weight, 6));
+
+        model.Selected = model.Rows.Single(r => r.Label == "Mid");
+
+        Assert.Contains(model.Sensitivity, r => r.Weight > 0.1);
+    }
+
+    /// <summary>
     /// A real one: an RC filter whose corner is set by a 5 % resistor and a 20 % capacitor, which
     /// between them move it much further than most people expect.
     /// </summary>

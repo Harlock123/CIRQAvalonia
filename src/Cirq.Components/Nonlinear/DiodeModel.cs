@@ -76,12 +76,35 @@ public sealed record DiodeModel(
     public static DiodeModel Zener(double breakdownVoltage) =>
         new($"Zener {breakdownVoltage:0.#}V", 1e-14, 1.0, 1.0, breakdownVoltage);
 
-    public static readonly IReadOnlyList<DiodeModel> Library =
+    private static readonly List<DiodeModel> Models =
     [
         D1N4148, D1N4001, D1N5817,
         LedRed, LedAmber, LedYellow, LedGreen, LedBlue, LedWhite,
         Zener(3.3), Zener(5.1), Zener(9.1), Zener(12.0),
     ];
+
+    /// <summary>
+    /// Every model the application knows, built in or imported. A saved circuit names its model
+    /// and finds it again in here, so anything imported has to be registered before a circuit
+    /// using it is opened.
+    /// </summary>
+    public static IReadOnlyList<DiodeModel> Library => Models;
+
+    /// <summary>
+    /// Adds a model, replacing any with the same name. Used by the SPICE importer; a part brought
+    /// in from a datasheet is then offered everywhere a built-in one is.
+    /// </summary>
+    public static void Register(DiodeModel model)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+
+        Models.RemoveAll(m => string.Equals(m.Name, model.Name, StringComparison.OrdinalIgnoreCase));
+        Models.Add(model);
+    }
+
+    /// <summary>Removes an imported model by name.</summary>
+    public static bool Unregister(string name) =>
+        Models.RemoveAll(m => string.Equals(m.Name, name, StringComparison.OrdinalIgnoreCase)) > 0;
 
     public override string ToString() => Name;
 }

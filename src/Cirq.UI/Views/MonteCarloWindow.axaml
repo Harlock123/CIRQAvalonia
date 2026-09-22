@@ -90,7 +90,46 @@
         </StackPanel>
       </Border>
 
-      <sp:AvaPlot Grid.Row="1" Name="Plot" />
+      <Grid Grid.Row="1" ColumnDefinitions="*,270">
+
+        <sp:AvaPlot Grid.Column="0" Name="Plot" />
+
+        <!-- Which part is responsible, for whichever trace is selected above. -->
+        <Border Grid.Column="1" Classes="panel" BorderThickness="1,0,0,0" Padding="10,8"
+                IsVisible="{Binding HasSensitivity}">
+          <DockPanel>
+            <TextBlock DockPanel.Dock="Top" Text="WHERE THE SPREAD COMES FROM"
+                       FontSize="10" Opacity="0.55" Margin="0,0,0,2" />
+            <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" FontSize="11" Opacity="0.7"
+                       Margin="0,0,0,8"
+                       Text="Each part taken to both ends of its own band with everything else at nominal. Share is of the variance, so contributions add in quadrature." />
+
+            <ScrollViewer>
+              <ItemsControl ItemsSource="{Binding Sensitivity}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <StackPanel Margin="0,0,0,7">
+                      <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Grid.Column="0" Text="{Binding Part}" FontSize="12"
+                                   FontWeight="SemiBold" />
+                        <TextBlock Grid.Column="1" Text="{Binding Share}" FontSize="12" />
+                      </Grid>
+
+                      <ProgressBar Minimum="0" Maximum="1" Value="{Binding Weight}"
+                                   Height="4" Margin="0,2,0,2" />
+
+                      <TextBlock FontSize="10" Opacity="0.65"
+                                 Text="{Binding Tolerance, StringFormat='band {0}'}" />
+                      <TextBlock FontSize="10" Opacity="0.65"
+                                 Text="{Binding Elasticity, StringFormat='output moves {0}x as far, proportionally'}" />
+                    </StackPanel>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </ScrollViewer>
+          </DockPanel>
+        </Border>
+      </Grid>
     </Grid>
 
   </DockPanel>

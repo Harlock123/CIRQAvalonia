@@ -608,6 +608,18 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     private void ShowBlockLibrary() => RequestBlockLibrary?.Invoke(this, EventArgs.Empty);
 
     /// <summary>
+    /// Models imported from SPICE cards, registered at startup so a circuit naming one finds it.
+    /// Settable so a test can point it at a temporary file rather than the person's own library.
+    /// </summary>
+    public UserModelStore UserModels { get; set; } = new();
+
+    /// <summary>Raised when the SPICE import window should be opened.</summary>
+    public event EventHandler? RequestSpiceImport;
+
+    [RelayCommand]
+    private void ShowSpiceImport() => RequestSpiceImport?.Invoke(this, EventArgs.Empty);
+
+    /// <summary>
     /// Saves the selected block to the library under a name, so it can be placed again — here or
     /// in another circuit.
     /// </summary>

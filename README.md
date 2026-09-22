@@ -32,7 +32,7 @@ Core ← Engine ← Components ← UI, which keeps the whole engine headless-tes
 
 ```bash
 dotnet run --project src/Cirq.UI     # the editor
-dotnet test                          # 2290 tests
+dotnet test                          # 2353 tests
 ./scripts/build-guide.sh             # the user guide as a PDF
 ```
 
@@ -196,7 +196,9 @@ Part of a circuit can be drawn as a **block**: select it, press Ctrl+G, and it b
 with a pin wherever a wire crossed the boundary. The hierarchy is flattened before anything is
 solved, and the parts are moved inside rather than copied, so a block changes nothing — not the
 answer, not a probe attached to something inside it, and not what you get back on ungrouping.
-A block can be **saved to a library** and placed again, here or in another circuit — as a copy
+Models can be **imported from SPICE cards** — paste a `.model` line off a datasheet and the part
+is available wherever a built-in one is, kept between runs. A block can be **saved to a library**
+and placed again, here or in another circuit — as a copy
 rather than a reference, which the docs say plainly rather than implying a link that is not there.
 **Notes, headings and boxes** can be put on the drawing too, and exports carry them.
 
@@ -299,6 +301,9 @@ Tests measure the solver against closed-form answers rather than recorded output
 | Memory and SPI | A memory whose contents are typed in and read back with the circuit's own writes showing, a dump that round-trips and skips runs of zeros, a counter walking its addresses and every stored byte reaching the bus, a reset restoring the preset, a transparent latch that follows while open and holds what it saw, and an SPI converter whose code the master decodes exactly where the datasheet says |
 | Temperature (MOSFET and op-amp) | A power MOSFET's on-resistance climbing towards double between room temperature and a hot heatsink, its threshold falling about two millivolts a degree, an op-amp's offset drifting with the CMOS part drifting several times less than the bipolar one, every parameter exactly nominal at 27 °C, that drift reaching the output multiplied by the noise gain, and the parts the guide says carry no temperature still carrying none |
 | Temperature | A silicon diode's forward drop falling about two millivolts a degree and a Schottky's falling less steeply, the same coefficient at both ends of the range rather than only near room temperature, LEDs falling too, saturation current roughly doubling every ten degrees, a bipolar's base-emitter voltage falling while its gain climbs by half again across the range, every parameter exactly nominal at the 27 °C the models are quoted at, a temperature sweep coming out a straight line and putting the circuit back afterwards, and a circuit carrying its own temperature through a save |
+| SPICE import | SPICE numbers with their suffixes, including M meaning milli where MEG means mega; cards wrapped over continuation lines, comments dropped, several in one block; a diode, a bipolar and a MOSFET read into their models with a P-channel's negative threshold brought into the channel's own convention; a device there is no model for named rather than ignored; parameters with nowhere to go named rather than dropped; an imported model joining the library, replacing by name, and surviving a restart; and a diode imported from the 1N4148's own parameters solving to the same drop as the built-in one |
+| Sensitivity | Two equal parts sharing the blame equally with the shares adding to one, the wider band ranked first, a part the output barely depends on ranked last however loose it is, elasticity being a property of the circuit rather than of the tolerance, each probe ranked separately with parts it does not depend on contributing nothing, and every part put back afterwards |
+| Analysis examples | Each one asserted against the thing it exists to show and against showing it as shipped: a hysteresis example opening already in XY and drawing a loop whose two branches overlap in input voltage, a bridge reading nothing nominally and hundreds of millivolts once tolerance is allowed for, a shunt read differentially where against ground it is lost in the rail, and a diode thermometer sweeping out a straight line at two millivolts a degree |
 | Block library | A block saved and rebuilt with its contents, surviving a restart, two instances that share no object, identity or designator and both solve correctly, editing one leaving the other alone, saving over a name replacing it, nesting surviving the round trip, and a damaged library file being an empty one rather than a crash |
 | XY mode | The first visible trace taken as the horizontal axis unless another is chosen, a hidden trace being neither, y = 2x coming out as exactly that, two sines a quarter cycle apart drawing a unit circle and the same two in phase collapsing to a line, and traces of different lengths paired by time rather than by index |
 | Blocks | Grouping part of a circuit changing what it solves to by nothing at all, and ungrouping changing it back; a pin appearing wherever a wire crossed the boundary and two wires onto one inner terminal sharing one pin; wires wholly inside moving inside; a non-linear part inside a block still solving as itself; a transient running through one unchanged; a block inside a block flattening the same way; every part appearing exactly once in the flattened list; a probe on a part that goes inside a block still reading it; and all of it surviving a save, nesting included |

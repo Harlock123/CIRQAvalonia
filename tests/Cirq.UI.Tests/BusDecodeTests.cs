@@ -96,10 +96,14 @@ public class BusDecodeTests
     /// A DS18B20 conversation, which is where 1-Wire's commands become readable rather than being
     /// a pattern of pulse widths.
     /// </summary>
+    /// <summary>
+    /// At the timebase the example ships with — no settings to change first, because an example
+    /// that needs one is an example that does not work.
+    /// </summary>
     [Fact]
     public void TheOneWireExampleDecodesItsResetAndCommands()
     {
-        var vm = Load("1-Wire Thermometer", 5e-3, sampleInterval: 1e-6);
+        var vm = Load("1-Wire Thermometer", 5e-3);
 
         var result = OneWireDecoder.Decode(Trace(vm, "DQ"));
 
@@ -115,13 +119,14 @@ public class BusDecodeTests
     }
 
     /// <summary>
-    /// The same capture at the timebase the example ships with is too coarse to decode, and the
-    /// decoder has to say so rather than produce shifted bytes that look like data.
+    /// And the same capture sampled too coarsely is refused rather than misread. A write-one slot
+    /// is six microseconds; sampled every twenty it is not there at all, and every bit after it
+    /// has moved.
     /// </summary>
     [Fact]
     public void TheSameCaptureSampledTooCoarselyIsRefusedRatherThanMisread()
     {
-        var vm = Load("1-Wire Thermometer", 5e-3);
+        var vm = Load("1-Wire Thermometer", 5e-3, sampleInterval: 20e-6);
 
         var result = OneWireDecoder.Decode(Trace(vm, "DQ"));
 

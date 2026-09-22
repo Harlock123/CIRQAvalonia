@@ -1,3 +1,4 @@
+using Cirq.Core.Probing;
 using Cirq.Components.Boards;
 using Cirq.Components.Bridges;
 using Cirq.Components.Buses;
@@ -197,6 +198,20 @@ public static class Examples
                 LoadThermocouple),
             new("Hall Counter", "A Hall switch counting a magnet, cleanly, where a contact could not",
                 LoadHallCounter),
+        ]),
+
+        // Circuits that exist to demonstrate a measurement rather than a design. Each is set up
+        // for one of the analyses and needs nothing changed before it shows what it is for.
+        new("Measurement",
+        [
+            new("Hysteresis Loop", "A comparator's hysteresis drawn as the loop it is — the scope is already in XY",
+                LoadHysteresisLoop),
+            new("Diode Thermometer", "A forward-biased diode is a thermometer. Run Simulate > DC Sweep over temperature",
+                LoadDiodeThermometer),
+            new("Resistor Bridge", "Four 5 % resistors that should read nothing. Run Simulate > Tolerance Analysis",
+                LoadResistorBridge),
+            new("High-Side Sensing", "Millivolts across a shunt at the top of a 24 V rail, read differentially — and the power it costs",
+                LoadHighSideSensing),
         ]),
 
         new("Signal Integrity & RF",
@@ -1925,7 +1940,15 @@ public static class Examples
         circuit.Connect(pullUp.B, master.Data);
         circuit.Connect(master.Data, sensor.Data);
 
-        vm.Scope.TimebasePerDivision = 5e-3;
+        // Half a millisecond a division, which is a five millisecond window — enough for the
+        // reset pulse and the first several bytes, and fine enough to sample them.
+        //
+        // The sampling is the reason for the number. 1-Wire says its bits with pulse widths, and a
+        // write-one slot is six microseconds wide; the scope takes four thousand samples across
+        // its window, so a slower timebase steps straight over those pulses. The trace still looks
+        // plausible and **Simulate > Decode Bus** cannot read it — which it says, rather than
+        // producing bytes that are quietly wrong.
+        vm.Scope.TimebasePerDivision = 500e-6;
         vm.Scope.VoltsPerDivision = 2.0;
         vm.Scope.AddProbe(master.Data, "DQ");
     }
@@ -4734,6 +4757,183 @@ public static class Examples
 
         vm.Scope.TimebasePerDivision = 1e-3;
         vm.Scope.VoltsPerDivision = 1.0;
+    }
+
+    /// <summary>
+    /// A comparator with hysteresis, fed a triangle wave, with the scope already in XY — so the
+    /// loop draws itself.
+    /// </summary>
+    public static void LoadHysteresisLoop(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "Hysteresis loop";
+
+        var supply = Place(circuit, new DcVoltageSource(5.0), -620, 220);
+
+        // A triangle rather than a sine, so the input sweeps up and back at a constant rate and
+        // the two switching points sit at the same place on the way through either way.
+        var ramp = Place(circuit, new FunctionGenerator(Waveform.Triangle, 200, 4.0)
+        {
+            DcOffset = 2.5,
+        }, -620, -120);
+
+        var comparator = Place(circuit, new Comparator(ComparatorModel.Lm311), -220, -40);
+
+        // The divider sets where it switches; the feedback resistor from the output back to the
+        // same node is what makes the two thresholds different.
+        var upper = Place(circuit, new Resistor(10e3), -400, 160);
+        var lower = Place(circuit, new Resistor(10e3), -400, 300);
+        var feedback = Place(circuit, new Resistor(100e3), 40, 160);
+        var pullup = Place(circuit, new Resistor(4.7e3), 120, -180);
+
+        var gnd = Place(circuit, new Ground(), -620, 380);
+        var gnd2 = Place(circuit, new Ground(), -620, 40);
+        var gnd3 = Place(circuit, new Ground(), -400, 400);
+        var gnd4 = Place(circuit, new Ground(), -220, 120);
+
+        circuit.Connect(supply.Negative, gnd.Pin);
+        circuit.Connect(ramp.Return, gnd2.Pin);
+
+        circuit.Connect(comparator.PositiveSupply, supply.Positive);
+        circuit.Connect(comparator.NegativeSupply, gnd4.Pin);
+
+        circuit.Connect(ramp.Output, comparator.NonInverting);
+
+        circuit.Connect(upper.A, supply.Positive);
+        circuit.Connect(upper.B, comparator.Inverting);
+        circuit.Connect(lower.A, comparator.Inverting);
+        circuit.Connect(lower.B, gnd3.Pin);
+
+        // Open collector, so it needs a pull-up before it can pull anything.
+        circuit.Connect(pullup.A, supply.Positive);
+        circuit.Connect(pullup.B, comparator.Output);
+
+        // The feedback that makes it a Schmitt trigger: the output moves the reference.
+        circuit.Connect(feedback.A, comparator.Output);
+        circuit.Connect(feedback.B, comparator.Inverting);
+
+        vm.Scope.TimebasePerDivision = 1e-3;
+        vm.Scope.VoltsPerDivision = 1.0;
+
+        var input = vm.Scope.AddProbe(ramp.Output, "Input");
+        vm.Scope.AddProbe(comparator.Output, "Output");
+
+        // Already in XY, with the input along the bottom. Switch Layout back to Unified to see
+        // the same thing against time — it is the same data, and the loop is not visible there.
+        vm.Scope.XyHorizontal = input;
+        vm.Scope.Layout = ScopeLayout.Xy;
+
+        vm.Simulation.SpeedFactor = 0.05;
+    }
+
+    /// <summary>
+    /// Four nominally equal resistors, probed across the middle. It reads nothing at all until
+    /// the tolerances are taken into account.
+    /// </summary>
+    public static void LoadResistorBridge(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "Resistor bridge";
+
+        var supply = Place(circuit, new DcVoltageSource(10.0), -420, 120);
+
+        // Ordinary five percent parts, which is what the analysis is about.
+        var leftTop = Place(circuit, new Resistor(10e3) { Tolerance = 0.05 }, -160, -120);
+        var leftBottom = Place(circuit, new Resistor(10e3) { Tolerance = 0.05 }, -160, 120);
+        var rightTop = Place(circuit, new Resistor(10e3) { Tolerance = 0.05 }, 160, -120);
+        var rightBottom = Place(circuit, new Resistor(10e3) { Tolerance = 0.05 }, 160, 120);
+
+        var gnd = Place(circuit, new Ground(), -420, 280);
+        var gnd2 = Place(circuit, new Ground(), 0, 280);
+
+        circuit.Connect(supply.Negative, gnd.Pin);
+
+        foreach (var (top, bottom) in new[] { (leftTop, leftBottom), (rightTop, rightBottom) })
+        {
+            circuit.Connect(supply.Positive, top.A);
+            circuit.Connect(top.B, bottom.A);
+            circuit.Connect(bottom.B, gnd2.Pin);
+        }
+
+        vm.Scope.TimebasePerDivision = 1e-3;
+        vm.Scope.VoltsPerDivision = 0.1;
+
+        // Across the middle, differentially. Both midpoints sit at five volts and the difference
+        // between them is the measurement — which against ground would be the fourth digit of a
+        // number that is mostly the supply.
+        var bridge = vm.Scope.AddProbe(leftTop.B, "Bridge");
+        bridge.Kind = ProbeKind.Differential;
+        bridge.ReferenceTerminal = rightTop.B;
+    }
+
+    /// <summary>
+    /// A shunt at the top of a rail: millivolts across it, twenty-four volts either side, and the
+    /// power it costs to measure the current that way.
+    /// </summary>
+    public static void LoadHighSideSensing(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "High-side sensing";
+
+        var supply = Place(circuit, new DcVoltageSource(24.0), -460, 120);
+        var shunt = Place(circuit, new Resistor(0.1), -180, -100);
+        var load = Place(circuit, new Resistor(12.0), 140, 60);
+
+        var gnd = Place(circuit, new Ground(), -460, 280);
+        var gnd2 = Place(circuit, new Ground(), 140, 220);
+
+        circuit.Connect(supply.Negative, gnd.Pin);
+        circuit.Connect(supply.Positive, shunt.A);
+        circuit.Connect(shunt.B, load.A);
+        circuit.Connect(load.B, gnd2.Pin);
+
+        vm.Scope.TimebasePerDivision = 1e-3;
+        vm.Scope.VoltsPerDivision = 0.05;
+
+        // Across the shunt, not against ground. Both of its ends are within a fraction of a
+        // percent of twenty-four volts, and the whole measurement is the difference.
+        var across = vm.Scope.AddProbe(shunt.A, "Across the shunt");
+        across.Kind = ProbeKind.Differential;
+        across.ReferenceTerminal = shunt.B;
+
+        // And what the measurement costs. Taken from the shunt's other end, because a terminal
+        // carries one probe: clicking a pin that already has one selects it rather than stacking
+        // a second on top, which is right on the canvas and means an example has to put its
+        // second measurement somewhere else.
+        var burned = vm.Scope.AddProbe(shunt.B, "Shunt power");
+        burned.Kind = ProbeKind.Power;
+        burned.ReferenceTerminal = shunt.A;
+
+        var delivered = vm.Scope.AddProbe(load.A, "Load power");
+        delivered.Kind = ProbeKind.Power;
+        delivered.ReferenceTerminal = load.B;
+    }
+
+    /// <summary>
+    /// A diode held at a constant current, which makes it a thermometer. There is nothing to watch
+    /// on the scope; the point is <b>Simulate &gt; DC Sweep</b> over temperature.
+    /// </summary>
+    public static void LoadDiodeThermometer(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "Diode thermometer";
+
+        // A current source rather than a resistor from a rail, and that is the whole design. A
+        // diode's forward drop only tracks temperature cleanly at a fixed current; fed through a
+        // resistor, the current rises as the drop falls and flatters the reading.
+        var bias = Place(circuit, new DcCurrentSource(1e-3), -300, 40);
+        var sensor = Place(circuit, new Diode(), 40, 40);
+
+        var gnd = Place(circuit, new Ground(), -300, 220);
+        var gnd2 = Place(circuit, new Ground(), 40, 220);
+
+        circuit.Connect(bias.Positive, gnd.Pin);
+        circuit.Connect(bias.Negative, sensor.Anode);
+        circuit.Connect(sensor.Cathode, gnd2.Pin);
+
+        vm.Scope.TimebasePerDivision = 1e-3;
+        vm.Scope.VoltsPerDivision = 0.2;
+        vm.Scope.AddProbe(sensor.Anode, "Vf");
     }
 
     private static T Place<T>(Circuit circuit, T component, double x, double y) where T : CircuitComponent

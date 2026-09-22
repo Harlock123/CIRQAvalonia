@@ -66,8 +66,24 @@ public sealed record MosfetModel(
 
     public static readonly MosfetModel Irf9540 = new("IRF9540", MosfetChannel.PChannel, 3.5, 0.8, 0.01);
 
-    public static readonly IReadOnlyList<MosfetModel> Library =
+    private static readonly List<MosfetModel> Models =
         [N2N7000, IrlZ44N, Irf540, Bs250, Irf9540];
+
+    /// <summary>Every model the application knows, built in or imported.</summary>
+    public static IReadOnlyList<MosfetModel> Library => Models;
+
+    /// <summary>Adds a model, replacing any with the same name.</summary>
+    public static void Register(MosfetModel model)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+
+        Models.RemoveAll(m => string.Equals(m.Name, model.Name, StringComparison.OrdinalIgnoreCase));
+        Models.Add(model);
+    }
+
+    /// <summary>Removes an imported model by name.</summary>
+    public static bool Unregister(string name) =>
+        Models.RemoveAll(m => string.Equals(m.Name, name, StringComparison.OrdinalIgnoreCase)) > 0;
 
     public override string ToString() => Name;
 }

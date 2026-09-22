@@ -1,0 +1,62 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:Cirq.UI.ViewModels"
+        x:Class="Cirq.UI.Views.SpiceImportWindow"
+        x:DataType="vm:SpiceImportViewModel"
+        Title="Import SPICE Model"
+        Width="720" Height="560"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource PanelBackground}">
+
+  <DockPanel>
+
+    <Border DockPanel.Dock="Top" Padding="14,12"
+            BorderBrush="{DynamicResource PanelBorder}" BorderThickness="0,0,0,1">
+      <StackPanel Spacing="8">
+        <TextBlock TextWrapping="Wrap" Opacity="0.8"
+                   Text="Paste a .model card from a datasheet. Diodes (D), bipolars (NPN, PNP) and MOSFETs (NMOS, PMOS) are understood; what is imported appears in the model list of the matching part." />
+
+        <TextBox Height="110" AcceptsReturn="True" FontFamily="monospace" FontSize="12"
+                 Text="{Binding Text, Mode=TwoWay}"
+                 PlaceholderText=".model 1N4148 D(Is=2.52n Rs=0.568 N=1.752 Bv=75)" />
+
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <Button Content="Import" Command="{Binding ImportCommand}" Padding="18,5" />
+          <Button Content="Paste an example" Command="{Binding UseSampleCommand}" Padding="14,5" />
+        </StackPanel>
+      </StackPanel>
+    </Border>
+
+    <Border DockPanel.Dock="Bottom" Padding="14,10"
+            BorderBrush="{DynamicResource PanelBorder}" BorderThickness="0,1,0,0">
+      <DockPanel>
+        <Button DockPanel.Dock="Right" Content="Remove" Command="{Binding RemoveCommand}"
+                Padding="14,5" />
+        <SelectableTextBlock Text="{Binding Status}" TextWrapping="Wrap" Opacity="0.85"
+                             VerticalAlignment="Center" />
+      </DockPanel>
+    </Border>
+
+    <TextBlock IsVisible="{Binding IsEmpty}"
+               HorizontalAlignment="Center" VerticalAlignment="Center"
+               Opacity="0.7" TextAlignment="Center"
+               Text="Nothing imported yet.&#x0a;&#x0a;Imported models are kept between runs and offered&#x0a;wherever a built-in one is. Parameters this simulator&#x0a;has nowhere to put are named rather than dropped." />
+
+    <ListBox ItemsSource="{Binding Imported}" SelectedItem="{Binding Selected, Mode=TwoWay}"
+             IsVisible="{Binding !IsEmpty}" Background="Transparent">
+      <ListBox.ItemTemplate>
+        <DataTemplate>
+          <StackPanel Margin="0,3">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="SemiBold" />
+              <TextBlock Text="{Binding Kind}" FontSize="11" Opacity="0.6" VerticalAlignment="Center" />
+            </StackPanel>
+            <TextBlock Text="{Binding Card}" FontSize="10" Opacity="0.65"
+                       FontFamily="monospace" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+        </DataTemplate>
+      </ListBox.ItemTemplate>
+    </ListBox>
+
+  </DockPanel>
+</Window>

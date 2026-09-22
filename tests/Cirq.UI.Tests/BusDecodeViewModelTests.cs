@@ -144,10 +144,14 @@ public class BusDecodeViewModelTests
         Assert.DoesNotContain(wrong.Rows, r => r.IsError);
     }
 
+    /// <summary>
+    /// The example itself decodes at the timebase it ships with; this is the same capture taken
+    /// deliberately too coarsely, which has to be refused rather than misread.
+    /// </summary>
     [Fact]
     public void ACaptureTooCoarseToDecodeIsReportedInTheSummaryRatherThanDecoded()
     {
-        var vm = Load("1-Wire Thermometer", 5e-3);
+        var vm = Load("1-Wire Thermometer", 5e-3, interval: 20e-6);
 
         var model = new BusDecodeViewModel(vm.Circuit);
         model.Run();
@@ -159,7 +163,7 @@ public class BusDecodeViewModelTests
     [Fact]
     public void TheSameExampleCapturedFinelyDecodesProperly()
     {
-        var vm = Load("1-Wire Thermometer", 5e-3, interval: 1e-6);
+        var vm = Load("1-Wire Thermometer", 5e-3);
 
         var model = new BusDecodeViewModel(vm.Circuit);
         model.Run();

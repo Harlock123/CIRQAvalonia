@@ -31,15 +31,16 @@ the [README](../README.md), and what changed between releases is in the
 19. [Drawing part of a circuit as one block](#drawing-part-of-a-circuit-as-one-block)
 20. [Reusing a block](#reusing-a-block)
 21. [Plotting one trace against another](#plotting-one-trace-against-another)
-22. [Naming a net instead of drawing it](#naming-a-net-instead-of-drawing-it)
-23. [Checking the circuit](#checking-the-circuit)
-24. [Development boards](#development-boards)
-25. [Saving and loading](#saving-and-loading)
-26. [Exporting](#exporting)
-27. [Appearance](#appearance)
-28. [What version is this](#what-version-is-this)
-29. [Keyboard reference](#keyboard-reference)
-30. [When a circuit will not simulate](#when-a-circuit-will-not-simulate)
+22. [Importing a SPICE model](#importing-a-spice-model)
+23. [Naming a net instead of drawing it](#naming-a-net-instead-of-drawing-it)
+24. [Checking the circuit](#checking-the-circuit)
+25. [Development boards](#development-boards)
+26. [Saving and loading](#saving-and-loading)
+27. [Exporting](#exporting)
+28. [Appearance](#appearance)
+29. [What version is this](#what-version-is-this)
+30. [Keyboard reference](#keyboard-reference)
+31. [When a circuit will not simulate](#when-a-circuit-will-not-simulate)
 
 This guide is also attached to every [release](../../releases) as a PDF, with a contents page and
 the screenshots in place — the same document, laid out for reading away from the machine. Build it
@@ -432,17 +433,24 @@ gets roughly two-thirds of the way each time.
 
 ### The example browser
 
-Everything above is also in **File > Examples...** (`Ctrl+Shift+E`), along with seventy-nine others.
+Everything above is also in **File > Examples...** (`Ctrl+Shift+E`), along with eighty-three others.
 
 They are grouped the way the component palette is — Fundamentals, Analog, Power Supplies, Switching
-& Motors, Digital Logic, Timers & Oscillators, Buses & Interfaces, Sensors, Signal Integrity & RF,
-Audio, Displays, Development Boards — with a description of whichever one is selected beside the list, and a search
+& Motors, Digital Logic, Timers & Oscillators, Buses & Interfaces, Sensors, **Measurement**, Signal
+Integrity & RF, Audio, Displays, Development Boards — with a description of whichever one is selected beside the list, and a search
 box across all three of the name, the description and the group. So looking for `I2C` finds the
 four bus examples, and looking for `hysteresis` finds the comparator circuit whose name you have
 forgotten. Double-click to open, or select and press Enter.
 
 Opening one replaces whatever is on the canvas, so save first if there is anything there worth
 keeping.
+
+The **Measurement** group is different from the rest: those circuits exist to demonstrate an
+analysis rather than a design, and each is set up so that the thing it is for works straight away
+with nothing to change. **Hysteresis Loop** opens with the scope already in XY. **Diode
+Thermometer** is waiting for a temperature sweep. **Resistor Bridge** has tolerances on its parts
+and a differential probe across the middle. **High-Side Sensing** reads millivolts across a shunt
+at the top of a 24 V rail and reports what the measurement costs in watts.
 
 The **Fundamentals** group is where to start, and the three in it are deliberately the three
 simplest things a circuit does. **RC Low-Pass** is the one built by hand above. **Transistor
@@ -3028,6 +3036,26 @@ the honest middle — it does not flatter the circuit the way a bell curve would
 the same answer. An analysis whose result changes every time you look at it decides nothing. Change
 the seed for a different draw of the same parts.
 
+### Which part is to blame
+
+The spread tells you whether the design works. It does not tell you **why**, and the two have
+different uses: the first is a pass or a fail, the second is where to spend money. Buying 1 %
+resistors for a whole board is expensive and mostly pointless; buying one for the part causing
+most of the spread is neither.
+
+The panel beside the histogram ranks every toleranced part by what it contributes to the selected
+trace. It is worked out exactly rather than sampled — each part is taken to both ends of its own
+band with everything else at nominal, which is two solves and no randomness — and the shares are
+of the **variance**, because independent contributions add in quadrature. A part responsible for
+half the spread is responsible for a quarter of the variance.
+
+Two things in it are worth reading together. The **band** is what the part is; the **elasticity**
+is what the circuit does with it — how far the output moves, proportionally, for a given move in
+the part. A part with a wide band and a small elasticity is not your problem. That combination is
+common and not obvious: hang a megohm across a divider of two kilohms and it can have twenty
+percent tolerance against their one percent and still be the least of your worries, because the
+output barely depends on it.
+
 ### What it is worth running on
 
 The interesting circuits are the ones where the answer is a **difference between two larger
@@ -3225,6 +3253,55 @@ disappears from a definition that three circuits are already using. Copies are p
 
 The library lives in a file beside the preferences, so it survives restarts and is easy to back up
 or delete.
+
+---
+
+## Importing a SPICE model
+
+**Edit > Import SPICE Model...** takes a `.model` card off a datasheet and turns it into a part.
+
+```
+.model 1N4148 D(Is=2.52n Rs=0.568 N=1.752 Bv=75 Ibv=5u)
+```
+
+Diodes (`D`), bipolars (`NPN`, `PNP`) and MOSFETs (`NMOS`, `PMOS`) are understood. What is imported
+appears in the model list of the matching part, alongside the built-in ones, and is kept between
+runs.
+
+This works because the parameters are the same parameters. `Is`, `N`, `Rs`, `Bf`, `Vto`, `Kp` and
+the rest are not this simulator's invention — they come from the same forty-year-old formulation
+SPICE uses, so a manufacturer's card maps across with nothing in between.
+
+### What it will not quietly do
+
+**Parameters it has nowhere to put are named, not dropped.** Import a card carrying junction
+capacitances and transit times and the report says which ones were ignored. They are not wrong to
+be in the card; this simulator has no charge storage to put them in, and letting them pass silently
+would leave you believing a part was modelled more closely than it is.
+
+**A device it has no model for is reported.** A JFET card comes back saying so rather than
+producing nothing and leaving you to wonder.
+
+### The suffix that catches everyone
+
+SPICE numbers are not quite ordinary numbers, and one of the differences has been catching people
+since the seventies:
+
+> **`M` means milli. `MEG` means mega.** And it is case-insensitive.
+
+So `1M` is a thousandth, not a million. A resistance written `1M` expecting a megohm is a thousand
+million times wrong, and nothing in the file will say so. This reader follows SPICE's rule exactly,
+including that anything after the suffix is decoration — `1kOhm`, `2.2uF` and `10MegHz` all parse,
+because the letter that matters is the first one after the digits.
+
+Continuation lines starting with `+` are joined on, `*` comment lines and anything after a `;` are
+dropped, and several cards can be pasted at once.
+
+### A caution about sharing
+
+A circuit that uses an imported model names it in the saved file. Opened on a machine that has not
+imported it, the circuit still loads — but with the default model and a warning saying so. The
+model travels with the person, not with the file.
 
 ---
 
@@ -3529,6 +3606,7 @@ Also available in the app at **Help > Keyboard Shortcuts**.
 | `Ctrl` `C` / `Ctrl` `V` | Copy the selection / paste a duplicate of it |
 | `Ctrl` `G` / `Ctrl` `Shift` `G` | Group the selection into a block / ungroup one |
 | Edit > Block Library | Save a block for reuse, or place a copy of a saved one |
+| Edit > Import SPICE Model | Paste a `.model` card from a datasheet and get a part |
 | Scope layout > Xy | Plot one trace against another instead of against time |
 | `Ctrl` `Z` / `Ctrl` `Y` | Undo / redo (`Ctrl` `Shift` `Z` redoes as well) |
 | `Delete` | Delete selection |

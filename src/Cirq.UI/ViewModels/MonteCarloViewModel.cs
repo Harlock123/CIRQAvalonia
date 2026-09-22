@@ -49,6 +49,29 @@ public sealed class MonteCarloRowViewModel(MonteCarloTrace trace, double band)
     }
 }
 
+/// <summary>One part's contribution to a measurement's spread, dressed for the list.</summary>
+public sealed class SensitivityRowViewModel(SensitivityEntry entry, double nominal)
+{
+    public SensitivityEntry Entry { get; } = entry;
+
+    public string Part => Entry.Part;
+
+    /// <summary>The band it was varied over.</summary>
+    public string Tolerance => $"±{Entry.Tolerance * 100:0.#} %";
+
+    /// <summary>Its share of the variance, which is what says where to spend the money.</summary>
+    public string Share => $"{Entry.Share * 100:0.#} %";
+
+    /// <summary>
+    /// How far the measurement moves for a given fractional move in the part. A half means the
+    /// output moves half as far, proportionally, as the part does.
+    /// </summary>
+    public string Elasticity => $"{Entry.Elasticity(nominal):0.##}";
+
+    /// <summary>A bar width from nought to one, for the share column.</summary>
+    public double Weight => Math.Clamp(Entry.Share, 0, 1);
+}
+
 /// <summary>
 /// The Monte Carlo window: build the circuit a few hundred times with its parts drawn from their
 /// tolerance bands, and see what the answer did.
@@ -101,11 +124,45 @@ public sealed partial class MonteCarloViewModel : ObservableObject
 
     public bool HasRows => Rows.Count > 0;
 
+    /// <summary>
+    /// Which part is responsible for the selected trace's spread, worst first.
+    /// <para>
+    /// The other half of the question. The spread says whether the design works; this says where
+    /// a tighter part would actually help, which is not always where the loosest one is — a part
+    /// the output barely depends on can have the widest band and matter least.
+    /// </para>
+    /// </summary>
+    public ObservableCollection<SensitivityRowViewModel> Sensitivity { get; } = [];
+
+    public bool HasSensitivity => Sensitivity.Count > 0;
+
     /// <summary>Raised when new results are ready, so the view can redraw the histogram.</summary>
     public event EventHandler? ResultsChanged;
 
-    partial void OnSelectedChanged(MonteCarloRowViewModel? value) =>
+    partial void OnSelectedChanged(MonteCarloRowViewModel? value)
+    {
+        ShowSensitivityFor(value);
         ResultsChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>The ranking for one trace, computed once per run and shown for whichever is chosen.</summary>
+    private IReadOnlyList<SensitivityResult> _sensitivity = [];
+
+    private void ShowSensitivityFor(MonteCarloRowViewModel? row)
+    {
+        Sensitivity.Clear();
+
+        if (row is not null)
+        {
+            var ranking = _sensitivity.FirstOrDefault(r => r.Label == row.Label);
+
+            if (ranking is not null)
+                foreach (var entry in ranking.Entries)
+                    Sensitivity.Add(new SensitivityRowViewModel(entry, ranking.Nominal));
+        }
+
+        OnPropertyChanged(nameof(HasSensitivity));
+    }
 
     partial void OnAcceptableBandPercentChanged(double value) => Run();
 
@@ -137,6 +194,8 @@ public sealed partial class MonteCarloViewModel : ObservableObject
     {
         Rows.Clear();
         Varied.Clear();
+        Sensitivity.Clear();
+        _sensitivity = [];
 
         if (!MonteCarlo.Targets(_circuit).Any())
         {
@@ -156,6 +215,10 @@ public sealed partial class MonteCarloViewModel : ObservableObject
         var band = Math.Max(AcceptableBandPercent, 0) / 100.0;
 
         var result = new MonteCarlo(_circuit).Run(new MonteCarloRequest(Math.Max(Trials, 2), Seed));
+
+        // Exact rather than sampled: each part is taken to each end of its own band with
+        // everything else at nominal, which is two solves and no randomness at all.
+        _sensitivity = new Cirq.Engine.Simulation.Sensitivity(_circuit).Run();
 
         foreach (var varied in result.Varied) Varied.Add(varied);
         foreach (var trace in result.Traces) Rows.Add(new MonteCarloRowViewModel(trace, band));

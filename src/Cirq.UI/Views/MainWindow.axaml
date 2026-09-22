@@ -53,6 +53,7 @@
         <MenuItem Header="_Ungroup Block" InputGesture="Ctrl+Shift+G"
                   Command="{Binding UngroupSelectionCommand}" />
         <MenuItem Header="Block _Library..." Command="{Binding ShowBlockLibraryCommand}" />
+        <MenuItem Header="Import SPICE _Model..." Command="{Binding ShowSpiceImportCommand}" />
         <Separator />
         <MenuItem Header="_Rotate" InputGesture="R" Command="{Binding RotateSelectionCommand}" />
         <MenuItem Header="_Delete" InputGesture="Delete" Command="{Binding DeleteSelectionCommand}" />
