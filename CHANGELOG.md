@@ -8,6 +8,16 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**Distortion.** The spectrum window now measures THD and THD+N, and lists the harmonics in dB
+relative to the carrier. This is the number an amplifier is sold on and the one thing in that
+window you cannot get by eye: a stage at one percent distortion looks exactly like a sine.
+
+*Which* harmonics is the diagnosis rather than the figure. Odd harmonics mean the distortion is
+symmetric — both rails clipping, a crossover notch. Even harmonics mean it is lopsided — a
+single-ended stage out of headroom on one side, a half-wave rectifier. THD counts the harmonics you
+asked for; THD+N weighs everything that is not the fundamental, so the gap between them is telling
+you something is present that is not a multiple of your signal.
+
 **Find a part.** The palette has a search box. 183 components in 16 collapsible groups is more than
 anybody browses, and browsing only worked if you already knew that a 4017 lives under "40xx Series"
 and an optocoupler under "Switching & Isolation". Type `555`, or `shift register`, or `logic`, and

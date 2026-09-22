@@ -33,8 +33,58 @@
         <CheckBox Content="Decibels" IsChecked="{Binding IsLogarithmic}" VerticalAlignment="Center"
                   ToolTip.Tip="A harmonic at a hundredth of the fundamental is invisible on a linear axis and obvious on a log one." />
 
+        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+          <TextBlock Text="Harmonics" VerticalAlignment="Center" />
+          <ComboBox Width="70" SelectedItem="{Binding HarmonicCount, Mode=TwoWay}"
+                    ItemsSource="{Binding Source={x:Static vm:SpectrumViewModel.HarmonicCountOptions}}"
+                    ToolTip.Tip="How many multiples of the fundamental to measure. Past the ninth they are usually below the floor, and on anything but a low fundamental they have run past the Nyquist limit anyway." />
+        </StackPanel>
+
+        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+          <TextBlock Text="Fundamental" VerticalAlignment="Center" />
+          <TextBox Width="90" Text="{Binding FundamentalHz, Mode=TwoWay}"
+                   PlaceholderText="auto" MinHeight="0" Padding="6,3"
+                   ToolTip.Tip="The frequency to measure distortion against, in hertz. Leave at 0 to take the largest component — but state it when you know it: at heavy distortion a harmonic can be the biggest thing in the spectrum, and then the automatic answer is about a different question." />
+        </StackPanel>
+
         <Button Content="Transform" Command="{Binding RunCommand}" IsEnabled="{Binding !IsBusy}"
                 Padding="18,5" />
+      </StackPanel>
+    </Border>
+
+    <!-- Distortion. The spectrum shows the harmonics; this says how much of them there is, which
+         is the number an amplifier is actually sold on and the one thing here that cannot be
+         read off the plot by eye. -->
+    <Border DockPanel.Dock="Bottom" Padding="14,8" IsVisible="{Binding HasDistortion}"
+            BorderBrush="{DynamicResource PanelBorder}" BorderThickness="0,1,0,0">
+      <StackPanel Spacing="6">
+        <TextBlock Text="DISTORTION" Classes="heading" />
+
+        <ItemsControl ItemsSource="{Binding Distortion}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:DistortionRow">
+              <Grid ColumnDefinitions="110,110,90,90,*" Margin="0,2">
+                <TextBlock Text="{Binding Label}" FontWeight="SemiBold"
+                           TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1" VerticalAlignment="Center" Opacity="0.85"
+                           Text="{Binding Fundamental}" />
+                <TextBlock Grid.Column="2" VerticalAlignment="Center"
+                           Text="{Binding Thd}" ToolTip.Tip="Total harmonic distortion: the harmonics added in quadrature, over the fundamental." />
+                <TextBlock Grid.Column="3" VerticalAlignment="Center" Opacity="0.75"
+                           Text="{Binding ThdPlusNoise}" ToolTip.Tip="THD+N: everything that is not the fundamental — harmonics, noise, hum, intermodulation. Always the larger of the two." />
+                <TextBlock Grid.Column="4" VerticalAlignment="Center" FontSize="11" Opacity="0.65"
+                           Text="{Binding Detail}" TextTrimming="CharacterEllipsis" />
+              </Grid>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <Grid ColumnDefinitions="110,110,90,90,*">
+          <TextBlock Grid.Column="1" Text="fundamental" FontSize="10" Opacity="0.5" />
+          <TextBlock Grid.Column="2" Text="THD" FontSize="10" Opacity="0.5" />
+          <TextBlock Grid.Column="3" Text="THD+N" FontSize="10" Opacity="0.5" />
+          <TextBlock Grid.Column="4" Text="largest harmonics, relative to the carrier" FontSize="10" Opacity="0.5" />
+        </Grid>
       </StackPanel>
     </Border>
 

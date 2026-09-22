@@ -59,12 +59,38 @@ public sealed record SpectrumRequest(SpectrumWindow Window = SpectrumWindow.Hann
 /// side. On a single-supply circuit the DC term is usually the largest thing in the spectrum, so
 /// anything inside that lobe is DC's skirt rather than a component of the signal.
 /// </param>
+/// <param name="NoiseBandwidth">
+/// The window's equivalent noise bandwidth, in bins: the mean of its squared weights over the
+/// square of their mean. One for a rectangular window, 1.5 for a Hann, about 2 for a
+/// Blackman-Harris.
+/// <para>
+/// It is here because a windowed sine does not sit in one bin, so recovering its amplitude means
+/// adding up the power across its lobe — and that sum comes out this many times too large. Anyone
+/// measuring a component by its energy rather than by its peak needs the number to divide back
+/// out.
+/// </para>
+/// </param>
 public sealed record SpectrumResult(
     IReadOnlyList<double> Frequencies,
     IReadOnlyList<double> Magnitudes,
     double SampleRate,
-    int FirstCleanBin = 1)
+    int FirstCleanBin = 1,
+    double NoiseBandwidth = 1.0)
 {
+    /// <summary>
+    /// Half the width of a window's main lobe, in bins — so a component at bin <c>m</c> occupies
+    /// <c>m ± this</c>, and two components closer together than twice it cannot be told apart.
+    /// </summary>
+    public int LobeHalfWidth => Math.Max(FirstCleanBin - 1, 1);
+
+    /// <summary>How the block was weighted, named from the lobe width it left behind.</summary>
+    public string Window() => LobeHalfWidth switch
+    {
+        <= 1 => "rectangular",
+        2 => "Hann",
+        _ => "Blackman-Harris",
+    };
+
     /// <summary>Spacing between bins, which is the resolution.</summary>
     public double Resolution => Frequencies.Count > 1 ? Frequencies[1] - Frequencies[0] : 0;
 
@@ -186,6 +212,20 @@ public static class Spectrum
         coherentGain /= size;
         if (coherentGain <= 0) coherentGain = 1.0;
 
+        // The window's equivalent noise bandwidth: mean of the squared weights over the square of
+        // their mean. Carried on the result so a harmonic's amplitude can be recovered from the
+        // power across its lobe rather than from whichever bin the peak happened to land in.
+        var meanSquare = 0.0;
+        for (var i = 0; i < size; i++)
+        {
+            var weight = Weight(request.Window, i, size);
+            meanSquare += weight * weight;
+        }
+
+        meanSquare /= size;
+
+        var noiseBandwidth = meanSquare / (coherentGain * coherentGain);
+
         Fourier.Transform(block);
 
         var bins = (size / 2) + 1;
@@ -204,7 +244,8 @@ public static class Spectrum
             magnitudes[i] = block[i].Magnitude * scale;
         }
 
-        return new SpectrumResult(frequencies, magnitudes, sampleRate, FirstCleanBin(request.Window));
+        return new SpectrumResult(
+            frequencies, magnitudes, sampleRate, FirstCleanBin(request.Window), noiseBandwidth);
     }
 
     /// <summary>

@@ -2916,7 +2916,54 @@ One honest note about the method. The solver's time steps are **not uniform** �
 an edge and lengthens them across a flat stretch — and a transform needs an even spacing, so the
 samples are resampled onto a uniform grid first by interpolating between the ones either side.
 That is sound as long as the grid is finer than the detail in the signal, which it is whenever the
-solver was taking steps small enough to draw the waveform in the first place.
+solver was taking steps small enough to draw the waveform in the first place. It does cost a
+fraction of a percent on a distortion figure, always in the direction of reading slightly *low* —
+interpolating takes a little more off a harmonic than off the fundamental.
+
+### Distortion
+
+Under the plot is the number an amplifier is actually sold on, and the one thing in this window you
+cannot get by looking: **THD**. A stage at one percent distortion looks exactly like a sine on the
+scope. You cannot see it. You can only measure it.
+
+For each probe the panel gives the fundamental it measured against, its amplitude, **THD**,
+**THD+N**, and the largest harmonics in dB relative to the carrier.
+
+**THD** is the harmonics added in quadrature over the fundamental — 3 % and 4 % of second and third
+is 5 % together, because it is the powers that add, not the amplitudes. It counts only the
+harmonics it was asked to look for, which is the **Harmonics** setting.
+
+**THD+N** is everything that is not the fundamental: harmonics, noise, hum, intermodulation,
+whatever a mixer left behind. It is always the larger of the two and it is what a real distortion
+analyser measures, because it works by notching the fundamental out and weighing the rest — it does
+not need to be told where to look. When the two disagree, the gap is telling you there is something
+present that is not a multiple of your signal.
+
+A square wave shows why there are two. Its harmonics are the odd ones, the nth at 1/n, running on
+for ever — so nine harmonics account for √(1/3² + 1/5² + 1/7² + 1/9²) = 42.9 %, and that is all THD
+can ever report. The true figure is √(π²/8 − 1) = 48.3 %, and THD+N finds most of it unaided.
+
+**Which harmonics is the diagnosis; the number is only the symptom.**
+
+- **Odd harmonics** mean the distortion is **symmetric** — the waveform is bent but not lopsided.
+  Both rails clipping looks like this, and so does a class-B crossover notch.
+- **Even harmonics** mean it is **asymmetric** — one side is being treated differently from the
+  other. A single-ended stage running out of headroom in one direction, a half-wave rectifier, a
+  badly biased transistor.
+
+A half-wave rectified sine is the clean case: its series has a DC term, a fundamental at half the
+peak, and then only even harmonics — the second at 4/3π of the fundamental, the fourth at 4/15π,
+and nothing odd at all.
+
+**Fundamental** is worth setting when you know it. Left at 0 it takes the largest component above
+DC, which is right nearly always — but a badly biased stage can put more energy into its second
+harmonic than into the signal, and then the automatic answer is measuring a real thing and
+answering a different question.
+
+One thing to watch: a probe keeps **ten thousand points**, so how much *time* it holds depends
+entirely on how finely the scope is sampling. At a fast timebase that is a few milliseconds, which
+is six cycles of a kilohertz tone — not enough resolution to separate the fundamental from DC. The
+panel says so rather than guessing. Slow the timebase until it has something to work with.
 
 ---
 

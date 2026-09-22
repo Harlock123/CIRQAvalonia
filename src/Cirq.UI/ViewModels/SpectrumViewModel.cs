@@ -19,6 +19,58 @@ public sealed record SpectrumCurve(
     IReadOnlyList<double> Magnitudes,
     IReadOnlyList<double> Decibels);
 
+/// <summary>One probe's distortion, as the window lists it.</summary>
+public sealed record DistortionRow(string Label, string Unit, HarmonicAnalysis Analysis)
+{
+    public string Fundamental => SiPrefix.Format(Analysis.Fundamental, "Hz");
+
+    public string Amplitude => SiPrefix.Format(Analysis.FundamentalAmplitude, Unit);
+
+    /// <summary>
+    /// THD as a percentage, or in parts per million once it is small enough that a percentage is
+    /// all leading zeroes. Under a thousandth of a percent it is reported as a limit rather than a
+    /// figure: below that the answer is the transform's own floor rather than the circuit's.
+    /// </summary>
+    public string Thd => Describe(Analysis.ThdPercent);
+
+    public string ThdPlusNoise => Describe(Analysis.ThdPlusNoisePercent);
+
+    public string Detail
+    {
+        get
+        {
+            if (!Analysis.IsUsable) return Analysis.Problem ?? string.Empty;
+
+            var parts = Analysis.Harmonics
+                .Where(h => h.Order > 1 && h.Relative > 1e-4)
+                .OrderByDescending(h => h.Relative)
+                .Take(4)
+                .Select(h => $"H{h.Order} {h.Decibels:0.0} dBc");
+
+            var line = string.Join("   ", parts);
+
+            if (line.Length == 0) line = "no harmonic above −80 dBc";
+
+            return Analysis.IsTruncated
+                ? $"{line}   ·   only {Analysis.HarmonicsInBand} of " +
+                  $"{Analysis.HarmonicsRequested} harmonics fit below {SiPrefix.Format(Nyquist, "Hz")}"
+                : line;
+        }
+    }
+
+    /// <summary>Where the band ran out, so a truncated answer can say where.</summary>
+    public double Nyquist { get; init; }
+
+    private static string Describe(double percent) => percent switch
+    {
+        < 1e-3 => "< 0.001 %",
+        < 0.01 => $"{percent * 1e4:0.#} ppm",
+        < 1 => $"{percent:0.000} %",
+        < 10 => $"{percent:0.00} %",
+        _ => $"{percent:0.0} %",
+    };
+}
+
 /// <summary>
 /// The spectrum window: what frequencies are in the traces the scope has already recorded.
 /// <para>
@@ -67,6 +119,29 @@ public sealed partial class SpectrumViewModel : ObservableObject
     [ObservableProperty]
     public partial bool IsLogarithmic { get; set; } = true;
 
+    /// <summary>
+    /// How many harmonics to look for when measuring distortion. Nine is the usual count: past
+    /// that they are almost always below the floor, and on anything but a very low fundamental
+    /// they have run past the Nyquist limit anyway.
+    /// </summary>
+    [ObservableProperty]
+    public partial int HarmonicCount { get; set; } = 9;
+
+    public static IReadOnlyList<int> HarmonicCountOptions { get; } = [3, 5, 7, 9, 15, 25];
+
+    /// <summary>
+    /// The fundamental to measure against, in hertz, or zero to take the largest component in
+    /// each trace.
+    /// <para>
+    /// Worth stating when you know it. At heavy distortion a harmonic can be the largest thing in
+    /// the spectrum — a badly biased stage can put more energy in the second harmonic than in the
+    /// fundamental — and measuring everything against the wrong one gives an answer that is not
+    /// wrong so much as about a different question.
+    /// </para>
+    /// </summary>
+    [ObservableProperty]
+    public partial double FundamentalHz { get; set; }
+
     [ObservableProperty]
     public partial string Status { get; set; } = string.Empty;
 
@@ -76,7 +151,15 @@ public sealed partial class SpectrumViewModel : ObservableObject
     /// <summary>The spectra from the last transform, one per visible probe.</summary>
     public ObservableCollection<SpectrumCurve> Curves { get; } = [];
 
+    /// <summary>
+    /// What the same traces measure as distortion — the number an amplifier is sold on, and the
+    /// one thing in this window that a picture of the spectrum cannot give you by eye.
+    /// </summary>
+    public ObservableCollection<DistortionRow> Distortion { get; } = [];
+
     public bool HasCurves => Curves.Count > 0;
+
+    public bool HasDistortion => Distortion.Count > 0;
 
     /// <summary>Raised when new curves are ready, so the view can redraw.</summary>
     public event EventHandler? CurvesChanged;
@@ -84,6 +167,10 @@ public sealed partial class SpectrumViewModel : ObservableObject
     partial void OnWindowChanged(SpectrumWindow value) => Run();
 
     partial void OnSizeChanged(int value) => Run();
+
+    partial void OnHarmonicCountChanged(int value) => Run();
+
+    partial void OnFundamentalHzChanged(double value) => Run();
 
     partial void OnIsLogarithmicChanged(bool value) => CurvesChanged?.Invoke(this, EventArgs.Empty);
 
@@ -99,12 +186,14 @@ public sealed partial class SpectrumViewModel : ObservableObject
         catch (Exception ex)
         {
             Curves.Clear();
+            Distortion.Clear();
             Status = $"The transform failed: {ex.Message}";
         }
         finally
         {
             IsBusy = false;
             OnPropertyChanged(nameof(HasCurves));
+            OnPropertyChanged(nameof(HasDistortion));
             CurvesChanged?.Invoke(this, EventArgs.Empty);
         }
     }
@@ -112,6 +201,7 @@ public sealed partial class SpectrumViewModel : ObservableObject
     private void Transform()
     {
         Curves.Clear();
+        Distortion.Clear();
 
         var probes = _circuit.Probes.Where(p => p.IsVisible).ToList();
 
@@ -148,6 +238,14 @@ public sealed partial class SpectrumViewModel : ObservableObject
 
             Curves.Add(new SpectrumCurve(
                 probe.Label, result.Frequencies, result.Magnitudes, decibels));
+
+            Distortion.Add(new DistortionRow(
+                probe.Label,
+                probe.Unit,
+                Harmonics.Of(result, FundamentalHz > 0 ? FundamentalHz : null, HarmonicCount))
+            {
+                Nyquist = result.Nyquist,
+            });
 
             if (result.Peak() is { } peak)
             {
