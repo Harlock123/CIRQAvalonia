@@ -8,6 +8,15 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**Click a wire and the net lights up.** Every wire on it, a dot on every pin on it, and the status
+bar naming the net and what is on it.
+
+It comes from the netlist the solver builds, not from the lines as drawn — so net labels are
+resolved and blocks are opened out, and what lights up is exactly what the simulator thinks is one
+node. That is the point: net labels make a big schematic readable by removing wires, and the price
+has been that you can no longer see a connection by following a line. A typo'd label now shows up
+at once, because the other end stays dark.
+
 **Step a parameter across a transient.** `Ctrl+Shift+F7` runs the whole circuit once per value of
 something and lays the results on one set of axes. The DC sweep already stepped a parameter, but it
 records an *operating point* at each value — where the circuit settles. This records how it gets

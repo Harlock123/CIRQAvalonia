@@ -175,6 +175,12 @@ public class CircuitCanvas : Control
     private bool _viewAdjustedByUser;
 
     private Terminal? _hoverTerminal;
+
+    /// <summary>
+    /// The net being picked out, or null when none is. Held here rather than on the view model
+    /// because it is a thing the canvas is showing rather than a property of the circuit.
+    /// </summary>
+    private NetHighlight? _highlightedNet;
     private Terminal? _wireStart;
     private readonly List<CorePoint> _wireWaypoints = [];
     private CorePoint _wireCursor;
@@ -349,7 +355,8 @@ public class CircuitCanvas : Control
                    Matrix.CreateScale(Zoom, Zoom) * Matrix.CreateTranslation(_panOffset.X, _panOffset.Y)))
         {
             CircuitRenderer.Draw(canvas, circuit,
-                new CircuitRenderOptions(Zoom, SelectedComponent, ShowInteractiveMarkers));
+                new CircuitRenderOptions(
+                    Zoom, SelectedComponent, ShowInteractiveMarkers, HighlightedNet: _highlightedNet));
 
             // Editing aids rather than part of the circuit, so they stay here and out of an export.
             DrawTerminals(canvas, circuit);
@@ -438,6 +445,18 @@ public class CircuitCanvas : Control
         {
             foreach (var terminal in component.Terminals)
             {
+                // Every pin on a highlighted net gets a dot, whether or not a wire reaches it.
+                // That is most of the value: a pin joined by a net label rather than by a line has
+                // nothing on the drawing to say so, and it is the one you came here to find.
+                if (_highlightedNet?.Terminals.Contains(terminal) == true)
+                {
+                    var spot = terminal.AbsolutePosition;
+
+                    context.DrawEllipse(CanvasTheme.NetHighlightBrush, null,
+                        new Point(spot.X, spot.Y), CanvasTheme.TerminalRadius * 1.6,
+                        CanvasTheme.TerminalRadius * 1.6);
+                }
+
                 var isHover = ReferenceEquals(terminal, _hoverTerminal);
                 if (!showAll && !isHover && !ReferenceEquals(component, SelectedComponent)) continue;
 
@@ -789,7 +808,7 @@ public class CircuitCanvas : Control
             _dragGroup.Clear();
             InteractiveEditEnded?.Invoke(this, EventArgs.Empty);
             e.Pointer.Capture(null);
-            TopologyChanged?.Invoke(this, EventArgs.Empty);
+            RaiseTopologyChanged();
         }
 
         base.OnPointerReleased(e);
@@ -827,12 +846,24 @@ public class CircuitCanvas : Control
         SelectedComponent = component;
         PendingItem = null;
         ActiveTool = EditorTool.Select;
-        TopologyChanged?.Invoke(this, EventArgs.Empty);
+        RaiseTopologyChanged();
         StatusChanged?.Invoke(this, $"Placed {component.Name}");
     }
 
     private void HandleSelectClick(CorePoint world, Point screen, PointerPressedEventArgs e)
     {
+        // A pin, before anything else. Clicking one is the other way to ask "what is this joined
+        // to", and on a schematic drawn with net labels it is the only way that works — there is
+        // no wire to click.
+        if (TerminalAt(world) is { } pin && e.ClickCount == 1)
+        {
+            SetSelection([]);
+            SelectedComponent = pin.Owner;
+
+            HighlightNet(NetHighlighting.For(Circuit!, pin));
+            return;
+        }
+
         var component = ComponentAt(world);
 
         // Double-clicking an operable device flips it, so a switch behaves like a switch instead
@@ -879,12 +910,15 @@ public class CircuitCanvas : Control
             SetSelection([]);
             hitWire.IsSelected = true;
             SelectedComponent = null;
+
+            HighlightNet(NetHighlighting.For(Circuit!, hitWire));
             return;
         }
 
         // Empty canvas: start a band. A press that turns out not to be a drag clears the
         // selection on release, which is what a plain click on nothing has always done.
         SetSelection([]);
+        HighlightNet(null);
 
         _isBanding = true;
         _bandStart = world;
@@ -932,7 +966,7 @@ public class CircuitCanvas : Control
         StatusChanged?.Invoke(this, $"Connected {_wireStart} to {terminal}");
         _wireStart = null;
         _wireWaypoints.Clear();
-        TopologyChanged?.Invoke(this, EventArgs.Empty);
+        RaiseTopologyChanged();
     }
 
     private void HandleProbeClick(CorePoint world, bool shift)
@@ -962,7 +996,7 @@ public class CircuitCanvas : Control
         {
             circuit.Remove(component);
             if (ReferenceEquals(component, SelectedComponent)) SelectedComponent = null;
-            TopologyChanged?.Invoke(this, EventArgs.Empty);
+            RaiseTopologyChanged();
             StatusChanged?.Invoke(this, $"Deleted {component.Name}");
             return;
         }
@@ -970,7 +1004,7 @@ public class CircuitCanvas : Control
         if (WireAt(world) is { } wire)
         {
             circuit.Remove(wire);
-            TopologyChanged?.Invoke(this, EventArgs.Empty);
+            RaiseTopologyChanged();
             StatusChanged?.Invoke(this, "Deleted wire");
         }
     }
@@ -1012,6 +1046,40 @@ public class CircuitCanvas : Control
     /// <b>both</b> of its ends are on selected parts, which is the same rule that decides whether
     /// it can be copied — a wire with one end outside the group has nothing to attach a copy to.
     /// </summary>
+    /// <summary>
+    /// Picks a net out on the drawing, or clears what was picked out. Says what is on it, because
+    /// the answer is usually a list of parts rather than a shape.
+    /// </summary>
+    private void HighlightNet(NetHighlight? net)
+    {
+        if (ReferenceEquals(_highlightedNet, net)) return;
+
+        _highlightedNet = net;
+
+        if (net is not null) StatusChanged?.Invoke(this, net.Summary);
+
+        InvalidateVisual();
+    }
+
+    /// <summary>Clears any highlighted net, for a caller that changed the circuit under it.</summary>
+    public void ClearNetHighlight() => HighlightNet(null);
+
+    /// <summary>
+    /// Announces that the circuit's shape changed, and drops any highlighted net first.
+    /// <para>
+    /// A net is a fact about how things are joined, so the moment a wire is drawn or cut it may
+    /// be a different net — and the parts of it still on screen would then be lit up as something
+    /// they are no longer. Recomputing on every edit would be the other answer, but clearing is
+    /// the honest one: the question was asked about a circuit that no longer exists.
+    /// </para>
+    /// </summary>
+    private void RaiseTopologyChanged()
+    {
+        HighlightNet(null);
+
+        TopologyChanged?.Invoke(this, EventArgs.Empty);
+    }
+
     public void SetSelection(IEnumerable<CircuitComponent> components)
     {
         var circuit = Circuit;
@@ -1058,7 +1126,7 @@ public class CircuitCanvas : Control
         foreach (var component in selection)
             component.RotationDegrees = (component.RotationDegrees + 90) % 360;
 
-        TopologyChanged?.Invoke(this, EventArgs.Empty);
+        RaiseTopologyChanged();
         InvalidateVisual();
     }
 
@@ -1070,7 +1138,7 @@ public class CircuitCanvas : Control
     public void BringIntoView(IReadOnlyList<CircuitComponent> components)
     {
         SelectedComponent = components.Count == 1 ? components[0] : null;
-        TopologyChanged?.Invoke(this, EventArgs.Empty);
+        RaiseTopologyChanged();
         InvalidateVisual();
     }
 
@@ -1099,7 +1167,7 @@ public class CircuitCanvas : Control
                 circuit.Remove(wire);
         }
 
-        TopologyChanged?.Invoke(this, EventArgs.Empty);
+        RaiseTopologyChanged();
         InvalidateVisual();
     }
 

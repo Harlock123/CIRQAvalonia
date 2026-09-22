@@ -3491,6 +3491,28 @@ Two things to watch for, and the rule check below catches both:
 Where a net is named, the name is what gets shown for it — on a probe, in an error message, and in
 the rule check's findings. A net called `RESET` is easier to reason about than one called `N17`.
 
+### Seeing what is joined to what
+
+**Click a wire, or click a pin**, and the whole net lights up: every wire on it, and a dot on every
+pin on it. The status bar names the net and lists what is on it — `VCC: C3, R7, U1, U2`.
+
+This exists because of the section above. Net labels make a big schematic readable by removing
+wires, and the price is that you can no longer see a connection by following a line: a rail named
+`VCC` in six places is six pieces of text, and the only way to be sure they are the same net is to
+trust that you typed them identically. Blocks are the same problem from the other direction — a
+pin joins to something inside that is not on the sheet at all.
+
+What lights up is taken from **the netlist the solver uses**, not from the lines as drawn. Labels
+are resolved and blocks are opened out, so what you see highlighted is exactly what the simulator
+thinks is one node — which is the only definition that matters. A typo'd label shows up
+immediately: click one end of what you thought was a rail, and the other end stays dark.
+
+Only wires on the sheet are lit. A block's internal wiring is on the net too, but it is not drawn,
+so highlighting it would light up nothing you can see; its pin gets a dot instead.
+
+The highlight clears as soon as you change anything, because the question was asked about a
+circuit that no longer exists.
+
 ---
 
 ## Checking the circuit

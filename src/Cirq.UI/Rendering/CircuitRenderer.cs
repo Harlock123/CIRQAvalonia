@@ -19,12 +19,18 @@ namespace Cirq.UI.Rendering;
 /// </param>
 /// <param name="ShowInteractiveMarkers">Rings the parts that can be operated by double-clicking.</param>
 /// <param name="ShowProbes">Whether probe pennants are drawn.</param>
+/// <param name="HighlightedNet">
+/// A net to pick out, drawn brighter and thicker than the rest. Null normally, and always in an
+/// export: it answers a question somebody asked on the canvas rather than being part of the
+/// drawing.
+/// </param>
 public sealed record CircuitRenderOptions(
     double Zoom,
     CircuitComponent? SelectedComponent = null,
     bool ShowInteractiveMarkers = true,
     bool ShowProbes = true,
-    bool ShowSelection = true);
+    bool ShowSelection = true,
+    NetHighlight? HighlightedNet = null);
 
 /// <summary>
 /// Draws a whole circuit — wires, symbols, captions and probes — onto any <see cref="ISymbolCanvas"/>.
@@ -58,9 +64,17 @@ public static class CircuitRenderer
         {
             if (wire.SourceTerminal is null || wire.TargetTerminal is null) continue;
 
+            // A net being picked out beats the wire being selected: the selection is one wire and
+            // the net is the answer to a question about all of them, so where both apply the
+            // bigger statement is the one to make.
+            var onNet = options.HighlightedNet?.Wires.Contains(wire) == true;
             var highlight = options.ShowSelection && wire.IsSelected;
-            var brush = highlight ? CanvasTheme.SelectionBrush : CanvasTheme.WireBrush;
-            var pen = CanvasTheme.Pen(brush, highlight ? 3.0 : 2.0, options.Zoom);
+
+            var brush = onNet
+                ? CanvasTheme.NetHighlightBrush
+                : highlight ? CanvasTheme.SelectionBrush : CanvasTheme.WireBrush;
+
+            var pen = CanvasTheme.Pen(brush, onNet ? 3.6 : highlight ? 3.0 : 2.0, options.Zoom);
             var points = BuildWirePath(wire).Select(p => new Point(p.X, p.Y)).ToList();
             if (points.Count < 2) continue;
 

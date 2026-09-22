@@ -32,6 +32,7 @@ public static class CanvasTheme
         IBrush Terminal,
         IBrush TerminalHover,
         IBrush Probe,
+        IBrush NetHighlight,
         IBrush Error,
         Color GridDot,
         Color GridMajor,
@@ -48,6 +49,7 @@ public static class CanvasTheme
         ThemeManager.Brush("TerminalFill"),
         ThemeManager.Brush("TerminalHover"),
         ThemeManager.Brush("TerminalHover"),
+        ThemeManager.Brush("NetHighlight"),
         ThemeManager.Brush("TextError"),
         ThemeManager.Color("CanvasGridDot"),
         ThemeManager.Color("CanvasGridMajor"),
@@ -98,6 +100,7 @@ public static class CanvasTheme
                 Terminal: ink,
                 TerminalHover: ink,
                 Probe: new ImmutableSolidColorBrush(Color.FromRgb(0x88, 0x22, 0x22)),
+                NetHighlight: new ImmutableSolidColorBrush(Color.FromRgb(0x00, 0x55, 0xAA)),
                 Error: new ImmutableSolidColorBrush(Color.FromRgb(0xAA, 0x00, 0x00)),
                 GridDot: Color.FromRgb(0xDD, 0xDD, 0xDD),
                 GridMajor: Color.FromRgb(0xCC, 0xCC, 0xCC),
@@ -117,6 +120,14 @@ public static class CanvasTheme
     public static IBrush TerminalBrush => Current.Terminal;
     public static IBrush TerminalHoverBrush => Current.TerminalHover;
     public static IBrush ProbeBrush => Current.Probe;
+
+    /// <summary>
+    /// The colour a picked-out net is drawn in. Its own entry rather than one borrowed from the
+    /// probe or the selection: it means a third thing — "this is all one node" — and on a drawing
+    /// where a probe pennant and a selected wire may both be on screen at once, three meanings
+    /// sharing two colours is how a highlight stops answering the question.
+    /// </summary>
+    public static IBrush NetHighlightBrush => Current.NetHighlight;
 
     /// <summary>Used to ring a part that is being used outside its ratings.</summary>
     public static IBrush ErrorBrush => Current.Error;
