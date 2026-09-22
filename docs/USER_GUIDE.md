@@ -3198,7 +3198,7 @@ Stated plainly, because a noise figure that quietly leaves things out is worse t
 - **Everything is referred to one output and one bias point.** Like the frequency response, this
   linearises about the operating point and says nothing about large signals.
 
-### Worth trying
+### Worth trying with noise
 
 Open the **Inverting Amplifier** and measure its output across a wide band: the ranking will show
 the op-amp's own voltage noise against its feedback resistors', and the curve will show the flicker
@@ -3454,7 +3454,7 @@ sides of it. Sweep one from −40 °C to 125 °C and you get an arch, not a line
 datasheet quotes a deviation band over a range rather than a figure in ppm per degree: there is no
 single slope to quote.
 
-### Worth trying
+### Worth trying with temperature
 
 Sweep the temperature of the **Transistor Switch** example and watch the bias move. Any zener
 reference shows its own drift for the same reason — and put a voltage probe on a **TL431** and
@@ -3528,6 +3528,31 @@ Blocks can contain blocks, and the flattening is recursive.
 
 ---
 
+## Reusing a block
+
+Grouping makes one block. **Edit > Block Library...** is where one goes so it can be placed again —
+in this circuit, or the next one, or in six months.
+
+Select a block, give it a name, press Save. It appears in the list with its size. Select it and
+press **Place a copy** and a fresh instance lands on the canvas, wired to nothing, with designators
+that do not clash with anything already there — including anything already inside another block.
+
+### A copy, not a reference
+
+This is worth being plain about. Placing a block twice gives two independent sets of parts. Change
+a resistor in one afterwards and the other does not follow, and neither does the saved definition.
+
+That is a real limitation rather than an oversight, and the reason to accept it is that the
+alternative is much worse than it sounds. A live link means every instance's own state — a
+capacitor's charge, a latch's contents, a motor's shaft angle — has to be reconciled with a
+definition that can change underneath it, and it means asking what happens to the wires when a pin
+disappears from a definition that three circuits are already using. Copies are predictable.
+
+The library lives in a file beside the preferences, so it survives restarts and is easy to back up
+or delete.
+
+---
+
 ## Plotting one trace against another
 
 The scope's **Layout** control has a fourth setting, **Xy**, which puts one trace along the bottom
@@ -3555,31 +3580,6 @@ Time is not always the interesting axis.
 Cursors are hidden in XY mode, because they mark instants and the horizontal axis is no longer
 time. The automatic measurements go on working — they are measurements of each trace, which has
 not changed.
-
----
-
-## Reusing a block
-
-Grouping makes one block. **Edit > Block Library...** is where one goes so it can be placed again —
-in this circuit, or the next one, or in six months.
-
-Select a block, give it a name, press Save. It appears in the list with its size. Select it and
-press **Place a copy** and a fresh instance lands on the canvas, wired to nothing, with designators
-that do not clash with anything already there — including anything already inside another block.
-
-### A copy, not a reference
-
-This is worth being plain about. Placing a block twice gives two independent sets of parts. Change
-a resistor in one afterwards and the other does not follow, and neither does the saved definition.
-
-That is a real limitation rather than an oversight, and the reason to accept it is that the
-alternative is much worse than it sounds. A live link means every instance's own state — a
-capacitor's charge, a latch's contents, a motor's shaft angle — has to be reconciled with a
-definition that can change underneath it, and it means asking what happens to the wires when a pin
-disappears from a definition that three circuits are already using. Copies are predictable.
-
-The library lives in a file beside the preferences, so it survives restarts and is easy to back up
-or delete.
 
 ---
 

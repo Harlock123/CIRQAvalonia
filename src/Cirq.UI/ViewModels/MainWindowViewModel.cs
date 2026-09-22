@@ -1097,6 +1097,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         Edit
           Ctrl+Z       Undo
           Ctrl+Y       Redo (Ctrl+Shift+Z works too)
+          Ctrl+C       Copy the selection
+          Ctrl+V       Paste a duplicate of it
           Ctrl+G       Group the selection into a block
           Ctrl+Shift+G Ungroup a block back onto the sheet
 
@@ -1109,7 +1111,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
           Esc          Cancel the current wire / clear the selection
 
         View
-          Ctrl + / -   Zoom in / out (the numeric keypad works too)
+          Ctrl+ / Ctrl-  Zoom in / out (the numeric keypad works too)
           F            Zoom to fit
           Wheel        Zoom at the cursor
           Middle drag  Pan (or hold Space and drag)
