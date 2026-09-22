@@ -18,11 +18,13 @@
 
         <TextBox Height="110" AcceptsReturn="True" FontFamily="monospace" FontSize="12"
                  Text="{Binding Text, Mode=TwoWay}"
-                 PlaceholderText=".model 1N4148 D(Is=2.52n Rs=0.568 N=1.752 Bv=75)" />
+                 PlaceholderText=".model 1N4148 D(Is=2.52n Rs=0.568 N=1.752 Bv=75)   —  or a .subckt definition" />
 
         <StackPanel Orientation="Horizontal" Spacing="8">
           <Button Content="Import" Command="{Binding ImportCommand}" Padding="18,5" />
-          <Button Content="Paste an example" Command="{Binding UseSampleCommand}" Padding="14,5" />
+          <Button Content="Paste a model" Command="{Binding UseSampleCommand}" Padding="14,5" />
+          <Button Content="Paste a subcircuit" Command="{Binding UseSubcircuitSampleCommand}" Padding="14,5"
+                  ToolTip.Tip="A .subckt is a pin list and a little netlist — an op-amp, a regulator, a reference. It comes in as a block you can place." />
           <Button Content="Keep the open circuit's models"
                   Command="{Binding KeepFromCircuitCommand}" Padding="14,5"
                   ToolTip.Tip="A circuit carries the imported models it uses, so it opens complete anywhere. This puts them in your library as well, for the next circuit." />

@@ -122,17 +122,17 @@ Three of those are worth separating, because they are easy to confuse:
 
 ## Placing components
 
-![The component palette: a Find a part box at the top, "184 parts in 16 groups" under it, and the sixteen categories with their counts — passive 11, switches 4, sources 12, semiconductors 13, transistors 11, LEDs and displays 9, power 10, analog ICs 13, logic gates 7, 74xx series 21, 40xx series 15, buses 17, digital I/O 8, sensors and actuators 18, switching and isolation 11, dev boards 4 — every group closed, so all sixteen headings fit on screen at once](images/02-palette.png)
+![The component palette: a Find a part box at the top, "186 parts in 16 groups" under it, and the sixteen categories with their counts — passive 11, switches 4, sources 14, semiconductors 13, transistors 11, LEDs and displays 9, power 10, analog ICs 13, logic gates 7, 74xx series 21, 40xx series 15, buses 17, digital I/O 8, sensors and actuators 18, switching and isolation 11, dev boards 4 — every group closed, so all sixteen headings fit on screen at once](images/02-palette.png)
 
 Click a palette entry, then click the canvas. The part lands where you click, snapped to the grid.
 
-The palette holds **184 components in 16 categories**:
+The palette holds **186 components in 16 categories**:
 
 | Category | Count | Contents |
 | --- | --- | --- |
 | Passive | 11 | Resistor, capacitor, electrolytic capacitor, inductor, transformer, centre-tapped transformer, potentiometer, crystal, ferrite bead, **common-mode choke** and transmission line — see [below](#common-mode-chokes) |
 | Switches | 4 | SPST, SPDT, push button, **8-way DIP switch** |
-| Sources | 12 | Ground, **net label**, **loop probe**, DC voltage, DC current, function generator, battery, solar cell, **noise source**, and the three **annotations** — note, heading and area — see [below](#writing-on-the-schematic) |
+| Sources | 14 | Ground, **net label**, **loop probe**, DC voltage, DC current, **voltage- and current-controlled sources**, function generator, battery, solar cell, **noise source**, and the three **annotations** — note, heading and area — see [below](#writing-on-the-schematic) |
 | Semiconductors | 13 | 1N4148, 1N4001, Schottky, zeners, **varactor**, **photodiode**, bridge rectifier, SCR, triac, diac, TVS and varistor — see [below](#three-ways-to-measure-light) |
 | Transistors | 11 | NPN and PNP bipolars, N- and P-channel MOSFETs, three JFETs and an **IGBT** — see [below](#the-igbt) |
 | LEDs & Displays | 9 | Six LED colours, seven-segment displays, **HD44780 character LCD** — see [below](#the-character-lcd) |
@@ -3679,6 +3679,45 @@ because the letter that matters is the first one after the digits.
 
 Continuation lines starting with `+` are joined on, `*` comment lines and anything after a `;` are
 dropped, and several cards can be pasted at once.
+
+### Bringing in a whole part, not just a device
+
+A `.model` card describes **one device** — a diode, a bipolar, a MOSFET — which is why the list
+above stops where it does. Everything more interesting than a transistor is published as a
+**`.subckt`**: a pin list and a little netlist of primitives. An op-amp, a regulator, a comparator,
+a voltage reference are all shipped that way.
+
+Paste one into the same box and it comes in as a **block**, which goes straight into the
+[block library](#reusing-a-block). That is not a coincidence so much as the reason it works: a
+block is already a pin list and a little netlist, it already flattens before anything is solved,
+and it already travels inside a saved circuit. A subcircuit is a block somebody else drew.
+
+```
+.subckt DIVIDER in out gnd
+R1 in out 10k
+R2 out gnd 10k
+.ends
+```
+
+**The pin order is the interface.** A SPICE subcircuit's pins have no names, only positions, so the
+block's pins come out in the order the header lists them. Get that wrong when you wire it up and
+you have quietly built a different part.
+
+What it can carry: `R`, `C`, `L`, `D`, `Q`, `M`, `V`, `I`, and — the ones that matter for
+macromodels — `E` and `G`, the controlled sources. Those two are in the palette as parts in their
+own right, because they are the primitives every amplifier is made of: a transconductance into a
+capacitor *is* an op-amp's input stage, which is why its gain falls with frequency.
+
+A `.model` written **inside** a subcircuit belongs to it, which is how a vendor ships a transistor's
+parameters alongside the circuit that uses them.
+
+**What it refuses, and why it refuses rather than approximating.** An element this library has no
+part for — a nested `X`, a behavioural `B`, a switch, a current-controlled source — stops the
+import, and the line is named. A block with a piece missing is not the part it claims to be: it
+would still solve, and it would give a confident wrong answer. Being told which line is the
+problem is more use than a part that lies. Parameterised subcircuits (`PARAMS:`) import with
+whatever values are written into the body, and say so.
+
 
 ### Circuits travel
 

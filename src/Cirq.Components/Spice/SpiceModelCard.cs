@@ -173,7 +173,11 @@ public static partial class SpiceModelReader
     /// cards onto lines beginning with a plus, and a model card that is four lines long in the
     /// datasheet is one statement.
     /// </summary>
-    private static IEnumerable<string> Statements(string text)
+    /// <summary>
+    /// Whole statements, with continuation lines joined and comments removed — shared with the
+    /// subcircuit reader, so both obey one set of rules about what a line is.
+    /// </summary>
+    internal static IEnumerable<string> Statements(string text)
     {
         var current = string.Empty;
 

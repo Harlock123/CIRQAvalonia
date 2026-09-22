@@ -91,6 +91,8 @@ public static class SymbolRenderer
             case Ground: DrawGround(context, pen); break;
             case DcVoltageSource: DrawVoltageSource(context, pen, zoom); break;
             case DcCurrentSource: DrawCurrentSource(context, pen); break;
+            case VoltageControlledVoltageSource: DrawControlledSource(context, pen, zoom, true); break;
+            case VoltageControlledCurrentSource: DrawControlledSource(context, pen, zoom, false); break;
             case FunctionGenerator fg: DrawFunctionGenerator(context, pen, fg); break;
             case Led led: DrawLed(context, pen, led); break;
             case DcMotor motor: DrawMotor(context, pen, zoom, motor); break;
@@ -468,6 +470,49 @@ public static class SymbolRenderer
         context.DrawLine(pen, new Point(-4, 0), new Point(4, 0));
         context.DrawLine(pen, new Point(1, -3), new Point(4, 0));
         context.DrawLine(pen, new Point(1, 3), new Point(4, 0));
+    }
+
+    /// <summary>
+    /// A controlled source: the diamond every textbook draws, with the control pins on the left
+    /// and the output on the right.
+    /// <para>
+    /// A diamond rather than a circle, and that distinction is worth keeping: a circle is an
+    /// <i>independent</i> source, which decides its own value, and a diamond is one whose value is
+    /// decided somewhere else. Drawing both the same way would lose the only thing about the
+    /// symbol that carries information.
+    /// </para>
+    /// </summary>
+    private static void DrawControlledSource(ISymbolCanvas context, IPen pen, double zoom, bool voltage)
+    {
+        // The output diamond, on the right where its pins are.
+        context.DrawGeometry(CanvasTheme.SymbolFill, pen, SymbolPath.Polyline(
+        [
+            new Point(40, -22), new Point(62, 0), new Point(40, 22), new Point(18, 0),
+        ], true));
+
+        // Stubs out to the pins.
+        context.DrawLine(pen, new Point(40, -22), new Point(40, -20));
+        context.DrawLine(pen, new Point(40, 22), new Point(40, 20));
+
+        // The control pair on the left, drawn as an open input rather than a part: nothing flows
+        // into them, and a symbol that suggested otherwise would be a lie about the model.
+        context.DrawLine(pen, new Point(-40, -20), new Point(-14, -20));
+        context.DrawLine(pen, new Point(-40, 20), new Point(-14, 20));
+        context.DrawLine(pen, new Point(-14, -20), new Point(-14, 20));
+
+        // A voltage source marks its polarity; a current source marks its direction.
+        if (voltage)
+        {
+            context.DrawLine(pen, new Point(36, -8), new Point(44, -8));
+            context.DrawLine(pen, new Point(40, -12), new Point(40, -4));
+            context.DrawLine(pen, new Point(36, 8), new Point(44, 8));
+        }
+        else
+        {
+            context.DrawLine(pen, new Point(40, 10), new Point(40, -10));
+            context.DrawLine(pen, new Point(36, -5), new Point(40, -10));
+            context.DrawLine(pen, new Point(44, -5), new Point(40, -10));
+        }
     }
 
     private static void DrawNetLabel(

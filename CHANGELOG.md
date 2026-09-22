@@ -22,6 +22,20 @@ carries the SPICE cards for its imported models, so the file is the only copy of
 was. The snapshot is discarded as soon as you save for real, and as soon as the question has been
 answered either way.
 
+**SPICE subcircuits import.** A `.model` card describes one device, which is why importing has
+only ever reached diodes, bipolars and MOSFETs. Everything more interesting than a transistor is
+published as a `.subckt` — a pin list and a little netlist — and one now comes in as a block, which
+goes into the block library like any other. A block is already a pin list and a little netlist, so
+everything blocks do applies: place it repeatedly, open it to look inside, and it travels inside a
+saved circuit.
+
+**VCVS and VCCS are parts now.** SPICE's `E` and `G`, the controlled sources — the primitives every
+amplifier is made of, and what almost every macromodel is built from. Useful in their own right: a
+transconductance into a capacitor *is* an op-amp's input stage.
+
+An element there is no part for stops the import and is named. A block with a piece missing would
+still solve and would give a confident wrong answer, which is worse than refusing.
+
 **Stability was measuring the wrong thing when anything else drove the circuit.** A loop gain is a
 ratio either side of the break, so a function generator still connected added its own response to
 both ends — and the failure was silent, because the numbers stayed plausible. The guide's own
