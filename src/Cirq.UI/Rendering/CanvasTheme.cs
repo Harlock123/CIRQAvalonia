@@ -55,6 +55,50 @@ public static class CanvasTheme
     /// <summary>Discards the cached palette, forcing the next draw to re-read the theme.</summary>
     public static void Invalidate() => _cached = null;
 
+    /// <summary>
+    /// Draws in ink on paper until disposed, whatever the application is wearing.
+    /// <para>
+    /// Printing a dark theme is two separate problems. The obvious one is that it empties a
+    /// cartridge. The one that actually matters is that a dark theme's strokes are <i>light</i>,
+    /// so a page cleared to white and drawn with them comes out blank — the circuit is there, in
+    /// pale grey, on white paper.
+    /// </para>
+    /// <para>
+    /// The colours are stated here rather than read from the light theme, because what prints
+    /// well is its own question: a pale value colour that reads nicely against a light background
+    /// on a screen is not necessarily legible on paper through a printer nobody has calibrated.
+    /// </para>
+    /// </summary>
+    public static IDisposable ForPrinting() => new PrintPalette();
+
+    private sealed class PrintPalette : IDisposable
+    {
+        private readonly Palette? _previous = _cached;
+
+        public PrintPalette()
+        {
+            var ink = new SolidColorBrush(Color.FromRgb(0x1A, 0x1A, 0x1A));
+
+            _cached = new Palette(
+                Background: Brushes.White,
+                Symbol: ink,
+                SymbolFill: Brushes.White,
+                Label: new SolidColorBrush(Color.FromRgb(0x44, 0x44, 0x44)),
+                Value: new SolidColorBrush(Color.FromRgb(0x22, 0x44, 0x88)),
+                Selection: ink,
+                Wire: ink,
+                Terminal: ink,
+                TerminalHover: ink,
+                Probe: new SolidColorBrush(Color.FromRgb(0x88, 0x22, 0x22)),
+                Error: new SolidColorBrush(Color.FromRgb(0xAA, 0x00, 0x00)),
+                GridDot: Color.FromRgb(0xDD, 0xDD, 0xDD),
+                GridMajor: Color.FromRgb(0xCC, 0xCC, 0xCC),
+                SegmentUnlit: Color.FromRgb(0xE4, 0xE4, 0xE4));
+        }
+
+        public void Dispose() => _cached = _previous;
+    }
+
     public static IBrush BackgroundBrush => Current.Background;
     public static IBrush SymbolBrush => Current.Symbol;
     public static IBrush SymbolFill => Current.SymbolFill;

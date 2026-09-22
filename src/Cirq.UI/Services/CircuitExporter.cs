@@ -134,6 +134,154 @@ public static class CircuitExporter
         return path;
     }
 
+    /// <summary>
+    /// Writes a PDF laid out for paper: a fixed sheet size, the drawing fitted inside the margins,
+    /// and a header saying what it is.
+    /// <para>
+    /// Separate from the ordinary PDF export, which sizes the page to the circuit — right for a
+    /// picture to embed, wrong for paper, where the sheet is a given and the drawing has to be
+    /// placed on it. Each part gets a page of its own rather than being crammed onto one: a
+    /// schematic and an oscilloscope trace squeezed onto the top and bottom half of a sheet are
+    /// two things too small to read.
+    /// </para>
+    /// </summary>
+    /// <returns>How many pages were written.</returns>
+    public static int WritePrintable(
+        Circuit circuit, IScopeSource? scope, string path, ExportOptions options, PageSetup page)
+    {
+        ArgumentNullException.ThrowIfNull(circuit);
+        ArgumentNullException.ThrowIfNull(page);
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+
+        var wantsSchematic = options.Content != ExportContent.Traces;
+        var wantsTraces = options.Content is ExportContent.Traces or ExportContent.Both;
+        var hasTraces = wantsTraces && scope is { HasTraces: true };
+
+        if (options.Content == ExportContent.Traces && !hasTraces)
+            throw new InvalidOperationException("There are no traces to print. Attach a probe and run first.");
+
+        var rows = options.IncludePartsList ? PartsList.For(circuit) : [];
+
+        // Ink on paper for the whole document, whatever the application is wearing. Without this
+        // a dark theme prints its own light strokes onto the white page below and comes out
+        // blank — see CanvasTheme.ForPrinting.
+        using var ink = CanvasTheme.ForPrinting();
+
+        using var stream = File.Create(path);
+        using var document = SKDocument.CreatePdf(stream);
+
+        var pages = 0;
+        var total = (wantsSchematic ? 1 : 0) + (hasTraces ? 1 : 0) + (rows.Count > 0 ? 1 : 0);
+
+        if (total == 0) total = 1;
+
+        void Sheet(string caption, double contentWidth, double contentHeight, Action<SKCanvas> draw)
+        {
+            var canvas = document.BeginPage((float)page.WidthPoints, (float)page.HeightPoints);
+
+            // Paper is white, whatever the application's theme is. A dark schematic printed as it
+            // appears on screen empties a cartridge and comes out worse.
+            canvas.Clear(SKColors.White);
+
+            DrawPageHeader(canvas, circuit, page, caption, ++pages, total);
+
+            var (x, y, scale) = page.Place(contentWidth, contentHeight);
+
+            var depth = canvas.Save();
+
+            canvas.Translate((float)x, (float)y);
+            canvas.Scale((float)scale);
+
+            draw(canvas);
+
+            canvas.RestoreToCount(depth);
+            document.EndPage();
+        }
+
+        if (wantsSchematic)
+        {
+            var bounds = SchematicBounds(circuit);
+
+            Sheet("Schematic", bounds.Width, bounds.Height,
+                canvas => DrawSchematic(canvas, circuit, bounds, options with
+                {
+                    // Always opaque on paper, whatever the export dialog last said.
+                    TransparentBackground = false,
+                }));
+        }
+
+        if (hasTraces && scope is not null)
+        {
+            var (_, _, width, height) = page.ContentArea;
+
+            // The scope fills the width and takes its usual proportion of it, or the page's
+            // height if that is less.
+            var traceWidth = width;
+            var traceHeight = Math.Min(width * TraceAspect, height);
+
+            Sheet("Traces", traceWidth, traceHeight,
+                canvas => DrawScope(canvas, scope,
+                    new SKRect(0, 0, (float)traceWidth, (float)traceHeight)));
+        }
+
+        if (rows.Count > 0)
+        {
+            var table = MeasurePartsList(rows);
+
+            Sheet("Parts list", table.Width, table.Height,
+                canvas => DrawPartsList(canvas, rows, table.Width));
+        }
+
+        // A circuit with nothing in it still has to produce a file a printer will accept.
+        if (pages == 0) Sheet("Schematic", 200, 150, _ => { });
+
+        return pages;
+    }
+
+    /// <summary>
+    /// The line across the top of a printed page: what the circuit is, when it was printed, and
+    /// which sheet this is.
+    /// <para>
+    /// Paper leaves the screen and does not come back. A schematic with nothing on it saying what
+    /// it is becomes a schematic of something nobody can remember, and a two-page printout with
+    /// no page numbers becomes two loose sheets.
+    /// </para>
+    /// </summary>
+    private static void DrawPageHeader(
+        SKCanvas canvas, Circuit circuit, PageSetup page, string caption, int number, int total)
+    {
+        if (!page.IncludeHeader) return;
+
+        var margin = (float)Math.Max(page.MarginPoints, 0);
+        var baseline = margin + 11f;
+
+        using var text = new SKPaint
+        {
+            Color = SKColors.Black,
+            IsAntialias = true,
+        };
+
+        using var title = new SKFont(SKTypeface.Default, 11f);
+        using var small = new SKFont(SKTypeface.Default, 8.5f);
+
+        var name = string.IsNullOrWhiteSpace(circuit.Title) ? "Untitled circuit" : circuit.Title;
+
+        canvas.DrawText($"{name} — {caption}", margin, baseline, SKTextAlign.Left, title, text);
+
+        var stamp = total > 1
+            ? $"{DateTime.Now:yyyy-MM-dd HH:mm}   ·   {number} of {total}"
+            : $"{DateTime.Now:yyyy-MM-dd HH:mm}";
+
+        canvas.DrawText(
+            stamp, (float)page.WidthPoints - margin, baseline, SKTextAlign.Right, small, text);
+
+        // A rule under it, so the header reads as a header rather than as part of the drawing.
+        using var line = new SKPaint { Color = new SKColor(0x99, 0x99, 0x99), StrokeWidth = 0.6f };
+
+        canvas.DrawLine(
+            margin, baseline + 6f, (float)page.WidthPoints - margin, baseline + 6f, line);
+    }
+
     /// <summary>Margin left around the schematic, in schematic units.</summary>
     private const double Margin = 28.0;
 

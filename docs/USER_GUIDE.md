@@ -36,11 +36,12 @@ the [README](../README.md), and what changed between releases is in the
 24. [Checking the circuit](#checking-the-circuit)
 25. [Development boards](#development-boards)
 26. [Saving and loading](#saving-and-loading)
-27. [Exporting](#exporting)
-28. [Appearance](#appearance)
-29. [What version is this](#what-version-is-this)
-30. [Keyboard reference](#keyboard-reference)
-31. [When a circuit will not simulate](#when-a-circuit-will-not-simulate)
+27. [Printing](#printing)
+28. [Exporting](#exporting)
+29. [Appearance](#appearance)
+30. [What version is this](#what-version-is-this)
+31. [Keyboard reference](#keyboard-reference)
+32. [When a circuit will not simulate](#when-a-circuit-will-not-simulate)
 
 This guide is also attached to every [release](../../releases) as a PDF, with a contents page and
 the screenshots in place — the same document, laid out for reading away from the machine. Build it
@@ -3483,6 +3484,49 @@ the file you already had.
 
 ---
 
+## Printing
+
+`File > Print...`, or `Ctrl+P`. Choose what goes on the paper — the schematic, the traces, the
+parts list — the sheet size and which way round it goes, and press Print.
+
+**Each thing gets a sheet of its own.** A schematic and an oscilloscope trace squeezed onto the
+top and bottom half of one page are two things too small to read.
+
+**Fit to the page** scales a large schematic down until it fits inside the margins, keeping its
+proportions — a drawing squashed to fill a sheet is not a drawing of the same circuit. It will not
+scale *up*: a small circuit blown up to fill a page looks like a mistake, and the drawing was laid
+out at a size somebody chose. Turn it off when the print is going to be measured, and accept that
+a big schematic may run off the edge.
+
+**The header** puts the circuit's name, the date and the sheet number across the top. Paper leaves
+the screen and does not come back, and a schematic with nothing on it saying what it is becomes a
+schematic of something nobody can remember.
+
+### It prints in ink, whatever theme you are using
+
+A dark theme's strokes are *light*. Printed as they appear on screen they would come out as pale
+grey on white paper — the circuit technically there and effectively blank — and a dark background
+printed faithfully would empty a cartridge on the way. So printing switches to a fixed set of ink
+colours: a white page, near-black symbols and wires, and values in a dark blue that stays legible
+through a printer nobody has calibrated. The circuit prints the same from either theme.
+
+### What actually reaches the printer
+
+Worth knowing, because it decides what the button does. **Avalonia has no printing API** on any
+platform, so this cannot open the system print dialog the way a native application would. What it
+does instead is produce a proper page-sized PDF and hand it to the operating system:
+
+- Where there is a print command — `lp` or `lpr`, which macOS always has and most Linux installs
+  do — the document goes straight to the default printer.
+- Where there is not, including on Windows, it opens in whatever handles PDFs, and the print
+  dialog is one keystroke away in a viewer you already know.
+
+The dialog says which of the two it will be before you press the button, rather than the second
+being quietly disguised as the first. Either way the PDF is written and the status bar says where,
+so it can be printed later or kept.
+
+---
+
 ## Exporting
 
 `File > Export...`, or `Ctrl+E`, writes the schematic and the traces out — as a picture, or as
@@ -3663,6 +3707,7 @@ Also available in the app at **Help > Keyboard Shortcuts**.
 | `F9` / `F10` | Collapse the palette / the properties panel |
 | View menu | **Mark Interactive Parts** rings everything you can double-click; **Describe Parts on Hover** turns the hover card off |
 | `Ctrl+N` / `Ctrl+O` / `Ctrl+S` / `Ctrl+Shift+S` | New / open / save / save as |
+| `Ctrl+P` | Print — a sheet each for the schematic, the traces and the parts list |
 | `Ctrl+E` | Export the schematic or the traces as PNG, JPEG, BMP, SVG or PDF |
 | `Ctrl+Shift+E` | Browse the example circuits |
 | `Help > About` | Version, and the libraries this is built on — with a button that copies the lot |

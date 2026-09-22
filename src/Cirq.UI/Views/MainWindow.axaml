@@ -27,6 +27,7 @@
         <MenuItem Header="_Save" InputGesture="Ctrl+S" Command="{Binding SaveCommand}" />
         <MenuItem Header="Save _As..." InputGesture="Ctrl+Shift+S" Command="{Binding SaveAsCommand}" />
         <Separator />
+        <MenuItem Header="_Print..." InputGesture="Ctrl+P" Command="{Binding PrintCommand}" />
         <MenuItem Header="_Export..." InputGesture="Ctrl+E" Command="{Binding ExportCommand}"
                   ToolTip.Tip="Write the schematic and the traces out as PNG, JPEG, BMP, SVG or PDF" />
         <Separator />

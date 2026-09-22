@@ -429,6 +429,12 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     /// <summary>Raised when the window should close.</summary>
     public event EventHandler? RequestClose;
 
+    /// <summary>Raised when the print dialog should open.</summary>
+    public event EventHandler? RequestPrint;
+
+    [RelayCommand]
+    private void Print() => RequestPrint?.Invoke(this, EventArgs.Empty);
+
     /// <summary>Raised when the settings dialog should open.</summary>
     public event EventHandler? RequestSettings;
 
@@ -891,6 +897,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
           Ctrl+O       Open
           Ctrl+S       Save
           Ctrl+Shift+S Save as
+          Ctrl+P       Print
 
         Canvas
           Double-click a switch, button or logic toggle to operate it.

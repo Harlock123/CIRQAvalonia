@@ -83,6 +83,7 @@ public partial class MainWindow : Window
         viewModel.RequestSelect += (_, components) => _canvas?.BringIntoView(components);
         viewModel.RequestClose += (_, _) => Close();
         viewModel.RequestSettings += async (_, _) => await ShowSettingsAsync();
+        viewModel.RequestPrint += async (_, _) => await PrintAsync();
         viewModel.RequestAbout += async (_, _) => await ShowAboutAsync();
         viewModel.RequestFrequencyResponse += async (_, _) => await ShowFrequencyResponseAsync();
         viewModel.RequestDcSweep += async (_, _) => await ShowDcSweepAsync();
@@ -245,6 +246,54 @@ public partial class MainWindow : Window
         var dialog = new RuleCheckWindow { DataContext = model };
 
         await dialog.ShowDialog(this);
+    }
+
+    /// <summary>
+    /// The print dialog, and what follows from it: a page-sized PDF written to a temporary file
+    /// and handed to whatever this system prints with.
+    /// </summary>
+    private async Task PrintAsync()
+    {
+        if (_viewModel is null) return;
+
+        var scope = this.FindControl<ScopePanel>("Scope");
+
+        var model = new PrintViewModel(scope?.HasTraces == true, PrintService.CanSpoolDirectly())
+        {
+            IncludeTraces = false,
+        };
+
+        var dialog = new PrintWindow { DataContext = model };
+
+        if (await dialog.ShowDialog<bool>(this) != true) return;
+
+        try
+        {
+            // Named after the circuit rather than given a random name: whichever route it takes,
+            // somebody ends up looking at this file in a viewer or a print queue.
+            var stem = string.IsNullOrWhiteSpace(_viewModel.Circuit.Title)
+                ? "circuit"
+                : string.Concat(_viewModel.Circuit.Title.Split(Path.GetInvalidFileNameChars()));
+
+            var path = Path.Combine(Path.GetTempPath(), $"{stem}.pdf");
+
+            CircuitExporter.WritePrintable(
+                _viewModel.Circuit,
+                model.IncludeTraces ? scope : null,
+                path,
+                new ExportOptions(
+                    ExportFormat.Pdf,
+                    model.Content,
+                    IncludePartsList: model.IncludePartsList),
+                model.Setup);
+
+            _viewModel.StatusMessage = PrintService.Send(path).Message;
+        }
+        catch (Exception ex) when (ex is IOException or InvalidOperationException
+                                      or UnauthorizedAccessException)
+        {
+            _viewModel.StatusMessage = $"Could not print: {ex.Message}";
+        }
     }
 
     private async Task ShowSettingsAsync()

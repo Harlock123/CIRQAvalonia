@@ -8,6 +8,18 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**Printing.** `Ctrl+P` lays the schematic, the traces and the parts list onto real sheets — a page
+each, fitted inside the margins, with a header naming the circuit and the date. Choose the paper
+size and orientation; a large schematic scales down to fit, and a small one is left at the size it
+was drawn.
+
+It prints in ink whatever theme you are using. A dark theme's strokes are light, so printed as they
+appear they would come out as pale grey on white paper.
+
+Avalonia has no printing API on any platform, so what this does is produce a proper page-sized PDF
+and hand it to the system: straight to the printer where there is a print command, and to your PDF
+viewer where there is not. The dialog says which it will be before you press the button.
+
 ## [0.30.0] - 2026-09-21
 
 Export stops being only pictures. Two text formats, so a circuit drawn here can be handed to
