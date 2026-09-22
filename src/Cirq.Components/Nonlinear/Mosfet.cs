@@ -197,6 +197,18 @@ public partial class Mosfet : CircuitComponent, ICurrentReporting, INoiseSource
     /// </summary>
     public double Transconductance { get; private set; }
 
+    /// <summary>
+    /// Where this part's flicker noise crosses its channel noise, in hertz. Below it the 1/f term
+    /// dominates and rises without limit; above it there is nothing but the channel.
+    /// <para>
+    /// A hundred kilohertz is typical for a power MOSFET and high enough that flicker is most of
+    /// the noise across the whole audio band. Set it to zero for a part where it does not matter,
+    /// or where you would rather see the channel noise on its own.
+    /// </para>
+    /// </summary>
+    [ObservableProperty]
+    public partial double FlickerCornerHz { get; set; } = 1e5;
+
     /// <summary>Gate-source voltage in the device's own polarity convention.</summary>
     public double Vgs { get; private set; }
 
@@ -389,10 +401,12 @@ public partial class Mosfet : CircuitComponent, ICurrentReporting, INoiseSource
     /// short-channel part is worse, sometimes several times worse, and this does not model that.
     /// </para>
     /// <para>
-    /// No flicker term. A MOSFET's 1/f noise is usually the larger of the two below a few
-    /// kilohertz and it is a process parameter rather than something derivable from the model
-    /// here, so it is left out rather than invented — which means a noise figure at low
-    /// frequencies is optimistic, and deliberately says so rather than looking authoritative.
+    /// Plus flicker, which below the corner is the larger of the two and often by a long way. A
+    /// MOSFET is the worst common device for it — surface conduction is what makes it so — and it
+    /// is why a MOSFET front end is a poor choice for anything DC-coupled or audio, where a
+    /// bipolar of the same transconductance would be quieter by an order of magnitude at ten
+    /// hertz. The corner is a process parameter rather than anything derivable, so it is a
+    /// property you can set.
     /// </para>
     /// </summary>
     public IEnumerable<NoiseEmission> NoiseSources(MnaSystem system, SimulationState state, double hertz)
@@ -400,7 +414,9 @@ public partial class Mosfet : CircuitComponent, ICurrentReporting, INoiseSource
         ArgumentNullException.ThrowIfNull(system);
         ArgumentNullException.ThrowIfNull(state);
 
-        var density = NoisePhysics.Channel(Transconductance, state.TemperatureKelvin);
+        var density = NoisePhysics.Flicker(
+            NoisePhysics.Channel(Transconductance, state.TemperatureKelvin),
+            FlickerCornerHz, hertz);
 
         if (density <= 0) yield break;
 

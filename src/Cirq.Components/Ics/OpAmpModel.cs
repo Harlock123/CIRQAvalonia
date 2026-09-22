@@ -16,7 +16,11 @@ public sealed record OpAmpModel(
     double InputOffsetVoltage,
     double InputBiasCurrent,
     double QuiescentCurrent,
-    double OffsetDriftPerKelvin = 15e-6)
+    double OffsetDriftPerKelvin = 15e-6,
+    double VoltageNoiseDensity = 20e-9,
+    double CurrentNoiseDensity = 0.5e-12,
+    double VoltageNoiseCornerHz = 200.0,
+    double CurrentNoiseCornerHz = 200.0)
 {
     /// <summary>
     /// Input offset voltage at a temperature.
@@ -29,6 +33,28 @@ public sealed record OpAmpModel(
     /// is volts.
     /// </para>
     /// </summary>
+    /// <summary>
+    /// Input-referred voltage noise at a frequency, in volts per root hertz.
+    /// <para>
+    /// Two terms. The <b>white</b> floor is what the datasheet quotes at 1 kHz and is flat from
+    /// there upwards. Below the <b>corner</b> it rises as 1/√f — flicker noise, which is what makes
+    /// a DC-coupled precision circuit hard and is the reason a chopper part exists at all. The
+    /// corner is where the two are equal, so the density there is √2 times the floor.
+    /// </para>
+    /// <para>
+    /// Both are properties of the part rather than of anything derivable, so they are quoted per
+    /// model from its datasheet. A JFET or CMOS input is quiet in current and noisy in voltage; a
+    /// bipolar is the other way round, and which matters depends entirely on the impedance the
+    /// amplifier is looking at.
+    /// </para>
+    /// </summary>
+    public double VoltageNoiseAt(double hertz) =>
+        VoltageNoiseDensity * Math.Sqrt(1.0 + (VoltageNoiseCornerHz / Math.Max(hertz, 1e-9)));
+
+    /// <summary>Input-referred current noise at a frequency, in amps per root hertz.</summary>
+    public double CurrentNoiseAt(double hertz) =>
+        CurrentNoiseDensity * Math.Sqrt(1.0 + (CurrentNoiseCornerHz / Math.Max(hertz, 1e-9)));
+
     public double OffsetAt(double kelvin) =>
         InputOffsetVoltage +
         (OffsetDriftPerKelvin * (kelvin - Cirq.Components.Nonlinear.JunctionTemperature.NominalKelvin));
@@ -65,12 +91,27 @@ public sealed record OpAmpModel(
         InputOffsetVoltage: 1e-3,
         InputBiasCurrent: 80e-9,
         QuiescentCurrent: 1.7e-3,
-        OffsetDriftPerKelvin: 15e-6);
+        OffsetDriftPerKelvin: 15e-6,
+
+        // A bipolar input: middling voltage noise, and current noise large enough to matter the
+        // moment it is asked to look at anything above a few kilohms.
+        VoltageNoiseDensity: 20e-9,
+        CurrentNoiseDensity: 0.5e-12,
+        VoltageNoiseCornerHz: 200,
+        CurrentNoiseCornerHz: 2e3);
 
     /// <summary>JFET input, fast and high impedance.</summary>
     public static readonly OpAmpModel Tl081 = new(
         "TL081", 200_000, 3e6, 13e6, 1e12, 100, 1.5, 3e-3, 30e-12, 1.4e-3,
-        OffsetDriftPerKelvin: 18e-6);
+        OffsetDriftPerKelvin: 18e-6,
+
+        // A JFET input, which is the trade in one line: a thousand times less current noise than
+        // the LM741's, at the price of a higher flicker corner. Looking at a megohm it is far
+        // quieter; looking at fifty ohms it is not.
+        VoltageNoiseDensity: 18e-9,
+        CurrentNoiseDensity: 0.01e-12,
+        VoltageNoiseCornerHz: 2e3,
+        CurrentNoiseCornerHz: 1e3);
 
     /// <summary>
     /// The single-supply workhorse. Its output gets closer to the rails than an LM741's, which is
@@ -85,7 +126,11 @@ public sealed record OpAmpModel(
     /// </summary>
     public static readonly OpAmpModel Lm358 = new(
         "LM358", 100_000, 1e6, 0.3e6, 2e6, 100, 1.5, 2e-3, 45e-9, 0.7e-3,
-        OffsetDriftPerKelvin: 7e-6)
+        OffsetDriftPerKelvin: 7e-6,
+        VoltageNoiseDensity: 40e-9,
+        CurrentNoiseDensity: 0.3e-12,
+        VoltageNoiseCornerHz: 500,
+        CurrentNoiseCornerHz: 1e3)
     {
         NegativeSwingHeadroom = 0.02,
     };
@@ -102,7 +147,15 @@ public sealed record OpAmpModel(
     /// </summary>
     public static readonly OpAmpModel Mcp6002 = new(
         "MCP6002", 112_000, 1e6, 0.6e6, 1e13, 100, 0.025, 2e-3, 1e-12, 100e-6,
-        OffsetDriftPerKelvin: 2e-6);
+        OffsetDriftPerKelvin: 2e-6,
+
+        // CMOS: almost no current noise at all, and a high flicker corner — which is why a
+        // rail-to-rail CMOS part is a poor choice for a DC-coupled precision measurement and an
+        // excellent one for a high-impedance sensor above a kilohertz.
+        VoltageNoiseDensity: 28e-9,
+        CurrentNoiseDensity: 0.6e-15,
+        VoltageNoiseCornerHz: 3e3,
+        CurrentNoiseCornerHz: 1e3);
 
     /// <summary>
     /// Four of the <see cref="Lm358"/> in one package, and electrically that is all it is — same

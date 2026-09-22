@@ -32,7 +32,7 @@ namespace Cirq.Components.Ics;
 /// 11=V−, 12=IN4+, 13=IN4−, 14=OUT4.
 /// </para>
 /// </summary>
-public partial class QuadOpAmp : CircuitComponent
+public partial class QuadOpAmp : CircuitComponent, INoiseSource
 {
     private const int Channels = 4;
 
@@ -145,6 +145,27 @@ public partial class QuadOpAmp : CircuitComponent
     {
         for (var i = 0; i < Channels; i++)
             system.StampCapacitance(system.InternalNode(this, i), -1, Model.CompensationCapacitance);
+    }
+
+    /// <summary>
+    /// Four amplifiers' worth of noise, named by channel — because on a part doing four different
+    /// jobs, which channel is the noisy one is the answer somebody is after.
+    /// </summary>
+    public IEnumerable<NoiseEmission> NoiseSources(MnaSystem system, SimulationState state, double hertz)
+    {
+        ArgumentNullException.ThrowIfNull(system);
+
+        for (var i = 0; i < Channels; i++)
+        {
+            var amplifier = _amplifiers[i];
+
+            var emissions = amplifier.Stage.Noise(
+                Model, $"{Name}{(char)('A' + i)}", hertz,
+                system.Node(amplifier.NonInverting), system.Node(amplifier.Inverting),
+                system.InternalNode(this, i));
+
+            foreach (var emission in emissions) yield return emission;
+        }
     }
 
     public override void CommitTimeStep(MnaSystem system, SimulationState state)

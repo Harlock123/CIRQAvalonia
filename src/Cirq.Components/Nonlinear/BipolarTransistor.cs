@@ -180,6 +180,17 @@ public partial class BipolarTransistor : CircuitComponent, ICurrentReporting, IN
     /// <summary>Base current at the converged solution, in amps.</summary>
     public double BaseCurrent { get; private set; }
 
+    /// <summary>
+    /// Where this part's flicker noise crosses the base current's shot noise, in hertz.
+    /// <para>
+    /// A few hundred hertz for a small-signal part, against a hundred kilohertz for a MOSFET —
+    /// three orders of magnitude, and the single strongest reason a low-frequency front end is
+    /// built out of bipolars.
+    /// </para>
+    /// </summary>
+    [ObservableProperty]
+    public partial double FlickerCornerHz { get; set; } = 300.0;
+
     public double EmitterCurrent => CollectorCurrent + BaseCurrent;
 
     /// <summary>Base-emitter voltage in the device's own polarity convention.</summary>
@@ -341,7 +352,12 @@ public partial class BipolarTransistor : CircuitComponent, ICurrentReporting, IN
         var c = system.Node(Collector);
         var e = system.Node(Emitter);
 
-        var baseShot = NoisePhysics.Shot(BaseCurrent);
+        // The base current carries the flicker term. A bipolar's 1/f noise lives in the base
+        // current rather than the collector current, and its corner is far lower than a MOSFET's
+        // — which is the whole of why a bipolar is the part to reach for below a kilohertz.
+        var baseShot = NoisePhysics.Flicker(
+            NoisePhysics.Shot(BaseCurrent), FlickerCornerHz, hertz);
+
         if (baseShot > 0) yield return new NoiseEmission($"{Name} shot (base)", b, e, baseShot);
 
         var collectorShot = NoisePhysics.Shot(CollectorCurrent);

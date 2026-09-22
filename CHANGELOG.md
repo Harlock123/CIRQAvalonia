@@ -17,9 +17,15 @@ is R3" is an instruction — and it is almost always one part, and almost always
 guess. Resistors contribute Johnson noise, diodes and bipolars shot noise in every current that
 crosses a junction, MOSFETs their channel noise.
 
-It is honest about what it leaves out: no flicker noise and no op-amp input noise, both of which
-are often dominant, so the figure is optimistic at low frequencies and incomplete on a circuit
-built around an op-amp. The guide says so rather than letting the number look complete.
+**Op-amps and flicker noise.** An op-amp's own input-referred voltage and current noise are usually
+the dominant terms in a circuit built around one, so a figure without them was the resistors' story
+and not the answer. Both are in now, each with its own flicker corner, and the ranking shows the
+trade they make: with small resistors the voltage noise is everything, with large ones the current
+noise takes over — same part, same gain, a different thing to go and fix.
+
+Flicker noise is on the active devices too, with the corner as an editable property. A bipolar's is
+a few hundred hertz and a MOSFET's a hundred kilohertz, which is the single strongest reason a
+low-frequency front end is built out of bipolars.
 
 **Click a wire and the net lights up.** Every wire on it, a dot on every pin on it, and the status
 bar naming the net and what is on it.

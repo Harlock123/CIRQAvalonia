@@ -24,7 +24,7 @@ namespace Cirq.Components.Ics;
 /// up when the supply rails themselves have series impedance.
 /// </para>
 /// </summary>
-public partial class OperationalAmplifier : CircuitComponent
+public partial class OperationalAmplifier : CircuitComponent, INoiseSource
 {
     private readonly OpAmpStage _stage = new();
 
@@ -93,6 +93,20 @@ public partial class OperationalAmplifier : CircuitComponent
         _stage.Commit(system, state, Model, system.InternalNode(this), PositiveSupply, NegativeSupply);
 
     public override void ResetState() => _stage.Reset();
+
+    /// <summary>
+    /// The amplifier's own input-referred noise, which in almost any circuit built around one is
+    /// the dominant term. See <see cref="OpAmpStage.Noise"/> for how an input-referred voltage
+    /// becomes a current the analysis can use.
+    /// </summary>
+    public IEnumerable<NoiseEmission> NoiseSources(MnaSystem system, SimulationState state, double hertz)
+    {
+        ArgumentNullException.ThrowIfNull(system);
+
+        return _stage.Noise(
+            Model, Name, hertz,
+            system.Node(NonInverting), system.Node(Inverting), system.InternalNode(this));
+    }
 
     partial void OnModelChanged(OpAmpModel value) => NotifyValueChanged();
 }

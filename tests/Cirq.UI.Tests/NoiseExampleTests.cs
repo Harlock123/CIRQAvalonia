@@ -21,11 +21,11 @@ public class NoiseExampleTests
     }
 
     /// <summary>
-    /// The guide says the feedback resistors are the whole of what this can see, and names the
-    /// ranking as the way to find which. Both halves checked.
+    /// The guide says to open this one and see the op-amp's own voltage noise against its
+    /// feedback resistors'. Both halves checked, including that the amplifier leads.
     /// </summary>
     [Fact]
-    public void TheInvertingAmplifiersNoiseIsItsResistors()
+    public void TheInvertingAmplifiersNoiseIsMostlyTheOpAmpsOwn()
     {
         using var vm = Load("Inverting Amplifier");
 
@@ -33,25 +33,31 @@ public class NoiseExampleTests
         model.Run();
 
         Assert.True(model.HasResult, model.Status);
-        Assert.NotEmpty(model.Contributors);
 
-        // It opens on the output rather than the input, which is a node an ideal source holds and
-        // which therefore has no noise on it at all.
+        // It opens on the output rather than the input, which is a node a source holds at no
+        // noise at all.
         Assert.Equal("Output", model.Output?.Label);
 
-        // Every generator it found is a resistor's: an op-amp's own noise is not modelled, which
-        // is exactly what the guide says.
-        Assert.All(model.Contributors, c => Assert.EndsWith("thermal", c.Name, StringComparison.Ordinal));
+        // The amplifier and the resistors are both there, and the amplifier leads.
+        Assert.Contains(model.Contributors, c => c.Name.EndsWith("voltage noise", StringComparison.Ordinal));
+        Assert.Contains(model.Contributors, c => c.Name.EndsWith("thermal", StringComparison.Ordinal));
+
+        Assert.EndsWith("voltage noise", model.Contributors[0].Name, StringComparison.Ordinal);
     }
 
     /// <summary>
-    /// And the other claim: make the dominant resistor a hundred times bigger and the noise goes
-    /// up by ten, because it goes as the square root of resistance.
+    /// And the other claim the guide makes: scale every resistor up by a hundred and the leader
+    /// changes from the amplifier's voltage noise to its current noise.
+    /// <para>
+    /// Which is the whole trade in one measurement. The voltage noise did not change — it is a
+    /// property of the part — but the current noise now has a hundred times the impedance to
+    /// develop across. Same amplifier, same gain, and a completely different thing to go and fix.
+    /// </para>
     /// </summary>
     [Fact]
-    public void AHundredTimesTheResistanceIsTenTimesTheNoise()
+    public void ScalingTheResistorsUpTurnsItIntoACurrentNoiseProblem()
     {
-        double Measure(double scale)
+        (string Leader, double Rms) Measure(double scale)
         {
             using var vm = Load("Inverting Amplifier");
 
@@ -63,10 +69,18 @@ public class NoiseExampleTests
 
             Assert.True(model.HasResult, model.Status);
 
-            return model.Density[0];
+            return (model.Contributors[0].Name, model.Rms);
         }
 
-        Assert.Equal(10.0, Measure(100.0) / Measure(1.0), 0.5);
+        var nominal = Measure(1.0);
+        var large = Measure(100.0);
+
+        Assert.EndsWith("voltage noise", nominal.Leader, StringComparison.Ordinal);
+        Assert.EndsWith("current noise (−)", large.Leader, StringComparison.Ordinal);
+
+        // And it is much noisier for it.
+        Assert.True(large.Rms > nominal.Rms * 5,
+            $"{large.Rms:E2} should be far above {nominal.Rms:E2}");
     }
 
     /// <summary>

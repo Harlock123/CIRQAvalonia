@@ -526,4 +526,98 @@ public class NoiseTests
             $"a stiff drive should leave the collector in charge: collector " +
             $"{shares["Q1 shot (collector)"]:0.###} against base {shares["Q1 shot (base)"]:0.###}");
     }
+
+    // ---- flicker -----------------------------------------------------------
+
+    /// <summary>
+    /// Flicker noise rises as 1/f in power and 1/√f in amplitude, so on log axes it is a straight
+    /// line — and there is no low enough frequency for it to stop mattering. At the corner the
+    /// density is √2 times the white floor, which is what "corner" means.
+    /// </summary>
+    [Fact]
+    public void FlickerNoiseIsTheWhiteFloorTimesOnePlusTheCornerOverF()
+    {
+        const double white = 4e-18;
+        const double corner = 1e3;
+
+        // At the corner the two terms are equal: twice the power, √2 the amplitude.
+        Assert.Equal(2 * white, NoisePhysics.Flicker(white, corner, corner), white * 1e-9);
+
+        // A decade below, ten times the power.
+        Assert.Equal(11 * white, NoisePhysics.Flicker(white, corner, corner / 10), white * 1e-9);
+
+        // Far above it, the floor and nothing else.
+        Assert.Equal(white, NoisePhysics.Flicker(white, corner, corner * 1e4), white * 1e-3);
+
+        // And a part with no corner has no flicker at all.
+        Assert.Equal(white, NoisePhysics.Flicker(white, 0, 1e-3), white * 1e-9);
+    }
+
+    /// <summary>
+    /// The reason a low-frequency front end is built out of bipolars: a MOSFET's flicker corner is
+    /// three orders of magnitude higher, so at ten hertz it is buried in 1/f noise where a bipolar
+    /// is still near its shot floor. Both parts here are set to their own typical corners.
+    /// </summary>
+    [Fact]
+    public void AMosfetsFlickerCornerIsFarAboveABipolars()
+    {
+        var mosfet = new Cirq.Components.Nonlinear.Mosfet();
+        var bipolar = new Cirq.Components.Nonlinear.BipolarTransistor();
+
+        Assert.True(mosfet.FlickerCornerHz > bipolar.FlickerCornerHz * 100,
+            $"{mosfet.FlickerCornerHz:0} Hz against {bipolar.FlickerCornerHz:0} Hz");
+
+        // Which at ten hertz is the difference between a hundredfold rise and a thirtyfold one.
+        var atTen = NoisePhysics.Flicker(1.0, mosfet.FlickerCornerHz, 10)
+                    / NoisePhysics.Flicker(1.0, bipolar.FlickerCornerHz, 10);
+
+        Assert.True(atTen > 100, $"the MOSFET should be far worse at ten hertz, not {atTen:0.#}×");
+    }
+
+    /// <summary>
+    /// And it shows up in a measurement rather than only in the arithmetic: the same transistor
+    /// with its corner switched off is flat, and with it on rises towards DC.
+    /// </summary>
+    [Fact]
+    public void TurningTheFlickerCornerOffMakesTheNoiseFlat()
+    {
+        double Ratio(double corner)
+        {
+            var circuit = new Circuit();
+
+            var supply = circuit.Add(new DcVoltageSource(10.0));
+            var bias = circuit.Add(new DcCurrentSource(2e-6));
+            var load = circuit.Add(new Resistor(10e3) { Name = "RL" });
+            var transistor = circuit.Add(new Cirq.Components.Nonlinear.BipolarTransistor
+            {
+                Name = "Q1",
+                FlickerCornerHz = corner,
+            });
+            var ground = circuit.Add(new Ground());
+
+            circuit.Connect(supply.Negative, ground.Pin);
+            circuit.Connect(supply.Positive, load.A);
+            circuit.Connect(load.B, transistor.Collector);
+            circuit.Connect(bias.Negative, transistor.Base);
+            circuit.Connect(bias.Positive, ground.Pin);
+            circuit.Connect(transistor.Emitter, ground.Pin);
+
+            var probe = new SignalProbe("Out", transistor.Collector, default);
+            circuit.Probes.Add(probe);
+
+            var sim = new CircuitSimulator(circuit);
+            sim.Settings.TemperatureKelvin = Room;
+            sim.Reset();
+            sim.SolveOperatingPoint();
+            sim.ResolveProbes();
+
+            var result = new NoiseAnalysis(sim).Run(
+                new NoiseRequest(new AcSweepRequest(1, 1e4, 20), probe));
+
+            return result.Density[0] / result.Density[^1];
+        }
+
+        Assert.Equal(1.0, Ratio(0), 0.05);
+        Assert.True(Ratio(300) > 5, $"with a 300 Hz corner, 1 Hz should be far noisier: {Ratio(300):0.#}×");
+    }
 }

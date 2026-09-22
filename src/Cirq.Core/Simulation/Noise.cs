@@ -82,4 +82,23 @@ public static class NoisePhysics
     /// </summary>
     public static double Channel(double transconductance, double kelvin, double gamma = 2.0 / 3.0) =>
         4.0 * Boltzmann * kelvin * gamma * Math.Abs(transconductance);
+
+    /// <summary>
+    /// Flicker noise: a white density multiplied by <c>1 + fc/f</c>, where <c>fc</c> is the corner
+    /// the two terms are equal at.
+    /// <para>
+    /// So it rises as 1/f in <i>power</i> and 1/√f in amplitude, which is why a plot of it is a
+    /// straight line on log axes and why there is no such thing as a low enough frequency for it
+    /// to stop mattering. It is the reason a DC-coupled precision measurement is hard, the reason
+    /// chopper-stabilised parts exist, and the reason a MOSFET is a poor choice for an audio front
+    /// end where a bipolar would do.
+    /// </para>
+    /// <para>
+    /// Unlike thermal and shot noise this has no derivation from anything: it comes out of
+    /// surface states and trapping, and the corner is a process parameter that has to be quoted
+    /// rather than worked out. A model that invented one would be making it up.
+    /// </para>
+    /// </summary>
+    public static double Flicker(double white, double cornerHz, double hertz) =>
+        cornerHz <= 0 ? white : white * (1.0 + (cornerHz / Math.Max(hertz, 1e-9)));
 }

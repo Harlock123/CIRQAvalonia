@@ -39,6 +39,50 @@ internal sealed class OpAmpStage
     /// Stamps one amplifier. <paramref name="gain"/> and <paramref name="branch"/> are this
     /// amplifier's own internal node and branch, which is what lets several share a package.
     /// </summary>
+    /// <summary>
+    /// The amplifier's own noise, as Norton sources the analysis can use.
+    /// <para>
+    /// An op-amp's noise is quoted <b>input-referred</b> — a voltage in series with the input and
+    /// a current into each input pin — because that is the only form that is a property of the
+    /// part rather than of the circuit around it. Neither can be stamped where it is quoted: a
+    /// voltage in series with a pin would mean breaking the node.
+    /// </para>
+    /// <para>
+    /// The voltage source does not need to be. The input stage drives the gain node through a
+    /// transconductance, so an input-referred <c>en</c> has exactly the same effect on everything
+    /// downstream as a current of <c>gm·en</c> injected at the gain node — which is a Norton
+    /// source at a node this part owns, and needs no change to the topology at all. The current
+    /// noise is already a current, and goes where it is quoted.
+    /// </para>
+    /// <para>
+    /// Why this matters: in almost any circuit built around an op-amp, these are the dominant
+    /// terms. A noise figure that counted only the resistors would be quietly, confidently wrong.
+    /// </para>
+    /// </summary>
+    public IEnumerable<NoiseEmission> Noise(
+        OpAmpModel model, string name, double hertz, int inP, int inN, int gain)
+    {
+        // The small-signal transconductance the input stage is linearised at. Referring the input
+        // voltage noise forward through it is what makes an equivalent current at the gain node.
+        var gm = model.Transconductance;
+
+        var en = model.VoltageNoiseAt(hertz);
+        var density = gm * en * gm * en;
+
+        if (density > 0) yield return new NoiseEmission($"{name} voltage noise", gain, -1, density);
+
+        var i = model.CurrentNoiseAt(hertz);
+        var current = i * i;
+
+        if (current <= 0) yield break;
+
+        // One generator per input pin, and they are independent — a part's current noise is quoted
+        // per input for that reason. On a circuit with a large resistance at one input and a small
+        // one at the other, only one of them ends up mattering.
+        yield return new NoiseEmission($"{name} current noise (+)", inP, -1, current);
+        yield return new NoiseEmission($"{name} current noise (−)", inN, -1, current);
+    }
+
     public void Stamp(
         MnaSystem system, SimulationState state, OpAmpModel model,
         int inP, int inN, int outNode, int vPos, int vNeg, int gain, int branch)

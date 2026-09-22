@@ -3034,15 +3034,47 @@ what it contributed.
 | Resistor | Johnson (thermal) | `4kT/R` — every resistance of the same value at the same temperature makes exactly this and no more |
 | Diode | Shot, plus thermal in its bulk resistance | `2qI` across the junction |
 | Bipolar | Shot in **both** the base and collector currents | `2qIb` and `2qIc` |
-| MOSFET | Channel thermal | `4kT·(2/3)·gm` |
+| MOSFET | Channel thermal, plus flicker | `4kT·(2/3)·gm`, rising below the corner |
+| Bipolar | …and flicker in the base current | its corner is a few hundred hertz, a MOSFET's a hundred kilohertz |
+| Op-amp | Input-referred voltage noise and current noise, both with their own flicker corners | usually the dominant terms in any circuit built around one |
 
 Thermal noise depends on temperature and not on current. Shot noise depends on current and **not on
 temperature** — it exists because charge arrives one electron at a time, so a steady current is
-steady only on average. Two different mechanisms, and telling them apart is most of what a noise
-analysis is for.
+steady only on average. **Flicker** (1/f) noise depends on neither: it comes out of surface states
+and trapping, rises without limit towards DC, and is quoted as a *corner frequency* where it equals
+whatever white noise it sits on top of. Three different mechanisms, and telling them apart is most
+of what a noise analysis is for.
+
+A bipolar's flicker corner is a few hundred hertz and a MOSFET's is a hundred kilohertz — three
+orders of magnitude, and the single strongest reason a low-frequency front end is built out of
+bipolars. Both are editable properties, because a corner is a process parameter rather than
+anything derivable from the rest of the model.
 
 Everything else is treated as silent. That is right for an ideal source or a switch, and it is an
 approximation everywhere else — see the honest notes at the end.
+
+### An op-amp's own noise
+
+An op-amp's noise is quoted **input-referred**: a voltage in series with the input and a current
+into each input pin. That is the only form that belongs to the part rather than to the circuit
+around it — and what comes out of the circuit is that voltage multiplied by the **noise gain**,
+which is not always the signal gain.
+
+That catches people. An inverting amplifier of gain −1 has a signal gain of one and a noise gain of
+two, so the same job built inverting is twice as noisy as built non-inverting.
+
+Which of the two generators matters is decided entirely by **the impedance the amplifier is looking
+at**, and the ranking will tell you which:
+
+- **Small resistors** and there is no impedance for the current noise to develop across, so the
+  voltage noise is everything.
+- **Large resistors** and the voltage noise has not changed at all, while the current noise now has
+  hundreds of kilohms to work into. Same part, same gain, completely different answer about what to
+  fix.
+
+That trade is the whole of why input stages come in bipolar and FET flavours. The LM741's current
+noise is fifty times the TL081's; looking at a megohm the JFET part is far quieter, and looking at
+fifty ohms it is not.
 
 ### The ranking is the answer
 
@@ -3078,24 +3110,27 @@ bandwidth-limit it rather than to change a part.
 
 Stated plainly, because a noise figure that quietly leaves things out is worse than none:
 
-- **No flicker (1/f) noise.** A real MOSFET's 1/f noise is usually the larger of the two below a
-  few kilohertz, and a bipolar has some too. It is a process parameter rather than something
-  derivable from the models here, so it is left out rather than invented — which means the figure
-  at low frequencies is **optimistic**.
-- **No op-amp input noise.** An op-amp's own voltage and current noise are usually the dominant
-  terms in a circuit built around one, so a noise figure on an op-amp circuit here is the
-  *resistors'* contribution and not the whole story.
+- **Flicker corners are typical figures, not measured ones.** They are process parameters, so the
+  model carries a plausible default per part and lets you set it. If you have the real number from
+  a datasheet, put it in.
+- **No flicker in resistors.** Excess noise in a carbon or thick-film resistor is real and
+  current-dependent; the model treats every resistor as making Johnson noise and nothing else,
+  which is right for metal film and optimistic for the cheap ones.
 - **The MOSFET's 2/3 is the long-channel value.** A short-channel part is worse, sometimes several
   times worse.
+- **No diode flicker, and no popcorn noise anywhere.**
 - **Everything is referred to one output and one bias point.** Like the frequency response, this
   linearises about the operating point and says nothing about large signals.
 
 ### Worth trying
 
-Open the **Inverting Amplifier** and measure its output: the feedback resistors are the whole of
-what this can see, and the ranking will say which. Then put a 1 MΩ in place of the 10 kΩ and watch
-the figure go up by ten. Or take any RC low-pass, measure it across three decades of resistor
-value, and watch the total refuse to move — which is √(kT/C) doing what it does.
+Open the **Inverting Amplifier** and measure its output across a wide band: the ranking will show
+the op-amp's own voltage noise against its feedback resistors', and the curve will show the flicker
+rise at the bottom end. Then scale every resistor up by a hundred and watch the leader change from
+the voltage noise to the current noise — same part, same gain, different answer.
+
+Or take any RC low-pass, measure it across three decades of resistor value, and watch the total
+refuse to move, which is √(kT/C) doing what it does.
 
 ---
 
