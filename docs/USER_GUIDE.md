@@ -209,6 +209,51 @@ The card keeps out of the way of everything else: it does not appear while you a
 panning, box-selecting or about to start a wire, and it folds back across the pointer rather than
 running off the edge of the window. **View > Describe Parts on Hover** turns it off.
 
+### The value as it is written on the part
+
+A resistor on the screen says `4k7`. The one in your hand says yellow-violet-red, and the distance
+between those two facts is why people carry a card in their wallet. So the hover card draws the
+marking next to the numbers: the bands a resistor or an inductor carries, or the code printed on a
+ceramic, alongside what the marking reads out to in words.
+
+![Seven parts with their markings drawn beside them: a 4k7 at five percent as yellow-violet-red with a gold tolerance band, 10k as brown-black-orange-gold, a 4R7 whose gold multiplier divides rather than multiplies, a 1k21 at one percent carrying five bands instead of four, a 100 microhenry inductor read in microhenries as brown-black-brown-silver, and two ceramic capacitors printed 104M and 103J — each with its bands read out in words beside it](images/25-colour-codes.png)
+
+The band count follows the convention rather than a setting. A part at five percent or looser gets
+**four** bands — two digits, a multiplier and a tolerance. One at two percent or tighter gets
+**five**, because you cannot promise one percent on a value you only spelled to two figures. That
+is why a 1 % part is marked brown-black-black-brown-brown and not brown-black-red-brown.
+
+Three things the picture says that the number beside it cannot:
+
+- **The wider gap** before the last band is how a real part tells you which end to start from. A
+  five-band code read backwards is a different resistor, and the spacing is the only thing on the
+  part that resolves it.
+- **Gold and silver divide.** They are multipliers of a tenth and a hundredth, which is how a 4R7
+  is painted yellow-violet-gold. It is the half of the table people forget exists.
+- **The tolerance band rounds tighter, never looser.** A part sold at five percent is never marked
+  ten. The marking is a promise, and rounding it the other way turns it into a lie.
+
+And two traps it exists to take the sting out of:
+
+- A ceramic's three digits are **picofarads**, however large the part is. `104` is not 104 of
+  anything — it is 10 followed by four zeros of picofarads, which is 100 nF. The card says so in as
+  many words rather than leaving you to remember it.
+- An inductor's bands are **microhenries**, for the same reason. 100 µH is brown-black-brown; there
+  is no way to paint it in henries at all, because the multiplier band does not reach that far down.
+
+When the code cannot spell exactly what a part is set to — 1234 Ω has no four-band spelling — the
+card says what the bands *do* say, in the same red it uses for a violation. Drawing the nearest
+bands silently would have the picture assert something about the part that is not true.
+
+Every marking is also written out in words: *brown 1 · black 0 · orange × 1,000 · gold ± 5 %*. The
+picture teaches you to recognise the pattern; the words are what let you learn to read it, and they
+are the half that works if you cannot tell the colours apart.
+
+Electrolytics are left out on purpose, even though they are capacitors. Their value is printed on
+the can in plain microfarads, so giving one a ceramic's three-digit code would be inventing a
+marking the part does not carry — which is worse than showing nothing. Parts identified by a part
+number rather than a value get nothing for the same reason.
+
 ### Selecting more than one part
 
 With the **Select** tool, drag a box across empty canvas and everything inside it is selected —

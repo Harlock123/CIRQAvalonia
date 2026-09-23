@@ -51,6 +51,34 @@ public static class HoverCard
         List<FormattedText> warnings =
             [.. summary.Warnings.Select(w => Text(w, BodySize, CanvasTheme.ErrorBrush))];
 
+        // What the part says about itself on its own body. Two lines under the picture: what the
+        // bands read out to, and — when the marking cannot say exactly what was typed — why.
+        var marking = summary.Marking;
+
+        var reading = marking is null
+            ? null
+            : Text(marking.Readout, BodySize - 0.5, CanvasTheme.LabelBrush);
+
+        // The caption only when it says something the subtitle does not. A banded part that reads
+        // back exactly what it is set to would otherwise print the same value twice, one line
+        // apart; when the bands cannot say it exactly, that difference is the whole point.
+        var captionText = marking is null
+            ? null
+            : marking.Note is not null ? $"{marking.Caption} — {marking.Note}"
+            : marking.Kind == Cirq.UI.Services.MarkingKind.Printed ? marking.Caption
+            : null;
+
+        var caption = captionText is null
+            ? null
+            : Text(captionText, BodySize - 0.5,
+                marking!.Note is null ? CanvasTheme.ValueBrush : CanvasTheme.ErrorBrush);
+
+        // Nothing wraps wider than the surface the card has to sit on. Place can move a card off
+        // an edge, but it cannot shrink one, so a card wider than the canvas is simply clipped at
+        // the control's edge — and the marking readout is long enough to cause that on a narrow
+        // canvas, where before only a long violation could.
+        var wrap = Math.Min(MinimumWrap, Math.Max(120, surface.Width - (Padding * 2) - Offset));
+
         // Two columns for the settings, so the values line up and can be read down.
         var labelWidth = rows.Count == 0 ? 0 : rows.Max(r => r.Label.Width);
         var valueWidth = rows.Count == 0 ? 0 : rows.Max(r => r.Value.Width);
@@ -58,9 +86,25 @@ public static class HoverCard
         var width = Math.Max(title.Width, subtitle?.Width ?? 0);
         width = Math.Max(width, labelWidth + (Gap * 3) + valueWidth);
 
+        if (marking is not null)
+        {
+            width = Math.Max(width, MarkingArt.Width(marking));
+
+            // Wrapped rather than allowed to set the card's width. Five bands read out in words
+            // is a long line, and the picture beside it is already the widest thing on the card.
+            reading!.MaxTextWidth = wrap;
+            width = Math.Max(width, reading.Width);
+
+            if (caption is not null)
+            {
+                caption.MaxTextWidth = wrap;
+                width = Math.Max(width, caption.Width);
+            }
+        }
+
         foreach (var warning in warnings)
         {
-            warning.MaxTextWidth = Math.Max(width, MinimumWrap);
+            warning.MaxTextWidth = Math.Max(width, wrap);
             width = Math.Max(width, warning.Width);
         }
 
@@ -68,6 +112,9 @@ public static class HoverCard
         if (subtitle is not null) height += (Gap / 2) + subtitle.Height;
         if (rows.Count > 0) height += Gap + rows.Sum(r => Math.Max(r.Label.Height, r.Value.Height));
         if (warnings.Count > 0) height += Gap + warnings.Sum(w => w.Height + 1);
+
+        if (marking is not null)
+            height += Gap + MarkingArt.Height + 2 + reading!.Height + (caption?.Height ?? 0);
 
         var box = Place(new Size(width + (Padding * 2), height + (Padding * 2)), pointer, surface);
 
@@ -111,6 +158,19 @@ public static class HoverCard
                 context.DrawText(warning, cursor);
                 cursor = cursor.WithY(cursor.Y + warning.Height + 1);
             }
+        }
+
+        if (marking is not null)
+        {
+            cursor = cursor.WithY(cursor.Y + Gap);
+
+            MarkingArt.Draw(new AvaloniaSymbolCanvas(context), marking, cursor);
+            cursor = cursor.WithY(cursor.Y + MarkingArt.Height + 2);
+
+            context.DrawText(reading!, cursor);
+            cursor = cursor.WithY(cursor.Y + reading!.Height);
+
+            if (caption is not null) context.DrawText(caption, cursor);
         }
     }
 

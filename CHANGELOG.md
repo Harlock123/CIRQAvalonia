@@ -8,6 +8,26 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**What the part actually looks like.** Rest the pointer on a resistor and the hover card now draws
+its **colour bands** next to its value — and on an inductor, and on a ceramic capacitor, where it
+draws the three-digit code printed on the disc. A schematic says `4k7`; the part in the drawer says
+yellow-violet-red, and the distance between those two facts is why people carry a card in their
+wallet.
+
+The marking follows the convention rather than a setting: four bands at five percent and **five at
+one percent**, because you cannot promise one percent on a value you only spelled to two figures.
+Gold and silver multipliers divide, so a 4R7 comes out yellow-violet-gold. The wider gap before the
+tolerance band is drawn too, because that is the only thing on a real part that says which end to
+read from. A ceramic's digits are counted in picofarads and an inductor's bands in microhenries,
+which are the two mistakes this is most useful for not making.
+
+Every marking is also written out in words — *brown 1 · black 0 · orange × 1,000 · gold ± 5 %* — so
+it can be read by anybody who cannot tell the colours apart, and so the picture teaches the code
+rather than just showing it. A value the bands cannot spell exactly says so, and says what they do
+spell, rather than quietly drawing the nearest thing. Electrolytics get no marking at all: their
+value is printed on the can in microfarads, and inventing a code for one would teach something
+untrue.
+
 ## [0.31.0] - 2026-09-22
 
 Six new analyses, and the parts to use them on. Until now this could tell you what a circuit does;

@@ -23,11 +23,16 @@ public sealed record SummaryRow(string Label, string Value);
 /// it here too, with nothing to keep in step.
 /// </para>
 /// </summary>
+/// <param name="Marking">
+/// How the value is written on the part itself — the bands on a resistor, the code on a ceramic
+/// capacitor — or null for a part that carries no such marking.
+/// </param>
 public sealed record ComponentSummary(
     string Title,
     string Subtitle,
     IReadOnlyList<SummaryRow> Rows,
-    IReadOnlyList<string> Warnings)
+    IReadOnlyList<string> Warnings,
+    ComponentMarking? Marking = null)
 {
     /// <summary>
     /// How many settings are listed before the card gives up and says how many are left. A card
@@ -60,7 +65,8 @@ public sealed record ComponentSummary(
             $"{component.Name} · {component.ComponentType}",
             component.ValueLabel,
             rows,
-            ViolationsOf(component));
+            ViolationsOf(component),
+            ComponentMarkings.For(component));
     }
 
     /// <summary>
