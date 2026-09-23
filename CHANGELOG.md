@@ -8,180 +8,109 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
-**Keep a reference, and compute new traces.** The scope can take a copy of what is on screen and
-keep drawing it — dashed and faded — while you change the circuit, because "is that better than
-what I had" is the question after every edit and two separate pictures cannot answer it. And the
-box beside it takes arithmetic on the recorded traces: `Out / In` is a gain, `db(Out / In)` is that
-in decibels, `I ^ 2 * 220` is a dissipation. The scope already had probe kinds for a difference and
-a power; every such kind is a guess at what somebody will want, and this covers the rest at the
-cost of one feature rather than a dozen.
+## [0.31.0] - 2026-09-22
 
-**Autosave and recovery.** A copy of the circuit is written every minute while there are unsaved
-changes, and offered back on the next start. It matters more than it did: a saved circuit now
-carries the SPICE cards for its imported models, so the file is the only copy of more than it once
-was. The snapshot is discarded as soon as you save for real, and as soon as the question has been
-answered either way.
+Six new analyses, and the parts to use them on. Until now this could tell you what a circuit does;
+this release is mostly about telling you whether it is any *good* — will it oscillate, how much
+noise does it make, how distorted is it, and will it still work built from the parts you can
+actually buy. 186 components in 16 categories, 87 worked examples, 2777 tests.
 
-**Worst case, beside the tolerance analysis.** Sampling answers "what will most of them do"; this
-answers "what is the worst this can ever be", which is the question a specification is written
-from. The corner where every part sits at its extreme the same way is one combination out of 2ⁿ,
-and random trials essentially never land on it — so the sampled spread is always the narrower and
-always optimistic. It finds the corner directly: a solve per part to learn which way each one
-pushes, then two more, and it reports the recipe for each extreme as well as the number.
+**Will it oscillate.** `Ctrl+F7` measures the loop gain of a feedback circuit and reports the
+**phase margin**, the gain margin and the crossover, with the verdict in words. This is the single
+most common reason a circuit that is correct on paper does not work on a bench: a regulator that
+rings, an amplifier that sings at two megahertz, a servo that hunts are all the same question, and
+none of them can be answered by looking at gain alone.
 
-**The DC sweep runs backwards.** Say what reading you want and it finds the value that gives it —
-plus the nearest E24 part you can actually buy and what that one achieves, because the exact answer
-is usually not a thing anybody sells.
+Where to break the loop is a judgement the circuit cannot make for itself, so it is a part — a
+**Loop Probe**, placed in the feedback path. Everywhere else it is a piece of wire, and it becomes
+a break only while the sweep runs, and only for small signals, so the operating point stays the one
+the working circuit has. The new **Loop Stability** example is a follower, which surprises people
+by being the hardest configuration to keep stable rather than the easiest.
 
-**A parts list export.** `Ctrl+E` will now write the bill of materials as CSV. The circuit already
-knew every part and value; this is that list in the form somebody ordering them wants.
+**How much noise, and from what.** `Shift+F5` gives output noise density in volts per root hertz,
+the total in RMS, and — the half that changes what you do — a ranking of every generator in the
+circuit by what it put on the output. "This makes 12 µV" is a number; "and 80 % of it is R3" is an
+instruction, and it is almost always one part and almost always not the one people guess.
 
-**A readout on the analysis plots.** Move the pointer across a loop gain or a noise curve and the
-line underneath says what it reads there. The scope keeps its draggable cursors, which are right
-for measuring an interval; a Bode plot wants one reading at one frequency instead.
+Resistors contribute Johnson noise, diodes and bipolars shot noise in every current that crosses a
+junction, MOSFETs their channel noise, and op-amps their input-referred voltage and current noise —
+which in a circuit built around one are usually the whole answer. Flicker noise rises towards DC on
+the active devices, with the corner as an editable property, because a bipolar's few hundred hertz
+against a MOSFET's hundred kilohertz is the reason a low-frequency front end is built out of
+bipolars.
 
-**Two examples for analyses that had none.** Crossover Distortion is a class-B pair and the notch
-it puts in everything — open the spectrum and read the THD, which comes out odd-harmonic because
-the notch is symmetric. Low-Noise Preamp is the same gain built twice, from big resistors and from
-small, so the noise window has something to compare.
+**How distorted.** The spectrum window now measures **THD** and **THD+N** and lists the harmonics
+in dB relative to the carrier. An amplifier at one percent distortion looks exactly like a sine on
+the scope — you cannot see it, you can only measure it. And *which* harmonics is the diagnosis
+rather than the figure: odd means the distortion is symmetric, like both rails clipping; even means
+it is lopsided, like a half-wave rectifier. The new **Crossover Distortion** example is a class-B
+pair and the notch it puts in everything.
 
-**SPICE subcircuits import.** A `.model` card describes one device, which is why importing has
-only ever reached diodes, bipolars and MOSFETs. Everything more interesting than a transistor is
-published as a `.subckt` — a pin list and a little netlist — and one now comes in as a block, which
-goes into the block library like any other. A block is already a pin list and a little netlist, so
-everything blocks do applies: place it repeatedly, open it to look inside, and it travels inside a
-saved circuit.
+**What happens if I try other values.** `Ctrl+Shift+F7` runs the whole transient once per value of
+something and lays the results on one set of axes — three capacitor values and the ringing that
+goes with each, four gate resistors and four switching edges. The DC sweep says where a circuit
+settles; this says how it gets there, which is the question people actually have. Every pass starts
+from the same conditions, so the curves differ only by the value.
 
-**VCVS and VCCS are parts now.** SPICE's `E` and `G`, the controlled sources — the primitives every
-amplifier is made of, and what almost every macromodel is built from. Useful in their own right: a
-transconductance into a capacitor *is* an op-amp's input stage.
+**The worst it can ever be, and the value you need.** Beside the tolerance analysis there is now
+**Worst case**, which finds the corner rather than sampling towards it. The combination where every
+part sits at its extreme the same way is one out of 2ⁿ, so random trials essentially never land on
+it and the sampled spread is always optimistic. This finds it in a solve per part rather than 2ⁿ,
+and reports the recipe as well as the number.
 
-An element there is no part for stops the import and is named. A block with a piece missing would
-still solve and would give a confident wrong answer, which is worse than refusing.
-
-**Stability was measuring the wrong thing when anything else drove the circuit.** A loop gain is a
-ratio either side of the break, so a function generator still connected added its own response to
-both ends — and the failure was silent, because the numbers stayed plausible. The guide's own
-illustration of the analysis read 6 dB of loop gain for a follower that has 106, which is how it
-was found. Every other small-signal source is now silenced for the length of a stability sweep and
-put back afterwards.
-
-**Stability.** `Ctrl+F7` measures how much gain goes round a feedback loop and how close it is to
-going round it the wrong way: loop gain, phase margin, gain margin and crossover, with the verdict
-in words as well as figures. This answers "will it oscillate", which is the single most common
-reason a circuit that is correct on paper does not work on a bench.
-
-Where to break the loop is a judgement the circuit cannot make for itself, so it is a part: a
-**Loop Probe**, placed in the feedback path. Everywhere else it is a piece of wire — zero volts
-across it at DC and in a transient alike — and it becomes a break only while the sweep is running,
-and only for small signals, so the operating point stays the one the working circuit has.
-
-The new **Loop Stability** example is a follower, which surprises people by being the hardest
-configuration to keep stable rather than the easiest: it has the most loop gain and the
-furthest-out crossover. Close its switch to put a capacitive load on the output and watch the
-margin go.
-
-**Noise.** `Shift+F5` measures the floor under everything: output noise density in volts per root
-hertz across a band, the total in RMS, and a ranking of every generator in the circuit by what it
-put on the output.
-
-The ranking is the half that changes what you do. "This makes 12 µV" is a number; "and 80 % of it
-is R3" is an instruction — and it is almost always one part, and almost always not the one people
-guess. Resistors contribute Johnson noise, diodes and bipolars shot noise in every current that
-crosses a junction, MOSFETs their channel noise.
-
-**Op-amps and flicker noise.** An op-amp's own input-referred voltage and current noise are usually
-the dominant terms in a circuit built around one, so a figure without them was the resistors' story
-and not the answer. Both are in now, each with its own flicker corner, and the ranking shows the
-trade they make: with small resistors the voltage noise is everything, with large ones the current
-noise takes over — same part, same gain, a different thing to go and fix.
-
-Flicker noise is on the active devices too, with the corner as an editable property. A bipolar's is
-a few hundred hertz and a MOSFET's a hundred kilohertz, which is the single strongest reason a
-low-frequency front end is built out of bipolars.
-
-**Click a wire and the net lights up.** Every wire on it, a dot on every pin on it, and the status
-bar naming the net and what is on it.
-
-It comes from the netlist the solver builds, not from the lines as drawn — so net labels are
-resolved and blocks are opened out, and what lights up is exactly what the simulator thinks is one
-node. That is the point: net labels make a big schematic readable by removing wires, and the price
-has been that you can no longer see a connection by following a line. A typo'd label now shows up
-at once, because the other end stays dark.
-
-**Step a parameter across a transient.** `Ctrl+Shift+F7` runs the whole circuit once per value of
-something and lays the results on one set of axes. The DC sweep already stepped a parameter, but it
-records an *operating point* at each value — where the circuit settles. This records how it gets
-there, which is the question people actually have: try three capacitor values and watch the ringing
-change, try four gate resistors and watch the switching edge.
-
-Every pass starts from the same conditions, so the curves differ only by the value. The status line
-gives each run's settling value and its overshoot, which is usually the number you are stepping a
-damping element to change.
-
-**Distortion.** The spectrum window now measures THD and THD+N, and lists the harmonics in dB
-relative to the carrier. This is the number an amplifier is sold on and the one thing in that
-window you cannot get by eye: a stage at one percent distortion looks exactly like a sine.
-
-*Which* harmonics is the diagnosis rather than the figure. Odd harmonics mean the distortion is
-symmetric — both rails clipping, a crossover notch. Even harmonics mean it is lopsided — a
-single-ended stage out of headroom on one side, a half-wave rectifier. THD counts the harmonics you
-asked for; THD+N weighs everything that is not the fundamental, so the gap between them is telling
-you something is present that is not a multiple of your signal.
-
-**Find a part.** The palette has a search box. 183 components in 16 collapsible groups is more than
-anybody browses, and browsing only worked if you already knew that a 4017 lives under "40xx Series"
-and an optocoupler under "Switching & Isolation". Type `555`, or `shift register`, or `logic`, and
-the list narrows — it matches the name, what the part does, and the group, because people look for
-what a part is *for* at least as often as for the number printed on it. `Ctrl+F` puts the caret in
-the box, Enter arms the first match so a part can be found and placed without the mouse, Escape
-clears it.
-
-**Circuits travel.** A saved circuit now carries the SPICE cards for any imported models it uses,
-so a `.cirq` file opens complete on a machine that has never seen them. Until now it opened with
-the *default* part in place of the one you chose — a different forward drop, different answers, one
-line in a dialog and nothing on the schematic to say so.
-
-Only what the circuit uses, and only what was imported: built-in parts mean the same thing in every
-copy, so an ordinary circuit's file is unchanged. And a model you already have wins — opening
-somebody's file never rewrites your own parts, it reports the disagreement instead. If you want to
-keep a model a file brought with it, the SPICE import window has a button for that.
-
-**The TL431 and regulators carry temperature.** A regulator's output falls about a millivolt a
-degree, and the die's temperature is the room plus whatever it is dissipating through its own
-thermal resistance — so a part idling in a hot enclosure and one working hard on a bench land in
-the same place, which is the point. The LM317's reference drifts several times less than a 7805's,
-which is a good part of what you pay for.
-
-The TL431's bandgap is **bowed rather than sloped**: both ends of the range sit below the middle.
-That is what a bandgap is — a junction drop falling two millivolts a degree added to a difference
-between two junctions rising, flat to first order with the second-order term left over — and it is
-why the datasheet quotes a deviation band rather than a figure in ppm per degree. Sweep one from
-−40 °C to 125 °C and you get an arch, not a line.
-
-Along the way the TL431 stopped failing to converge at certain setpoints. It has ten siemens of
-transconductance through a sigmoid a couple of millivolts wide, and Newton walking that without a
-limiter overshot the active region entirely and was thrown back past it on the next step — so a
-setpoint of 2.490 V would not solve while 2.495 V solved immediately, for no reason anybody could
-see. It now limits its step the way the diode limits its junction voltage.
-
-**Printing in ink was not thread-safe.** The palette printing swaps in was built from ordinary
-Avalonia brushes, which check the calling thread on every read — so drawing it from anywhere but
-the thread that made it threw on the first stroke, and an export catches that and reports it. The
-visible symptom was an export that wrote its file and then quietly did nothing else. The palette
-is immutable now.
+And the DC sweep runs **backwards**: say what reading you want and it finds the value that gives
+it, along with the nearest E24 part you can actually buy and what *that* one achieves — because the
+exact answer is usually not a thing anybody sells.
 
 **Printing.** `Ctrl+P` lays the schematic, the traces and the parts list onto real sheets — a page
-each, fitted inside the margins, with a header naming the circuit and the date. Choose the paper
-size and orientation; a large schematic scales down to fit, and a small one is left at the size it
-was drawn.
+each, fitted inside the margins, with a header naming the circuit and the date. It prints in ink
+whatever theme you are using, since a dark theme's light strokes would come out blank on white
+paper. Avalonia has no printing API on any platform, so the document is produced as a page-sized
+PDF and handed to the system; the dialog says whether that will reach a printer or a viewer.
 
-It prints in ink whatever theme you are using. A dark theme's strokes are light, so printed as they
-appear they would come out as pale grey on white paper.
+**Parts you did not have to model.** SPICE `.subckt` definitions import, not just `.model` cards. A
+card describes one device, which is why importing has only ever reached diodes, bipolars and
+MOSFETs; anything more interesting — an op-amp, a regulator, a reference — ships as a subcircuit,
+and one now comes in as a block you can place. **VCVS and VCCS** are parts in their own right too,
+which is what makes the macromodels work and which are worth having anyway: a transconductance into
+a capacitor *is* an op-amp's input stage.
 
-Avalonia has no printing API on any platform, so what this does is produce a proper page-sized PDF
-and hand it to the system: straight to the printer where there is a print command, and to your PDF
-viewer where there is not. The dialog says which it will be before you press the button.
+**Circuits travel.** A saved file carries the SPICE cards for the imported models it uses, so it
+opens complete on a machine that never had them. Until now it opened with the *default* part in
+place of the one you chose — a different forward drop, different answers, and nothing on the
+schematic to say so. Only what the circuit uses, only what was imported, and a model you already
+have always wins.
+
+**Around the editor.** The palette has a **Find a part** box (`Ctrl+F`) that matches on the name, on
+what the part does, and on the group. **Click a wire or a pin** and the whole net lights up, taken
+from the netlist the solver builds rather than the lines as drawn — so a typo'd net label shows up
+at once. The scope can **keep a reference** to compare against after a change, and takes
+**arithmetic on the traces** (`Out / In`, `db(Out / In)`, `I ^ 2 * 220`). A copy of the circuit is
+**autosaved** every minute and offered back on the next start. `Ctrl+E` will write the parts list as
+a **bill of materials**. And moving the pointer across a loop-gain or noise plot says what it reads
+there.
+
+**Temperature reaches the regulators.** A regulator's output falls about a millivolt a degree, with
+the die at the room temperature plus whatever it is dissipating — so one idling in a hot enclosure
+and one working hard on a bench land in the same place. The TL431's bandgap is **bowed rather than
+sloped**: sweep it and you get an arch, both ends below the middle, which is the whole reason the
+part costs more than a zener.
+
+### Fixed
+
+**The TL431 would not converge at some setpoints.** Ten siemens through a sigmoid a couple of
+millivolts wide is a knife edge for Newton, so 2.490 V would not solve while 2.495 V solved
+immediately, for no reason anybody could see. It now limits its step the way the diode limits its
+junction voltage.
+
+**Exporting could write its file and then silently do nothing else.** The palette used for printing
+in ink was built from thread-affine brushes, so drawing it from another thread threw — and the
+export catches that exception. The status bar just stayed on "Ready".
+
+**Stability measured the wrong thing if anything else was driving the circuit.** A loop gain is a
+ratio either side of the break, so a generator still connected added its own response to both ends.
+It stayed plausible while it was wrong: a follower read 6 dB of loop gain where it has 106. Every
+other small-signal source is now silenced for the length of a stability sweep.
 
 ## [0.30.0] - 2026-09-21
 
