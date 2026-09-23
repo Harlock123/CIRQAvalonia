@@ -8,6 +8,11 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+## [0.33.1] - 2026-09-23
+
+Documentation only — nothing in the application changed, so there is no need to update for it
+unless you want the guide. 186 components in 16 categories, 87 worked examples, 3046 tests.
+
 **`4k7` is now explained rather than assumed.** It is RKM code — BS 1852, now IEC 60062 — where the
 multiplier letter stands where the decimal point would have been, because a decimal point is the
 easiest mark on a drawing to lose and `47` against `4.7` is a factor of ten in a value somebody is
@@ -1653,7 +1658,8 @@ First public build of CirqAvalonia — an electronic circuit analyzer and mixed-
 
 **501 tests** measure the solver against closed-form answers rather than recorded output.
 
-[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.33.0...HEAD
+[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.33.1...HEAD
+[0.33.1]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.33.0...v0.33.1
 [0.33.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.32.0...v0.33.0
 [0.32.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.31.0...v0.32.0
 [0.31.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.30.0...v0.31.0
