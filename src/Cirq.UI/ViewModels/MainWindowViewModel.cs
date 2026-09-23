@@ -237,6 +237,27 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     public partial bool ShowHoverDetails { get; set; } = true;
 
+    /// <summary>
+    /// Whether current is drawn moving along the wires.
+    /// <para>
+    /// Off unless asked for. It is the fastest way to make a circuit legible to somebody who
+    /// cannot yet read a trace — you can see that current leaves the supply, divides at a
+    /// junction, and comes back — but it is also motion on a drawing somebody may be trying to
+    /// work on, and it costs a pass over every wire per frame.
+    /// </para>
+    /// </summary>
+    [ObservableProperty]
+    public partial bool ShowCurrentFlow { get; set; }
+
+    partial void OnShowCurrentFlowChanged(bool value)
+    {
+        Simulation.TrackWireCurrents = value;
+
+        if (value) Simulation.RefreshWireCurrents();
+
+        RequestRedraw?.Invoke(this, EventArgs.Empty);
+    }
+
     [ObservableProperty]
     public partial double GridSize { get; set; } = 10.0;
 

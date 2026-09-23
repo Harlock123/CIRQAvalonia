@@ -4,6 +4,7 @@ using System.Text.Json;
 using Cirq.Components.Digital;
 using Cirq.Core.Primitives;
 using Cirq.Core.Probing;
+using Cirq.Core.Verification;
 using Cirq.Components.Hierarchy;
 using Cirq.Components.Spice;
 using Cirq.Core.Topology;
@@ -184,6 +185,22 @@ public static class CircuitSerializer
         }
 
         document.Models = EmbeddedModels(circuit);
+
+        if (circuit.Specs.Count > 0)
+        {
+            document.Specs = [.. circuit.Specs.Select(spec => new SpecRecord
+            {
+                Id = spec.Id,
+                Name = spec.Name,
+                Trace = spec.Trace,
+                Quantity = spec.Quantity.ToString(),
+                Comparison = spec.Comparison.ToString(),
+                Limit = spec.Limit,
+                Tolerance = spec.Tolerance,
+                Unit = spec.Unit,
+                IsEnabled = spec.IsEnabled,
+            })];
+        }
 
         return document;
     }
@@ -491,6 +508,41 @@ public static class CircuitSerializer
                 probe.ReferenceTerminal = Resolve(record.Reference, byId, result.Warnings);
 
             circuit.Probes.Add(probe);
+        }
+
+        foreach (var record in document.Specs ?? [])
+        {
+            var spec = new DesignSpec
+            {
+                Id = record.Id == Guid.Empty ? Guid.NewGuid() : record.Id,
+                Name = record.Name,
+                Trace = record.Trace,
+                Limit = record.Limit,
+                Tolerance = record.Tolerance,
+                Unit = record.Unit,
+                IsEnabled = record.IsEnabled,
+            };
+
+            // Stored by name, so a file written by a newer version that has grown a quantity this
+            // one does not know about keeps the requirement rather than silently measuring the
+            // wrong thing. It is reported instead.
+            if (Enum.TryParse<SpecQuantity>(record.Quantity, ignoreCase: true, out var quantity))
+            {
+                spec.Quantity = quantity;
+            }
+            else
+            {
+                result.Warnings.Add(
+                    $"Requirement \"{record.Name}\" measures \"{record.Quantity}\", which this " +
+                    "version does not know how to measure. It was kept but turned off.");
+
+                spec.IsEnabled = false;
+            }
+
+            if (Enum.TryParse<SpecComparison>(record.Comparison, ignoreCase: true, out var comparison))
+                spec.Comparison = comparison;
+
+            circuit.Specs.Add(spec);
         }
 
         return result;

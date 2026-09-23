@@ -84,6 +84,9 @@
         <MenuItem Header="Describe Parts on _Hover" ToggleType="CheckBox"
                   IsChecked="{Binding ShowHoverDetails, Mode=TwoWay}"
                   ToolTip.Tip="Rest the pointer on a part to see its name, type and settings" />
+        <MenuItem Header="Show Current _Flow" ToggleType="CheckBox"
+                  IsChecked="{Binding ShowCurrentFlow, Mode=TwoWay}"
+                  ToolTip.Tip="Dots along each wire, moving at a rate set by the current in it" />
         <Separator />
         <MenuItem Header="Component _Palette" InputGesture="F9" ToggleType="CheckBox"
                   IsChecked="{Binding IsPaletteExpanded, Mode=TwoWay}" />
@@ -278,6 +281,7 @@
                                 ShowGrid="{Binding ShowGrid}"
                                 ShowInteractiveMarkers="{Binding ShowInteractiveMarkers}"
                                 ShowHoverDetails="{Binding ShowHoverDetails}"
+                                ShowCurrentFlow="{Binding ShowCurrentFlow}"
                                 SnapToGrid="{Binding SnapToGrid}"
                                 GridSize="{Binding GridSize}" />
 

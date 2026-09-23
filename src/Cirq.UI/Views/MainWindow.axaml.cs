@@ -369,6 +369,18 @@ public partial class MainWindow : Window
     {
         if (_viewModel is null) return;
 
+        if (_viewModel.ShowCurrentFlow && _canvas is not null)
+        {
+            // Nothing is stepping while it is paused, so the snapshot has to be asked for.
+            if (!_viewModel.Simulation.IsRunning) _viewModel.Simulation.RefreshWireCurrents();
+
+            _canvas.WireCurrents = _viewModel.Simulation.WireCurrents;
+        }
+        else if (_canvas is not null)
+        {
+            _canvas.WireCurrents = null;
+        }
+
         _canvas?.InvalidateVisual();
 
         // The parts can be worked from the canvas too — double-clicking a switch still flips it —

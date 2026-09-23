@@ -17,6 +17,13 @@ public partial class Circuit : ObservableObject
     public ObservableCollection<SignalProbe> Probes { get; } = [];
 
     /// <summary>
+    /// What this circuit is supposed to do, written down so it can be checked rather than
+    /// remembered. Travels with the circuit, because a requirement that lives in one person's
+    /// head is not a requirement.
+    /// </summary>
+    public ObservableCollection<Cirq.Core.Verification.DesignSpec> Specs { get; } = [];
+
+    /// <summary>
     /// The temperature everything in this circuit is at, in degrees Celsius. 27 °C is what every
     /// model in the library is characterised at, and what a datasheet means by "room temperature".
     /// <para>
@@ -78,6 +85,7 @@ public partial class Circuit : ObservableObject
     public void Clear()
     {
         Probes.Clear();
+        Specs.Clear();
         Wires.Clear();
         Components.Clear();
     }

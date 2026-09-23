@@ -464,18 +464,27 @@ public sealed class CircuitSimulator
         };
     }
 
-    private double ProbeCurrent(SignalProbe probe)
+    private double ProbeCurrent(SignalProbe probe) => TerminalCurrent(probe.TargetTerminal);
+
+    /// <summary>
+    /// Current into a component through one of its pins, in amps, positive inwards — the
+    /// convention a clamp meter uses.
+    /// <para>
+    /// A component that knows which pin was asked about is asked first. The generic branch current
+    /// is the fallback, and it cannot tell one pin from another: on a package with ten driven
+    /// outputs there are ten branches and no way to say which was meant.
+    /// </para>
+    /// </summary>
+    public double TerminalCurrent(Terminal? terminal)
     {
-        var owner = probe.TargetTerminal?.Owner;
+        var owner = terminal?.Owner;
         if (owner is null) return 0;
 
-        // A component that knows which pin was probed is asked first. The generic branch current
-        // is the fallback, and it cannot tell one pin from another — on a package with ten driven
-        // outputs there are ten branches and no way to say which was meant.
         if (owner is ICurrentReporting reporting)
-            return reporting.TerminalCurrent(probe.TargetTerminal!, System, State);
+            return reporting.TerminalCurrent(terminal!, System, State);
 
         if (owner.VoltageSourceCount > 0) return System.BranchCurrent(owner);
+
         return 0;
     }
 }

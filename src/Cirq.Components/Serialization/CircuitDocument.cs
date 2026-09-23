@@ -40,6 +40,37 @@ public sealed class CircuitDocument
     /// </summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<ModelRecord>? Models { get; set; }
+
+    /// <summary>
+    /// What the circuit is supposed to do. Null in every file written before requirements existed,
+    /// and in every circuit that has none — so an ordinary file is byte-for-byte what it was.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<SpecRecord>? Specs { get; set; }
+}
+
+/// <summary>One written-down requirement, exactly as the panel holds it.</summary>
+public sealed class SpecRecord
+{
+    public Guid Id { get; set; }
+
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>The probe label this requirement measures.</summary>
+    public string Trace { get; set; } = string.Empty;
+
+    /// <summary>Stored by name so a new quantity can be added without moving the others.</summary>
+    public string Quantity { get; set; } = nameof(Cirq.Core.Verification.SpecQuantity.PeakToPeak);
+
+    public string Comparison { get; set; } = nameof(Cirq.Core.Verification.SpecComparison.AtMost);
+
+    public double Limit { get; set; }
+
+    public double Tolerance { get; set; }
+
+    public string Unit { get; set; } = "V";
+
+    public bool IsEnabled { get; set; } = true;
 }
 
 /// <summary>One imported device model, as the card that defines it.</summary>

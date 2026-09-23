@@ -54,6 +54,16 @@ public class CircuitCanvas : Control
     public static readonly StyledProperty<bool> ShowInteractiveMarkersProperty =
         AvaloniaProperty.Register<CircuitCanvas, bool>(nameof(ShowInteractiveMarkers), true);
 
+    public static readonly StyledProperty<bool> ShowCurrentFlowProperty =
+        AvaloniaProperty.Register<CircuitCanvas, bool>(nameof(ShowCurrentFlow));
+
+    /// <summary>
+    /// How much current each wire is carrying, refreshed by whoever is running the simulation.
+    /// Null, or an empty map, draws nothing.
+    /// </summary>
+    public static readonly StyledProperty<IReadOnlyDictionary<WireSegment, double>?> WireCurrentsProperty =
+        AvaloniaProperty.Register<CircuitCanvas, IReadOnlyDictionary<WireSegment, double>?>(nameof(WireCurrents));
+
     public static readonly StyledProperty<bool> ShowHoverDetailsProperty =
         AvaloniaProperty.Register<CircuitCanvas, bool>(nameof(ShowHoverDetails), true);
 
@@ -104,6 +114,20 @@ public class CircuitCanvas : Control
     {
         get => GetValue(ShowGridProperty);
         set => SetValue(ShowGridProperty, value);
+    }
+
+    /// <summary>Whether the dots showing current moving along the wires are drawn.</summary>
+    public bool ShowCurrentFlow
+    {
+        get => GetValue(ShowCurrentFlowProperty);
+        set => SetValue(ShowCurrentFlowProperty, value);
+    }
+
+    /// <summary>What each wire is carrying, for those dots.</summary>
+    public IReadOnlyDictionary<WireSegment, double>? WireCurrents
+    {
+        get => GetValue(WireCurrentsProperty);
+        set => SetValue(WireCurrentsProperty, value);
     }
 
     /// <summary>Whether components that can be double-clicked are marked as such.</summary>
@@ -190,6 +214,7 @@ public class CircuitCanvas : Control
         AffectsRender<CircuitCanvas>(
             CircuitProperty, ActiveToolProperty, SelectedComponentProperty,
             ZoomProperty, GridSizeProperty, ShowGridProperty, PendingItemProperty, ShowHoverDetailsProperty,
+            ShowCurrentFlowProperty, WireCurrentsProperty,
             ShowInteractiveMarkersProperty);
     }
 
@@ -359,6 +384,7 @@ public class CircuitCanvas : Control
                     Zoom, SelectedComponent, ShowInteractiveMarkers, HighlightedNet: _highlightedNet));
 
             // Editing aids rather than part of the circuit, so they stay here and out of an export.
+            DrawCurrentFlow(canvas, circuit);
             DrawTerminals(canvas, circuit);
             DrawWireInProgress(canvas);
             DrawSelectionBand(canvas);
@@ -369,6 +395,45 @@ public class CircuitCanvas : Control
         // describing. Being here also keeps it out of an export, like the grid.
         DrawHoverCard(context);
     }
+
+    /// <summary>
+    /// Dots travelling along each wire at a rate set by what it is carrying.
+    /// <para>
+    /// Here rather than in <see cref="CircuitRenderer"/> because it is not part of the drawing.
+    /// An exported schematic is a still, and a still of moving dots says nothing at all — it
+    /// would be a row of marks in whatever positions the clock happened to be at.
+    /// </para>
+    /// <para>
+    /// The colour is fixed rather than themed, for the same reason the colour bands on the hover
+    /// card are: it is an overlay that has to read against a dark canvas, a light one and pure
+    /// black alike, and the themes' own inks are chosen to blend with their backgrounds.
+    /// </para>
+    /// </summary>
+    private void DrawCurrentFlow(ISymbolCanvas canvas, Circuit circuit)
+    {
+        if (!ShowCurrentFlow) return;
+        if (WireCurrents is not { Count: > 0 } currents) return;
+
+        var seconds = Environment.TickCount64 / 1000.0;
+        var radius = Math.Clamp(3.0 / Zoom, 1.5, 6.0);
+
+        foreach (var wire in circuit.Wires)
+        {
+            if (!currents.TryGetValue(wire, out var amps)) continue;
+            if (wire.SourceTerminal is null || wire.TargetTerminal is null) continue;
+
+            var path = CircuitRenderer.BuildWirePath(wire)
+                .Select(p => new Point(p.X, p.Y))
+                .ToList();
+
+            foreach (var dot in CurrentFlow.Dots(path, amps, seconds))
+                canvas.DrawEllipse(FlowBrush, null, dot, radius, radius);
+        }
+    }
+
+    /// <summary>Amber, which reads on every theme the application has.</summary>
+    private static readonly IBrush FlowBrush =
+        new Avalonia.Media.Immutable.ImmutableSolidColorBrush(Color.FromRgb(0xFF, 0xB7, 0x03));
 
     /// <summary>The band as a rectangle, however it was dragged — up, down, left or right.</summary>
     private Rect BandRect() => new(

@@ -85,6 +85,50 @@ public sealed partial class SimulationController : ObservableObject, IDisposable
     /// <summary>Raised on the worker thread after a batch of time points has been solved.</summary>
     public event Action? Advanced;
 
+    /// <summary>
+    /// Whether the current in each wire is worked out as the run goes. Off unless something is
+    /// drawing it, because it costs a pass over every wire per slice.
+    /// </summary>
+    public bool TrackWireCurrents { get; set; }
+
+    private IReadOnlyDictionary<WireSegment, double> _wireCurrents =
+        new Dictionary<WireSegment, double>();
+
+    /// <summary>
+    /// What each wire was carrying at the last solved point.
+    /// <para>
+    /// A snapshot, replaced wholesale rather than edited in place, because it is written on the
+    /// worker thread and read on the UI one. Swapping a reference is atomic; a reader either gets
+    /// the whole of the previous answer or the whole of the new one, and never a half-built
+    /// dictionary being enumerated as it grows.
+    /// </para>
+    /// </summary>
+    public IReadOnlyDictionary<WireSegment, double> WireCurrents => _wireCurrents;
+
+    /// <summary>
+    /// Works the currents out now, for when nothing is running. Safe only because there is no
+    /// worker touching the matrix while the simulation is stopped — during a run the snapshot is
+    /// taken inside the same lock the solver holds.
+    /// </summary>
+    public void RefreshWireCurrents()
+    {
+        if (IsRunning) return;
+
+        lock (_gate) SnapshotWireCurrents();
+    }
+
+    private void SnapshotWireCurrents()
+    {
+        if (!TrackWireCurrents || Simulator is null)
+        {
+            if (_wireCurrents.Count > 0) _wireCurrents = new Dictionary<WireSegment, double>();
+
+            return;
+        }
+
+        _wireCurrents = WireCurrentsService.For(Circuit, Simulator);
+    }
+
     /// <summary>Marks the topology as changed so the next run recompiles the netlist.</summary>
     public void InvalidateTopology()
     {
@@ -182,6 +226,7 @@ public sealed partial class SimulationController : ObservableObject, IDisposable
                 SimulationTime = Simulator.Time;
                 Status = $"Stepped to {FormatTime(SimulationTime)}";
                 CheckBoards();
+                SnapshotWireCurrents();
             }
             catch (Exception ex)
             {
@@ -278,6 +323,9 @@ public sealed partial class SimulationController : ObservableObject, IDisposable
                     CheckBoards();
 
                     SimulationTime = simulator.Time;
+
+                    // Inside the lock, so the matrix is not being written while it is read.
+                    SnapshotWireCurrents();
                 }
             }
             catch (Exception ex)

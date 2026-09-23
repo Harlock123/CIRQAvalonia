@@ -7,6 +7,7 @@ using Cirq.Components.Sources;
 using Cirq.Core.Primitives;
 using Cirq.Core.Probing;
 using Cirq.Core.Topology;
+using Cirq.Core.Verification;
 using Cirq.Engine.Simulation;
 
 namespace Cirq.Components.Tests;
@@ -19,6 +20,95 @@ public class SerializationTests
         var result = CircuitSerializer.FromJson(CircuitSerializer.ToJson(circuit));
         Assert.True(result.IsClean, $"Load warnings: {string.Join("; ", result.Warnings)}");
         return result.Circuit;
+    }
+
+
+    /// <summary>
+    /// A circuit's written-down requirements travel with it. A requirement that lives in one
+    /// person's head is not a requirement, and one that does not survive a save is worse — it
+    /// looks like the design has none.
+    /// </summary>
+    [Fact]
+    public void RequirementsTravelWithTheCircuit()
+    {
+        var circuit = new Circuit();
+
+        circuit.Add(new Resistor(1e3) { Name = "R1" });
+
+        circuit.Specs.Add(new DesignSpec
+        {
+            Name = "Rail ripple",
+            Trace = "Rail",
+            Quantity = SpecQuantity.PeakToPeak,
+            Comparison = SpecComparison.AtMost,
+            Limit = 0.05,
+            Unit = "V",
+        });
+
+        circuit.Specs.Add(new DesignSpec
+        {
+            Name = "Output regulation",
+            Trace = "Out",
+            Quantity = SpecQuantity.Mean,
+            Comparison = SpecComparison.Within,
+            Limit = 5.0,
+            Tolerance = 0.1,
+            IsEnabled = false,
+        });
+
+        var loaded = RoundTrip(circuit);
+
+        Assert.Equal(2, loaded.Specs.Count);
+
+        var ripple = loaded.Specs[0];
+
+        Assert.Equal("Rail ripple", ripple.Name);
+        Assert.Equal("Rail", ripple.Trace);
+        Assert.Equal(SpecQuantity.PeakToPeak, ripple.Quantity);
+        Assert.Equal(SpecComparison.AtMost, ripple.Comparison);
+        Assert.Equal(0.05, ripple.Limit, 1e-12);
+        Assert.True(ripple.IsEnabled);
+
+        var regulation = loaded.Specs[1];
+
+        Assert.Equal(SpecComparison.Within, regulation.Comparison);
+        Assert.Equal(0.1, regulation.Tolerance, 1e-12);
+        Assert.False(regulation.IsEnabled);
+    }
+
+    /// <summary>A circuit with no requirements writes no requirements section at all.</summary>
+    [Fact]
+    public void ACircuitWithoutRequirementsIsUnchangedOnDisk()
+    {
+        var circuit = new Circuit();
+
+        circuit.Add(new Resistor(1e3) { Name = "R1" });
+
+        Assert.DoesNotContain("\"specs\"", CircuitSerializer.ToJson(circuit), StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// A file written by a newer version, measuring something this one has never heard of, keeps
+    /// the requirement and says so rather than silently measuring the wrong thing.
+    /// </summary>
+    [Fact]
+    public void AnUnknownQuantityIsKeptAndReported()
+    {
+        var circuit = new Circuit();
+
+        circuit.Add(new Resistor(1e3) { Name = "R1" });
+        circuit.Specs.Add(new DesignSpec { Name = "Settling", Trace = "Out" });
+
+        var json = CircuitSerializer.ToJson(circuit)
+            .Replace("\"PeakToPeak\"", "\"SettlingTime\"", StringComparison.Ordinal);
+
+        var result = CircuitSerializer.FromJson(json);
+
+        var spec = Assert.Single(result.Circuit.Specs);
+
+        Assert.Equal("Settling", spec.Name);
+        Assert.False(spec.IsEnabled);
+        Assert.Contains(result.Warnings, w => w.Contains("SettlingTime", StringComparison.Ordinal));
     }
 
     /// <summary>Every component type the palette can place, instantiated through its own factory.</summary>
