@@ -107,6 +107,9 @@ public partial class MainWindow : Window
         viewModel.RequestTransientStep += async (_, _) => await ShowTransientStepAsync();
         viewModel.RequestNoise += async (_, _) => await ShowNoiseAsync();
         viewModel.RequestStability += async (_, _) => await ShowStabilityAsync();
+        viewModel.RequestImpedance += async (_, _) => await ShowImpedanceAsync();
+        viewModel.RequestPoleZero += async (_, _) => await ShowPoleZeroAsync();
+        viewModel.RequestSpecs += async (_, _) => await ShowSpecsAsync();
         viewModel.RequestRuleCheck += async (_, _) => await ShowRuleCheckAsync();
         viewModel.RequestSpectrum += async (_, _) => await ShowSpectrumAsync();
         viewModel.RequestBusDecode += async (_, _) => await ShowBusDecodeAsync();
@@ -209,6 +212,44 @@ public partial class MainWindow : Window
         {
             DataContext = new StabilityViewModel(_viewModel.Circuit),
         };
+
+        await dialog.ShowDialog(this);
+    }
+
+    private async Task ShowImpedanceAsync()
+    {
+        if (_viewModel is null) return;
+
+        var dialog = new ImpedanceWindow
+        {
+            DataContext = new ImpedanceViewModel(_viewModel.Circuit),
+        };
+
+        await dialog.ShowDialog(this);
+    }
+
+    private async Task ShowPoleZeroAsync()
+    {
+        if (_viewModel is null) return;
+
+        var dialog = new PoleZeroWindow
+        {
+            DataContext = new PoleZeroViewModel(_viewModel.Circuit),
+        };
+
+        await dialog.ShowDialog(this);
+    }
+
+    private async Task ShowSpecsAsync()
+    {
+        if (_viewModel is null) return;
+
+        var model = new SpecsViewModel(_viewModel.Circuit);
+
+        // Adding or editing a requirement changes the document, the same as moving a part does.
+        model.Changed += (_, _) => _viewModel.MarkModified();
+
+        var dialog = new SpecsWindow { DataContext = model };
 
         await dialog.ShowDialog(this);
     }

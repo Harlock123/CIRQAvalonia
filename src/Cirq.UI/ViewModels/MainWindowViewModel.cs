@@ -443,6 +443,12 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     public partial bool IsModified { get; private set; }
 
+    /// <summary>
+    /// Records that the document has changed, for edits made somewhere other than the canvas —
+    /// a requirement written down in its own window is an edit like moving a part is.
+    /// </summary>
+    public void MarkModified() => IsModified = true;
+
     /// <summary>File name for display, or a placeholder for a circuit that has never been saved.</summary>
     public string DocumentName => CurrentFilePath is null
         ? "Untitled"
@@ -687,6 +693,24 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
     /// <summary>Raised when the About dialog should be shown.</summary>
     public event EventHandler? RequestAbout;
+
+    /// <summary>Raised when the impedance window should be opened.</summary>
+    public event EventHandler? RequestImpedance;
+
+    [RelayCommand]
+    private void ShowImpedance() => RequestImpedance?.Invoke(this, EventArgs.Empty);
+
+    /// <summary>Raised when the pole-zero window should be opened.</summary>
+    public event EventHandler? RequestPoleZero;
+
+    [RelayCommand]
+    private void ShowPoleZero() => RequestPoleZero?.Invoke(this, EventArgs.Empty);
+
+    /// <summary>Raised when the requirements window should be opened.</summary>
+    public event EventHandler? RequestSpecs;
+
+    [RelayCommand]
+    private void ShowSpecs() => RequestSpecs?.Invoke(this, EventArgs.Empty);
 
     /// <summary>Raised when the frequency-response window should be opened.</summary>
     public event EventHandler? RequestFrequencyResponse;
@@ -1147,9 +1171,12 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
           Ctrl+Shift+F7 Step a parameter across a transient
           Shift+F5     Noise
           Ctrl+F7      Stability — loop gain and phase margin
+          Ctrl+F6      Impedance — what the circuit looks like from one point
+          Shift+F6     Poles and zeros — what it rings at, and how long it settles
           F3           Spectrum of the traces
           Shift+F3     Decode the traces as a bus
           F4           Check circuit
+          Ctrl+F4      Requirements — what it is supposed to do, checked
           Shift+F4     Tolerance analysis
           F8           Reset
 

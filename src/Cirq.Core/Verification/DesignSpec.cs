@@ -32,6 +32,37 @@ public enum SpecQuantity
     RiseTime,
 }
 
+/// <summary>
+/// The words for each measurement, in one place.
+/// <para>
+/// A requirement is read far more often than it is written, and it is read in sentences — "rail
+/// peak to peak at most 50 mV". Spelling that off the enum gives "peaktopeak", which is the code
+/// leaking into the product.
+/// </para>
+/// </summary>
+public static class SpecWords
+{
+    public static string Of(SpecQuantity quantity) => quantity switch
+    {
+        SpecQuantity.PeakToPeak => "peak to peak",
+        SpecQuantity.Minimum => "minimum",
+        SpecQuantity.Maximum => "maximum",
+        SpecQuantity.Mean => "mean",
+        SpecQuantity.Rms => "RMS",
+        SpecQuantity.Frequency => "frequency",
+        SpecQuantity.DutyCycle => "duty cycle",
+        SpecQuantity.RiseTime => "rise time",
+        _ => quantity.ToString(),
+    };
+
+    public static string Of(SpecComparison comparison) => comparison switch
+    {
+        SpecComparison.AtMost => "at most",
+        SpecComparison.AtLeast => "at least",
+        _ => "within",
+    };
+}
+
 /// <summary>How a measured value is held against its limit.</summary>
 public enum SpecComparison
 {
@@ -102,8 +133,7 @@ public partial class DesignSpec : ObservableObject
         _ => $"{Label} within {Format(Tolerance)} of {Format(Limit)}",
     };
 
-    private string Label =>
-        $"{Trace} {Quantity.ToString().ToLowerInvariant()}";
+    private string Label => $"{Trace} {SpecWords.Of(Quantity)}";
 
     internal string Format(double value) => SiPrefix.Format(value, Unit);
 }
@@ -176,8 +206,8 @@ public static class SpecCheck
             // A frequency needs cycles and a rise time needs an edge. Saying so is more use than
             // failing the requirement, because the circuit has not been shown to break it.
             return new SpecResult(spec, null, null,
-                $"Nothing to measure yet: {spec.Quantity.ToString().ToLowerInvariant()} needs more " +
-                "of the waveform than the scope has recorded.");
+                $"Nothing to measure yet: {SpecWords.Of(spec.Quantity)} needs more of the " +
+                "waveform than the scope has recorded.");
         }
 
         var passed = spec.Comparison switch

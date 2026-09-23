@@ -200,13 +200,13 @@ public class DesignSpecTests
     [Fact]
     public void ItReadsBackAsASentence()
     {
-        Assert.Equal("Rail ripple at most 50mV", new DesignSpec
+        Assert.Equal("Rail peak to peak at most 50mV", new DesignSpec
         {
             Trace = "Rail",
             Quantity = SpecQuantity.PeakToPeak,
             Comparison = SpecComparison.AtMost,
             Limit = 0.05,
-        }.Describe().Replace("peaktopeak", "ripple"));
+        }.Describe());
 
         Assert.Equal("Out mean within 100mV of 5V", new DesignSpec
         {

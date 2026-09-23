@@ -145,6 +145,20 @@ public static class DocPlot
         };
     }
 
+    /// <summary>
+    /// A decade axis up the side, for a quantity plotted as its logarithm. The mirror of
+    /// <see cref="DecadeBottom"/>, and needed for the same reason: an impedance that runs from
+    /// fifty milliohms to a couple of hundred ohms has its whole interesting part squashed against
+    /// the bottom of a linear axis.
+    /// </summary>
+    public static void DecadeLeft(Plot plot)
+    {
+        plot.Axes.Left.TickGenerator = new ScottPlot.TickGenerators.NumericAutomatic
+        {
+            LabelFormatter = v => Cirq.Core.Units.SiPrefix.Format(Math.Pow(10, v), string.Empty),
+        };
+    }
+
     public static void SiLeft(Plot plot)
     {
         plot.Axes.Left.TickGenerator = new ScottPlot.TickGenerators.NumericAutomatic
@@ -168,14 +182,14 @@ public static class DocPlot
     }
 
     /// <summary>A dashed reference line, for the thresholds a margin is measured from.</summary>
-    public static void Reference(Plot plot, double y, string label)
+    public static void Reference(Plot plot, double y, string? label)
     {
         var line = plot.Add.HorizontalLine(y);
 
         line.Color = Marker;
         line.LineWidth = 1;
         line.LinePattern = LinePattern.Dashed;
-        line.Text = label;
+        line.Text = label ?? string.Empty;
     }
 
     /// <summary>

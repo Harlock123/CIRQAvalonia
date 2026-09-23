@@ -8,6 +8,51 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+Five analyses and one overlay, all about the half of a design that a waveform does not show.
+
+**What does it look like from here?** `Ctrl+F6` measures **impedance** against frequency at any
+probe — magnitude and phase. Every bench question about loading is this one: what an amplifier
+presents to whatever drives it, what a regulator can hold its output against, where a decoupling
+network resonates and how much it actually helps at the frequency the chip switches at. A gain plot
+answers none of them, because gain is a ratio between two points and this is a property of one.
+
+One amp of small-signal current goes in and the volts that appear are the ohms. Every other source
+is silenced for the sweep, which is what makes it the Thévenin impedance rather than a number with
+the circuit's own signal mixed in. The phase says which kind of resonance you are looking at, and a
+decoupling capacitor's series resonance — above which it is not a capacitor any more, it is the loop
+of wire it is soldered into — is marked on the plot.
+
+**What does it ring at?** `Shift+F6` finds the circuit's **poles and zeros**. Stability says a loop
+has eight degrees of phase margin; this says why: a conjugate pair at 145 kHz with a Q of seven. A
+transient shows a circuit ringing; this gives the frequency and how many cycles it takes to stop
+without measuring either off a trace. They are the circuit's own properties rather than properties
+of whatever you drove it with.
+
+That needed a general real eigensolver, so there is now one. Zeros come from the bordered system
+matrix rather than the textbook shortcut of "the natural frequencies with the output shorted",
+because the shortcut silently loses zeros at the origin and every AC-coupled stage has one. A
+transmission line is refused rather than approximated: a delay has infinitely many poles.
+
+**How hot does the part get?** MOSFETs, bipolars and diodes now **heat themselves**. Give one a
+thermal resistance in degrees per watt and its die stops sitting at ambient: on-resistance climbs,
+a bipolar draws more as it warms, a rectifier's drop falls. A switch specified at room temperature
+is specified wrong, and this is how you find out by how much. Zero is the default and keeps the old
+behaviour exactly. Thermal runaway stops at the junction temperature the part is rated for and says
+so on its hover card, rather than the solver failing with a message about time steps.
+
+**Is that what it was supposed to do?** `Ctrl+F4` is where **requirements** are written down — a
+name, a trace, one measurement off it, and a limit — and checked. Every analysis here already
+produces numbers; until the limit is written down somewhere, whether they are the right numbers
+lives in whoever last looked. The answer is three-way: met, not met, or nothing to measure, and the
+third is not the second. Requirements are saved with the circuit.
+
+**Where is the current actually going?** **View > Show Current Flow** puts moving dots on the wires,
+at a rate set by what each is carrying and in the direction it is going. A schematic shows what is
+connected and a scope shows what one point is doing; neither shows that current leaves the supply,
+divides at a junction, and comes back. The speed is logarithmic, because a microamp of base current
+beside an amp of collector current would otherwise be indistinguishable from stopped. Where a
+junction divides the current the wires are left dark rather than guessed at.
+
 ## [0.32.0] - 2026-09-23
 
 What a part looks like, not just what it is set to. Hover a resistor and its colour bands are drawn

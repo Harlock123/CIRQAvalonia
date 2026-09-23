@@ -1,0 +1,89 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:sp="clr-namespace:ScottPlot.Avalonia;assembly=ScottPlot.Avalonia"
+        xmlns:vm="clr-namespace:Cirq.UI.ViewModels"
+        x:Class="Cirq.UI.Views.PoleZeroWindow"
+        x:DataType="vm:PoleZeroViewModel"
+        Title="Poles and Zeros"
+        Width="1000" Height="700"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource PanelBackground}">
+
+  <DockPanel>
+
+    <Border DockPanel.Dock="Top" Padding="14,12"
+            Background="{DynamicResource PanelBackground}"
+            BorderBrush="{DynamicResource PanelBorder}" BorderThickness="0,0,0,1">
+      <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+        <TextBlock Text="From" VerticalAlignment="Center" />
+        <ComboBox Width="150" ItemsSource="{Binding Inputs}"
+                  SelectedItem="{Binding Input, Mode=TwoWay}"
+                  DisplayMemberBinding="{Binding Name}"
+                  ToolTip.Tip="The source a transfer function goes in at. Only the zeros need it: the poles belong to the circuit however it is driven." />
+
+        <TextBlock Text="to" VerticalAlignment="Center" Opacity="0.7" />
+        <ComboBox Width="150" ItemsSource="{Binding Outputs}"
+                  SelectedItem="{Binding Output, Mode=TwoWay}"
+                  DisplayMemberBinding="{Binding Label}"
+                  ToolTip.Tip="The probe the transfer function comes out at." />
+
+        <Button Content="Find" Command="{Binding RunCommand}" IsEnabled="{Binding !IsBusy}"
+                Padding="18,5" />
+      </StackPanel>
+    </Border>
+
+    <Border DockPanel.Dock="Right" Width="330" Padding="12,10"
+            BorderBrush="{DynamicResource PanelBorder}" BorderThickness="1,0,0,0">
+      <DockPanel>
+        <TextBlock DockPanel.Dock="Top" Text="ROOTS" Classes="heading" />
+
+        <TextBlock DockPanel.Dock="Top" FontSize="10" Opacity="0.5" Margin="0,0,0,6"
+                   TextWrapping="Wrap"
+                   Text="Slowest first — the pole nearest the axis decides how long everything takes, however fast the rest of it is." />
+
+        <ScrollViewer>
+          <ItemsControl ItemsSource="{Binding Roots}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:RootRow">
+                <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,3" ColumnSpacing="8">
+                  <TextBlock Text="{Binding Kind}" FontSize="10" Opacity="0.5"
+                             VerticalAlignment="Center" Width="34" />
+                  <StackPanel Grid.Column="1" Spacing="1">
+                    <TextBlock Text="{Binding Frequency}" FontSize="12" />
+                    <TextBlock Text="{Binding Position}" FontSize="9" Opacity="0.55"
+                               FontFamily="monospace" TextTrimming="CharacterEllipsis" />
+                  </StackPanel>
+                  <TextBlock Grid.Column="2" Text="{Binding Shape}" FontSize="11"
+                             VerticalAlignment="Center" Opacity="0.8" />
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </ScrollViewer>
+      </DockPanel>
+    </Border>
+
+    <Border DockPanel.Dock="Bottom" Padding="14,10"
+            BorderBrush="{DynamicResource PanelBorder}" BorderThickness="0,1,0,0">
+      <StackPanel Spacing="6">
+        <StackPanel Orientation="Horizontal" Spacing="26">
+          <StackPanel>
+            <TextBlock Text="POLES" FontSize="10" Opacity="0.5" />
+            <TextBlock Text="{Binding PoleCount}" FontSize="19" FontWeight="SemiBold" />
+          </StackPanel>
+          <StackPanel>
+            <TextBlock Text="DOMINANT" FontSize="10" Opacity="0.5" />
+            <TextBlock Text="{Binding Dominant}" FontSize="19" FontWeight="SemiBold" />
+          </StackPanel>
+          <TextBlock Text="{Binding Verdict}" TextWrapping="Wrap" VerticalAlignment="Center"
+                     MaxWidth="470" Opacity="0.85" />
+        </StackPanel>
+
+        <TextBlock Text="{Binding Status}" TextWrapping="Wrap" Opacity="0.6" FontSize="11" />
+      </StackPanel>
+    </Border>
+
+    <sp:AvaPlot Name="Plot" />
+
+  </DockPanel>
+</Window>

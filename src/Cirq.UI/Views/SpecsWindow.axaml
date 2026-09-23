@@ -1,0 +1,99 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:Cirq.UI.ViewModels"
+        x:Class="Cirq.UI.Views.SpecsWindow"
+        x:DataType="vm:SpecsViewModel"
+        Title="Requirements"
+        Width="1020" Height="620"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource PanelBackground}">
+
+  <DockPanel>
+
+    <Border DockPanel.Dock="Top" Padding="14,12"
+            BorderBrush="{DynamicResource PanelBorder}" BorderThickness="0,0,0,1">
+      <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+        <Button Content="Add requirement" Command="{Binding AddCommand}" Padding="14,5" />
+        <Button Content="Check" Command="{Binding CheckCommand}" Padding="18,5" />
+        <TextBlock Text="{Binding Summary}" VerticalAlignment="Center" FontWeight="SemiBold" />
+      </StackPanel>
+    </Border>
+
+    <Border DockPanel.Dock="Bottom" Padding="14,9"
+            BorderBrush="{DynamicResource PanelBorder}" BorderThickness="0,1,0,0">
+      <TextBlock TextWrapping="Wrap" FontSize="11" Opacity="0.6"
+                 Text="Measured across everything the probes have recorded, not the window on the scope — a limit that passes because the interesting half is off the left of the screen is not a check. Requirements are saved with the circuit." />
+    </Border>
+
+    <ScrollViewer Padding="10">
+      <StackPanel Spacing="4">
+
+        <TextBlock Text="Nothing written down yet. Add a requirement to say what this circuit is supposed to do."
+                   IsVisible="{Binding !HasRows}" Opacity="0.6" Margin="6,10" TextWrapping="Wrap" />
+
+        <ItemsControl ItemsSource="{Binding Rows}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:SpecRowViewModel">
+              <Border Margin="0,3" Padding="10,8" CornerRadius="4"
+                      BorderBrush="{DynamicResource PanelBorder}" BorderThickness="1">
+                <StackPanel Spacing="6">
+
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <CheckBox IsChecked="{Binding Spec.IsEnabled, Mode=TwoWay}"
+                              ToolTip.Tip="Keep the requirement on record without holding the design to it today" />
+                    <TextBox Width="170" Text="{Binding Spec.Name, Mode=TwoWay}" PlaceholderText="Name" />
+
+                    <TextBlock Text="on" VerticalAlignment="Center" Opacity="0.6" />
+                    <ComboBox Width="120"
+                              ItemsSource="{Binding $parent[Window].((vm:SpecsViewModel)DataContext).Traces}"
+                              SelectedItem="{Binding Spec.Trace, Mode=TwoWay}" />
+
+                    <ComboBox Width="130"
+                              ItemsSource="{x:Static vm:SpecsViewModel.Quantities}"
+                              DisplayMemberBinding="{Binding Label}"
+                              SelectedValueBinding="{Binding Value}"
+                              SelectedValue="{Binding Spec.Quantity, Mode=TwoWay}" />
+
+                    <ComboBox Width="100"
+                              ItemsSource="{x:Static vm:SpecsViewModel.Comparisons}"
+                              DisplayMemberBinding="{Binding Label}"
+                              SelectedValueBinding="{Binding Value}"
+                              SelectedValue="{Binding Spec.Comparison, Mode=TwoWay}" />
+
+                    <TextBox Width="90" Text="{Binding Spec.Limit, Mode=TwoWay}" PlaceholderText="Limit" />
+                    <TextBox Width="70" Text="{Binding Spec.Tolerance, Mode=TwoWay}" PlaceholderText="±" />
+                    <TextBox Width="48" Text="{Binding Spec.Unit, Mode=TwoWay}" PlaceholderText="Unit" />
+
+                    <Button Content="✕" Padding="8,3"
+                            Command="{Binding $parent[Window].((vm:SpecsViewModel)DataContext).RemoveCommand}"
+                            CommandParameter="{Binding}" />
+                  </StackPanel>
+
+                  <StackPanel Orientation="Horizontal" Spacing="10">
+                    <TextBlock Text="{Binding Verdict}" FontSize="11" FontWeight="SemiBold"
+                               Width="52" IsVisible="{Binding IsMet}"
+                               Foreground="{DynamicResource NetHighlight}" />
+                    <TextBlock Text="{Binding Verdict}" FontSize="11" FontWeight="SemiBold"
+                               Width="52" IsVisible="{Binding IsBroken}"
+                               Foreground="{DynamicResource TextError}" />
+                    <TextBlock Text="{Binding Verdict}" FontSize="11" Width="52"
+                               IsVisible="{Binding IsUnknown}"
+                               Foreground="{DynamicResource TextFaint}" />
+
+                    <TextBlock Text="{Binding Detail}" FontSize="11" Opacity="0.75"
+                               VerticalAlignment="Center" TextWrapping="Wrap" />
+                    <TextBlock Text="{Binding Margin}" FontSize="11" Opacity="0.5"
+                               VerticalAlignment="Center" />
+                  </StackPanel>
+
+                </StackPanel>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+      </StackPanel>
+    </ScrollViewer>
+
+  </DockPanel>
+</Window>

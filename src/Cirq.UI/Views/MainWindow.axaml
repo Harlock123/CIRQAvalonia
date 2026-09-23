@@ -111,6 +111,12 @@
                   Command="{Binding ShowNoiseCommand}" />
         <MenuItem Header="Stabi_lity..." InputGesture="Ctrl+F7"
                   Command="{Binding ShowStabilityCommand}" />
+        <MenuItem Header="_Impedance..." InputGesture="Ctrl+F6"
+                  Command="{Binding ShowImpedanceCommand}"
+                  ToolTip.Tip="What the circuit looks like from one point: what it presents to a source, or holds an output against a load" />
+        <MenuItem Header="Poles and _Zeros..." InputGesture="Shift+F6"
+                  Command="{Binding ShowPoleZeroCommand}"
+                  ToolTip.Tip="The circuit's own natural frequencies — what it rings at, and how long it takes to settle" />
         <MenuItem Header="_Spectrum..." InputGesture="F3"
                   Command="{Binding ShowSpectrumCommand}" />
         <MenuItem Header="Decode _Bus..." InputGesture="Shift+F3"
@@ -120,6 +126,9 @@
         <Separator />
         <MenuItem Header="_Check Circuit..." InputGesture="F4"
                   Command="{Binding ShowRuleCheckCommand}" />
+        <MenuItem Header="_Requirements..." InputGesture="Ctrl+F4"
+                  Command="{Binding ShowSpecsCommand}"
+                  ToolTip.Tip="What this circuit is supposed to do, checked against what it did" />
         <MenuItem Header="Play Speaker _Recording" Command="{Binding PlayRecordingCommand}" />
         <Separator />
         <MenuItem Header="Spee_d" ItemsSource="{Binding SpeedOptions}">

@@ -87,7 +87,7 @@ at the window edge; click the rail to bring it back.
 
 ## Which analysis answers which question
 
-There are a dozen analyses here and they answer genuinely different questions. This is the map;
+There are a good many analyses here and they answer genuinely different questions. This is the map;
 each row links to the section that explains it.
 
 | You want to know | Use | Key |
@@ -99,11 +99,16 @@ each row links to the section that explains it.
 | What **frequencies are in** this waveform | [Spectrum](#what-is-in-a-signal) — the FFT of what was recorded | `F3` |
 | How **distorted** is my amplifier | [Distortion](#distortion), under the spectrum — THD, THD+N and the harmonics | `F3` |
 | **Will it oscillate** | [Stability](#stability) — loop gain, phase margin, gain margin | `Ctrl` `F7` |
+| What does it **look like** to whatever drives or loads it | [Impedance](#impedance) — ohms and phase against frequency | `Ctrl` `F6` |
+| What does it **ring at**, and how long does it settle | [Poles and zeros](#poles-and-zeros) — the circuit's own natural frequencies | `Shift` `F6` |
 | How much **noise** does it make, and from what | [Noise](#noise) — density, RMS, and a ranking of every generator | `Shift` `F5` |
 | What are these **digital lines saying** | [Reading a bus](#reading-a-bus) — I²C, SPI, UART, 1-Wire, CAN | `Shift` `F3` |
 | Will it work with the **parts I can buy** | [Tolerance analysis](#will-it-work-with-the-parts-you-can-buy) — hundreds of builds from the bands | `Shift` `F4` |
 | What have I **wired wrong** | [Check circuit](#checking-the-circuit) — the mistakes no part can report about itself | `F4` |
 | What does **temperature** do to it | [Temperature](#temperature) — set it, or sweep it like any other parameter | — |
+| How hot does the **part itself** get | [Self-heating](#when-a-part-heats-itself) — give it a thermal resistance and the loop closes | — |
+| Does it meet what I **said it had to do** | [Requirements](#requirements) — written down, and checked | `Ctrl` `F4` |
+| Where is the **current actually going** | [Current flow](#watching-the-current-move) — dots on the wires, in the View menu | — |
 | Is this **better than what I had** | [Keep a reference](#comparing-and-computing-traces), change the circuit, compare | — |
 | What is the **worst it can ever be** | [Worst case](#the-worst-it-can-ever-be), in the tolerance window — the corner, not a sample of it | `Shift` `F4` |
 | **What value** gives me this answer | [Solve](#working-it-backwards), in the DC sweep window | `Shift` `F7` |
@@ -117,6 +122,9 @@ Three of those are worth separating, because they are easy to confuse:
 - **Stability** and **frequency response** both sweep and both draw gain and phase — but the
   response is of the closed circuit, and stability is of the loop with the feedback opened. A
   circuit can have a perfectly flat response and no phase margin at all.
+- **Stability** and **poles and zeros** answer the same question from opposite ends. The sweep
+  measures the loop and reports a margin; the poles are what that margin is a consequence of. One
+  says "eight degrees"; the other says "a pair at 145 kHz with a Q of seven".
 
 ---
 
@@ -210,6 +218,30 @@ speaker being asked to dissipate more than its rating, and it says so in as many
 The card keeps out of the way of everything else: it does not appear while you are dragging,
 panning, box-selecting or about to start a wire, and it folds back across the pointer rather than
 running off the edge of the window. **View > Describe Parts on Hover** turns it off.
+
+### Watching the current move
+
+**View > Show Current Flow** draws dots travelling along each wire, at a rate set by what it is
+carrying and in the direction it is actually going.
+
+A schematic shows what is connected. A scope shows what one point is doing over time. Neither shows
+the thing a beginner most needs to see, which is that current is *going somewhere* — that it leaves
+the supply, divides at a junction in a ratio you cannot get by looking, and comes back.
+
+The speed is **logarithmic**, and has to be: current in a circuit spans decades, and a microamp of
+base current beside an amp of collector current would be indistinguishable from stopped on a linear
+scale. Six decades are mapped onto the speed, so both are visibly moving and visibly different.
+
+Some wires stay dark, and that is deliberate. A wire's current is known when one of its ends is a
+pin that can report its own current and has no other wire on it, or when it follows from a
+two-terminal part whose other wire is already known — which is what carries the answer round the
+return through ground. Where a **junction** divides the current, the share each wire takes depends
+on the whole rest of the circuit, and those wires are left out rather than guessed at. A drawing
+that split it evenly would be confidently wrong on the one part of a schematic you would trust it
+for.
+
+It is an overlay rather than part of the drawing, so it never appears in an export: a still of
+moving dots is a row of marks in whatever positions the clock happened to be at.
 
 ### The value as it is written on the part
 
@@ -3212,6 +3244,144 @@ window agrees with it:
 
 ---
 
+## Impedance
+
+**Simulate > Impedance...** (`Ctrl+F6`) measures what the circuit looks like from one point:
+magnitude in ohms and phase in degrees, across the band.
+
+Every bench question about **loading** is this one. What does this amplifier present to whatever
+drives it. What can that regulator hold its output against when the load steps. Where does the
+decoupling network resonate, and how much does it actually help at the frequency the chip switches
+at. A gain plot cannot answer any of them, because a gain is a ratio between two points and this is
+a property of one.
+
+Pick a probe and press **Measure**. A probe with a reference is measured between its two points; a
+plain one is measured against ground.
+
+### How it is done, and why the sources go quiet
+
+One amp of small-signal current is pushed in at the probe and the volts that appear across it are
+read. With a current of exactly one, the voltage **is** the impedance.
+
+Every other small-signal source is silenced for the length of the sweep, because an impedance is
+defined with the circuit's own sources dead — that is what makes it the Thévenin impedance rather
+than a number with the circuit's own signal mixed into it. You do not have to do anything about
+this; it is just worth knowing that the generator you left running is not affecting the answer.
+
+The same sweep serves both directions. Probing an input measures what a source would have to drive;
+probing an output measures what the circuit can hold a load against. Nothing in the analysis knows
+the difference, and there is none.
+
+### Reading the phase
+
+The phase is the half people skip, and it is the half that says what you are looking at:
+
+| Phase | What it is | What it means |
+| --- | --- | --- |
+| 0° | resistive | dissipating, not storing |
+| +90° | inductive | impedance rising with frequency |
+| −90° | capacitive | impedance falling with frequency |
+
+Where the phase **crosses zero**, the reactance has changed sign and you are at a resonance. Which
+way it crosses says which kind. Falling through zero — inductive below, capacitive above — is a
+**parallel** resonance and the impedance peaks there. Rising through it is a **series** resonance
+and the impedance dips. Both are marked on the plot.
+
+![The impedance of a 100 nF ceramic with 5 nH of lead inductance, on logarithmic axes: the magnitude falling as 1/ωC from a hundred ohms at ten kilohertz down to a dip of fifty milliohms near seven megahertz, then rising again as ωL to thirty ohms at a gigahertz — and below it the phase sitting at minus ninety degrees, swinging up through zero at the dip and settling at plus ninety](images/27-impedance.png)
+
+A **decoupling capacitor's series resonance** is the most useful number on this plot and the one
+that surprises people: above it, the part is not a capacitor any more, it is the loop of wire it is
+soldered into. A 100 nF ceramic with 5 nH of lead and track resonates near 7 MHz, and at 50 MHz it
+has ten times the impedance it had at 7 — which is why a board has both a 100 nF and a 1 nF next to
+every chip, and why the short one matters more than the big one.
+
+### Two impedances to check it against
+
+- A **divider** seen from its tap is its two resistors in parallel. The supply is a short for small
+  signals, which is the whole of why a Thévenin resistance is what it is.
+- A **follower's output** is the op-amp's own output resistance divided by one plus the loop gain,
+  so it starts at a fraction of a milliohm and climbs as the loop runs out of gain — reaching the
+  bare 75 Ω above the gain-bandwidth product. An op-amp output looks **inductive**, and this is why.
+
+---
+
+## Poles and Zeros
+
+**Simulate > Poles and Zeros...** (`Shift+F6`) finds the circuit's own natural frequencies.
+
+Stability says a loop has eight degrees of phase margin. This says *why*: there is a conjugate pair
+at 145 kHz with a Q of seven. A transient shows a circuit ringing; this gives the frequency it rings
+at and how many cycles it takes to stop, without having to measure either off a trace.
+
+They are the circuit's own properties, not properties of whatever you happened to drive it with,
+which is what makes them worth having. A sweep samples the response; a pole is the thing the
+response is a consequence of.
+
+![The s-plane of a follower with a capacitive load: a conjugate pair of poles plotted as crosses at about minus sixty-seven thousand radians a second and plus and minus nine hundred thousand, well to the left of the dashed vertical line that marks the imaginary axis](images/28-pole-zero.png)
+
+### Reading the plot
+
+The s-plane is three facts at a glance:
+
+| Where a root sits | What it means |
+| --- | --- |
+| Further **left** | dies away faster |
+| Further **up or down** | rings at a higher frequency |
+| **Right** of the vertical line | does not settle at all |
+
+The list beside it gives each root as a frequency, and then either a **Q** — for a pair that rings,
+how many cycles before it dies away — or a **time constant**, for a real pole that only decays.
+Slowest first, because the pole nearest the axis decides how long the whole circuit takes to settle
+however fast everything else is.
+
+### Poles belong to the circuit; zeros belong to a path
+
+A pole is a property of the circuit and needs nothing named. A zero is a frequency at which *one
+particular input* produces nothing at *one particular output*, so both have to be named for there to
+be any. Pick a source in **From** and a probe in **to**.
+
+A high-pass has a zero at the origin, which is only another way of saying it passes nothing at DC.
+A low-pass has none at all.
+
+### What it will not do
+
+A **transmission line** is refused rather than approximated. A delay has infinitely many poles —
+spaced out forever, which is the same fact as an echo coming back again and again — so there is no
+finite list to report. Use a frequency sweep on those.
+
+---
+
+## Requirements
+
+**Simulate > Requirements...** (`Ctrl+F4`) is where you write down what the circuit is supposed to
+do, so it can be checked rather than remembered.
+
+Everything else here answers "what does this do". This is the other half — "and is that right" —
+and until it is written down somewhere the answer lives in whoever last looked at the trace.
+
+A requirement is a **name**, a **trace**, one **measurement** off it, and a **limit**:
+
+| Comparison | For |
+| --- | --- |
+| **At most** | ripple, overshoot, dissipation — things with a ceiling |
+| **At least** | swing, margin, headroom — things with a floor |
+| **Within** | a regulated output, where too low fails as surely as too high |
+
+Press **Check** and each one comes back met, not met, or with nothing to measure. The third is not
+the second: a frequency that needed two cycles and got one has not been shown to be wrong, and
+calling that a failure is how a panel gets ignored.
+
+Each result also carries a **margin** — how much room is left as a percentage of the limit. A
+design that passes everything at 2 % margin is a design that passes today, and that is worth being
+able to see.
+
+Requirements are **saved with the circuit**, because a requirement that lives in one person's head
+is not a requirement. They are measured across everything the probes have recorded, not the window
+on the scope: a ripple limit that passes because the interesting half is off the left of the screen
+is not a check.
+
+---
+
 ## Noise
 
 **Simulate > Noise...** (`Shift+F5`) measures the floor under everything: how much noise a circuit
@@ -3621,6 +3791,46 @@ makes the case for the more expensive part better than any number does. A diode 
 thermometer: sweep the temperature with a voltage probe on it and you have plotted the calibration
 curve. And put a current probe on a **MOSFET Driver**'s switch and sweep it to 125 °C — the
 conduction loss is most of the way to double.
+
+### When a part heats itself
+
+Everything above takes the circuit's ambient, which is the right answer for a part dissipating
+nothing and the wrong one for a part dissipating watts. The die of a MOSFET holding six amps is
+nowhere near the air around it, and its on-resistance is the parameter that decided how many watts
+those were. The loop closes, and it is the loop rather than either half of it that decides whether
+a design works.
+
+Give a **MOSFET, a bipolar or a diode** a **Thermal Resistance** in degrees per watt and it stops
+sitting at ambient:
+
+| θ<sub>JA</sub> | What that is |
+| --- | --- |
+| 0 | not modelled — the default, and what the part did before |
+| 200 | a TO-92 in free air |
+| 62 | a TO-220 in free air, no heatsink |
+| 10 | a TO-220 on a small clip-on heatsink |
+| 2 | bolted to a real one |
+
+The die then sits at **ambient plus watts times θ**, solved for rather than evaluated: the power
+depends on the temperature through the device's own parameters, so the two are found together. In a
+transient it *follows* its dissipation with a **Thermal Time Constant** rather than jumping to it,
+which is why a part survives a pulse that would destroy it held on.
+
+What this changes:
+
+- A **switch specified at room temperature is specified wrong.** A logic-level MOSFET's
+  on-resistance climbs by half again between 25 °C and 125 °C, so the part that dropped 240 mV cold
+  drops 400 mV hot and burns proportionally more doing it.
+- A **bipolar biased from a fixed base voltage draws more as it warms**, because its base-emitter
+  drop falls. That is the positive feedback that makes thermal runaway a real failure rather than a
+  figure of speech, and it is why a real stage has an emitter resistor.
+- A **diode used as a thermometer reads its own dissipation**, which is why the datasheet method
+  uses a small current.
+
+**Runaway is reported, not left to the solver.** With a bad enough heatsink the feedback's loop gain
+exceeds one — every degree adds more dissipation than it took to produce — and there is no
+temperature the part settles at. It stops at the **Maximum Junction Temperature** it is rated for
+and says so on its hover card, rather than the solver failing with a message about time steps.
 
 ---
 
@@ -4357,7 +4567,7 @@ Also available in the app at **Help > Keyboard Shortcuts**.
 | Shift-click with the probe tool | Set the selected probe's second point, for a differential or power measurement |
 | Click a wire or a pin | Light up the whole net it is on, and say what is joined to it |
 | `F9` / `F10` | Collapse the palette / the properties panel |
-| View menu | **Mark Interactive Parts** rings everything you can double-click; **Describe Parts on Hover** turns the hover card off |
+| View menu | **Mark Interactive Parts** rings everything you can double-click; **Describe Parts on Hover** turns the hover card off; **Show Current Flow** puts moving dots on the wires |
 | `Ctrl+N` / `Ctrl+O` / `Ctrl+S` / `Ctrl+Shift+S` | New / open / save / save as |
 | `Ctrl+P` | Print — a sheet each for the schematic, the traces and the parts list |
 | `Ctrl+E` | Export — PNG, JPEG, BMP, SVG, PDF, a SPICE netlist, the traces as CSV, or the parts list as a BOM |

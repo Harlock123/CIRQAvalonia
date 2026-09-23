@@ -236,6 +236,123 @@ public class GuidePlotTests
         vm.Dispose();
     }
 
+    // ---- impedance ---------------------------------------------------------
+
+    /// <summary>
+    /// A decoupling capacitor's impedance, which is the plot that changes how people lay out a
+    /// board: it stops being a capacitor at its series resonance and is an inductor above it.
+    /// </summary>
+    [Fact]
+    public void DecouplingImpedance()
+    {
+        var circuit = new Circuit();
+
+        var capacitor = circuit.Add(new Capacitor(100e-9) { Name = "C1" });
+        var parasitic = circuit.Add(new Inductor(5e-9) { Name = "L1", SeriesResistance = 0 });
+        var esr = circuit.Add(new Resistor(0.05) { Name = "R1" });
+        var ground = Gnd(circuit);
+
+        circuit.Connect(capacitor.B, parasitic.A);
+        circuit.Connect(parasitic.B, esr.A);
+        circuit.Connect(esr.B, ground.Pin);
+
+        var probe = new SignalProbe("Rail", capacitor.A, default);
+        circuit.Probes.Add(probe);
+
+        var model = new ImpedanceViewModel(circuit) { StartHz = 1e4, StopHz = 1e9 };
+        model.Run();
+
+        Assert.True(model.HasResult, model.Status);
+
+        // It really does turn round, and where the textbook says: 1/2π√(LC).
+        var resonance = Assert.Single(model.Resonances);
+
+        Assert.True(resonance.Series);
+        Assert.Equal(1.0 / (2 * Math.PI * Math.Sqrt(5e-9 * 100e-9)), resonance.Hertz, resonance.Hertz * 0.02);
+
+        var x = model.Frequencies.Select(Math.Log10).ToArray();
+
+        DocPlot.Stack("27-impedance.png", (magnitude, phase) =>
+        {
+            DocPlot.Style(magnitude, "Frequency (Hz)", "|Z| (Ω)");
+            DocPlot.DecadeBottom(magnitude);
+            DocPlot.DecadeLeft(magnitude);
+            DocPlot.Line(magnitude, x, [.. model.Ohms.Select(Math.Log10)], 0);
+            DocPlot.Vertical(magnitude, Math.Log10(resonance.Hertz), null);
+            DocPlot.Title(magnitude,
+                $"A 100 nF ceramic with 5 nH of lead — a capacitor below " +
+                $"{Cirq.Core.Units.SiPrefix.Format(resonance.Hertz, "Hz")}, an inductor above it");
+
+            DocPlot.Style(phase, "Frequency (Hz)", "Phase (°)");
+            DocPlot.DecadeBottom(phase);
+            DocPlot.Line(phase, x, model.Degrees, 1);
+            // No label on the line: the axis already says degrees, and a caption here lands on
+            // top of the tick labels.
+            DocPlot.Reference(phase, 0, null);
+            DocPlot.Vertical(phase, Math.Log10(resonance.Hertz), null);
+        });
+    }
+
+    // ---- poles and zeros ---------------------------------------------------
+
+    /// <summary>
+    /// The s-plane of the same follower the stability plot measures, from the other end: the pair
+    /// that eats its phase margin, drawn where it sits.
+    /// </summary>
+    [Fact]
+    public void PoleZeroMap()
+    {
+        var vm = new MainWindowViewModel();
+
+        vm.Circuit.Clear();
+        vm.Scope.ClearProbes();
+        Examples.All.Single(e => e.Name == "Loop Stability").Build(vm);
+
+        vm.Circuit.Components.OfType<ToggleSwitch>().Single().IsClosed = true;
+
+        var model = new PoleZeroViewModel(vm.Circuit);
+        model.Run();
+
+        Assert.True(model.HasResult, model.Status);
+
+        var ringing = model.Poles.Where(p => p.IsOscillatory).OrderByDescending(p => p.Q ?? 0).First();
+
+        Assert.True(ringing.Q > 1, $"expected a lightly damped pair, got Q of {ringing.Q}");
+
+        var plot = DocPlot.New("Real (rad/s) — how fast it dies away", "Imaginary (rad/s) — what it rings at");
+
+        DocPlot.SiBottom(plot);
+        DocPlot.SiLeft(plot);
+
+        // The imaginary axis, which is the line between a circuit that settles and one that does
+        // not. Unlabelled: at this scale it sits hard against the right edge and a caption on it
+        // runs off the picture.
+        var axis = plot.Add.VerticalLine(0);
+        axis.Color = DocPlot.Marker;
+        axis.LineWidth = 1;
+        axis.LinePattern = ScottPlot.LinePattern.Dashed;
+
+        var poles = plot.Add.ScatterPoints(
+            model.Poles.Select(p => p.S.Real).ToArray(),
+            model.Poles.Select(p => p.S.Imaginary).ToArray(),
+            DocPlot.Traces[0]);
+
+        poles.MarkerShape = ScottPlot.MarkerShape.Cross;
+        poles.MarkerSize = 13;
+        poles.MarkerLineWidth = 2;
+        poles.LegendText = "Poles";
+
+        DocPlot.Legend(plot);
+        DocPlot.Title(plot,
+            $"The same follower the stability plot measures — a pair at " +
+            $"{Cirq.Core.Units.SiPrefix.Format(ringing.Hertz, "Hz")} with a Q of {ringing.Q:0.#}. " +
+            "Everything left of the dashed line decays.");
+
+        DocPlot.Save(plot, "28-pole-zero.png", 900, 520);
+
+        vm.Dispose();
+    }
+
     // ---- noise -------------------------------------------------------------
 
     /// <summary>
