@@ -159,18 +159,32 @@ public sealed partial class SpecsViewModel : ObservableObject
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
-    private TraceMeasurements? Measure(string label)
+    private TraceMeasurements? Measure(string label) => Measurement(_circuit)(label);
+
+    /// <summary>
+    /// How a requirement gets at what a trace did: across the whole recording rather than the
+    /// window on the scope, because a requirement is about the circuit and not about what
+    /// somebody has scrolled to.
+    /// <para>
+    /// Null means there is no such trace at all. A trace that exists but has recorded nothing yet
+    /// is a different thing and gets an empty measurement, so the requirement comes back "nothing
+    /// to measure yet" rather than "no trace called that" — which would be a lie about the
+    /// circuit and would send somebody looking for a probe that is already in front of them.
+    /// </para>
+    /// </summary>
+    public static Func<string, TraceMeasurements?> Measurement(Circuit circuit)
     {
-        var probe = _circuit.Probes.FirstOrDefault(p => p.Label == label);
+        ArgumentNullException.ThrowIfNull(circuit);
 
-        // Null means there is no such trace at all. A trace that exists but has recorded nothing
-        // yet is a different thing and gets an empty measurement, so the requirement comes back
-        // "nothing to measure yet" rather than "no trace called that" — which would be a lie
-        // about the circuit and would send somebody looking for a probe that is already there.
-        if (probe is null) return null;
+        return label =>
+        {
+            var probe = circuit.Probes.FirstOrDefault(p => p.Label == label);
 
-        return probe.HistoryBuffer is { } history
-            ? TraceMeasurements.OfAll(history.ToArray())
-            : TraceMeasurements.None;
+            if (probe is null) return null;
+
+            return probe.HistoryBuffer is { } history
+                ? TraceMeasurements.OfAll(history.ToArray())
+                : TraceMeasurements.None;
+        };
     }
 }

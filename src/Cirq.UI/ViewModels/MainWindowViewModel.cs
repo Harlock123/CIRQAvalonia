@@ -15,8 +15,13 @@ namespace Cirq.UI.ViewModels;
 /// <summary>Top-level state for the editor window.</summary>
 public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 {
-    public MainWindowViewModel()
+    /// <param name="clipboard">
+    /// Shared with the window this one was opened from, or null for an editor of its own.
+    /// </param>
+    public MainWindowViewModel(ComponentClipboard? clipboard = null)
     {
+        Clipboard = clipboard ?? new ComponentClipboard();
+
         Circuit = new Circuit { Title = "Untitled circuit" };
         Simulation = new SimulationController(Circuit);
         Scope = new ScopeViewModel(Circuit);
@@ -338,7 +343,21 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     /// Where a copy of the circuit is kept while it is being worked on, so a crash costs the last
     /// few minutes rather than the afternoon.
     /// </summary>
-    public AutosaveStore Autosave { get; set; } = new();
+    public AutosaveStore Autosave { get; set; } = new(AutosaveStore.PathFor(NextWindow()));
+
+    private static int _windows = -1;
+
+    /// <summary>
+    /// Which editor window this is, so each gets its own recovery file. Counted rather than
+    /// asked, because the windows do not know about each other and should not have to.
+    /// </summary>
+    private static int NextWindow() => System.Threading.Interlocked.Increment(ref _windows);
+
+    /// <summary>Raised when another editor window should be opened.</summary>
+    public event EventHandler? RequestNewWindow;
+
+    [RelayCommand]
+    private void NewWindow() => RequestNewWindow?.Invoke(this, EventArgs.Empty);
 
     /// <summary>
     /// How often to take that copy. A minute is often enough to be worth having and rare enough
@@ -693,6 +712,12 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
     /// <summary>Raised when the About dialog should be shown.</summary>
     public event EventHandler? RequestAbout;
+
+    /// <summary>Raised when a design report should be written.</summary>
+    public event EventHandler? RequestReport;
+
+    [RelayCommand]
+    private void WriteReport() => RequestReport?.Invoke(this, EventArgs.Empty);
 
     /// <summary>Raised when the explain window should be opened.</summary>
     public event EventHandler? RequestExplain;
@@ -1097,8 +1122,20 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         return components;
     }
 
-    /// <summary>The clipboard, which holds one part between a copy and a paste.</summary>
-    public ComponentClipboard Clipboard { get; } = new();
+    /// <summary>
+    /// The clipboard. Its own by default; shared when a second window is opened from a first.
+    /// <para>
+    /// Sharing it is most of why anybody opens two windows — copying an input stage out of one
+    /// circuit and into another — so a clipboard per window would make the one thing the feature
+    /// is for the one thing it could not do.
+    /// </para>
+    /// <para>
+    /// Passed in rather than held in a static, which was tried first and is wrong twice over: a
+    /// process-wide clipboard leaks between tests that run in parallel, and it makes an editor's
+    /// state depend on what some other editor did. Handing one in says who is sharing with whom.
+    /// </para>
+    /// </summary>
+    public ComponentClipboard Clipboard { get; }
 
     /// <summary>What the Edit menu's paste entry says, so it names what is waiting.</summary>
     public string PasteMenuText =>
@@ -1268,6 +1305,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
         File
           Ctrl+N       New circuit
+          Ctrl+Shift+N New window — a second circuit, side by side
           Ctrl+Shift+E Browse examples
           Ctrl+O       Open
           Ctrl+S       Save

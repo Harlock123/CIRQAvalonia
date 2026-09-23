@@ -5,6 +5,8 @@ using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
 using Cirq.UI.Controls;
 using Cirq.UI.Services;
+using Cirq.Components.Explaining;
+using Cirq.Core.Verification;
 using Cirq.UI.ViewModels;
 
 namespace Cirq.UI.Views;
@@ -16,7 +18,14 @@ public partial class MainWindow : Window
     private MainWindowViewModel? _viewModel;
 
     public MainWindow()
+        : this(first: false)
     {
+    }
+
+    public MainWindow(bool first)
+    {
+        _first = first;
+
         InitializeComponent();
 
         // The canvas shows live state (LED brightness, logic levels, probe readouts), so it is
@@ -63,6 +72,8 @@ public partial class MainWindow : Window
             box?.SelectAll();
         });
 
+        viewModel.RequestNewWindow += (_, _) => OpenAnother(viewModel.Clipboard);
+
         Dispatcher.UIThread.Post(async () =>
         {
             _canvas?.RequestFit();
@@ -73,8 +84,53 @@ public partial class MainWindow : Window
             // the first snapshot.
             await viewModel.OfferRecoveryAsync();
 
+            if (_first) await OfferOtherWindowsRecoveryAsync();
+
             viewModel.StartAutosave();
         });
+    }
+
+    /// <summary>
+    /// True for the window the application opened with. Only that one goes looking for snapshots
+    /// belonging to windows that are not there any more — a window opened later has not lost
+    /// anything, and asking it to offer somebody else's work would be strange.
+    /// </summary>
+    private readonly bool _first;
+
+    /// <summary>
+    /// Another editor, with its own circuit, simulation, scope and history — and the clipboard
+    /// of the window it was opened from, so a block can be carried between them.
+    /// </summary>
+    private static void OpenAnother(Services.ComponentClipboard clipboard)
+    {
+        new MainWindow { DataContext = new MainWindowViewModel(clipboard) }.Show();
+    }
+
+    /// <summary>
+    /// Offers back whatever other windows were working on when the application last stopped.
+    /// <para>
+    /// One window per snapshot, which is what was on screen before — recovering two circuits into
+    /// one window would mean choosing which of them to throw away.
+    /// </para>
+    /// </summary>
+    private async Task OfferOtherWindowsRecoveryAsync()
+    {
+        // This window has already dealt with its own.
+        var mine = _viewModel?.Autosave.Location;
+
+        foreach (var store in AutosaveStore.Abandoned())
+        {
+            if (string.Equals(store.Location, mine, StringComparison.Ordinal)) continue;
+
+            var recovered = new MainWindowViewModel(_viewModel?.Clipboard) { Autosave = store };
+            var window = new MainWindow { DataContext = recovered };
+
+            window.Show();
+
+            await recovered.OfferRecoveryAsync();
+
+            recovered.StartAutosave();
+        }
     }
 
     private void WireUpCanvas(MainWindowViewModel viewModel)
@@ -110,6 +166,7 @@ public partial class MainWindow : Window
         viewModel.RequestFind += async (_, _) => await ShowFindAsync();
         viewModel.RequestCompare += async (_, _) => await ShowCompareAsync();
         viewModel.RequestExplain += async (_, _) => await ShowExplainAsync();
+        viewModel.RequestReport += async (_, _) => await WriteReportAsync();
         viewModel.RequestGoTo += (_, component) => _canvas?.CentreOn(component);
         viewModel.RequestImpedance += async (_, _) => await ShowImpedanceAsync();
         viewModel.RequestPoleZero += async (_, _) => await ShowPoleZeroAsync();
@@ -218,6 +275,80 @@ public partial class MainWindow : Window
         };
 
         await dialog.ShowDialog(this);
+    }
+
+    private async Task WriteReportAsync()
+    {
+        if (_viewModel is null || _viewModel.FileDialogs is not { } dialogs) return;
+
+        var suggested = (_viewModel.Circuit.Title.Length > 0 ? _viewModel.Circuit.Title : "circuit")
+                        + " report.html";
+
+        var path = await dialogs.PickSavePathAsync(suggested);
+        if (path is null) return;
+
+        if (!path.EndsWith(".html", StringComparison.OrdinalIgnoreCase))
+            path = Path.ChangeExtension(path, ".html");
+
+        try
+        {
+            var report = new ReportContent(
+                _viewModel.Circuit.Title.Length > 0 ? _viewModel.Circuit.Title : "Circuit",
+                Notes: string.Empty,
+                Schematic: SchematicSvg(_viewModel.Circuit),
+                Specs: SpecCheck.EvaluateAll(
+                    _viewModel.Circuit.Specs, SpecsViewModel.Measurement(_viewModel.Circuit)),
+                Explanations: CircuitExplainer.Explain(_viewModel.Circuit));
+
+            DesignReport.Write(_viewModel.Circuit, report, path);
+
+            _viewModel.StatusMessage = $"Report written to {Path.GetFileName(path)}";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            await dialogs.ReportAsync("Design report", $"Could not write the report: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// The schematic as SVG, through the ordinary exporter so the drawing in a report is the same
+    /// drawing an export produces — and a temporary file, because that is the exporter's door.
+    /// </summary>
+    private static string? SchematicSvg(Cirq.Core.Topology.Circuit circuit)
+    {
+        var temporary = Path.Combine(Path.GetTempPath(), $"cirq-report-{Guid.NewGuid():N}.svg");
+
+        try
+        {
+            CircuitExporter.Export(
+                circuit, null, temporary,
+                new ExportOptions(ExportFormat.Svg, ExportContent.Schematic));
+
+            var svg = File.ReadAllText(temporary);
+
+            // Only the drawing: an SVG file's declaration and doctype have no business inside a
+            // page that already has its own.
+            var start = svg.IndexOf("<svg", StringComparison.OrdinalIgnoreCase);
+
+            return start < 0 ? null : svg[start..];
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
+                                       or InvalidOperationException)
+        {
+            // A report without a picture is still a report.
+            return null;
+        }
+        finally
+        {
+            try
+            {
+                if (File.Exists(temporary)) File.Delete(temporary);
+            }
+            catch (IOException)
+            {
+                // A stray temporary file is not worth failing a report over.
+            }
+        }
     }
 
     private async Task ShowExplainAsync()

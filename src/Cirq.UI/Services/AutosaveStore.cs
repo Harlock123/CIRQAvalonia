@@ -60,13 +60,54 @@ public sealed class AutosaveStore
         _path = path ?? DefaultPath();
     }
 
-    public static string DefaultPath() =>
+    public static string DefaultPath() => PathFor(0);
+
+    /// <summary>
+    /// Where the snapshot for one editor window goes.
+    /// <para>
+    /// One file each, because two windows sharing one would take turns overwriting each other's
+    /// work and the survivor would be whichever happened to autosave last — which is the worst
+    /// possible behaviour for the one feature whose entire job is not losing anything.
+    /// </para>
+    /// </summary>
+    public static string PathFor(int window) =>
+        Path.Combine(
+            Folder(),
+            window == 0 ? "recovery.cirq" : $"recovery-{window + 1}.cirq");
+
+    private static string Folder() =>
         Path.Combine(
             Environment.GetFolderPath(
                 Environment.SpecialFolder.ApplicationData,
                 Environment.SpecialFolderOption.Create),
-            "CirqAvalonia",
-            "recovery.cirq");
+            "CirqAvalonia");
+
+    /// <summary>
+    /// Every snapshot left behind by a previous run, whichever window wrote it, oldest first.
+    /// <para>
+    /// Scanned rather than remembered: how many windows were open when the lights went out is
+    /// exactly the thing nobody wrote down.
+    /// </para>
+    /// </summary>
+    public static IReadOnlyList<AutosaveStore> Abandoned()
+    {
+        try
+        {
+            var folder = Folder();
+
+            if (!Directory.Exists(folder)) return [];
+
+            return [.. Directory.EnumerateFiles(folder, "recovery*.cirq")
+                .OrderBy(p => p, StringComparer.Ordinal)
+                .Select(p => new AutosaveStore(p))
+                .Where(s => s.Pending() is not null)];
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Not being able to look is not a reason to refuse to start.
+            return [];
+        }
+    }
 
     /// <summary>Where the snapshot lives, so it can be found or deleted.</summary>
     public string Location => _path;

@@ -46,6 +46,38 @@ produces numbers; until the limit is written down somewhere, whether they are th
 lives in whoever last looked. The answer is three-way: met, not met, or nothing to measure, and the
 third is not the second. Requirements are saved with the circuit.
 
+**Why will it not solve?** The message used to be *Newton-Raphson failed to converge, try a
+smaller time step*, which is only useful to somebody who already knows what is wrong — and that is
+the one person who does not need it. The solver knew more all along: it tracks how far every
+unknown moved, so it knows which net was still swinging, and it asks every non-linear part whether
+it settled, so it knows which said no. Both name somewhere on the drawing to go and look. A part
+that did not complain is never blamed.
+
+**Where is R17?** `Ctrl+Shift+F` finds a part on the sheet — by designator, value, kind or net
+name. `Ctrl+F` searches the palette for a part to *place*; this searches the drawing you already
+have, which past twenty parts is the more frequent question.
+
+**Edit > Arrange** lines up or spaces out a selection: six alignments and two distributions,
+snapped back onto the grid, in one undo step however many parts moved.
+
+**What is this circuit?** `Ctrl+F1` reads the drawing back in words — a divider and where its tap
+sits, an RC and its corner, an op-amp stage and its gain, a flyback diode, a 555 and its frequency
+and duty. About a dozen structures, each recognised exactly, and silence on everything else: a
+confident wrong description is the one thing here that could teach somebody something false.
+
+**What did I change?** **File > Compare with a Saved Circuit** answers it in values rather than
+braces. Parts are matched by identity, so one that was renamed *and* moved is still the same part;
+a wire is the pair of pins it joins, so redrawing it through a different corner is not a change.
+
+**File > Design Report** writes one self-contained HTML page — the schematic as SVG, what the
+circuit is, the requirements with their verdicts, the parts, and the conditions. Every piece of it
+existed already; what was missing was the thing that assembles them, which is the artefact you hand
+to another person.
+
+**File > New Window** opens a second editor with its own circuit, sharing the clipboard — for
+comparing two designs, and for carrying a block from one into the other. Each window keeps its own
+recovery snapshot, and the next start offers every abandoned one back in a window of its own.
+
 **Where is the current actually going?** **View > Show Current Flow** puts moving dots on the wires,
 at a rate set by what each is carrying and in the direction it is going. A schematic shows what is
 connected and a scope shows what one point is doing; neither shows that current leaves the supply,

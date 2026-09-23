@@ -108,6 +108,8 @@ each row links to the section that explains it.
 | Why **will it not solve** | [When it will not solve](#when-it-will-not-solve) — the solver names the net and the part | — |
 | **What is this circuit** | [What is this circuit?](#what-is-this-circuit) — the drawing read back in words | `Ctrl` `F1` |
 | What did I **change** | [Compare](#comparing-with-a-saved-circuit) — this against a file, in values rather than braces | — |
+| How do I **hand this to somebody** | [A design report](#a-design-report) — drawing, requirements and parts on one page | — |
+| Can I have **two circuits** open | [Two circuits at once](#two-circuits-at-once) — a second window, sharing a clipboard | `Ctrl` `Shift` `N` |
 | What does **temperature** do to it | [Temperature](#temperature) — set it, or sweep it like any other parameter | — |
 | How hot does the **part itself** get | [Self-heating](#when-a-part-heats-itself) — give it a thermal resistance and the loop closes | — |
 | Does it meet what I **said it had to do** | [Requirements](#requirements) — written down, and checked | `Ctrl` `F4` |
@@ -326,6 +328,42 @@ there is.
   pin half a square off where the next wire will want to meet it.
 - Anything already in the right place is left alone, and the whole move is **one undo step**: six
   parts jumping into line is one thing that happened, not six.
+
+### A design report
+
+**File > Design Report...** writes one page — the schematic, what the circuit is, the requirements
+with their verdicts, the parts, and the conditions it was run at.
+
+Every piece of this already existed: the exporter draws schematics, the parts list is a table,
+requirements produce verdicts, and the explainer produces sentences. What was missing was the thing
+that assembles them, which is the artefact you actually hand to another person. A folder of PNGs is
+not a deliverable; a page that opens with *all seven requirements met* is.
+
+It is **HTML, and self-contained** — no fonts or scripts fetched from anywhere, so it still renders
+years later on a machine with no network. It opens on anything, prints from a browser, and the
+schematic goes in as **SVG**, so it stays sharp when somebody zooms in on the one corner they care
+about and the designators can be selected as text.
+
+The verdict goes at the top, before anything else. A report whose verdict is on page four is a
+report whose verdict nobody knows.
+
+### Two circuits at once
+
+**File > New Window** (`Ctrl` `Shift` `N`) opens a second editor, with its own circuit,
+simulation, scope and undo history.
+
+It is for the two things one window cannot do: **comparing two designs** side by side, and
+**copying a block from one circuit into another**. The clipboard is shared between windows for
+exactly that reason — a clipboard per window would make the main thing the feature is for the one
+thing it could not do. Draw a box round an input stage in one window, `Ctrl` `C`, and paste it into
+the other, wires and all.
+
+Each window keeps its **own recovery snapshot**, so two of them cannot overwrite each other's
+work; and if the application stops with several open, the next start offers each one back, in a
+window of its own.
+
+*Windows rather than tabs, deliberately.* The reason to have two circuits open is nearly always to
+look at both, and tabs are the one arrangement that makes that impossible.
 
 ### Comparing with a saved circuit
 

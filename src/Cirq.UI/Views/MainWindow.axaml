@@ -28,6 +28,13 @@
         <MenuItem Header="Save _As..." InputGesture="Ctrl+Shift+S" Command="{Binding SaveAsCommand}" />
         <Separator />
         <MenuItem Header="_Print..." InputGesture="Ctrl+P" Command="{Binding PrintCommand}" />
+        <MenuItem Header="New _Window" InputGesture="Ctrl+Shift+N"
+                  Command="{Binding NewWindowCommand}"
+                  ToolTip.Tip="A second editor, with its own circuit — for comparing two designs, or copying a block from one into the other" />
+        <Separator />
+        <MenuItem Header="Design _Report..."
+                  Command="{Binding WriteReportCommand}"
+                  ToolTip.Tip="One page with the drawing, what it is, the requirements and the parts — the thing you hand to somebody" />
         <MenuItem Header="Co_mpare with a Saved Circuit..."
                   Command="{Binding ShowCompareCommand}"
                   ToolTip.Tip="What changed between this and a file on disk, said the way a person would say it" />
