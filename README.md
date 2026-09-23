@@ -669,7 +669,13 @@ the whole thing at its natural size. The editing aids — dot grid, terminal dot
 The toolbar wraps onto extra rows rather than overflowing, and `MinWidth` is deliberately small, so
 the window stays usable at whatever size a tiling window manager hands it.
 
-Component values accept engineering notation: `10k`, `2.2M`, `100R`, `4k7`, `100nF`, `1kHz`.
+Component values accept engineering notation: `10k`, `2.2M`, `100R`, `4k7`, `100nF`, `1kHz`. The
+odd-looking one is **RKM code** (BS 1852, now IEC 60062), where the multiplier letter stands where
+the decimal point would have been — `4k7` is 4.7 kΩ and `4R7` is 4.7 Ω — because a decimal point is
+the easiest mark on a drawing to lose and `47` against `4.7` is a factor of ten. Note that a
+**SPICE card reads the same text differently**: `4k7` is 4 000 there, because SPICE takes the first
+letter after the digits as the scale and discards the rest. Both are right where they are, and the
+[guide](docs/USER_GUIDE.md#4k7-is-not-a-typo) has the detail.
 
 Switches, push buttons and logic toggles are operated by **double-clicking them on the canvas**
 rather than through the inspector.

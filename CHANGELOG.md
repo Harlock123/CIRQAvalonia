@@ -8,6 +8,18 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**`4k7` is now explained rather than assumed.** It is RKM code — BS 1852, now IEC 60062 — where the
+multiplier letter stands where the decimal point would have been, because a decimal point is the
+easiest mark on a drawing to lose and `47` against `4.7` is a factor of ten in a value somebody is
+about to solder in. The guide used the spelling throughout without ever naming it, which makes it
+read like a typo to anybody who has not met it.
+
+**And the collision it has with SPICE is written down.** `4k7` is 4 700 in a value box and 4 000 in
+a SPICE card, because SPICE takes the first letter after the digits as the scale and discards the
+rest. Both readings are correct where they are and neither can change without breaking files that
+already exist, so it is documented — and pinned by a test, so it cannot drift into being an
+accident.
+
 ## [0.33.0] - 2026-09-23
 
 Twelve additions, in two halves. Five analyses and an overlay about the part of a design a waveform

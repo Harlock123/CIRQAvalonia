@@ -211,7 +211,7 @@ they have served their purpose.
 Rest the pointer on a part and a card appears beside it: the designator and type, what the part is
 currently showing on the canvas, and the settings it is holding — the same names and values the
 properties panel gives, without selecting anything. On a schematic with eight resistors on it,
-finding the 4k7 is a look rather than eight clicks.
+finding the 4.7 kΩ one is a look rather than eight clicks.
 
 ![The hover card open over a schematic: R1 with its probe flag above it, and beside it a panel headed "R1 · Resistor" reading 10kΩ, then Resistance 10kΩ and Tolerance 0.05, then a drawing of the resistor itself with brown, black and orange bands and a gold one after a wider gap, and under it the line "brown 1 · black 0 · orange × 1,000 · gold ± 5 %"](images/26-hover-card.png)
 
@@ -259,6 +259,30 @@ A resistor on the screen says `4k7`. The one in your hand says yellow-violet-red
 between those two facts is why people carry a card in their wallet. So the hover card draws the
 marking next to the numbers: the bands a resistor or an inductor carries, or the code printed on a
 ceramic, alongside what the marking reads out to in words.
+
+#### `4k7` is not a typo
+
+That spelling turns up throughout this guide and on real parts and drawings, so it is worth naming:
+it is **RKM code**, standardised as BS 1852 and now IEC 60062. The multiplier letter goes where the
+decimal point would have been.
+
+| Written | Means |
+| --- | --- |
+| `4R7` | 4.7 Ω |
+| `470R` | 470 Ω |
+| `4k7` | 4.7 kΩ |
+| `1k21` | 1.21 kΩ |
+| `4M7` | 4.7 MΩ |
+
+The point of it is that a decimal point is the easiest mark on a drawing to lose — to a
+photocopier, a fax, a small font, a speck of dirt — and `47` against `4.7` is a factor of ten in a
+value somebody is about to solder in. Moving the point into a letter makes it unlosable, and the
+letter has to be there anyway. Digits after the letter are the fractional part, so `1k21` is
+1.21 kΩ and `1k221` would be 1.221 kΩ.
+
+You can type it into any value box, and **[Setting values](#setting-values)** has the rest of what
+those boxes accept. One place it means something else is a SPICE card — see
+[the suffix that catches everyone](#the-suffix-that-catches-everyone).
 
 ![Seven parts with their markings drawn beside them: a 4k7 at five percent as yellow-violet-red with a gold tolerance band, 10k as brown-black-orange-gold, a 4R7 whose gold multiplier divides rather than multiplies, a 1k21 at one percent carrying five bands instead of four, a 100 microhenry inductor read in microhenries as brown-black-brown-silver, and two ceramic capacitors printed 104M and 103J — each with its bands read out in words beside it](images/25-colour-codes.png)
 
@@ -457,7 +481,7 @@ Values accept **engineering notation**, the way you would say them out loud:
 | `10k` | 10 000 |
 | `2.2M` | 2 200 000 |
 | `100R` | 100 |
-| `4k7` | 4 700 |
+| `4k7` | 4 700 — [RKM code](#4k7-is-not-a-typo), where the letter replaces the decimal point |
 | `100nF` | 100 × 10⁻⁹ |
 | `1kHz` | 1 000 |
 
@@ -4038,6 +4062,14 @@ So `1M` is a thousandth, not a million. A resistance written `1M` expecting a me
 million times wrong, and nothing in the file will say so. This reader follows SPICE's rule exactly,
 including that anything after the suffix is decoration — `1kOhm`, `2.2uF` and `10MegHz` all parse,
 because the letter that matters is the first one after the digits.
+
+That last part collides with something this application accepts everywhere else. **`4k7` means
+4 700 in a value box and 4 000 in a SPICE card**, because SPICE takes the first letter after the
+digits as the scale and throws the `7` away with the rest of the decoration. Both readings are
+correct for where they are — one is [RKM code](#4k7-is-not-a-typo), the other is SPICE's rule since
+the seventies — and neither can be changed without breaking files somebody already has. So a card
+pasted in is read SPICE's way, exactly as the simulator it was written for would read it, and it is
+worth knowing that a value you would have written `4k7` has to be written `4.7k` in a card.
 
 Continuation lines starting with `+` are joined on, `*` comment lines and anything after a `;` are
 dropped, and several cards can be pasted at once.

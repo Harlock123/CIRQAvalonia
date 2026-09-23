@@ -29,6 +29,31 @@ public class SpiceImportTests
     }
 
     /// <summary>
+    /// The same eight characters mean two different numbers depending on where they are written,
+    /// and both readings are correct where they are.
+    /// <para>
+    /// <c>4k7</c> is RKM code in a value box — the letter stands where the decimal point would
+    /// have been — so it is 4 700. In a SPICE card it is 4 000, because SPICE takes the first
+    /// letter after the digits as the scale and discards everything after it. Neither can be
+    /// changed without breaking files that already exist, so the collision is documented rather
+    /// than resolved, and pinned here so it cannot drift into being an accident.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void RkmAndSpiceReadTheSameTextDifferently()
+    {
+        // SPICE: the k is the scale, the 7 is decoration.
+        Assert.Equal(4000.0, SpiceValue.Parse("4k7")!.Value, 1e-9);
+
+        // Written the way a card has to write it, it is the value anybody meant.
+        Assert.Equal(4700.0, SpiceValue.Parse("4.7k")!.Value, 1e-9);
+
+        // And the application's own reader, which is the one a value box uses.
+        Assert.Equal(4700.0, Cirq.Core.Units.SiPrefix.Parse("4k7"), 1e-9);
+        Assert.Equal(4700.0, Cirq.Core.Units.SiPrefix.Parse("4.7k"), 1e-9);
+    }
+
+    /// <summary>
     /// The trap that has been catching people since the seventies, and the reason this is parsed
     /// rather than handed to double.Parse.
     /// </summary>
