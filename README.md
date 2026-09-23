@@ -170,7 +170,9 @@ latch and discharge transistor all interact with the RC network around them in o
 
 ![The digit counter example: a 7490 decade counter driving a 7447 decoder into a seven-segment display, with the QA and QD outputs plotted on a stacked scope](docs/images/05-digital.png)
 
-**Analyses.** Four of them, and they answer different questions. The **operating point** settles
+**Analyses.** A good many, and they answer genuinely different questions — the guide's
+[index of them](docs/USER_GUIDE.md#which-analysis-answers-which-question) is the map. The four the
+rest are built on: the **operating point** settles
 the circuit as though it had been powered for ever. **Transient** walks it through time, which is
 what the scope shows. **Frequency response** linearises about the bias point and sweeps a small
 signal across a range, which measures what the circuit *does* to each frequency. **DC sweep**
@@ -250,6 +252,38 @@ current noise — which in a circuit built around one are usually the whole answ
 rises towards DC on the active devices, with the corner as an editable property, because a
 bipolar's few hundred hertz against a MOSFET's hundred kilohertz is the reason a low-frequency
 front end is built out of bipolars.
+
+**Impedance** measures what the circuit looks like from one point rather than between two: one amp
+of small-signal current in at a probe, and the volts that appear are the ohms. Every other source is
+silenced for the sweep, which is what makes it the Thévenin impedance rather than a number with the
+circuit's own signal mixed in. The phase says which kind of resonance you are at — a decoupling
+capacitor's **series resonance**, above which it is not a capacitor any more but the loop of wire it
+is soldered into, is the most useful number on the plot.
+
+**Poles and zeros** give the circuit's own natural frequencies. Stability says a loop has eight
+degrees of phase margin; this says why — a conjugate pair at 145 kHz with a Q of seven. The
+small-signal system is `G·x + C·dx/dt = 0`, so the poles are the roots of `det(G + sC)`, found as
+the eigenvalues of `(G + σC)⁻¹C` with a general real eigensolver written for it. Zeros come from the
+**bordered system matrix** rather than the textbook shortcut of "the natural frequencies with the
+output shorted", because the shortcut silently loses zeros at the origin and every AC-coupled stage
+has one. A transmission line is refused rather than approximated: a delay has infinitely many poles.
+
+**Self-heating** closes the loop every temperature model left open. Give a MOSFET, a bipolar or a
+diode a thermal resistance in degrees per watt and its die stops sitting at ambient: on-resistance
+climbs, a bipolar draws more as it warms, a rectifier's drop falls. The update is an outer loop
+rather than a perturbation inside Newton, so the power it works from came from a settled circuit.
+Runaway stops at the junction temperature the part is rated for and says so, rather than the solver
+failing with a message about time steps.
+
+**Requirements** are the other half of a simulator. Every analysis here produces numbers; a
+requirement is a name, one of those numbers and a limit, held against what the circuit did and
+saved with the file. The answer is three-way — met, not met, or nothing to measure — because the
+third is not the second.
+
+**Current flow** puts moving dots on the wires, at a rate set by what each is carrying and in the
+direction it is going. Logarithmic, because a microamp of base current beside an amp of collector
+current would otherwise be indistinguishable from stopped. Where a junction divides the current the
+wires stay dark rather than being guessed at.
 
 The scope can **keep a reference**: take a copy of what is on screen, change the circuit, and see
 both curves on the same axes — because what you are looking for after an edit is the difference
@@ -528,6 +562,23 @@ toolbar used to show: active tool, simulation speed, elapsed time and solver rat
 
 `Help > Keyboard Shortcuts` lists everything below, and the
 [User Guide](docs/USER_GUIDE.md) walks through building a circuit from an empty canvas.
+
+Six things are about working on a drawing rather than solving one. **Find on Sheet**
+(`Ctrl+Shift+F`) goes to a part by designator, value, kind or net name — `Ctrl+F` searches the
+palette for a part to *place*, and past twenty parts "where is R17" is the more frequent question.
+**Edit > Arrange** lines up or spaces out a selection, snapped back onto the grid and in one undo
+step however many parts moved. **What Is This Circuit?** (`Ctrl+F1`) reads the drawing back in
+words — a divider and where its tap sits, an RC and its corner, an op-amp stage and its gain — and
+stays quiet about anything it does not recognise exactly, because a confident wrong description is
+the one thing here that could teach somebody something false. **Compare with a Saved Circuit** says
+what changed in values rather than in braces, matching parts by identity so one renamed *and* moved
+is still the same part. **Design Report** writes one self-contained HTML page with the schematic as
+SVG, the requirements and their verdicts, and the parts. And **New Window** (`Ctrl+Shift+N`) opens
+a second editor sharing the clipboard, for comparing two designs or carrying a block between them.
+
+When the solver cannot find an answer it now says **where**: the net that was still moving, what is
+attached to it, and any part that said it had not settled — all of which name somewhere on the
+drawing to go and look, which "try a smaller time step" does not.
 
 The palette holds 186 components in 16 collapsible categories, with a **Find a part** box
 (`Ctrl+F`) over them:

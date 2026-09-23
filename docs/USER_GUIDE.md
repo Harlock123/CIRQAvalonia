@@ -18,34 +18,39 @@ the [README](../README.md), and what changed between releases is in the
 6. [Wiring](#wiring)
 7. [Setting values](#setting-values)
 8. [Probes and the oscilloscope](#probes-and-the-oscilloscope)
-9. [Running a simulation](#running-a-simulation)
-10. [Worked example: an RC low-pass](#worked-example-an-rc-low-pass)
-11. [Digital and mixed-signal circuits](#digital-and-mixed-signal-circuits)
-12. [Measuring what is on the scope](#measuring-what-is-on-the-scope)
-13. [DC sweeps and the curve tracer](#dc-sweeps-and-the-curve-tracer)
-14. [What is in a signal](#what-is-in-a-signal)
-15. [Stability](#stability)
-16. [Noise](#noise)
-17. [Reading a bus](#reading-a-bus)
-18. [Measuring between two points, and measuring power](#measuring-between-two-points-and-measuring-power)
-19. [Will it work with the parts you can buy](#will-it-work-with-the-parts-you-can-buy)
-20. [Temperature](#temperature)
-21. [Writing on the schematic](#writing-on-the-schematic)
-22. [Drawing part of a circuit as one block](#drawing-part-of-a-circuit-as-one-block)
-23. [Reusing a block](#reusing-a-block)
-24. [Plotting one trace against another](#plotting-one-trace-against-another)
-25. [Importing a SPICE model](#importing-a-spice-model)
-26. [Comparing and computing traces](#comparing-and-computing-traces)
-27. [Naming a net instead of drawing it](#naming-a-net-instead-of-drawing-it)
-28. [Checking the circuit](#checking-the-circuit)
-29. [Development boards](#development-boards)
-30. [Saving and loading](#saving-and-loading)
-31. [Printing](#printing)
-32. [Exporting](#exporting)
-33. [Appearance](#appearance)
-34. [What version is this](#what-version-is-this)
-35. [Keyboard reference](#keyboard-reference)
-36. [When a circuit will not simulate](#when-a-circuit-will-not-simulate)
+9. [Frequency response](#frequency-response)
+10. [Running a simulation](#running-a-simulation)
+11. [Worked example: an RC low-pass](#worked-example-an-rc-low-pass)
+12. [Digital and mixed-signal circuits](#digital-and-mixed-signal-circuits)
+13. [Measuring what is on the scope](#measuring-what-is-on-the-scope)
+14. [DC sweeps and the curve tracer](#dc-sweeps-and-the-curve-tracer)
+15. [What is in a signal](#what-is-in-a-signal)
+16. [Stability](#stability)
+17. [Impedance](#impedance)
+18. [Poles and Zeros](#poles-and-zeros)
+19. [Requirements](#requirements)
+20. [Noise](#noise)
+21. [Reading a bus](#reading-a-bus)
+22. [Measuring between two points, and measuring power](#measuring-between-two-points-and-measuring-power)
+23. [Will it work with the parts you can buy](#will-it-work-with-the-parts-you-can-buy)
+24. [Temperature](#temperature)
+25. [Writing on the schematic](#writing-on-the-schematic)
+26. [Drawing part of a circuit as one block](#drawing-part-of-a-circuit-as-one-block)
+27. [Reusing a block](#reusing-a-block)
+28. [Plotting one trace against another](#plotting-one-trace-against-another)
+29. [Importing a SPICE model](#importing-a-spice-model)
+30. [Comparing and computing traces](#comparing-and-computing-traces)
+31. [Naming a net instead of drawing it](#naming-a-net-instead-of-drawing-it)
+32. [What is this circuit?](#what-is-this-circuit)
+33. [Checking the circuit](#checking-the-circuit)
+34. [Development boards](#development-boards)
+35. [Saving and loading](#saving-and-loading)
+36. [Printing](#printing)
+37. [Exporting](#exporting)
+38. [Appearance](#appearance)
+39. [What version is this](#what-version-is-this)
+40. [Keyboard reference](#keyboard-reference)
+41. [When a circuit will not simulate](#when-a-circuit-will-not-simulate)
 
 This guide is also attached to every [release](../../releases) as a PDF, with a contents page and
 the screenshots in place — the same document, laid out for reading away from the machine. Build it
@@ -105,7 +110,7 @@ each row links to the section that explains it.
 | What are these **digital lines saying** | [Reading a bus](#reading-a-bus) — I²C, SPI, UART, 1-Wire, CAN | `Shift` `F3` |
 | Will it work with the **parts I can buy** | [Tolerance analysis](#will-it-work-with-the-parts-you-can-buy) — hundreds of builds from the bands | `Shift` `F4` |
 | What have I **wired wrong** | [Check circuit](#checking-the-circuit) — the mistakes no part can report about itself | `F4` |
-| Why **will it not solve** | [When it will not solve](#when-it-will-not-solve) — the solver names the net and the part | — |
+| Why **will it not solve** | [When it will not converge](#when-a-circuit-will-not-simulate) — the solver names the net and the part | — |
 | **What is this circuit** | [What is this circuit?](#what-is-this-circuit) — the drawing read back in words | `Ctrl` `F1` |
 | What did I **change** | [Compare](#comparing-with-a-saved-circuit) — this against a file, in values rather than braces | — |
 | How do I **hand this to somebody** | [A design report](#a-design-report) — drawing, requirements and parts on one page | — |
@@ -328,63 +333,6 @@ there is.
   pin half a square off where the next wire will want to meet it.
 - Anything already in the right place is left alone, and the whole move is **one undo step**: six
   parts jumping into line is one thing that happened, not six.
-
-### A design report
-
-**File > Design Report...** writes one page — the schematic, what the circuit is, the requirements
-with their verdicts, the parts, and the conditions it was run at.
-
-Every piece of this already existed: the exporter draws schematics, the parts list is a table,
-requirements produce verdicts, and the explainer produces sentences. What was missing was the thing
-that assembles them, which is the artefact you actually hand to another person. A folder of PNGs is
-not a deliverable; a page that opens with *all seven requirements met* is.
-
-It is **HTML, and self-contained** — no fonts or scripts fetched from anywhere, so it still renders
-years later on a machine with no network. It opens on anything, prints from a browser, and the
-schematic goes in as **SVG**, so it stays sharp when somebody zooms in on the one corner they care
-about and the designators can be selected as text.
-
-The verdict goes at the top, before anything else. A report whose verdict is on page four is a
-report whose verdict nobody knows.
-
-### Two circuits at once
-
-**File > New Window** (`Ctrl` `Shift` `N`) opens a second editor, with its own circuit,
-simulation, scope and undo history.
-
-It is for the two things one window cannot do: **comparing two designs** side by side, and
-**copying a block from one circuit into another**. The clipboard is shared between windows for
-exactly that reason — a clipboard per window would make the main thing the feature is for the one
-thing it could not do. Draw a box round an input stage in one window, `Ctrl` `C`, and paste it into
-the other, wires and all.
-
-Each window keeps its **own recovery snapshot**, so two of them cannot overwrite each other's
-work; and if the application stops with several open, the next start offers each one back, in a
-window of its own.
-
-*Windows rather than tabs, deliberately.* The reason to have two circuits open is nearly always to
-look at both, and tabs are the one arrangement that makes that impossible.
-
-### Comparing with a saved circuit
-
-**File > Compare with a Saved Circuit...** says what changed between the circuit on screen and a
-file on disk — `R2 1k → 2k2`, `C5 added`, `the wire from U1.3 to R4.A separated`.
-
-The file is JSON and diffs as text, which is worth having and is not what anybody wants to read.
-"What did I change since I saved" is answered by a list of values, not by nine lines of moved
-braces — and after an hour of editing, or when an autosave turns up and you have no idea whether it
-is ahead of the file or behind it, that is the only question being asked.
-
-Two things it is careful about:
-
-- **Parts are matched by identity**, not by name or position, because both of those are things you
-  change on purpose. A part that was renamed *and* moved is still the same part, and is reported as
-  two changes to it rather than as one part removed and another added.
-- **A wire is the pair of pins it joins.** Redrawing one through a different corner changes the
-  picture and not the circuit, so it is not reported at all.
-
-Moves are counted but never led with: a tidy-up moves thirty parts and changes nothing about what
-the circuit does, and putting that first would bury the one value that did.
 
 ### Finding something on the sheet
 
@@ -4308,35 +4256,6 @@ series with something hanging off the tap is not reported as a divider, because 
 the ratio and quoting the unloaded number would be worse than silence. Nothing recognised is not a
 criticism of the circuit.
 
----
-
-## When it will not solve
-
-Sometimes the solver cannot find an answer, and says so:
-
-> The solver could not find an answer at t = 0 s: after 100 iterations the circuit was still moving
-> by 0.0837 a step. Most of that movement is on net N3, between D1 and V1. D1 says it has not
-> settled.
-
-That is the useful half of the message: **a net you can go and look at**, and **what is attached to
-it**. Non-linear parts are asked separately whether they have settled, and one that says no is named
-— which is a different question from the node still moving, and both are reported when both are
-true. A part that did not complain is never blamed, because sending you to look at the wrong thing
-is exactly the failure this is meant to avoid.
-
-The causes, in the order they are worth checking:
-
-| Cause | What it looks like | What to do |
-| --- | --- | --- |
-| **A node with no DC path to ground** | the named net is one nothing resistive reaches | add a resistor to ground, or a ground |
-| **A source straight into a junction** | the named net sits between a source and a diode or a base | put a resistor in series — a real supply has one |
-| **A genuinely fast edge** | it only happens partway through a run, not at t = 0 | shorten the time step |
-
-The first two are drawing mistakes and the third is a setting. The named net tells you which,
-because a drawing mistake has a place and a time step does not.
-
----
-
 ## Checking the circuit
 
 **Simulate > Check Circuit...** (`F4`) looks for the mistakes that are silent.
@@ -4484,6 +4403,45 @@ the file you already had.
 
 A file also carries the SPICE cards for any imported models it uses, so a circuit sent to somebody
 else opens as the circuit you saved rather than as an approximation of it.
+
+### Comparing with a saved circuit
+
+**File > Compare with a Saved Circuit...** says what changed between the circuit on screen and a
+file on disk — `R2 1k → 2k2`, `C5 added`, `the wire from U1.3 to R4.A separated`.
+
+The file is JSON and diffs as text, which is worth having and is not what anybody wants to read.
+"What did I change since I saved" is answered by a list of values, not by nine lines of moved
+braces — and after an hour of editing, or when an autosave turns up and you have no idea whether it
+is ahead of the file or behind it, that is the only question being asked.
+
+Two things it is careful about:
+
+- **Parts are matched by identity**, not by name or position, because both of those are things you
+  change on purpose. A part that was renamed *and* moved is still the same part, and is reported as
+  two changes to it rather than as one part removed and another added.
+- **A wire is the pair of pins it joins.** Redrawing one through a different corner changes the
+  picture and not the circuit, so it is not reported at all.
+
+Moves are counted but never led with: a tidy-up moves thirty parts and changes nothing about what
+the circuit does, and putting that first would bury the one value that did.
+
+### Two circuits at once
+
+**File > New Window** (`Ctrl` `Shift` `N`) opens a second editor, with its own circuit,
+simulation, scope and undo history.
+
+It is for the two things one window cannot do: **comparing two designs** side by side, and
+**copying a block from one circuit into another**. The clipboard is shared between windows for
+exactly that reason — a clipboard per window would make the main thing the feature is for the one
+thing it could not do. Draw a box round an input stage in one window, `Ctrl` `C`, and paste it into
+the other, wires and all.
+
+Each window keeps its **own recovery snapshot**, so two of them cannot overwrite each other's
+work; and if the application stops with several open, the next start offers each one back, in a
+window of its own.
+
+*Windows rather than tabs, deliberately.* The reason to have two circuits open is nearly always to
+look at both, and tabs are the one arrangement that makes that impossible.
 
 ### If something goes wrong
 
@@ -4642,6 +4600,24 @@ given a reading nobody measured.
 Very long runs are decimated evenly to twenty thousand rows. Spread across the whole run, not
 truncated: a file cut short at the limit would silently be a file of the first fraction of it.
 
+### A design report
+
+**File > Design Report...** writes one page — the schematic, what the circuit is, the requirements
+with their verdicts, the parts, and the conditions it was run at.
+
+Every piece of this already existed: the exporter draws schematics, the parts list is a table,
+requirements produce verdicts, and the explainer produces sentences. What was missing was the thing
+that assembles them, which is the artefact you actually hand to another person. A folder of PNGs is
+not a deliverable; a page that opens with *all seven requirements met* is.
+
+It is **HTML, and self-contained** — no fonts or scripts fetched from anywhere, so it still renders
+years later on a machine with no network. It opens on anything, prints from a browser, and the
+schematic goes in as **SVG**, so it stays sharp when somebody zooms in on the one corner they care
+about and the designators can be selected as text.
+
+The verdict goes at the top, before anything else. A report whose verdict is on page four is a
+report whose verdict nobody knows.
+
 
 ## Appearance
 
@@ -4757,12 +4733,37 @@ and working backwards to the wiring.
 | Singular matrix | A node connects to nothing else, or a section is isolated from ground |
 | Failed to converge | A non-linear device is being asked for something extreme |
 
-Convergence failures are worth a word. The solver already damps Newton-Raphson, limits junction
-voltages with SPICE's `pnjlim`, and falls back to Gmin stepping when a bias point will not settle
-directly. If it still fails, the circuit itself is usually the problem — an LED with no series
-resistor, a transistor with its base driven straight from a stiff voltage source, a supply shorted
-to ground. Add the resistor that would exist in reality and it will generally solve.
-
 If a waveform looks wrong rather than absent, check the timebase before suspecting the solver: at a
 slow timebase a fast signal is aliased into nonsense. The status bar shows how far simulated time
 has actually advanced.
+
+### When it will not converge
+
+Convergence failures are worth their own section, because the solver has already tried everything
+it can on your behalf: it damps Newton-Raphson, limits junction voltages with SPICE's `pnjlim`, and
+falls back to Gmin stepping when a bias point will not settle directly. By the time you see one,
+the circuit itself is usually the problem.
+
+So the message says which part of it, rather than only that it happened:
+
+> The solver could not find an answer at t = 0 s: after 100 iterations the circuit was still moving
+> by 0.0837 a step. Most of that movement is on net N3, between D1 and V1. D1 says it has not
+> settled.
+
+That is the useful half of the message: **a net you can go and look at**, and **what is attached to
+it**. Non-linear parts are asked separately whether they have settled, and one that says no is named
+— which is a different question from the node still moving, and both are reported when both are
+true. A part that did not complain is never blamed, because sending you to look at the wrong thing
+is exactly the failure this is meant to avoid.
+
+The causes, in the order they are worth checking:
+
+| Cause | What it looks like | What to do |
+| --- | --- | --- |
+| **A node with no DC path to ground** | the named net is one nothing resistive reaches | add a resistor to ground, or a ground |
+| **A source straight into a junction** | the named net sits between a source and a diode or a base | put a resistor in series — a real supply has one |
+| **A genuinely fast edge** | it only happens partway through a run, not at t = 0 | shorten the time step |
+
+The first two are drawing mistakes and the third is a setting. The named net tells you which,
+because a drawing mistake has a place and a time step does not.
+

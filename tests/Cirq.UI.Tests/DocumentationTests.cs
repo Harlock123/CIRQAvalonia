@@ -94,6 +94,60 @@ public partial class DocumentationTests
         Assert.True(broken.Count == 0, "links to nowhere: " + string.Join(", ", broken));
     }
 
+    /// <summary>The guide's chapters — the <c>##</c> headings, not the subsections under them.</summary>
+    private static IReadOnlyList<(string Title, string Anchor, int Index)> TopLevelHeadings(string text) =>
+        [.. System.Text.RegularExpressions.Regex.Matches(text, @"^## (.+)$",
+                System.Text.RegularExpressions.RegexOptions.Multiline)
+            .Select(m => (m.Groups[1].Value.Trim(), Slug(m.Groups[1].Value.Trim()), m.Index))];
+
+    /// <summary>
+    /// Every section the guide's own feature index sends people to is listed in the contents.
+    /// <para>
+    /// The contents is deliberately a <b>selection</b> — the component tutorials are not in it,
+    /// and should not be — so "every heading must be listed" would be the wrong rule. But the
+    /// "which analysis answers which question" table is the guide's index of what the application
+    /// does, and anything it points at is a chapter by definition.
+    /// </para>
+    /// <para>
+    /// Written after five new chapters reached the guide without reaching the contents. The
+    /// existing checks all passed: every entry still pointed somewhere, the numbering still ran
+    /// without gaps, and the order was still right. Nothing here notices what is <i>missing</i>
+    /// unless it is told what has to be there.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void EverySectionTheFeatureIndexPointsAtIsInTheContents()
+    {
+        var guide = Guide;
+
+        var start = guide.IndexOf("## Which analysis answers which question", StringComparison.Ordinal);
+
+        Assert.True(start >= 0, "the guide has no feature index any more");
+
+        var end = guide.IndexOf("\n## ", start + 4, StringComparison.Ordinal);
+        var table = end < 0 ? guide[start..] : guide[start..end];
+
+        var listed = Contents(guide).Select(e => e.Anchor).ToHashSet();
+
+        // Only chapters. The index also points at subsections — "Distortion" lives inside "What
+        // is in a signal" — and those have no business in a top-level contents.
+        var chapters = TopLevelHeadings(guide).Select(h => h.Anchor).ToHashSet();
+
+        var linked = InternalLinkPattern().Matches(table)
+            .Select(m => m.Groups[1].Value)
+            .Where(chapters.Contains)
+            .Distinct()
+            .ToList();
+
+        Assert.NotEmpty(linked);
+
+        var missing = linked.Where(a => !listed.Contains(a)).ToList();
+
+        Assert.True(missing.Count == 0,
+            "sections the feature index points at but the contents does not list: " +
+            string.Join(", ", missing));
+    }
+
     /// <summary>
     /// The contents runs 1, 2, 3 without a gap or a repeat — which is what happens when a section
     /// is inserted and the numbers below it are not renumbered.
