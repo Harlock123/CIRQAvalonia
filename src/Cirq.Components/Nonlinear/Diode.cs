@@ -14,7 +14,7 @@ namespace Cirq.Components.Nonlinear;
 /// exponential from overflowing when an early iterate overshoots.
 /// </para>
 /// </summary>
-public partial class Diode : TwoTerminalComponent, ICurrentReporting, INoiseSource
+public partial class Diode : TwoTerminalComponent, ICurrentReporting, INoiseSource, ISelfHeating
 {
     /// <summary>Largest exponent evaluated before the model falls back to a linear extrapolation.</summary>
     private const double MaxExponent = 80.0;
@@ -67,6 +67,57 @@ public partial class Diode : TwoTerminalComponent, ICurrentReporting, INoiseSour
     public double TerminalCurrent(Terminal terminal, MnaSystem system, SimulationState state) =>
         CurrentIntoPin(terminal, Current);
 
+    /// <summary>
+    /// Junction-to-ambient thermal resistance in degrees per watt, or zero to leave the rise
+    /// unmodelled. It matters most for a rectifier, where a volt across an amp is a watt the part
+    /// has to get rid of, and for anything used as a temperature sensor.
+    /// </summary>
+    [ObservableProperty]
+    public partial double ThermalResistance { get; set; }
+
+    /// <summary>How long the die takes to follow a change in dissipation, in seconds.</summary>
+    [ObservableProperty]
+    public partial double ThermalTimeConstant { get; set; } = 0.5;
+
+    /// <summary>
+    /// The highest the die is rated to reach, in degrees Celsius. A hundred and fifty is what
+    /// almost every silicon part is given.
+    /// </summary>
+    [ObservableProperty]
+    public partial double MaximumJunctionTemperature { get; set; } = 150.0;
+
+    private readonly SelfHeating _thermal = new();
+
+    private double _watts;
+
+    /// <summary>Watts the diode was dissipating at the last solved point.</summary>
+    public double PowerDissipation => _thermal.Watts;
+
+    /// <summary>Where the die actually is, in degrees Celsius.</summary>
+    public double JunctionTemperature => _thermal.Celsius;
+
+    /// <summary>The air around it, in degrees Celsius.</summary>
+    public double AmbientTemperature => _thermal.Ambient;
+
+    /// <summary>True when the die reached the maximum it is rated for.</summary>
+    public bool IsOverTemperature => _thermal.IsOverTemperature;
+
+    /// <summary>What is wrong with how this part is being run, if anything.</summary>
+    public IReadOnlyList<string> Violations => IsOverTemperature
+        ?
+        [
+            $"the die reaches its {MaximumJunctionTemperature:0} °C limit dissipating " +
+            $"{PowerDissipation:0.##} W through {ThermalResistance:0.#} °C/W — it needs a better " +
+            "heatsink, or less to do",
+        ]
+        : [];
+
+    /// <summary>The die when it is being tracked, the circuit's ambient when it is not.</summary>
+    private double Kelvin(SimulationState state) =>
+        ThermalResistance > 0 && !double.IsNaN(_thermal.Celsius)
+            ? _thermal.Kelvin
+            : state.TemperatureKelvin;
+
     /// <summary>True when the diode is carrying meaningful forward current.</summary>
     public bool IsConducting => _current > 1e-6;
 
@@ -76,14 +127,15 @@ public partial class Diode : TwoTerminalComponent, ICurrentReporting, INoiseSour
         var cathode = system.Node(B);
         var bulk = system.InternalNode(this);
 
-        var vt = state.ThermalVoltage * Model.EmissionCoefficient;
+        var vt = PhysicalConstants.Boltzmann * Kelvin(state) / PhysicalConstants.ElementaryCharge
+                 * Model.EmissionCoefficient;
         var raw = system.IterationVoltageAcross(anode, bulk);
         var vd = LimitJunctionVoltage(raw, _previousJunctionVoltage, vt, CriticalVoltage(vt));
 
         _limitedThisIteration = Math.Abs(vd - raw) > 1e-12;
         _previousJunctionVoltage = vd;
 
-        var (current, conductance) = Evaluate(vd, vt, Model.SaturationCurrentAt(state.TemperatureKelvin));
+        var (current, conductance) = Evaluate(vd, vt, Model.SaturationCurrentAt(Kelvin(state)));
 
         // Companion for the junction: i = Gd·v + Ieq, linearised about vd.
         system.StampNorton(anode, bulk, conductance, current - conductance * vd);
@@ -91,6 +143,12 @@ public partial class Diode : TwoTerminalComponent, ICurrentReporting, INoiseSour
         // Bulk resistance from the junction to the cathode. A floor keeps an ideal diode from
         // producing an infinite conductance on this branch.
         system.StampConductance(bulk, cathode, 1.0 / Math.Max(Model.SeriesResistance, 1e-4));
+
+        // The whole drop across the part, junction and bulk together, times what is flowing.
+        // Recorded rather than acted on: the die is moved by the outer loop in HasConverged.
+        var across = system.IterationVoltageAcross(anode, cathode);
+
+        _watts = Math.Abs(across) * Math.Abs(current);
     }
 
     /// <summary>Evaluates the model, returning the junction current and its small-signal conductance.</summary>
@@ -164,16 +222,27 @@ public partial class Diode : TwoTerminalComponent, ICurrentReporting, INoiseSour
     {
         // A limited iteration means the solver has not actually reached the junction voltage the
         // matrix asked for, so the point cannot be declared converged yet.
-        return !_limitedThisIteration;
+        if (_limitedThisIteration) return false;
+
+        // Reached only once the electrical solve is within tolerance, which makes this the outer
+        // step of an electro-thermal loop rather than a perturbation inside the inner one.
+        if (state is { IsTransient: false }) return _thermal.Relax(_watts, state, ThermalResistance, MaximumJunctionTemperature);
+
+        return true;
     }
 
     public override void CommitTimeStep(MnaSystem system, SimulationState state)
     {
+        if (state.IsTransient)
+            _thermal.Advance(
+                _watts, state, ThermalResistance, ThermalTimeConstant, MaximumJunctionTemperature);
+
         var junction = system.NodeVoltage(system.Node(A)) - system.NodeVoltage(system.InternalNode(this));
-        var vt = state.ThermalVoltage * Model.EmissionCoefficient;
+        var vt = PhysicalConstants.Boltzmann * Kelvin(state) / PhysicalConstants.ElementaryCharge
+                 * Model.EmissionCoefficient;
 
         _junctionVoltage = junction;
-        (_current, _) = Evaluate(junction, vt, Model.SaturationCurrentAt(state.TemperatureKelvin));
+        (_current, _) = Evaluate(junction, vt, Model.SaturationCurrentAt(Kelvin(state)));
     }
 
     public override void ResetState()
@@ -182,6 +251,8 @@ public partial class Diode : TwoTerminalComponent, ICurrentReporting, INoiseSour
         _previousJunctionVoltage = 0;
         _current = 0;
         _limitedThisIteration = false;
+        _watts = 0;
+        _thermal.Reset();
     }
 
     partial void OnModelChanged(DiodeModel value) => NotifyValueChanged();

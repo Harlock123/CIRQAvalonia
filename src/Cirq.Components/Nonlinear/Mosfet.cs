@@ -151,7 +151,7 @@ public sealed record MosfetModel(
 /// way real silicon does rather than producing an unbounded spike. The gate draws no current.
 /// </para>
 /// </summary>
-public partial class Mosfet : CircuitComponent, ICurrentReporting, INoiseSource
+public partial class Mosfet : CircuitComponent, ICurrentReporting, INoiseSource, ISelfHeating
 {
     /// <summary>Saturation current of the body diode.</summary>
     private const double BodyDiodeSaturationCurrent = 1e-14;
@@ -196,6 +196,55 @@ public partial class Mosfet : CircuitComponent, ICurrentReporting, INoiseSource
     /// analysis measures the channel's thermal noise against.
     /// </summary>
     public double Transconductance { get; private set; }
+
+    /// <summary>
+    /// Junction-to-ambient thermal resistance in degrees per watt, or zero to leave the rise
+    /// unmodelled — which is the default, because a bare part has no thermal resistance until
+    /// somebody says what it is mounted on. A TO-220 in free air is about 62; on a small heatsink
+    /// perhaps 10; bolted to a real one, two or three.
+    /// </summary>
+    [ObservableProperty]
+    public partial double ThermalResistance { get; set; }
+
+    /// <summary>
+    /// How long the die takes to follow a change in dissipation, in seconds. Small — a die is
+    /// thin and light — which is why a MOSFET survives a pulse that would destroy it held on.
+    /// </summary>
+    [ObservableProperty]
+    public partial double ThermalTimeConstant { get; set; } = 0.5;
+
+    /// <summary>
+    /// The highest the die is rated to reach, in degrees Celsius. A hundred and fifty is what
+    /// almost every silicon part is given.
+    /// </summary>
+    [ObservableProperty]
+    public partial double MaximumJunctionTemperature { get; set; } = 150.0;
+
+    private readonly SelfHeating _thermal = new();
+
+    private double _watts;
+
+    /// <summary>Watts the channel was dissipating at the last solved point.</summary>
+    public double PowerDissipation => _thermal.Watts;
+
+    /// <summary>Where the die actually is, in degrees Celsius.</summary>
+    public double JunctionTemperature => _thermal.Celsius;
+
+    /// <summary>The air around it, in degrees Celsius.</summary>
+    public double AmbientTemperature => _thermal.Ambient;
+
+    /// <summary>True when the die reached the maximum it is rated for.</summary>
+    public bool IsOverTemperature => _thermal.IsOverTemperature;
+
+    /// <summary>What is wrong with how this part is being run, if anything.</summary>
+    public IReadOnlyList<string> Violations => IsOverTemperature
+        ?
+        [
+            $"the die reaches its {MaximumJunctionTemperature:0} °C limit dissipating " +
+            $"{PowerDissipation:0.##} W through {ThermalResistance:0.#} °C/W — it needs a better " +
+            "heatsink, or less to do",
+        ]
+        : [];
 
     /// <summary>
     /// Where this part's flicker noise crosses its channel noise, in hertz. Below it the 1/f term
@@ -268,6 +317,10 @@ public partial class Mosfet : CircuitComponent, ICurrentReporting, INoiseSource
         system.Add(sourceNode, drainNode, -gds);
         system.AddRhs(sourceNode, idEq);
 
+        // Recorded, not acted on: the die is moved by the outer loop in HasConverged, once the
+        // electrical solve has settled and this figure means something.
+        _watts = vds * Math.Abs(id);
+
         if (Model.HasBodyDiode) StampBodyDiode(system, state, d, s, polarity);
 
         // A gate with nothing attached would otherwise leave an empty matrix row.
@@ -285,8 +338,14 @@ public partial class Mosfet : CircuitComponent, ICurrentReporting, INoiseSource
     /// </summary>
     private void CacheForTemperature(SimulationState state)
     {
-        _threshold = Model.ThresholdAt(state.TemperatureKelvin);
-        _transconductance = Model.TransconductanceAt(state.TemperatureKelvin);
+        // The die, once there is one to read. On the first iteration of a solve there is not, so
+        // the part starts at ambient and walks up from there — which is also what it does.
+        var kelvin = ThermalResistance > 0 && !double.IsNaN(_thermal.Celsius)
+            ? _thermal.Kelvin
+            : state.TemperatureKelvin;
+
+        _threshold = Model.ThresholdAt(kelvin);
+        _transconductance = Model.TransconductanceAt(kelvin);
     }
 
     private double _threshold;
@@ -351,10 +410,24 @@ public partial class Mosfet : CircuitComponent, ICurrentReporting, INoiseSource
     /// combines these with <c>All</c>, which short-circuits, so a convergence check that mutated
     /// state would run an unpredictable number of times.
     /// </summary>
-    public override bool HasConverged(MnaSystem system, SimulationState state) => !_limitedThisIteration;
+    public override bool HasConverged(MnaSystem system, SimulationState state)
+    {
+        if (_limitedThisIteration) return false;
+
+        // Reached only when the electrical solve is already within tolerance, which makes this
+        // the outer step of an electro-thermal loop rather than a perturbation inside the inner
+        // one. In a transient the die is advanced once per accepted step instead.
+        if (state is { IsTransient: false }) return _thermal.Relax(_watts, state, ThermalResistance, MaximumJunctionTemperature);
+
+        return true;
+    }
 
     public override void CommitTimeStep(MnaSystem system, SimulationState state)
     {
+        if (state.IsTransient)
+            _thermal.Advance(
+                _watts, state, ThermalResistance, ThermalTimeConstant, MaximumJunctionTemperature);
+
         var polarity = Polarity;
 
         CacheForTemperature(state);
@@ -384,6 +457,8 @@ public partial class Mosfet : CircuitComponent, ICurrentReporting, INoiseSource
     {
         _bodyDiodeVoltage = 0;
         _limitedThisIteration = false;
+        _watts = 0;
+        _thermal.Reset();
         DrainCurrent = 0;
         Vgs = 0;
         Vds = 0;

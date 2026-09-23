@@ -139,7 +139,7 @@ public sealed record BjtModel(
 /// output conductance, which is what sets a common-emitter stage's gain.
 /// </para>
 /// </summary>
-public partial class BipolarTransistor : CircuitComponent, ICurrentReporting, INoiseSource
+public partial class BipolarTransistor : CircuitComponent, ICurrentReporting, INoiseSource, ISelfHeating
 {
     private double _vbe;
     private double _vbc;
@@ -176,6 +176,60 @@ public partial class BipolarTransistor : CircuitComponent, ICurrentReporting, IN
 
     /// <summary>Collector current at the converged solution, in amps.</summary>
     public double CollectorCurrent { get; private set; }
+
+    /// <summary>
+    /// Junction-to-ambient thermal resistance in degrees per watt, or zero to leave the rise
+    /// unmodelled. A TO-92 in free air is around 200, a TO-220 about 62, and on a heatsink far
+    /// less — the number that decides whether a stage biases or runs away.
+    /// </summary>
+    [ObservableProperty]
+    public partial double ThermalResistance { get; set; }
+
+    /// <summary>How long the die takes to follow a change in dissipation, in seconds.</summary>
+    [ObservableProperty]
+    public partial double ThermalTimeConstant { get; set; } = 0.5;
+
+    /// <summary>
+    /// The highest the die is rated to reach, in degrees Celsius. A hundred and fifty is what
+    /// almost every silicon part is given.
+    /// </summary>
+    [ObservableProperty]
+    public partial double MaximumJunctionTemperature { get; set; } = 150.0;
+
+    private readonly SelfHeating _thermal = new();
+
+    private double _watts;
+
+    /// <summary>Watts the device was dissipating at the last solved point.</summary>
+    public double PowerDissipation => _thermal.Watts;
+
+    /// <summary>Where the die actually is, in degrees Celsius.</summary>
+    public double JunctionTemperature => _thermal.Celsius;
+
+    /// <summary>The air around it, in degrees Celsius.</summary>
+    public double AmbientTemperature => _thermal.Ambient;
+
+    /// <summary>True when the die reached the maximum it is rated for.</summary>
+    public bool IsOverTemperature => _thermal.IsOverTemperature;
+
+    /// <summary>What is wrong with how this part is being run, if anything.</summary>
+    public IReadOnlyList<string> Violations => IsOverTemperature
+        ?
+        [
+            $"the die reaches its {MaximumJunctionTemperature:0} °C limit dissipating " +
+            $"{PowerDissipation:0.##} W through {ThermalResistance:0.#} °C/W — it needs a better " +
+            "heatsink, or less to do",
+        ]
+        : [];
+
+    /// <summary>
+    /// The temperature the junctions are modelled at: the die when it is being tracked, the
+    /// circuit's ambient when it is not.
+    /// </summary>
+    private double Kelvin(SimulationState state) =>
+        ThermalResistance > 0 && !double.IsNaN(_thermal.Celsius)
+            ? _thermal.Kelvin
+            : state.TemperatureKelvin;
 
     /// <summary>Base current at the converged solution, in amps.</summary>
     public double BaseCurrent { get; private set; }
@@ -217,8 +271,10 @@ public partial class BipolarTransistor : CircuitComponent, ICurrentReporting, IN
         var e = system.Node(Emitter);
 
         var polarity = Polarity;
-        var vt = state.ThermalVoltage * Model.EmissionCoefficient;
-        var saturation = Model.SaturationCurrentAt(state.TemperatureKelvin);
+        var kelvin = Kelvin(state);
+        var vt = PhysicalConstants.Boltzmann * kelvin / PhysicalConstants.ElementaryCharge
+                 * Model.EmissionCoefficient;
+        var saturation = Model.SaturationCurrentAt(kelvin);
         var vCritical = Junction.CriticalVoltage(saturation, vt);
 
         // Mirror into NPN convention, then limit each junction against its previous iterate.
@@ -237,7 +293,7 @@ public partial class BipolarTransistor : CircuitComponent, ICurrentReporting, IN
         var (forward, gForward) = Junction.Evaluate(vbe, saturation, vt);
         var (reverse, gReverse) = Junction.Evaluate(vbc, saturation, vt);
 
-        var bf = Math.Max(Model.ForwardBetaAt(state.TemperatureKelvin), 1e-3);
+        var bf = Math.Max(Model.ForwardBetaAt(kelvin), 1e-3);
         var br = Math.Max(Model.ReverseBeta, 1e-3);
 
         var ic = forward - reverse - reverse / br;
@@ -279,22 +335,45 @@ public partial class BipolarTransistor : CircuitComponent, ICurrentReporting, IN
         // Keep both junctions weakly connected so a floating base cannot empty the matrix row.
         system.StampConductance(b, e, 1e-12);
         system.StampConductance(b, c, 1e-12);
+
+        // What the device is burning. The collector-emitter product is nearly all of it in any
+        // stage that is amplifying; the base term matters in a saturated switch, where Vce is
+        // small and Ib is not. Recorded rather than acted on — the die is moved by the outer loop
+        // in HasConverged, once this figure means something.
+        var vce = vbe - vbc;
+
+        _watts = (Math.Abs(vce) * Math.Abs(ic)) + (Math.Abs(vbe) * Math.Abs(ib));
     }
 
-    public override bool HasConverged(MnaSystem system, SimulationState state) => !_limitedThisIteration;
+    public override bool HasConverged(MnaSystem system, SimulationState state)
+    {
+        if (_limitedThisIteration) return false;
+
+        if (state is { IsTransient: false }) return _thermal.Relax(_watts, state, ThermalResistance, MaximumJunctionTemperature);
+
+        return true;
+    }
 
     public override void CommitTimeStep(MnaSystem system, SimulationState state)
     {
+        if (state.IsTransient)
+            _thermal.Advance(
+                _watts, state, ThermalResistance, ThermalTimeConstant, MaximumJunctionTemperature);
+
         var polarity = Polarity;
-        var vt = state.ThermalVoltage * Model.EmissionCoefficient;
+
+        // The die's own thermal voltage, not the room's: the two are the same only for a part
+        // that is dissipating nothing.
+        var vt = PhysicalConstants.Boltzmann * Kelvin(state) / PhysicalConstants.ElementaryCharge
+                 * Model.EmissionCoefficient;
 
         _vbe = polarity * (system.NodeVoltage(Base) - system.NodeVoltage(Emitter));
         _vbc = polarity * (system.NodeVoltage(Base) - system.NodeVoltage(Collector));
 
-        var (forward, _) = Junction.Evaluate(_vbe, Model.SaturationCurrentAt(state.TemperatureKelvin), vt);
-        var (reverse, _) = Junction.Evaluate(_vbc, Model.SaturationCurrentAt(state.TemperatureKelvin), vt);
+        var (forward, _) = Junction.Evaluate(_vbe, Model.SaturationCurrentAt(Kelvin(state)), vt);
+        var (reverse, _) = Junction.Evaluate(_vbc, Model.SaturationCurrentAt(Kelvin(state)), vt);
 
-        var bf = Math.Max(Model.ForwardBetaAt(state.TemperatureKelvin), 1e-3);
+        var bf = Math.Max(Model.ForwardBetaAt(Kelvin(state)), 1e-3);
         var br = Math.Max(Model.ReverseBeta, 1e-3);
 
         var transport = forward - reverse - reverse / br;
@@ -329,6 +408,8 @@ public partial class BipolarTransistor : CircuitComponent, ICurrentReporting, IN
         _limitedThisIteration = false;
         CollectorCurrent = 0;
         BaseCurrent = 0;
+        _watts = 0;
+        _thermal.Reset();
     }
 
     partial void OnModelChanged(BjtModel value) => NotifyValueChanged();
