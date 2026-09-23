@@ -1,19 +1,27 @@
 namespace Cirq.Engine.Simulation;
 
+/// <summary>
+/// Thrown when the solver cannot find an answer.
+/// <para>
+/// It carries a <see cref="Report"/> rather than only a number, because the useful part of this
+/// failure is <i>where</i> rather than <i>how far</i>: the node that was still moving, what is
+/// attached to it, and which parts said they had not settled. All three name somewhere on the
+/// drawing to go and look, which "try a smaller time step" does not.
+/// </para>
+/// </summary>
 public sealed class ConvergenceException : Exception
 {
-    public ConvergenceException(double time, int iterations, double residual)
-        : base($"Newton-Raphson failed to converge at t={time:g6}s after {iterations} iterations " +
-               $"(largest update {residual:g3}). Try a smaller time step or check for a circuit with no DC path to ground.")
+    public ConvergenceException(ConvergenceReport report)
+        : base(report?.Describe() ?? throw new ArgumentNullException(nameof(report)))
     {
-        Time = time;
-        Iterations = iterations;
-        Residual = residual;
+        Report = report;
     }
 
-    public double Time { get; }
+    public ConvergenceReport Report { get; }
 
-    public int Iterations { get; }
+    public double Time => Report.Time;
 
-    public double Residual { get; }
+    public int Iterations => Report.Iterations;
+
+    public double Residual => Report.Residual;
 }

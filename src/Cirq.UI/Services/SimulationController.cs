@@ -354,7 +354,9 @@ public sealed partial class SimulationController : ObservableObject, IDisposable
     private static string Describe(Exception ex) => ex switch
     {
         CircuitTopologyException => $"Topology: {ex.Message}",
-        ConvergenceException => $"Convergence: {ex.Message}",
+        // The message is already a sentence naming a net and the parts on it, so it is shown as
+        // written rather than prefixed with a word nobody outside a solver uses.
+        ConvergenceException => ex.Message,
         _ => $"{ex.GetType().Name}: {ex.Message}",
     };
 

@@ -105,6 +105,7 @@ each row links to the section that explains it.
 | What are these **digital lines saying** | [Reading a bus](#reading-a-bus) — I²C, SPI, UART, 1-Wire, CAN | `Shift` `F3` |
 | Will it work with the **parts I can buy** | [Tolerance analysis](#will-it-work-with-the-parts-you-can-buy) — hundreds of builds from the bands | `Shift` `F4` |
 | What have I **wired wrong** | [Check circuit](#checking-the-circuit) — the mistakes no part can report about itself | `F4` |
+| Why **will it not solve** | [When it will not solve](#when-it-will-not-solve) — the solver names the net and the part | — |
 | What does **temperature** do to it | [Temperature](#temperature) — set it, or sweep it like any other parameter | — |
 | How hot does the **part itself** get | [Self-heating](#when-a-part-heats-itself) — give it a thermal resistance and the loop closes | — |
 | Does it meet what I **said it had to do** | [Requirements](#requirements) — written down, and checked | `Ctrl` `F4` |
@@ -302,6 +303,46 @@ box against that would catch far less than the box visibly encloses.
 Wires are not selected by the box directly. A wire is selected exactly when **both of its ends are
 on selected parts**, which is the same rule that decides whether it can be copied. Click empty
 canvas to clear the selection, or click a single part to select just that one.
+
+### Lining them up
+
+**Edit > Arrange** lines up or spaces out whatever is selected. Six ways to align — left, centre,
+right, top, middle, bottom — and two ways to distribute, horizontally and vertically.
+
+A schematic is read as much as it is solved, and a drawing where the parts are a few pixels out is
+harder to read than one where they are not: the eye spends effort on the wobble that it should be
+spending on the circuit. Nudging six parts into a column by hand is also the least interesting work
+there is.
+
+- **Left and right go by the parts' edges**, because that is what those words mean. The two centre
+  lines go by their middles, and the target is the *average* of the middles, so aligning to a centre
+  does not drift the selection sideways.
+- **Distributing keeps the two outermost parts exactly where they are** and spaces everything
+  between them evenly. That is what makes it safe to reach for without thinking: it cannot run the
+  drawing away from where it was, because the extremes are fixed.
+- With **Snap to Grid** on, the new positions are rounded onto the grid, so lining up never leaves a
+  pin half a square off where the next wire will want to meet it.
+- Anything already in the right place is left alone, and the whole move is **one undo step**: six
+  parts jumping into line is one thing that happened, not six.
+
+### Finding something on the sheet
+
+**Edit > Find on Sheet...** (`Ctrl` `Shift` `F`) goes to a part by name.
+
+`Ctrl` `F` searches the *palette*, for a part to place. This searches the drawing you already have,
+which past about twenty parts is a different and more frequent question: where is `R17`, which one
+is the `4k7`, what is on the `VCC` rail.
+
+Type a designator, a value, a kind of part or a net name. Enter goes to the top match, the arrow
+keys move through the list without leaving the box, and the part is selected and brought into view
+at the zoom you were already working at — not dropped into a close-up of one resistor with no idea
+what is around it.
+
+The order is the part that matters. An **exact designator** comes first, then one that starts with
+what you typed, then values, then kinds of part, then nets — because a designator is nearly always
+what is being looked for. It is the thing printed in an error message, quoted in a parts list and
+written on a note. Blocks are searched inside too: a part does not stop existing because somebody
+tidied it away.
 
 ### Copying
 
@@ -4169,6 +4210,33 @@ so highlighting it would light up nothing you can see; its pin gets a dot instea
 
 The highlight clears as soon as you change anything, because the question was asked about a
 circuit that no longer exists.
+
+---
+
+## When it will not solve
+
+Sometimes the solver cannot find an answer, and says so:
+
+> The solver could not find an answer at t = 0 s: after 100 iterations the circuit was still moving
+> by 0.0837 a step. Most of that movement is on net N3, between D1 and V1. D1 says it has not
+> settled.
+
+That is the useful half of the message: **a net you can go and look at**, and **what is attached to
+it**. Non-linear parts are asked separately whether they have settled, and one that says no is named
+— which is a different question from the node still moving, and both are reported when both are
+true. A part that did not complain is never blamed, because sending you to look at the wrong thing
+is exactly the failure this is meant to avoid.
+
+The causes, in the order they are worth checking:
+
+| Cause | What it looks like | What to do |
+| --- | --- | --- |
+| **A node with no DC path to ground** | the named net is one nothing resistive reaches | add a resistor to ground, or a ground |
+| **A source straight into a junction** | the named net sits between a source and a diode or a base | put a resistor in series — a real supply has one |
+| **A genuinely fast edge** | it only happens partway through a run, not at t = 0 | shorten the time step |
+
+The first two are drawing mistakes and the third is a setting. The named net tells you which,
+because a drawing mistake has a place and a time step does not.
 
 ---
 

@@ -49,6 +49,24 @@
         <MenuItem Header="_Copy" InputGesture="Ctrl+C" Command="{Binding CopySelectionCommand}" />
         <MenuItem Header="{Binding PasteMenuText}" InputGesture="Ctrl+V" Command="{Binding PasteCommand}" />
         <Separator />
+        <MenuItem Header="_Find on Sheet..." InputGesture="Ctrl+Shift+F"
+                  Command="{Binding ShowFindCommand}"
+                  ToolTip.Tip="Go to a part by its designator, its value, its kind, or a net name" />
+        <Separator />
+        <MenuItem Header="_Arrange"
+                  ToolTip.Tip="Line up or space out the selected parts — a schematic is read as much as it is solved">
+          <MenuItem Header="Align _Left" Command="{Binding AlignSelectionCommand}" CommandParameter="Left" />
+          <MenuItem Header="Align _Centre" Command="{Binding AlignSelectionCommand}" CommandParameter="HorizontalCentre" />
+          <MenuItem Header="Align _Right" Command="{Binding AlignSelectionCommand}" CommandParameter="Right" />
+          <Separator />
+          <MenuItem Header="Align _Top" Command="{Binding AlignSelectionCommand}" CommandParameter="Top" />
+          <MenuItem Header="Align _Middle" Command="{Binding AlignSelectionCommand}" CommandParameter="VerticalMiddle" />
+          <MenuItem Header="Align _Bottom" Command="{Binding AlignSelectionCommand}" CommandParameter="Bottom" />
+          <Separator />
+          <MenuItem Header="Distribute _Horizontally" Command="{Binding SpreadSelectionCommand}" CommandParameter="Horizontal" />
+          <MenuItem Header="Distribute _Vertically" Command="{Binding SpreadSelectionCommand}" CommandParameter="Vertical" />
+        </MenuItem>
+        <Separator />
         <MenuItem Header="_Group into Block" InputGesture="Ctrl+G"
                   Command="{Binding GroupSelectionCommand}" />
         <MenuItem Header="_Ungroup Block" InputGesture="Ctrl+Shift+G"

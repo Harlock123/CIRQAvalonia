@@ -694,6 +694,25 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     /// <summary>Raised when the About dialog should be shown.</summary>
     public event EventHandler? RequestAbout;
 
+    /// <summary>Raised when the find-on-sheet window should be opened.</summary>
+    public event EventHandler? RequestFind;
+
+    [RelayCommand]
+    private void ShowFind() => RequestFind?.Invoke(this, EventArgs.Empty);
+
+    /// <summary>Raised when the canvas should select one part and bring it into view.</summary>
+    public event EventHandler<CircuitComponent>? RequestGoTo;
+
+    /// <summary>Selects a part and centres the view on it, which is what a find result does.</summary>
+    public void GoTo(CircuitComponent component)
+    {
+        ArgumentNullException.ThrowIfNull(component);
+
+        SelectedComponent = component;
+        RequestGoTo?.Invoke(this, component);
+        StatusMessage = $"Went to {component.Name}";
+    }
+
     /// <summary>Raised when the impedance window should be opened.</summary>
     public event EventHandler? RequestImpedance;
 
@@ -822,6 +841,59 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
     [RelayCommand]
     private void DeleteSelection() => RequestDeleteSelection?.Invoke(this, EventArgs.Empty);
+
+    /// <summary>
+    /// The selection, which lives on the parts rather than here — the same rule the canvas uses.
+    /// </summary>
+    private IReadOnlyList<CircuitComponent> SelectedParts =>
+        [.. Circuit.Components.Where(c => c.IsSelected)];
+
+    [RelayCommand]
+    private void AlignSelection(string? edge)
+    {
+        if (!Enum.TryParse<AlignTo>(edge, ignoreCase: true, out var to)) return;
+
+        Apply(Arrange.Align(SelectedParts, to), $"Align {Spaced(to.ToString())}");
+    }
+
+    [RelayCommand]
+    private void SpreadSelection(string? axis)
+    {
+        if (!Enum.TryParse<SpreadAlong>(axis, ignoreCase: true, out var along)) return;
+
+        Apply(Arrange.Spread(SelectedParts, along), $"Distribute {along.ToString().ToLowerInvariant()}");
+    }
+
+    /// <summary>
+    /// Moves the parts, as one undo step. Six parts jumping into line is one thing that happened,
+    /// not six — and an arrangement that moved nothing leaves no step at all.
+    /// </summary>
+    private void Apply(IReadOnlyDictionary<CircuitComponent, (double X, double Y)> moves, string label)
+    {
+        if (SnapToGrid) moves = Arrange.OnGrid(moves, GridSize);
+
+        if (moves.Count == 0)
+        {
+            StatusMessage = "Nothing to move: select two or more parts that are not already in line.";
+            return;
+        }
+
+        using (History.Gesture(Circuit, label))
+        {
+            foreach (var (part, (x, y)) in moves)
+            {
+                part.X = x;
+                part.Y = y;
+            }
+        }
+
+        StatusMessage = $"{label}: moved {moves.Count} {(moves.Count == 1 ? "part" : "parts")}";
+        RequestRedraw?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>"HorizontalCentre" as "horizontal centre", for a menu label and a status line.</summary>
+    private static string Spaced(string name) =>
+        string.Concat(name.Select((c, i) => i > 0 && char.IsUpper(c) ? $" {char.ToLowerInvariant(c)}" : $"{char.ToLowerInvariant(c)}"));
 
     /// <summary>
     /// Groups the selection into a block: one symbol on the sheet, with a pin wherever a wire
@@ -1162,6 +1234,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
           Middle drag  Pan (or hold Space and drag)
           F9 / F10     Collapse the palette / properties panel
           Ctrl+F       Find a part in the palette
+          Ctrl+Shift+F Find a part on the sheet — designator, value, kind or net
 
         Simulation
           F5           Run or pause

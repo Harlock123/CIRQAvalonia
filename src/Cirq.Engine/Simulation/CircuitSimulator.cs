@@ -370,7 +370,8 @@ public sealed class CircuitSimulator
             if (IsWithinTolerance() && _nonlinear.All(c => c.HasConverged(System, State))) return;
         }
 
-        throw new ConvergenceException(State.Time, maxIterations, residual);
+        throw new ConvergenceException(ConvergenceReport.From(
+            State.Time, maxIterations, residual, _iterationDelta, System, State, _nonlinear));
     }
 
     private bool IsWithinTolerance()

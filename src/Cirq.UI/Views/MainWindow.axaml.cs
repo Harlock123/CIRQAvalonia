@@ -107,6 +107,8 @@ public partial class MainWindow : Window
         viewModel.RequestTransientStep += async (_, _) => await ShowTransientStepAsync();
         viewModel.RequestNoise += async (_, _) => await ShowNoiseAsync();
         viewModel.RequestStability += async (_, _) => await ShowStabilityAsync();
+        viewModel.RequestFind += async (_, _) => await ShowFindAsync();
+        viewModel.RequestGoTo += (_, component) => _canvas?.CentreOn(component);
         viewModel.RequestImpedance += async (_, _) => await ShowImpedanceAsync();
         viewModel.RequestPoleZero += async (_, _) => await ShowPoleZeroAsync();
         viewModel.RequestSpecs += async (_, _) => await ShowSpecsAsync();
@@ -214,6 +216,17 @@ public partial class MainWindow : Window
         };
 
         await dialog.ShowDialog(this);
+    }
+
+    private async Task ShowFindAsync()
+    {
+        if (_viewModel is null) return;
+
+        var model = new FindViewModel(_viewModel.Circuit);
+
+        model.RequestGoTo += (_, component) => _viewModel.GoTo(component);
+
+        await new FindWindow { DataContext = model }.ShowDialog(this);
     }
 
     private async Task ShowImpedanceAsync()

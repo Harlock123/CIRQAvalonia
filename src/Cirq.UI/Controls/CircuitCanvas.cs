@@ -273,6 +273,28 @@ public class CircuitCanvas : Control
     public void ZoomToFit() => FitTo(Bounds.Size);
 
     /// <summary>
+    /// Brings one part into the middle of the view, without changing the zoom.
+    /// <para>
+    /// The zoom is left alone deliberately: somebody looking for R17 on a big sheet wants to be
+    /// taken to it at the scale they were working at, not dropped into a close-up of one resistor
+    /// with no idea what is around it.
+    /// </para>
+    /// </summary>
+    public void CentreOn(CircuitComponent component)
+    {
+        ArgumentNullException.ThrowIfNull(component);
+
+        var box = VisualBoundsOf(component);
+
+        _viewAdjustedByUser = true;
+        _panOffset = new Point(
+            (Bounds.Width / 2) - (box.Center.X * Zoom),
+            (Bounds.Height / 2) - (box.Center.Y * Zoom));
+
+        InvalidateVisual();
+    }
+
+    /// <summary>
     /// Steps the zoom about the middle of the viewport, which is where the menu and the keyboard
     /// have to work from — the wheel zooms about the pointer instead, because there is one.
     /// </summary>
