@@ -16,6 +16,27 @@ public sealed record DiodeModel(
     double TemperatureExponent = 3.0)
 {
     /// <summary>
+    /// Roughly what this part drops carrying a given current at room temperature, from the
+    /// junction equation and the bulk resistance.
+    /// <para>
+    /// The back-of-an-envelope figure, and deliberately: it is what somebody writes down before
+    /// drawing anything, and the exact answer comes out of a solve. A red LED reads about 1.8 V
+    /// and a 1N4001 at an amp about 0.9, which are the numbers people already carry.
+    /// </para>
+    /// </summary>
+    public double ForwardVoltageAt(double amps = 0.01)
+    {
+        if (amps <= 0) return 0;
+
+        const double thermal = 0.025852;
+
+        var junction = EmissionCoefficient * thermal
+                       * Math.Log((amps / Math.Max(SaturationCurrent, 1e-30)) + 1.0);
+
+        return junction + (amps * SeriesResistance);
+    }
+
+    /// <summary>
     /// The saturation current at a given temperature. Everything else in the model is quoted at
     /// 27 °C; this is the one parameter that has to move, and it is the one that decides which way
     /// the forward drop goes as the part warms up.

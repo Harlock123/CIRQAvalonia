@@ -1,0 +1,45 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:Cirq.UI.ViewModels"
+        xmlns:ser="clr-namespace:Cirq.Components.Serialization;assembly=Cirq.Components"
+        x:Class="Cirq.UI.Views.CompareWindow"
+        x:DataType="vm:CompareViewModel"
+        Title="Compare with a Saved Circuit"
+        Width="640" Height="540"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource PanelBackground}">
+
+  <DockPanel Margin="14">
+
+    <StackPanel DockPanel.Dock="Top" Spacing="4" Margin="0,0,0,10">
+      <TextBlock Text="{Binding Summary}" FontSize="17" FontWeight="SemiBold" />
+      <TextBlock FontSize="11" Opacity="0.6">
+        <Run Text="This circuit against" />
+        <Run Text="{Binding Against}" FontWeight="SemiBold" />
+      </TextBlock>
+    </StackPanel>
+
+    <TextBlock DockPanel.Dock="Bottom" FontSize="11" Opacity="0.6" Margin="0,10,0,0"
+               TextWrapping="Wrap"
+               Text="Parts are matched by identity rather than by name or position, so a part that was renamed or moved is still the same part. A wire is the pair of pins it joins, so redrawing one through a different corner is not a change to the circuit." />
+
+    <TextBlock IsVisible="{Binding !HasChanges}" Opacity="0.6" Margin="2,10"
+               Text="The two are identical." />
+
+    <ScrollViewer IsVisible="{Binding HasChanges}">
+      <ItemsControl ItemsSource="{Binding Changes}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="ser:CircuitChange">
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" Margin="0,3">
+              <TextBlock Text="{Binding Subject}" FontWeight="SemiBold" Width="90"
+                         TextTrimming="CharacterEllipsis" />
+              <TextBlock Grid.Column="1" Text="{Binding Detail}" Opacity="0.8"
+                         TextWrapping="Wrap" />
+            </Grid>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </ScrollViewer>
+
+  </DockPanel>
+</Window>

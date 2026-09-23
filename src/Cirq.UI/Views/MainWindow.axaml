@@ -28,6 +28,10 @@
         <MenuItem Header="Save _As..." InputGesture="Ctrl+Shift+S" Command="{Binding SaveAsCommand}" />
         <Separator />
         <MenuItem Header="_Print..." InputGesture="Ctrl+P" Command="{Binding PrintCommand}" />
+        <MenuItem Header="Co_mpare with a Saved Circuit..."
+                  Command="{Binding ShowCompareCommand}"
+                  ToolTip.Tip="What changed between this and a file on disk, said the way a person would say it" />
+        <Separator />
         <MenuItem Header="_Export..." InputGesture="Ctrl+E" Command="{Binding ExportCommand}"
                   ToolTip.Tip="Write the schematic and the traces out as PNG, JPEG, BMP, SVG or PDF" />
         <Separator />
@@ -142,6 +146,9 @@
         <MenuItem Header="_Tolerance Analysis..." InputGesture="Shift+F4"
                   Command="{Binding ShowMonteCarloCommand}" />
         <Separator />
+        <MenuItem Header="What Is This Circuit_?" InputGesture="Ctrl+F1"
+                  Command="{Binding ShowExplainCommand}"
+                  ToolTip.Tip="Read the drawing back in words — the structures it recognises, with their numbers worked out" />
         <MenuItem Header="_Check Circuit..." InputGesture="F4"
                   Command="{Binding ShowRuleCheckCommand}" />
         <MenuItem Header="_Requirements..." InputGesture="Ctrl+F4"

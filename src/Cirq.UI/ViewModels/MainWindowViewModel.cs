@@ -694,6 +694,18 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     /// <summary>Raised when the About dialog should be shown.</summary>
     public event EventHandler? RequestAbout;
 
+    /// <summary>Raised when the explain window should be opened.</summary>
+    public event EventHandler? RequestExplain;
+
+    [RelayCommand]
+    private void ShowExplain() => RequestExplain?.Invoke(this, EventArgs.Empty);
+
+    /// <summary>Raised when the compare-with-a-file window should be opened.</summary>
+    public event EventHandler? RequestCompare;
+
+    [RelayCommand]
+    private void ShowCompare() => RequestCompare?.Invoke(this, EventArgs.Empty);
+
     /// <summary>Raised when the find-on-sheet window should be opened.</summary>
     public event EventHandler? RequestFind;
 
@@ -1235,6 +1247,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
           F9 / F10     Collapse the palette / properties panel
           Ctrl+F       Find a part in the palette
           Ctrl+Shift+F Find a part on the sheet — designator, value, kind or net
+          Ctrl+F1      What is this circuit? — the drawing read back in words
 
         Simulation
           F5           Run or pause

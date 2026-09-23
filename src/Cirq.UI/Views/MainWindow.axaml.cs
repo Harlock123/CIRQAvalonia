@@ -108,6 +108,8 @@ public partial class MainWindow : Window
         viewModel.RequestNoise += async (_, _) => await ShowNoiseAsync();
         viewModel.RequestStability += async (_, _) => await ShowStabilityAsync();
         viewModel.RequestFind += async (_, _) => await ShowFindAsync();
+        viewModel.RequestCompare += async (_, _) => await ShowCompareAsync();
+        viewModel.RequestExplain += async (_, _) => await ShowExplainAsync();
         viewModel.RequestGoTo += (_, component) => _canvas?.CentreOn(component);
         viewModel.RequestImpedance += async (_, _) => await ShowImpedanceAsync();
         viewModel.RequestPoleZero += async (_, _) => await ShowPoleZeroAsync();
@@ -216,6 +218,46 @@ public partial class MainWindow : Window
         };
 
         await dialog.ShowDialog(this);
+    }
+
+    private async Task ShowExplainAsync()
+    {
+        if (_viewModel is null) return;
+
+        var model = new ExplainViewModel(_viewModel.Circuit);
+
+        model.RequestHighlight += (_, parts) =>
+        {
+            _canvas?.SetSelection(parts);
+
+            if (parts.Count > 0) _canvas?.CentreOn(parts[0]);
+        };
+
+        await new ExplainWindow { DataContext = model }.ShowDialog(this);
+    }
+
+    private async Task ShowCompareAsync()
+    {
+        if (_viewModel is null) return;
+
+        if (_viewModel.FileDialogs is not { } dialogs) return;
+
+        var path = await dialogs.PickOpenPathAsync();
+        if (path is null) return;
+
+        var model = CompareViewModel.Build(_viewModel.Circuit, path, out var problem);
+
+        if (model is null)
+        {
+            await dialogs.ReportAsync("Compare", problem ?? "That file could not be read.");
+            return;
+        }
+
+        // A file that did not load cleanly can look as though parts were deleted. Say so before
+        // showing a list that would otherwise be read as a list of edits.
+        if (problem is not null) await dialogs.ReportAsync("Compare", problem);
+
+        await new CompareWindow { DataContext = model }.ShowDialog(this);
     }
 
     private async Task ShowFindAsync()

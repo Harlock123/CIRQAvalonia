@@ -106,6 +106,8 @@ each row links to the section that explains it.
 | Will it work with the **parts I can buy** | [Tolerance analysis](#will-it-work-with-the-parts-you-can-buy) — hundreds of builds from the bands | `Shift` `F4` |
 | What have I **wired wrong** | [Check circuit](#checking-the-circuit) — the mistakes no part can report about itself | `F4` |
 | Why **will it not solve** | [When it will not solve](#when-it-will-not-solve) — the solver names the net and the part | — |
+| **What is this circuit** | [What is this circuit?](#what-is-this-circuit) — the drawing read back in words | `Ctrl` `F1` |
+| What did I **change** | [Compare](#comparing-with-a-saved-circuit) — this against a file, in values rather than braces | — |
 | What does **temperature** do to it | [Temperature](#temperature) — set it, or sweep it like any other parameter | — |
 | How hot does the **part itself** get | [Self-heating](#when-a-part-heats-itself) — give it a thermal resistance and the loop closes | — |
 | Does it meet what I **said it had to do** | [Requirements](#requirements) — written down, and checked | `Ctrl` `F4` |
@@ -324,6 +326,27 @@ there is.
   pin half a square off where the next wire will want to meet it.
 - Anything already in the right place is left alone, and the whole move is **one undo step**: six
   parts jumping into line is one thing that happened, not six.
+
+### Comparing with a saved circuit
+
+**File > Compare with a Saved Circuit...** says what changed between the circuit on screen and a
+file on disk — `R2 1k → 2k2`, `C5 added`, `the wire from U1.3 to R4.A separated`.
+
+The file is JSON and diffs as text, which is worth having and is not what anybody wants to read.
+"What did I change since I saved" is answered by a list of values, not by nine lines of moved
+braces — and after an hour of editing, or when an autosave turns up and you have no idea whether it
+is ahead of the file or behind it, that is the only question being asked.
+
+Two things it is careful about:
+
+- **Parts are matched by identity**, not by name or position, because both of those are things you
+  change on purpose. A part that was renamed *and* moved is still the same part, and is reported as
+  two changes to it rather than as one part removed and another added.
+- **A wire is the pair of pins it joins.** Redrawing one through a different corner changes the
+  picture and not the circuit, so it is not reported at all.
+
+Moves are counted but never led with: a tidy-up moves thirty parts and changes nothing about what
+the circuit does, and putting that first would bury the one value that did.
 
 ### Finding something on the sheet
 
@@ -4210,6 +4233,42 @@ so highlighting it would light up nothing you can see; its pin gets a dot instea
 
 The highlight clears as soon as you change anything, because the question was asked about a
 circuit that no longer exists.
+
+---
+
+## What is this circuit?
+
+**Simulate > What Is This Circuit?** (`Ctrl` `F1`) reads the drawing back in words.
+
+A netlist says what is joined to what. A person reading the same schematic sees *a divider setting
+3.3 V*, *a low-pass turning over at 1.6 kHz*, *a follower* — structures, each with a number that
+follows from it. That translation is most of what "knowing how to read a schematic" is, and it is
+the part a simulator normally leaves entirely to the reader.
+
+It recognises about a dozen structures, each exactly:
+
+| It finds | And works out |
+| --- | --- |
+| A resistive **divider** | where the tap sits, in volts |
+| An **RC low-pass** or **high-pass** | the corner, and which way round it is |
+| A **tuned circuit** | the resonance, and whether the impedance peaks or dips there |
+| A **decoupling capacitor** | which rail it holds up |
+| A **pull-up** or **pull-down** | which way, and what it is holding |
+| An **LED's series resistor** | the current it sets |
+| An op-amp **inverting**, **non-inverting** or **follower** stage | the gain |
+| An **emitter follower** or **common-emitter** stage | what it is for |
+| A **flyback diode** | what it is across, and what happens without it |
+| A **555 astable** | the frequency and the duty cycle |
+
+Pick one and its parts light up on the drawing. **Copy all** puts the lot on the clipboard as
+text, which is a quick way to get a description of a circuit into a note.
+
+**It stays quiet when it is not sure**, and that is the important half. A confident wrong
+description is the one thing here that could teach somebody something false, and they would have no
+way to tell — so every recogniser is narrow and says nothing rather than guessing. Two resistors in
+series with something hanging off the tap is not reported as a divider, because the load changes
+the ratio and quoting the unloaded number would be worse than silence. Nothing recognised is not a
+criticism of the circuit.
 
 ---
 
