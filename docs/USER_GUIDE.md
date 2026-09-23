@@ -66,7 +66,7 @@ write. Preferences are created on first use.
 
 ## The window
 
-![The CirqAvalonia editor: menu bar, component palette on the left, schematic canvas in the centre, properties panel on the right, and the oscilloscope drawer across the bottom](images/01-overview.png)
+![The CirqAvalonia editor running an RC low-pass: menu bar across the top, the component palette on the left with its Find a part box and sixteen closed groups, the schematic canvas in the centre with probe flags on the input and output, the properties panel on the right, the oscilloscope drawer across the bottom showing the square wave against the capacitor's charging curve, and the controls panel at the bottom right with the generator's frequency, amplitude, offset and duty](images/01-overview.png)
 
 Five regions, and they stay put:
 
@@ -194,6 +194,8 @@ Rest the pointer on a part and a card appears beside it: the designator and type
 currently showing on the canvas, and the settings it is holding — the same names and values the
 properties panel gives, without selecting anything. On a schematic with eight resistors on it,
 finding the 4k7 is a look rather than eight clicks.
+
+![The hover card open over a schematic: R1 with its probe flag above it, and beside it a panel headed "R1 · Resistor" reading 10kΩ, then Resistance 10kΩ and Tolerance 0.05, then a drawing of the resistor itself with brown, black and orange bands and a gold one after a wider gap, and under it the line "brown 1 · black 0 · orange × 1,000 · gold ± 5 %"](images/26-hover-card.png)
 
 The settings a part marks as **operable** come first, because those are the ones its author singled
 out as the things you work: a generator leads with its frequency, amplitude, offset and duty cycle
