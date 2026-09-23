@@ -363,7 +363,7 @@ Press `V` to go back to the select tool.
 
 ## Setting values
 
-![The properties panel showing a selected function generator with its placement, amplitude, offset, duty cycle, edge time, frequency, output resistance and waveform shape](images/03-inspector.png)
+![The properties panel showing a selected function generator: Designator, X, Y and Rotation under Placement, then AC magnitude, AC phase, peak-to-peak amplitude, DC offset, duty cycle, edge time and frequency under Parameters, with output resistance and waveform shape below the fold](images/03-inspector.png)
 
 Select a component and the right-hand panel fills with its parameters. Selected parts are outlined
 on the canvas, so there is never a question of what you are editing.

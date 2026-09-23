@@ -524,7 +524,7 @@ The palette holds 186 components in 16 collapsible categories, with a **Find a p
 Selecting a component fills the properties panel. It is built by reflection, so a new component
 type gets a complete editor without any UI code:
 
-![The properties panel showing a selected function generator with its placement, amplitude, offset, duty cycle, edge time, frequency, output resistance and waveform shape](docs/images/03-inspector.png)
+![The properties panel showing a selected function generator: Designator, X, Y and Rotation under Placement, then AC magnitude, AC phase, peak-to-peak amplitude, DC offset, duty cycle, edge time and frequency under Parameters, with output resistance and waveform shape below the fold](docs/images/03-inspector.png)
 
 Probes attach to terminals and stream into the scope, which redraws on its own timer so the render
 rate is decoupled from the solver. A probe reads **voltage, current or logic level** — pick which
