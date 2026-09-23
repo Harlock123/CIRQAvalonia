@@ -90,6 +90,25 @@ public abstract partial class CircuitComponent : ObservableObject
     public virtual void StampAc(AcSystem system, SimulationState state) { }
 
     /// <summary>
+    /// True when <see cref="StampAc"/> contributes a plain <c>G + jωC</c> — a constant part and a
+    /// part proportional to frequency — which every resistance, capacitance and inductance does.
+    /// <para>
+    /// It matters to anything that wants the circuit as a <b>finite</b> set of natural
+    /// frequencies, because that only exists when the whole system can be written that way. A
+    /// delay cannot: <c>e^{-sτ}</c> has infinitely many poles, so a circuit containing one has no
+    /// finite list to report and a pole-zero analysis has to decline rather than return the poles
+    /// of some other circuit.
+    /// </para>
+    /// <para>
+    /// Declared rather than detected, because detecting it means sampling the stamp at two
+    /// frequencies and a short delay is indistinguishable from a small inductance at any frequency
+    /// low enough to try — which is exactly how a transmission line got through the numeric check
+    /// that was written first.
+    /// </para>
+    /// </summary>
+    public virtual bool HasLinearAcStamp => true;
+
+    /// <summary>
     /// Number of auxiliary branch-current unknowns this component needs (ideal voltage sources,
     /// inductors, and controlled voltage sources each need one).
     /// </summary>

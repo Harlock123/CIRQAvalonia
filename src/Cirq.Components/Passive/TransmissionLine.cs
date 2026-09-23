@@ -194,6 +194,13 @@ public partial class TransmissionLine : CircuitComponent, IBreakpointSource
     /// wave resonances that make an unterminated stub look like a short — falls out of two rows.
     /// </para>
     /// </summary>
+    /// <summary>
+    /// A delay is not a reactance. Its stamp carries <c>e^{-jωτ}</c>, which is not linear in
+    /// frequency at all — the line has infinitely many poles, spaced a half wavelength apart
+    /// forever, which is the same fact as an echo coming back again and again.
+    /// </summary>
+    public override bool HasLinearAcStamp => false;
+
     public override void StampAc(AcSystem system, SimulationState state)
     {
         var a1 = system.Node(NearPlus);
