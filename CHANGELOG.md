@@ -8,7 +8,11 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
-Five analyses and one overlay, all about the half of a design that a waveform does not show.
+## [0.33.0] - 2026-09-23
+
+Twelve additions, in two halves. Five analyses and an overlay about the part of a design a waveform
+does not show; and six about working on a drawing rather than solving one. 186 components in 16
+categories, 87 worked examples, 3045 tests.
 
 **What does it look like from here?** `Ctrl+F6` measures **impedance** against frequency at any
 probe — magnitude and phase. Every bench question about loading is this one: what an amplifier
@@ -46,6 +50,13 @@ produces numbers; until the limit is written down somewhere, whether they are th
 lives in whoever last looked. The answer is three-way: met, not met, or nothing to measure, and the
 third is not the second. Requirements are saved with the circuit.
 
+**Where is the current actually going?** **View > Show Current Flow** puts moving dots on the wires,
+at a rate set by what each is carrying and in the direction it is going. A schematic shows what is
+connected and a scope shows what one point is doing; neither shows that current leaves the supply,
+divides at a junction, and comes back. The speed is logarithmic, because a microamp of base current
+beside an amp of collector current would otherwise be indistinguishable from stopped. Where a
+junction divides the current the wires are left dark rather than guessed at.
+
 **Why will it not solve?** The message used to be *Newton-Raphson failed to converge, try a
 smaller time step*, which is only useful to somebody who already knows what is wrong — and that is
 the one person who does not need it. The solver knew more all along: it tracks how far every
@@ -77,13 +88,6 @@ to another person.
 **File > New Window** opens a second editor with its own circuit, sharing the clipboard — for
 comparing two designs, and for carrying a block from one into the other. Each window keeps its own
 recovery snapshot, and the next start offers every abandoned one back in a window of its own.
-
-**Where is the current actually going?** **View > Show Current Flow** puts moving dots on the wires,
-at a rate set by what each is carrying and in the direction it is going. A schematic shows what is
-connected and a scope shows what one point is doing; neither shows that current leaves the supply,
-divides at a junction, and comes back. The speed is logarithmic, because a microamp of base current
-beside an amp of collector current would otherwise be indistinguishable from stopped. Where a
-junction divides the current the wires are left dark rather than guessed at.
 
 ## [0.32.0] - 2026-09-23
 
@@ -1637,7 +1641,8 @@ First public build of CirqAvalonia — an electronic circuit analyzer and mixed-
 
 **501 tests** measure the solver against closed-form answers rather than recorded output.
 
-[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.32.0...HEAD
+[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.33.0...HEAD
+[0.33.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.32.0...v0.33.0
 [0.32.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.31.0...v0.32.0
 [0.31.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.30.0...v0.31.0
 [0.30.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.29.0...v0.30.0
