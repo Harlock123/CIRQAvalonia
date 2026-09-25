@@ -8,6 +8,15 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+## [0.35.0] - 2026-09-25
+
+Every limit a part is sold against, gathered into one list. Four measurements the circuit could not
+take. A number it can now give a name to, a sheet you can edit without a mouse, and a test suite
+that finally opens its own windows. 188 components in 16 categories, 87 worked examples, 3428
+tests.
+
+### Added
+
 **The sheet can be edited without a mouse.** Arrow keys move the selection by one grid square, and
 by one unit with Shift — which is the only way to put something off the grid deliberately. **Tab**
 steps to the next part and **Shift+Tab** to the previous, bringing one into view when it is off
@@ -90,6 +99,12 @@ have nothing in it drawn in a colour that cannot be read against its own backgro
 The theme test is the interesting one: it builds a dialog while the application says Light, turns
 the application dark underneath it, and asks what colour the dialog is now. Reverting the actual
 fix that shipped in 0.33.3 makes it fail, with the reason in the message.
+
+Having a real application to ask also turned up something that had never been askable: the theme is
+resolved from drawing code, drawing is not inherently a UI-thread job, and an Avalonia object
+throws at any thread but its own. Asked from somewhere that cannot reach the application, it now
+answers the same way it answers when there is no application at all, rather than taking the render
+down.
 
 ## [0.34.0] - 2026-09-24
 
