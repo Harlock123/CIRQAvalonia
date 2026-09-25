@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
+using Avalonia.Threading;
 using Avalonia.Styling;
 
 namespace Cirq.UI.Services;
@@ -51,7 +52,7 @@ public static class ThemeManager
     /// </summary>
     public static ThemeVariant Effective(Application? application = null)
     {
-        application ??= Application.Current;
+        application ??= Reachable();
         if (application is null) return ThemeVariant.Dark;
 
         // Avalonia's own resolved variant, rather than re-deriving one from PlatformSettings.
@@ -65,13 +66,13 @@ public static class ThemeManager
     /// <summary>True when the desktop actually reports a preference we can follow.</summary>
     public static bool IsSystemThemeDiscoverable(Application? application = null)
     {
-        application ??= Application.Current;
+        application ??= Reachable();
         return application?.PlatformSettings is not null;
     }
 
     public static void Apply(AppTheme theme, Application? application = null)
     {
-        application ??= Application.Current;
+        application ??= Reachable();
         if (application is null) return;
 
         Selected = theme;
@@ -83,12 +84,33 @@ public static class ThemeManager
     public static void NotifyChanged() => ThemeChanged?.Invoke(null, EventArgs.Empty);
 
     /// <summary>
+    /// The application, but only when this thread may actually ask it anything.
+    /// <para>
+    /// An Avalonia object belongs to the thread that made it and throws at anyone else, and the
+    /// application is an Avalonia object. Everything here is reached from drawing code, and drawing
+    /// is not inherently a UI-thread job — an export writes a PDF with no window involved, and the
+    /// print palette exists precisely so that it can. Asking from the wrong thread should therefore
+    /// give the same answer as asking when there is no application at all, rather than taking the
+    /// render down.
+    /// </para>
+    /// <para>
+    /// Which is also what it did before there was ever an application to ask: <c>Application.Current</c>
+    /// was null in every test, so these paths returned their fallbacks. The moment a headless one
+    /// existed, a dozen render tests started throwing here — not because anything about them had
+    /// changed, but because the question had finally become answerable and they were asking it from
+    /// somewhere it could not be answered.
+    /// </para>
+    /// </summary>
+    private static Application? Reachable() =>
+        Dispatcher.UIThread.CheckAccess() ? Application.Current : null;
+
+    /// <summary>
     /// Resolves a semantic brush from the active theme. Falls back to magenta rather than throwing,
     /// so a missing key is loudly visible during development instead of crashing a render pass.
     /// </summary>
     public static IBrush Brush(string key)
     {
-        var application = Application.Current;
+        var application = Reachable();
         if (application is not null &&
             application.TryGetResource(key, Effective(application), out var value) &&
             value is IBrush brush)

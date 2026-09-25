@@ -12,7 +12,7 @@ namespace Cirq.UI.Tests;
 /// is. The arithmetic is tested against closed form in the engine's own tests; what is checked here
 /// is that it reaches the window intact and that nothing is dressed up on the way.
 /// </summary>
-public class PowerViewModelTests
+public class RatingsViewModelTests
 {
     private static SimulationController Loop(double ohms = 100.0, double rating = 0.25, bool battery = false)
     {
@@ -42,34 +42,61 @@ public class PowerViewModelTests
     [Fact]
     public void TheRowsSayWhatThePartIsDoing()
     {
-        var model = new PowerViewModel(Loop()) { AverageOverSeconds = 0 };
+        var model = new RatingsViewModel(Loop()) { AverageOverSeconds = 0 };
         model.Run();
 
-        var row = model.Parts.Single(p => p.Name == "R1");
+        var part = model.Parts.Single(p => p.Name == "R1");
 
-        Assert.Equal("1W", row.Watts);
-        Assert.Equal("Over", row.Status);
-        Assert.Contains("250mW", row.Rating, StringComparison.Ordinal);
-        Assert.Contains("400%", row.Rating, StringComparison.Ordinal);
+        Assert.Equal("Over", part.Status);
+
+        var power = part.Findings.Single(f => f.Kind == "power");
+
+        Assert.Contains("1W of 250mW", power.Detail, StringComparison.Ordinal);
+        Assert.Contains("400%", power.Detail, StringComparison.Ordinal);
     }
 
     /// <summary>
-    /// A part nobody rated shows a dash rather than a zero or a blank. Both of those read as
-    /// measurements of something, and "nothing has been said about this" is not a measurement.
+    /// A part with no rating of any kind is not listed at all, rather than listed with dashes.
+    /// A row that says nothing is a row somebody has to read before finding that out.
     /// </summary>
     [Fact]
-    public void AnUnratedPartShowsADash()
+    public void AnUnratedPartIsNotListed()
     {
         var controller = Loop(rating: 0);
 
-        var model = new PowerViewModel(controller) { AverageOverSeconds = 0 };
+        var model = new RatingsViewModel(controller) { AverageOverSeconds = 0 };
         model.Run();
 
-        var row = model.Parts.Single(p => p.Name == "R1");
+        Assert.DoesNotContain(model.Parts, p => p.Name == "R1");
+    }
 
-        Assert.Equal("—", row.Rating);
-        Assert.Equal("—", row.Status);
-        Assert.Equal("—", row.Die);
+    /// <summary>
+    /// Every limit a part is near shows under that part, rather than as separate rows scattered
+    /// through the list. A part has several and they are read together.
+    /// </summary>
+    [Fact]
+    public void EveryLimitAboutOnePartIsUnderThatPart()
+    {
+        var circuit = new Circuit();
+
+        var supply = circuit.Add(new DcVoltageSource(100.0) { Name = "V1" });
+        var c = circuit.Add(new Capacitor(1e-6) { Name = "C1", VoltageRating = 50.0 });
+        var ground = circuit.Add(new Ground { Name = "GND1" });
+
+        circuit.Wires.Add(new WireSegment { SourceTerminal = supply.Positive, TargetTerminal = c.A });
+        circuit.Wires.Add(new WireSegment { SourceTerminal = c.B, TargetTerminal = ground.Pin });
+        circuit.Wires.Add(new WireSegment { SourceTerminal = supply.Negative, TargetTerminal = ground.Pin });
+
+        var controller = new SimulationController(circuit);
+        Assert.True(controller.Rebuild(), controller.Status);
+
+        var model = new RatingsViewModel(controller) { AverageOverSeconds = 0 };
+        model.Run();
+
+        var part = model.Parts.Single(p => p.Name == "C1");
+
+        Assert.Equal("Over", part.Status);
+        Assert.Contains(part.Findings, f => f.Kind == "voltage");
     }
 
     /// <summary>
@@ -81,23 +108,23 @@ public class PowerViewModelTests
     {
         var controller = Loop();
 
-        var instant = new PowerViewModel(controller) { AverageOverSeconds = 0 };
+        var instant = new RatingsViewModel(controller) { AverageOverSeconds = 0 };
         instant.Run();
 
         Assert.Contains("operating point", instant.Basis, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("switches", instant.Basis, StringComparison.OrdinalIgnoreCase);
 
-        var averaged = new PowerViewModel(controller) { AverageOverSeconds = 1e-4 };
+        var averaged = new RatingsViewModel(controller) { AverageOverSeconds = 1e-4 };
         averaged.Run();
 
-        Assert.Contains("Averaged", averaged.Basis, StringComparison.Ordinal);
+        Assert.Contains("Peaks and averages", averaged.Basis, StringComparison.Ordinal);
     }
 
     /// <summary>The verdict names the part, because "something is over" is not actionable.</summary>
     [Fact]
     public void TheSummaryNamesThePart()
     {
-        var model = new PowerViewModel(Loop()) { AverageOverSeconds = 0 };
+        var model = new RatingsViewModel(Loop()) { AverageOverSeconds = 0 };
         model.Run();
 
         Assert.Contains("R1", model.Summary, StringComparison.Ordinal);
@@ -107,10 +134,10 @@ public class PowerViewModelTests
     [Fact]
     public void ACircuitThatIsFineSaysSo()
     {
-        var model = new PowerViewModel(Loop(ohms: 10_000)) { AverageOverSeconds = 0 };
+        var model = new RatingsViewModel(Loop(ohms: 10_000)) { AverageOverSeconds = 0 };
         model.Run();
 
-        Assert.Contains("inside half its rating", model.Summary, StringComparison.Ordinal);
+        Assert.Contains("comfortably inside", model.Summary, StringComparison.Ordinal);
         Assert.False(model.IsEmpty);
     }
 
@@ -121,7 +148,7 @@ public class PowerViewModelTests
     [Fact]
     public void ABatteryOnTheSheetGetsALifeEstimate()
     {
-        var model = new PowerViewModel(Loop(ohms: 1000, battery: true)) { AverageOverSeconds = 0 };
+        var model = new RatingsViewModel(Loop(ohms: 1000, battery: true)) { AverageOverSeconds = 0 };
         model.Run();
 
         Assert.True(model.HasBattery);
@@ -135,7 +162,7 @@ public class PowerViewModelTests
     [Fact]
     public void NoBatteryMeansNoEstimate()
     {
-        var model = new PowerViewModel(Loop()) { AverageOverSeconds = 0 };
+        var model = new RatingsViewModel(Loop()) { AverageOverSeconds = 0 };
         model.Run();
 
         Assert.False(model.HasBattery);
@@ -149,7 +176,7 @@ public class PowerViewModelTests
     [InlineData(100, "4.2 days")]
     [InlineData(24 * 800, "2.2 years")]
     public void ALifeIsSpelledInTheUnitsSomebodyWouldSayIt(double hours, string expected) =>
-        Assert.Equal(expected, PowerViewModel.Spell(TimeSpan.FromHours(hours)));
+        Assert.Equal(expected, RatingsViewModel.Spell(TimeSpan.FromHours(hours)));
 
     /// <summary>
     /// A running simulation is paused for the measurement and started again after. Averaging steps
@@ -164,7 +191,7 @@ public class PowerViewModelTests
 
         try
         {
-            var model = new PowerViewModel(controller) { AverageOverSeconds = 1e-4 };
+            var model = new RatingsViewModel(controller) { AverageOverSeconds = 1e-4 };
             model.Run();
 
             Assert.True(controller.IsRunning, "the run was not restarted after the measurement");

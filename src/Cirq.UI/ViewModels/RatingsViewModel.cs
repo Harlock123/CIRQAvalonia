@@ -9,56 +9,52 @@ using CommunityToolkit.Mvvm.Input;
 
 namespace Cirq.UI.ViewModels;
 
-/// <summary>One part's line in the budget, dressed for the list.</summary>
-public sealed class PowerRowViewModel
+/// <summary>One limit, dressed for the list.</summary>
+public sealed class FindingViewModel(RatingFinding finding)
 {
-    public PowerRowViewModel(PowerRow row, double ambientCelsius)
+    public RatingFinding Finding => finding;
+
+    /// <summary>Which limit this is — power, temperature, voltage, current, or the part's own words.</summary>
+    public string Kind => finding.Word;
+
+    /// <summary>Where it got to against what it may reach, or the complaint itself.</summary>
+    public string Detail => finding.Describe();
+
+    public bool IsOver => finding.Verdict == PowerVerdict.Over;
+
+    public bool IsWarm => finding.Verdict == PowerVerdict.Warm;
+}
+
+/// <summary>
+/// One part, and everything the circuit has to say about it.
+/// <para>
+/// Grouped by part rather than listed one limit per row, because a part has several and they are
+/// read together. An electrolytic over its voltage says so twice — once as a measurement against
+/// its rating and once in its own words about what will happen — and those are two useful
+/// sentences about one problem rather than two problems.
+/// </para>
+/// </summary>
+public sealed class PartRatingsViewModel
+{
+    public PartRatingsViewModel(string name, string type, IEnumerable<RatingFinding> findings)
     {
-        Row = row;
-        Verdict = row.VerdictAt(ambientCelsius);
-        Thermal = row.ThermalFraction(ambientCelsius);
+        Name = name;
+        Type = type;
+        Findings = [.. findings.Select(f => new FindingViewModel(f))];
     }
 
-    public PowerRow Row { get; }
+    public string Name { get; }
 
-    public PowerVerdict Verdict { get; }
+    public string Type { get; }
 
-    /// <summary>How far the die has gone towards its limit, or NaN when it has none.</summary>
-    public double Thermal { get; }
+    public IReadOnlyList<FindingViewModel> Findings { get; }
 
-    public string Name => Row.Name;
+    public bool IsOver => Findings.Any(f => f.IsOver);
 
-    public string Type => Row.Type;
-
-    public string Watts => SiPrefix.Format(Row.Watts, "W", 3);
-
-    /// <summary>
-    /// What it is rated for and how much of that it is using, or a plain dash when nothing has
-    /// been said about it. A dash rather than a zero or a blank: those read as measurements.
-    /// </summary>
-    public string Rating => Row.Rating > 0
-        ? $"{SiPrefix.Format(Row.Rating, "W", 2)} · {Row.Fraction * 100:0}%"
-        : "—";
-
-    /// <summary>Where the die is and how far that is towards its limit, when it models one.</summary>
-    public string Die => Row.Celsius is { } celsius
-        ? Row.MaximumCelsius is { } limit
-            ? $"{celsius:0.#} °C of {limit:0} °C"
-            : $"{celsius:0.#} °C"
-        : "—";
+    public bool IsWarm => !IsOver && Findings.Any(f => f.IsWarm);
 
     /// <summary>The word for the chip at the left of the row.</summary>
-    public string Status => Verdict switch
-    {
-        PowerVerdict.Over => "Over",
-        PowerVerdict.Warm => "Warm",
-        PowerVerdict.Fine => "OK",
-        _ => "—",
-    };
-
-    public bool IsOver => Verdict == PowerVerdict.Over;
-
-    public bool IsWarm => Verdict == PowerVerdict.Warm;
+    public string Status => IsOver ? "Over" : IsWarm ? "Warm" : "OK";
 }
 
 /// <summary>One supply's line.</summary>
@@ -83,18 +79,18 @@ public sealed class SupplyRowViewModel(SupplyRow row)
 /// they do.
 /// </para>
 /// </summary>
-public sealed partial class PowerViewModel : ObservableObject
+public sealed partial class RatingsViewModel : ObservableObject
 {
     private readonly SimulationController _simulation;
 
-    public PowerViewModel(SimulationController simulation)
+    public RatingsViewModel(SimulationController simulation)
     {
         _simulation = simulation;
         Run();
     }
 
-    /// <summary>Everything that dissipates, nearest its limit first.</summary>
-    public ObservableCollection<PowerRowViewModel> Parts { get; } = [];
+    /// <summary>Every part with something said about it, nearest a limit first.</summary>
+    public ObservableCollection<PartRatingsViewModel> Parts { get; } = [];
 
     /// <summary>Everything delivering power.</summary>
     public ObservableCollection<SupplyRowViewModel> Supplies { get; } = [];
@@ -150,16 +146,23 @@ public sealed partial class PowerViewModel : ObservableObject
 
         var result = Measure();
 
-        foreach (var row in result.Parts) Parts.Add(new PowerRowViewModel(row, result.AmbientCelsius));
+        // Grouped by part, in the order the findings arrived — which is worst first, so the part
+        // with the worst single finding leads.
+        foreach (var group in result.Findings.GroupBy(f => f.Name))
+            Parts.Add(new PartRatingsViewModel(group.Key, group.First().Type, group));
+
         foreach (var row in result.Supplies) Supplies.Add(new SupplyRowViewModel(row));
 
         Summary = result.Summary();
 
+        var ambient = _simulation.Settings.TemperatureKelvin - 273.15;
+
         Basis = result.IsAveraged
-            ? $"Averaged over {SiPrefix.Format(result.Seconds, "s", 3)} of running, at " +
-              $"{result.AmbientCelsius:0.#} °C ambient."
-            : $"At the operating point, at {result.AmbientCelsius:0.#} °C ambient. A circuit that " +
-              "switches needs averaging — put a duration in the box and run it again.";
+            ? $"Peaks and averages across {SiPrefix.Format(result.Seconds, "s", 3)} of running, at " +
+              $"{ambient:0.#} °C ambient. Voltage and current are the worst reached; dissipation " +
+              "is the mean, because one is a breakdown and the other is heat."
+            : $"At the operating point, at {ambient:0.#} °C ambient. A circuit that switches needs " +
+              "a run — put a duration in the box and measure again.";
 
         Describe(result);
 
@@ -176,7 +179,7 @@ public sealed partial class PowerViewModel : ObservableObject
     /// is the part that would be surprising.
     /// </para>
     /// </summary>
-    private PowerBudgetResult Measure()
+    private RatingsResult Measure()
     {
         var wasRunning = _simulation.IsRunning;
 
@@ -184,15 +187,15 @@ public sealed partial class PowerViewModel : ObservableObject
 
         try
         {
-            var budget = new PowerBudget(_simulation.Simulator!);
+            var check = new RatingsCheck(_simulation.Simulator!);
 
-            return AverageOverSeconds > 0 ? budget.Over(AverageOverSeconds) : budget.At();
+            return AverageOverSeconds > 0 ? check.Over(AverageOverSeconds) : check.At();
         }
         catch (Exception ex) when (ex is InvalidOperationException or ConvergenceException)
         {
             Summary = $"Could not run the circuit that far: {ex.Message}";
 
-            return PowerBudgetResult.Empty;
+            return RatingsResult.Empty;
         }
         finally
         {
@@ -208,7 +211,7 @@ public sealed partial class PowerViewModel : ObservableObject
     /// somebody to repeat themselves and then disagree with their own schematic.
     /// </para>
     /// </summary>
-    private void Describe(PowerBudgetResult result)
+    private void Describe(RatingsResult result)
     {
         var capacity = Flattening.Flatten(_simulation.Circuit.Components)
             .OfType<Battery>()

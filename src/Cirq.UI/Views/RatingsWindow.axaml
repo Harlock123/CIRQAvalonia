@@ -1,9 +1,9 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:Cirq.UI.ViewModels"
-        x:Class="Cirq.UI.Views.PowerWindow"
-        x:DataType="vm:PowerViewModel"
-        Title="Power"
+        x:Class="Cirq.UI.Views.RatingsWindow"
+        x:DataType="vm:RatingsViewModel"
+        Title="Ratings"
         Width="820" Height="600"
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource PanelBackground}">
@@ -23,9 +23,9 @@
       <DockPanel>
         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8"
                     VerticalAlignment="Center">
-          <TextBlock Text="Average over" VerticalAlignment="Center" Opacity="0.8" FontSize="12" />
+          <TextBlock Text="Watch for" VerticalAlignment="Center" Opacity="0.8" FontSize="12" />
           <TextBox Text="{Binding AverageOverSeconds}" Width="88" VerticalAlignment="Center"
-                   ToolTip.Tip="Seconds of running to average across. Several cycles of whatever the circuit does. Zero reads the instant instead." />
+                   ToolTip.Tip="Seconds of running to watch. Several cycles of whatever the circuit does. Zero reads the operating point instead." />
           <TextBlock Text="s" VerticalAlignment="Center" Opacity="0.8" FontSize="12" />
           <Button Content="Measure again" Command="{Binding RunCommand}" Padding="14,5" />
         </StackPanel>
@@ -46,39 +46,50 @@
     <TextBlock IsVisible="{Binding IsEmpty}"
                HorizontalAlignment="Center" VerticalAlignment="Center"
                Opacity="0.7" TextAlignment="Center"
-               Text="Nothing here dissipates or supplies anything.&#x0a;&#x0a;A part is counted when it says what it turns into heat — a&#x0a;resistor through its power rating, a semiconductor through&#x0a;its own thermal model. A capacitor stores and returns its&#x0a;energy rather than spending it, so it has none to count." />
+               Text="Nothing here has a rating to check.&#x0a;&#x0a;A part appears when it has a limit and the circuit can say&#x0a;where it is against it — watts against a power rating, volts&#x0a;across a capacitor, amps through an LED, a die against its&#x0a;maximum — or when the part itself has something to say." />
 
     <ScrollViewer IsVisible="{Binding !IsEmpty}">
       <StackPanel Margin="14,0,14,12" Spacing="14">
 
         <StackPanel Spacing="4">
-          <TextBlock Text="Dissipating" FontSize="11" Opacity="0.6" Margin="2,0" />
-
-          <Grid ColumnDefinitions="64,86,110,96,*" Margin="2,0,2,2">
-            <TextBlock Grid.Column="0" Text="" FontSize="10" Opacity="0.5" />
-            <TextBlock Grid.Column="1" Text="Part" FontSize="10" Opacity="0.5" />
-            <TextBlock Grid.Column="2" Text="Dissipating" FontSize="10" Opacity="0.5" />
-            <TextBlock Grid.Column="3" Text="Rated" FontSize="10" Opacity="0.5" />
-            <TextBlock Grid.Column="4" Text="Die" FontSize="10" Opacity="0.5" />
-          </Grid>
+          <TextBlock Text="Against its ratings" FontSize="11" Opacity="0.6" Margin="2,0" />
 
           <ItemsControl ItemsSource="{Binding Parts}">
             <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="vm:PowerRowViewModel">
-                <Grid ColumnDefinitions="64,86,110,96,*" Margin="2,3">
-                  <Border Grid.Column="0" CornerRadius="3" Padding="6,1" Height="20"
-                          HorizontalAlignment="Left" VerticalAlignment="Top"
-                          Background="{DynamicResource GroupHeaderBackground}">
-                    <TextBlock Text="{Binding Status}" FontSize="10" VerticalAlignment="Center"
-                               Foreground="{DynamicResource TextMuted}" />
-                  </Border>
-                  <TextBlock Grid.Column="1" Text="{Binding Name}" FontSize="12"
-                             TextTrimming="CharacterEllipsis" Margin="0,2,8,0" />
-                  <TextBlock Grid.Column="2" Text="{Binding Watts}" FontSize="12" Margin="0,2,8,0" />
-                  <TextBlock Grid.Column="3" Text="{Binding Rating}" FontSize="12" Margin="0,2,8,0" />
-                  <TextBlock Grid.Column="4" Text="{Binding Die}" FontSize="12" Margin="0,2,0,0"
-                             Opacity="0.85" TextTrimming="CharacterEllipsis" />
-                </Grid>
+              <DataTemplate x:DataType="vm:PartRatingsViewModel">
+                <Border Margin="0,3" Padding="10,7" CornerRadius="4"
+                        Background="{DynamicResource GroupHeaderBackground}">
+                  <StackPanel Spacing="4">
+
+                    <Grid ColumnDefinitions="64,140,*">
+                      <Border Grid.Column="0" CornerRadius="3" Padding="6,1" Height="20"
+                              HorizontalAlignment="Left" VerticalAlignment="Center"
+                              Background="{DynamicResource PanelBackground}">
+                        <TextBlock Text="{Binding Status}" FontSize="10" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource TextMuted}" />
+                      </Border>
+                      <TextBlock Grid.Column="1" Text="{Binding Name}" FontSize="13"
+                                 VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                      <TextBlock Grid.Column="2" Text="{Binding Type}" FontSize="11"
+                                 VerticalAlignment="Center" Opacity="0.7"
+                                 TextTrimming="CharacterEllipsis" />
+                    </Grid>
+
+                    <ItemsControl ItemsSource="{Binding Findings}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:FindingViewModel">
+                          <Grid ColumnDefinitions="110,*" Margin="2,2">
+                            <TextBlock Grid.Column="0" Text="{Binding Kind}" FontSize="11"
+                                       Opacity="0.75" />
+                            <TextBlock Grid.Column="1" Text="{Binding Detail}" FontSize="11"
+                                       TextWrapping="Wrap" />
+                          </Grid>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                  </StackPanel>
+                </Border>
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>

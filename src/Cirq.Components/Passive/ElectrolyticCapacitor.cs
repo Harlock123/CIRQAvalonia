@@ -1,4 +1,5 @@
 using Cirq.Core.Simulation;
+using Cirq.Core.Topology;
 using Cirq.Core.Units;
 using CommunityToolkit.Mvvm.ComponentModel;
 
@@ -15,7 +16,7 @@ namespace Cirq.Components.Passive;
 /// being driven above 3.3V.
 /// </para>
 /// </summary>
-public partial class ElectrolyticCapacitor : Capacitor
+public partial class ElectrolyticCapacitor : Capacitor, IVoltageRated
 {
     public ElectrolyticCapacitor(double capacitance = 100e-6)
         : base(capacitance)

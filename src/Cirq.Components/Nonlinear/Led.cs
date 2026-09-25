@@ -1,3 +1,4 @@
+using Cirq.Core.Topology;
 using Cirq.Core.Primitives;
 using CommunityToolkit.Mvvm.ComponentModel;
 
@@ -7,7 +8,7 @@ namespace Cirq.Components.Nonlinear;
 /// A diode that also reports how brightly it is lit, so the canvas can render an illuminated
 /// symbol. Brightness is the forward current normalised against the rated current.
 /// </summary>
-public partial class Led : Diode
+public partial class Led : Diode, ICurrentRated
 {
     public Led(DiodeModel? model = null, Color? colour = null)
         : base(model ?? DiodeModel.LedRed)

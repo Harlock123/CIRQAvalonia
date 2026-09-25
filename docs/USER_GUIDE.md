@@ -36,7 +36,7 @@ the [README](../README.md), and what changed between releases is in the
 24. [Will it work with the parts you can buy](#will-it-work-with-the-parts-you-can-buy)
 25. [Temperature](#temperature)
 26. [Feeding it a real waveform](#feeding-it-a-real-waveform)
-27. [Power](#power)
+27. [Ratings](#ratings)
 28. [Writing on the schematic](#writing-on-the-schematic)
 29. [Drawing part of a circuit as one block](#drawing-part-of-a-circuit-as-one-block)
 30. [Reusing a block](#reusing-a-block)
@@ -122,8 +122,8 @@ each row links to the section that explains it.
 | Can I have **two circuits** open | [Two circuits at once](#two-circuits-at-once) — a second window, sharing a clipboard | `Ctrl` `Shift` `N` |
 | What does **temperature** do to it | [Temperature](#temperature) — set it, or sweep it like any other parameter | — |
 | How hot does the **part itself** get | [Self-heating](#when-a-part-heats-itself) — give it a thermal resistance and the loop closes | — |
-| Is anything **past what it is rated for** | [Power](#power) — every part's dissipation against its rating, averaged across a run | `Ctrl` `F5` |
-| How long will it run **on a battery** | [Power](#power) — the draw, and the arithmetic on the cell's capacity | `Ctrl` `F5` |
+| Is anything **past what it is rated for** | [Ratings](#ratings) — every part against every limit it has, watched across a run | `Ctrl` `F5` |
+| How long will it run **on a battery** | [Ratings](#ratings) — the draw, and the arithmetic on the cell's capacity | `Ctrl` `F5` |
 | Does it meet what I **said it had to do** | [Requirements](#requirements) — written down, and checked | `Ctrl` `F4` |
 | Did my edit **break something else** | [A baseline](#a-baseline) — what it produced then, against what it produces now | `Ctrl` `F8` |
 | Where is the **current actually going** | [Current flow](#watching-the-current-move) — dots on the wires, in the View menu | — |
@@ -4154,76 +4154,76 @@ solver breakpoint, for the same reason the waveform source's corners are.
 
 ---
 
-## Power
+## Ratings
 
-**Simulate > Power...** (`Ctrl+F5`) is the other half of that: what every part in the circuit is
-dissipating, against what it is rated for, with the part nearest a limit at the top.
+**Simulate > Ratings...** (`Ctrl+F5`) is one list of every part that is near, or past, something it
+is sold against.
 
-It exists because of an asymmetry. A semiconductor already worries about itself — a MOSFET reports
-its own watts, models its own die and complains on its hover card when it is past either. A
-**resistor sitting at nine tenths of a watt in a quarter-watt package says nothing at all.** It
-solves perfectly, gives the right answer, and is one of the commonest ways a circuit that works on
-the screen becomes a smell on the bench.
+All of this existed and none of it was anywhere you could see it. **Thirty-two component types
+report their own violations** — a relay coil with no flyback diode, an electrolytic over its volts,
+a cell being asked for most of its short-circuit current — and those reached exactly two places: a
+red ring drawn by about a dozen of the symbols, and the hover card. So a part could be complaining
+and drawing nothing at all, and the only way to find it was to rest the pointer on each of a
+hundred and eighty-eight in turn.
 
-Every resistor now carries a **Power Rating**, a quarter of a watt by default, which is the part
-most people have in the drawer. Set it to what you are actually going to buy.
+A part can fail three ways, and each is checked:
 
-| Column | What it is |
+| Limit | Carried by |
 | --- | --- |
-| Status | **OK**, **Warm**, **Over**, or a dash for a part nobody has rated |
-| Dissipating | What it is turning into heat |
-| Rated | What it can take, and what fraction of that is being used |
-| Die | Where its junction is, for a part that models one, and the limit it is rated to |
+| **Power** | Resistors, thermistors and LDRs, through a **Power Rating** — a quarter watt by default |
+| **Temperature** | Any semiconductor given a **Thermal Resistance**, against its maximum junction temperature |
+| **Voltage** | Capacitors, through a **Voltage Rating** — 50 V for a ceramic, whatever is printed on an electrolytic |
+| **Current** | LEDs and fuses, through a **Rated Current** |
+
+Everything a part says about itself appears too, in its own words, under the same part. An
+electrolytic over its rating therefore shows twice — once as a measurement against the number, once
+as the part's warning about what will happen — which is two useful sentences about one problem
+rather than two problems.
+
+**A plain capacitor now has a voltage rating**, which it never did. It was the one passive in the
+library that could be taken to four times what it is sold for and say nothing whatever. An
+electrolytic has always had one; a ceramic fails the same way, just more quietly, and usually by
+losing most of its capacitance on the way.
 
 **Warm starts at half the rating**, not at the rating. A part run at its full rating is a part at
 the temperature that rating was measured at — in free air, on a bench, with nothing around it —
 which is not where yours is. Half is the margin the trade has used for as long as there have been
 resistors.
 
-A part can be comfortably inside one limit and past the other, so both are checked and the worse
-one decides. A TO-220 regulator dropping nine volts at half an amp is well inside its package's
-watts and well past what the heatsink it has not got can carry away.
+### Peaks for the limits, averages for the heat
 
-### Averaging, and why it is on by default
+The box at the bottom says how long to watch the circuit for. Make it several cycles of whatever it
+does.
 
-**The instant a switching circuit happens to be at is not a summary of it.** A MOSFET caught
-mid-edge is dissipating watts; the same MOSFET a microsecond later is dissipating milliwatts. Read
-either one as "the" dissipation and the answer is wrong by whatever fraction of the cycle you
-caught — and it is wrong in a different direction every time you look.
+Across that run, **voltage and current are the worst reached and dissipation is the mean**, and the
+difference is not a detail. Watts are thermal: what matters is the average over long enough for the
+part to have warmed up, which is exactly why a MOSFET survives a pulse that would destroy it held
+on. Volts are not — a dielectric breaks down at the instant the peak arrives, and averaging is
+precisely the wrong thing to do to it.
 
-So the window integrates across a run and divides, rather than reading the matrix as it stands. The
-box at the bottom says how long: make it several cycles of whatever the circuit does. Set it to
-zero to read the operating point instead, which is exactly right for a circuit that does not switch
-and a trap for one that does — the window says which of the two you are looking at, under the
-verdict.
+So a capacitor fed a quarter-duty square wave is reported at the full height of the pulse, and the
+resistor beside it at a quarter of its peak dissipation, from the same run.
 
-Averaging runs the circuit forward, so the canvas and the scope will be at a later moment when you
+Set the duration to zero to read the operating point instead. That is exactly right for a circuit
+that does not switch and a trap for one that does, and the window says which of the two you are
+looking at.
+
+Watching runs the circuit forward, so the canvas and the scope will be at a later moment when you
 close the window. A running simulation is paused first and started again afterwards.
 
-### What is counted, and what is not
+### What the circuit costs to run
 
-A part is counted when it has said that it turns power into heat. A semiconductor says so through
-its own thermal model; a resistor, a thermistor and an LDR say so by having a power rating at all.
+Below the list: every part that is delivering power, what it is holding its output at, and what is
+being drawn from it.
 
-**A capacitor is not counted, and that is not an omission.** It has volts across it and amps
-through it like anything else, and the product of those is energy going in and coming back out
-rather than energy being spent. Counting it would put an imaginary watt in the budget of every
-filter in the library. Nothing about the topology can distinguish the two cases, so the parts that
-dissipate are the ones that say so.
-
-**What is supplying is decided by which way the power is going**, not by what the part is called: a
-battery being charged is a load, a regulator is both at once, and a motor being turned by the load
-it was driving is a generator whatever its symbol says.
-
-### How long it will run
+**What counts as supplying is decided by which way the power is going**, not by what the part is
+called: a battery being charged is a load, a regulator is both at once, and a motor being turned by
+the load it was driving is a generator whatever its symbol says.
 
 Put a **Battery** in the circuit and the window works out how long it lasts, from the capacity on
-the cell and the current coming out of it.
-
-Treat that as arithmetic and nothing more. A real cell delivers less than its rating at a high
-current, less again when it is cold, and a circuit that sleeps between bursts draws nothing like
-its running current on average. The figure is the right order of magnitude and the wrong number to
-put in a specification.
+the cell and the current coming out of it. Treat that as arithmetic and nothing more — a real cell
+delivers less at a high current, less again when it is cold, and a circuit that sleeps between
+bursts draws nothing like its running current on average.
 
 ---
 
@@ -5065,7 +5065,7 @@ Also available in the app at **Help > Keyboard Shortcuts**.
 | `Shift` `F3` | Decode bus — read the traces as I²C, SPI, UART, 1-Wire or CAN |
 | `F4` | Check circuit — the wiring mistakes no part can report about itself |
 | `Shift` `F4` | Tolerance analysis — will it work with the parts you can buy |
-| `Ctrl` `F5` | Power — what every part dissipates against its rating, and how long a battery lasts |
+| `Ctrl` `F5` | Ratings — every part against every limit it has, and how long a battery lasts |
 | `Ctrl` `F8` | Baseline — record what the circuit does now, and say what changed later |
 | Shift-click with the probe tool | Set the selected probe's second point, for a differential or power measurement |
 | Click a wire or a pin | Light up the whole net it is on, and say what is joined to it |

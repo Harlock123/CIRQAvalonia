@@ -38,7 +38,7 @@ public class WindowTests(WindowSession session)
     /// <summary>Every window the menu can open, with a view model it will accept.</summary>
     public static TheoryData<string> Windows() => new(
         "About", "Baseline", "Compare", "Conditions", "DcSweep", "ExampleBrowser", "Explain",
-        "Find", "FrequencyResponse", "Impedance", "MonteCarlo", "Noise", "PoleZero", "Power",
+        "Find", "FrequencyResponse", "Impedance", "MonteCarlo", "Noise", "PoleZero", "Ratings",
         "RuleCheck", "Specs", "SpectrumAnalyser", "Stability", "TransientStep");
 
     private static Window Build(string name)
@@ -63,9 +63,9 @@ public class WindowTests(WindowSession session)
             "MonteCarlo" => new MonteCarloWindow { DataContext = new MonteCarloViewModel(circuit) },
             "Noise" => new NoiseWindow { DataContext = new NoiseViewModel(circuit) },
             "PoleZero" => new PoleZeroWindow { DataContext = new PoleZeroViewModel(circuit) },
-            "Power" => new PowerWindow
+            "Ratings" => new RatingsWindow
             {
-                DataContext = new PowerViewModel(new SimulationController(circuit)),
+                DataContext = new RatingsViewModel(new SimulationController(circuit)),
             },
             "RuleCheck" => new RuleCheckWindow { DataContext = new RuleCheckViewModel(circuit) },
             "Specs" => new SpecsWindow { DataContext = new SpecsViewModel(circuit) },

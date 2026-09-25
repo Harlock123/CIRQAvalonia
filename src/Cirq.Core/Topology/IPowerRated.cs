@@ -30,3 +30,34 @@ public interface IPowerRated
     /// </summary>
     double PowerRating { get; set; }
 }
+
+
+/// <summary>
+/// A part with a voltage it must not be taken above.
+/// <para>
+/// A different kind of limit from a dissipation, and it has to be checked differently. Watts are
+/// thermal: what matters is the average over long enough for the part to have warmed up, which is
+/// why a MOSFET survives a pulse that would destroy it held on. Volts are not — a dielectric that
+/// breaks down does so at the instant the peak arrives, and averaging is exactly the wrong thing to
+/// do to it. So a rating like this is held against the <b>peak</b>.
+/// </para>
+/// </summary>
+public interface IVoltageRated
+{
+    /// <summary>The most it may have across it, or zero when nothing has been said about it.</summary>
+    double VoltageRating { get; set; }
+}
+
+/// <summary>
+/// A part with a current it must not be taken above, held against the peak for the reason
+/// <see cref="IVoltageRated"/> is.
+/// <para>
+/// The property is called <c>RatedCurrent</c> rather than <c>CurrentRating</c> because that is what
+/// the parts which already had one call it. An interface that made three existing parts rename
+/// their property would be an interface arranging the library around itself.
+/// </para>
+/// </summary>
+public interface ICurrentRated
+{
+    double RatedCurrent { get; set; }
+}

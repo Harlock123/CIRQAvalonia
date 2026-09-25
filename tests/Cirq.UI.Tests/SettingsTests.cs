@@ -2,6 +2,8 @@ using Avalonia.Styling;
 using Cirq.UI.Services;
 using Cirq.UI.ViewModels;
 
+using Cirq.UI.Tests.Support;
+
 namespace Cirq.UI.Tests;
 
 /// <summary>In-memory store so the settings view model can be driven without touching disk.</summary>
@@ -137,7 +139,19 @@ public class SettingsPersistenceTests : IDisposable
     }
 }
 
-public class SettingsViewModelTests
+/// <summary>
+/// The settings dialog's view model.
+/// <para>
+/// In the window collection, and running on its thread, because choosing a theme calls
+/// <see cref="Cirq.UI.Services.ThemeManager"/> — which reads and writes <c>Application.Current</c>.
+/// Before this suite had a headless application there was no <c>Application.Current</c> at all, so
+/// these tests passed down a null-safe path they were never meant to be exercising. The moment one
+/// existed they threw, because an Avalonia object belongs to the thread that made it and xunit had
+/// called them on another.
+/// </para>
+/// </summary>
+[Collection(WindowCollection.Name)]
+public class SettingsViewModelTests(WindowSession session)
 {
     private static SettingsViewModel Create(AppTheme theme, out FakeSettingsStore store)
     {
@@ -148,90 +162,122 @@ public class SettingsViewModelTests
     [Fact]
     public void SystemIsOfferedFirst()
     {
-        var vm = Create(AppTheme.System, out _);
+        session.Run(() =>
+        {
+            var vm = Create(AppTheme.System, out _);
 
-        Assert.Equal(AppTheme.System, vm.Choices[0].Theme);
-        Assert.Equal("System", vm.Choices[0].Name);
+            Assert.Equal(AppTheme.System, vm.Choices[0].Theme);
+            Assert.Equal("System", vm.Choices[0].Name);
+        });
     }
 
     [Fact]
     public void EveryThemeTheApplicationSupportsIsOffered()
     {
-        var vm = Create(AppTheme.System, out _);
+        session.Run(() =>
+        {
+            var vm = Create(AppTheme.System, out _);
 
-        // Adding an AppTheme without a choice would leave it unreachable from the dialog.
-        Assert.Equal(
-            Enum.GetValues<AppTheme>().ToHashSet(),
-            vm.Choices.Select(c => c.Theme).ToHashSet());
+            // Adding an AppTheme without a choice would leave it unreachable from the dialog.
+            Assert.Equal(
+                Enum.GetValues<AppTheme>().ToHashSet(),
+                vm.Choices.Select(c => c.Theme).ToHashSet());
+        });
     }
 
     [Fact]
     public void HighContrastCanBeChosenAndIsStored()
     {
-        var vm = Create(AppTheme.System, out var store);
+        session.Run(() =>
+        {
+            var vm = Create(AppTheme.System, out var store);
 
-        vm.SelectedTheme = vm.Choices.Single(c => c.Theme == AppTheme.HighContrast);
+            vm.SelectedTheme = vm.Choices.Single(c => c.Theme == AppTheme.HighContrast);
 
-        Assert.Equal(AppTheme.HighContrast, store.Load().Theme);
+            Assert.Equal(AppTheme.HighContrast, store.Load().Theme);
+        });
     }
 
     [Fact]
     public void EveryChoiceIsDescribedAndDistinct()
     {
-        var vm = Create(AppTheme.System, out _);
+        session.Run(() =>
+        {
+            var vm = Create(AppTheme.System, out _);
 
-        Assert.Equal(vm.Choices.Count, vm.Choices.Select(c => c.Theme).Distinct().Count());
-        Assert.All(vm.Choices, c => Assert.False(string.IsNullOrWhiteSpace(c.Description)));
+            Assert.Equal(vm.Choices.Count, vm.Choices.Select(c => c.Theme).Distinct().Count());
+            Assert.All(vm.Choices, c => Assert.False(string.IsNullOrWhiteSpace(c.Description)));
+        });
     }
 
     [Fact]
     public void TheDialogOpensOnWhicheverThemeIsStored()
     {
-        var vm = Create(AppTheme.Dark, out _);
+        session.Run(() =>
+        {
+            var vm = Create(AppTheme.Dark, out _);
 
-        Assert.Equal(AppTheme.Dark, vm.SelectedTheme.Theme);
+            Assert.Equal(AppTheme.Dark, vm.SelectedTheme.Theme);
+        });
     }
 
     [Fact]
     public void OpeningTheDialogDoesNotWriteAnything()
     {
-        // Selecting the stored value on load must not count as a change.
-        Create(AppTheme.Light, out var store);
+        session.Run(() =>
+        {
+            // Selecting the stored value on load must not count as a change.
+            Create(AppTheme.Light, out var store);
 
-        Assert.Equal(0, store.Saves);
+            Assert.Equal(0, store.Saves);
+        });
     }
 
     [Fact]
     public void ChoosingAThemeStoresItImmediately()
     {
-        var vm = Create(AppTheme.System, out var store);
+        session.Run(() =>
+        {
+            var vm = Create(AppTheme.System, out var store);
 
-        vm.SelectedTheme = vm.Choices.Single(c => c.Theme == AppTheme.Light);
+            vm.SelectedTheme = vm.Choices.Single(c => c.Theme == AppTheme.Light);
 
-        Assert.Equal(1, store.Saves);
-        Assert.Equal(AppTheme.Light, store.Load().Theme);
+            Assert.Equal(1, store.Saves);
+            Assert.Equal(AppTheme.Light, store.Load().Theme);
+        });
     }
 
     [Fact]
     public void TheSystemNoteAppearsOnlyForTheSystemChoice()
     {
-        var vm = Create(AppTheme.System, out _);
-        Assert.False(string.IsNullOrWhiteSpace(vm.SystemThemeNote));
+        session.Run(() =>
+        {
+            var vm = Create(AppTheme.System, out _);
+            Assert.False(string.IsNullOrWhiteSpace(vm.SystemThemeNote));
 
-        vm.SelectedTheme = vm.Choices.Single(c => c.Theme == AppTheme.Dark);
-        Assert.Equal(string.Empty, vm.SystemThemeNote);
+            vm.SelectedTheme = vm.Choices.Single(c => c.Theme == AppTheme.Dark);
+            Assert.Equal(string.Empty, vm.SystemThemeNote);
+        });
     }
 
     [Fact]
     public void TheDialogShowsWhereSettingsAreKept()
     {
-        var vm = Create(AppTheme.System, out _);
+        session.Run(() =>
+        {
+            var vm = Create(AppTheme.System, out _);
 
-        Assert.False(string.IsNullOrWhiteSpace(vm.SettingsLocation));
+            Assert.False(string.IsNullOrWhiteSpace(vm.SettingsLocation));
+        });
     }
 }
 
-public class ThemeManagerTests
+/// <summary>
+/// <see cref="Cirq.UI.Services.ThemeManager"/> itself, which reads and writes the application's
+/// theme — so on the window collection's thread, for the reason above.
+/// </summary>
+[Collection(WindowCollection.Name)]
+public class ThemeManagerTests(WindowSession session)
 {
     [Theory]
     [InlineData(AppTheme.Light)]
@@ -246,36 +292,85 @@ public class ThemeManagerTests
     [Fact]
     public void EveryThemeMapsToADistinctVariant()
     {
-        // Two themes collapsing onto one variant would make a menu entry silently do nothing.
-        var variants = Enum.GetValues<AppTheme>().Select(ThemeManager.ToVariant).ToList();
+        session.Run(() =>
+        {
+            // Two themes collapsing onto one variant would make a menu entry silently do nothing.
+            var variants = Enum.GetValues<AppTheme>().Select(ThemeManager.ToVariant).ToList();
 
-        Assert.Equal(variants.Count, variants.Distinct().Count());
+            Assert.Equal(variants.Count, variants.Distinct().Count());
+        });
     }
 
     [Fact]
     public void HighContrastIsACustomVariantThatFallsBackToDark()
     {
-        var variant = ThemeManager.ToVariant(AppTheme.HighContrast);
+        session.Run(() =>
+        {
+            var variant = ThemeManager.ToVariant(AppTheme.HighContrast);
 
-        Assert.Equal("HighContrast", variant.Key);
+            Assert.Equal("HighContrast", variant.Key);
 
-        // Inheriting from Dark is what lets the theme dictionary name only the keys that differ,
-        // and leaves the Fluent control chrome resolving instead of coming back empty.
-        Assert.Equal(ThemeVariant.Dark, variant.InheritVariant);
+            // Inheriting from Dark is what lets the theme dictionary name only the keys that differ,
+            // and leaves the Fluent control chrome resolving instead of coming back empty.
+            Assert.Equal(ThemeVariant.Dark, variant.InheritVariant);
+        });
     }
 
     [Fact]
     public void SystemMapsToAvaloniasFollowThePlatformVariant()
     {
-        // Default is what makes Avalonia track the desktop rather than pinning a palette.
-        Assert.Equal(ThemeVariant.Default, ThemeManager.ToVariant(AppTheme.System));
+        session.Run(() =>
+        {
+            // Default is what makes Avalonia track the desktop rather than pinning a palette.
+            Assert.Equal(ThemeVariant.Default, ThemeManager.ToVariant(AppTheme.System));
+        });
     }
 
+    /// <summary>
+    /// Asked from somewhere it cannot reach the application, it answers this application's own
+    /// default rather than throwing.
+    /// <para>
+    /// Deliberately <b>not</b> run on the session's thread, which is the whole point of it. An
+    /// Avalonia object belongs to the thread that made it, and everything that resolves a theme is
+    /// reached from drawing code — which is not inherently a UI-thread job, since an export writes
+    /// a PDF with no window involved. Somewhere that cannot ask should get the same answer as
+    /// somewhere with nothing to ask, and neither should take the render down.
+    /// </para>
+    /// <para>
+    /// This test used to be called "with no application", and was true because there was no
+    /// application anywhere in the suite. Now there is one, a thread away, which is a better test
+    /// of the same contract.
+    /// </para>
+    /// </summary>
     [Fact]
-    public void WithNoApplicationTheEffectiveVariantIsTheApplicationsOwnDefault()
+    public void AskedFromAnotherThreadItAnswersTheApplicationsOwnDefault()
     {
-        // Headless, there is no platform to ask; dark is this application's own default.
-        Assert.Equal(ThemeVariant.Dark, ThemeManager.Effective(null));
+        // Which thread the application belongs to, asked from inside it.
+        var owner = session.Run(() => Environment.CurrentManagedThreadId);
+
+        // And then a thread that is definitely not that one. Started explicitly rather than
+        // assuming xunit's is different: when this test ran first, before anything had touched the
+        // session, the dispatcher had not been bound yet and xunit's thread *was* the UI thread.
+        ThemeVariant? variant = null;
+        Avalonia.Media.IBrush? brush = null;
+        var ran = 0;
+
+        var elsewhere = new Thread(() =>
+        {
+            ran = Environment.CurrentManagedThreadId;
+            variant = ThemeManager.Effective(null);
+            brush = ThemeManager.Brush("PanelBackground");
+        });
+
+        elsewhere.Start();
+        elsewhere.Join();
+
+        Assert.NotEqual(owner, ran);
+
+        Assert.Equal(ThemeVariant.Dark, variant);
+
+        // And a brush asked from there is the loud fallback rather than an exception.
+        Assert.Equal(Avalonia.Media.Brushes.Magenta, brush);
     }
 }
 
@@ -284,7 +379,11 @@ public class ThemeManagerTests
 /// resolves to magenta at runtime rather than throwing, so nothing else would catch it; these read
 /// the XAML directly and compare the key sets.
 /// </summary>
-public class ThemeDictionaryTests
+/// <summary>
+/// The theme dictionaries, read through the application — so on its thread, for the reason above.
+/// </summary>
+[Collection(WindowCollection.Name)]
+public class ThemeDictionaryTests(WindowSession session)
 {
     private static XElement Themes()
     {
@@ -328,29 +427,35 @@ public class ThemeDictionaryTests
     [Fact]
     public void AllThreeVariantsAreDeclared()
     {
-        var variants = Variants();
+        session.Run(() =>
+        {
+            var variants = Variants();
 
-        Assert.Contains("Dark", variants.Keys);
-        Assert.Contains("Light", variants.Keys);
+            Assert.Contains("Dark", variants.Keys);
+            Assert.Contains("Light", variants.Keys);
 
-        // The custom variant has to be keyed with x:Static: Avalonia's type converter handles only
-        // the built-in names, and a plain string key would not bind to it.
-        Assert.Contains("{x:Static services:AppThemes.HighContrast}", variants.Keys);
+            // The custom variant has to be keyed with x:Static: Avalonia's type converter handles only
+            // the built-in names, and a plain string key would not bind to it.
+            Assert.Contains("{x:Static services:AppThemes.HighContrast}", variants.Keys);
+        });
     }
 
     [Fact]
     public void EveryVariantDefinesExactlyTheSameKeys()
     {
-        var variants = Variants();
-        var expected = variants["Dark"];
-
-        foreach (var (name, keys) in variants)
+        session.Run(() =>
         {
-            Assert.Empty(keys.Except(expected));     // nothing invented
-            Assert.Empty(expected.Except(keys));     // nothing missing, which would render magenta
-            Assert.NotEmpty(keys);
-            Assert.True(keys.Count == expected.Count, name);
-        }
+            var variants = Variants();
+            var expected = variants["Dark"];
+
+            foreach (var (name, keys) in variants)
+            {
+                Assert.Empty(keys.Except(expected));     // nothing invented
+                Assert.Empty(expected.Except(keys));     // nothing missing, which would render magenta
+                Assert.NotEmpty(keys);
+                Assert.True(keys.Count == expected.Count, name);
+            }
+        });
     }
 
 
@@ -419,20 +524,23 @@ public class ThemeDictionaryTests
     [Fact]
     public void HighContrastPutsPureWhiteTextOnPureBlackGrounds()
     {
-        var high = Themes()
-            .Elements().Elements()
-            .Single(d => d.Attribute(Xaml + "Key")!.Value.Contains("HighContrast"));
+        session.Run(() =>
+        {
+            var high = Themes()
+                .Elements().Elements()
+                .Single(d => d.Attribute(Xaml + "Key")!.Value.Contains("HighContrast"));
 
-        string Colour(string key) => high.Elements()
-            .Single(b => b.Attribute(Xaml + "Key")!.Value == key)
-            .Attribute("Color")!.Value;
+            string Colour(string key) => high.Elements()
+                .Single(b => b.Attribute(Xaml + "Key")!.Value == key)
+                .Attribute("Color")!.Value;
 
-        Assert.Equal("#000000", Colour("AppBackground"));
-        Assert.Equal("#000000", Colour("CanvasBackground"));
-        Assert.Equal("#000000", Colour("PlotBackground"));
+            Assert.Equal("#000000", Colour("AppBackground"));
+            Assert.Equal("#000000", Colour("CanvasBackground"));
+            Assert.Equal("#000000", Colour("PlotBackground"));
 
-        Assert.Equal("#FFFFFF", Colour("TextPrimary"));
-        Assert.Equal("#FFFFFF", Colour("SymbolStroke"));
-        Assert.Equal("#FFFFFF", Colour("PanelBorder"));
+            Assert.Equal("#FFFFFF", Colour("TextPrimary"));
+            Assert.Equal("#FFFFFF", Colour("SymbolStroke"));
+            Assert.Equal("#FFFFFF", Colour("PanelBorder"));
+        });
     }
 }

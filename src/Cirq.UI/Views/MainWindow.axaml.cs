@@ -173,7 +173,7 @@ public partial class MainWindow : Window
         viewModel.RequestPoleZero += async (_, _) => await ShowPoleZeroAsync();
         viewModel.RequestSpecs += async (_, _) => await ShowSpecsAsync();
         viewModel.RequestRuleCheck += async (_, _) => await ShowRuleCheckAsync();
-        viewModel.RequestPower += async (_, _) => await ShowPowerAsync();
+        viewModel.RequestRatings += async (_, _) => await ShowRatingsAsync();
         viewModel.RequestBaseline += async (_, _) => await ShowBaselineAsync();
         viewModel.RequestSpectrum += async (_, _) => await ShowSpectrumAsync();
         viewModel.RequestBusDecode += async (_, _) => await ShowBusDecodeAsync();
@@ -550,13 +550,13 @@ public partial class MainWindow : Window
         await dialog.ShowModal(this);
     }
 
-    private async Task ShowPowerAsync()
+    private async Task ShowRatingsAsync()
     {
         if (_viewModel is null) return;
 
-        var dialog = new PowerWindow
+        var dialog = new RatingsWindow
         {
-            DataContext = new PowerViewModel(_viewModel.Simulation),
+            DataContext = new RatingsViewModel(_viewModel.Simulation),
         };
 
         await dialog.ShowModal(this);

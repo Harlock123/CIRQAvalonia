@@ -8,6 +8,27 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**One list of everything outside its ratings.** **Simulate > Ratings...** (`Ctrl+F5`, and what the
+Power window has become) gathers every limit in the circuit into one place, grouped by part.
+
+All of this existed and none of it was anywhere you could see it. **Thirty-two component types
+report their own violations** — a relay coil with no flyback, an electrolytic over its volts, a
+cell being asked for most of its short-circuit current — and those reached exactly two places: a
+red ring drawn by about a dozen of the symbols, and the hover card. A part could be complaining and
+drawing nothing at all, and the only way to find it was to hover over each of a hundred and
+eighty-eight in turn.
+
+A part fails three ways and all three are now checked: watts against a power rating, volts against
+a voltage rating, amps against a rated current, plus the die against its maximum. **A plain
+capacitor has a voltage rating at last** — it was the one passive in the library that could be
+taken to four times what it is sold for and say nothing whatever.
+
+**Peaks for the limits, averages for the heat.** Watts are thermal, so what matters is the mean
+over long enough for the part to warm up — which is why a MOSFET survives a pulse that would
+destroy it held on. Volts are not: a dielectric breaks down at the instant the peak arrives, and
+averaging is exactly the wrong thing to do to it. One run reports the worst voltage and current
+reached and the mean dissipation, at the same time.
+
 **The suite opens windows now.** Three thousand tests and not one of them had ever constructed one
 — which is why both of the UI bugs that have ever shipped got out: a dialog with no way to close
 it, and a dialog drawn in the light palette while the application around it was dark, its buttons

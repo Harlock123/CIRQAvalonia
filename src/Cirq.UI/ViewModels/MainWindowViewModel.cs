@@ -831,7 +831,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     public event EventHandler? RequestRuleCheck;
 
     /// <summary>Raised for the power budget window.</summary>
-    public event EventHandler? RequestPower;
+    public event EventHandler? RequestRatings;
 
     /// <summary>Raised for the baseline window.</summary>
     public event EventHandler? RequestBaseline;
@@ -1351,7 +1351,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
           Shift+F3     Decode the traces as a bus
           F4           Check circuit
           Ctrl+F4      Requirements — what it is supposed to do, checked
-          Ctrl+F5      Power — what every part dissipates against what it is rated for
+          Ctrl+F5      Ratings — every part against every limit it has
           Ctrl+F8      Baseline — record what it does now, and say what changed later
           Shift+F4     Tolerance analysis
           F8           Reset
@@ -1426,7 +1426,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     private void ShowRuleCheck() => RequestRuleCheck?.Invoke(this, EventArgs.Empty);
 
     [RelayCommand]
-    private void ShowPower() => RequestPower?.Invoke(this, EventArgs.Empty);
+    private void ShowRatings() => RequestRatings?.Invoke(this, EventArgs.Empty);
 
     [RelayCommand]
     private void ShowBaseline() => RequestBaseline?.Invoke(this, EventArgs.Empty);

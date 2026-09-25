@@ -17,7 +17,7 @@ namespace Cirq.Components.Passive;
 /// square of the overload beyond it.
 /// </para>
 /// </summary>
-public partial class Fuse : TwoTerminalComponent, ICurrentReporting
+public partial class Fuse : TwoTerminalComponent, ICurrentReporting, ICurrentRated
 {
     public Fuse(double ratedCurrent = 1.0)
     {

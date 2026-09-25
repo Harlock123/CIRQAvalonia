@@ -10,7 +10,7 @@ namespace Cirq.Components.Passive;
 /// Capacitor discretised with a Norton companion model: <c>i = Geq·v + Ieq</c>, where the
 /// coefficients come from Trapezoidal or Backward-Euler integration of <c>i = C·dv/dt</c>.
 /// </summary>
-public partial class Capacitor : TwoTerminalComponent, ICurrentReporting, IToleranced
+public partial class Capacitor : TwoTerminalComponent, ICurrentReporting, IToleranced, IVoltageRated
 {
     private double _previousVoltage;
     private double _previousCurrent;
@@ -25,6 +25,18 @@ public partial class Capacitor : TwoTerminalComponent, ICurrentReporting, IToler
     /// <summary>Capacitance in farads.</summary>
     [ObservableProperty]
     public partial double Capacitance { get; set; }
+
+    /// <summary>
+    /// The most it may have across it, in volts. Fifty is the commonest small ceramic.
+    /// <para>
+    /// Until now a plain capacitor was the one passive with no rating of any kind, which made it
+    /// the one part in the library that could be taken to four times what it is sold for and say
+    /// nothing whatever. An electrolytic has always had this; a ceramic fails the same way, just
+    /// more quietly and usually by losing most of its capacitance first.
+    /// </para>
+    /// </summary>
+    [ObservableProperty]
+    public partial double VoltageRating { get; set; } = 50.0;
 
     /// <summary>
     /// How far the real part may be from its marked capacitance, as a fraction — 0.05 for a
