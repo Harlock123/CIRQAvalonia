@@ -173,6 +173,7 @@ public partial class MainWindow : Window
         viewModel.RequestPoleZero += async (_, _) => await ShowPoleZeroAsync();
         viewModel.RequestSpecs += async (_, _) => await ShowSpecsAsync();
         viewModel.RequestRuleCheck += async (_, _) => await ShowRuleCheckAsync();
+        viewModel.RequestPower += async (_, _) => await ShowPowerAsync();
         viewModel.RequestSpectrum += async (_, _) => await ShowSpectrumAsync();
         viewModel.RequestBusDecode += async (_, _) => await ShowBusDecodeAsync();
         viewModel.RequestMonteCarlo += async (_, _) => await ShowMonteCarloAsync();
@@ -531,6 +532,23 @@ public partial class MainWindow : Window
         var dialog = new RuleCheckWindow { DataContext = model };
 
         await dialog.ShowModal(this);
+    }
+
+    private async Task ShowPowerAsync()
+    {
+        if (_viewModel is null) return;
+
+        var dialog = new PowerWindow
+        {
+            DataContext = new PowerViewModel(_viewModel.Simulation),
+        };
+
+        await dialog.ShowModal(this);
+
+        // Averaging runs the circuit forward, so the canvas and the scope are looking at a
+        // different moment from the one they were. Repainting is the difference between that being
+        // obvious and it looking like the window broke something.
+        RefreshLiveState();
     }
 
     /// <summary>

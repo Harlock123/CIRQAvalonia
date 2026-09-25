@@ -19,8 +19,12 @@ namespace Cirq.Components.Passive;
 /// light-sensing circuit can be exercised while the simulation runs.
 /// </para>
 /// </summary>
-public partial class LightDependentResistor : TwoTerminalComponent, IInteractiveComponent, ICurrentReporting
+public partial class LightDependentResistor : TwoTerminalComponent, IInteractiveComponent, ICurrentReporting, IPowerRated
 {
+    /// <summary>Watts it can dissipate. A cadmium sulphide cell is a small part in a small package.</summary>
+    [ObservableProperty]
+    public partial double PowerRating { get; set; } = 0.1;
+
     /// <summary>Illuminance used for "covered", in lux — a dark room, not a sealed box.</summary>
     public const double CoveredIlluminance = 0.1;
 

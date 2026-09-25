@@ -191,60 +191,17 @@ public static class LiveValues
     private static IEnumerable<CircuitComponent> Flattened(Circuit circuit) =>
         Flattening.Flatten(circuit.Components);
 
+    /// <summary>
+    /// One part's reading, which is <see cref="DeviceStates"/>' answer wearing this layer's name.
+    /// The arithmetic lives there because the power budget asks exactly the same question, and two
+    /// pieces of code arriving at it separately is two pieces of code that disagree eventually.
+    /// </summary>
     private static PartReading Read(CircuitComponent part, CircuitSimulator simulator)
     {
-        double? volts = null;
-        double? amps = null;
+        var state = DeviceStates.Of(part, simulator);
 
-        // Two pins, both of them in this netlist. A part dropped on the sheet and not yet wired to
-        // anything has terminals the netlist has never seen, and asking for their nodes throws.
-        var pair = part.Terminals.Count == 2
-            && simulator.Netlist.Contains(part.Terminals[0])
-            && simulator.Netlist.Contains(part.Terminals[1]);
-
-        if (pair)
-        {
-            volts = Sane(
-                simulator.System.NodeVoltage(part.Terminals[0]) -
-                simulator.System.NodeVoltage(part.Terminals[1]));
-
-            // Either the part speaks for its own first pin, or it keeps exactly one branch and the
-            // solver already has the answer. Both are read through the same call, which prefers the
-            // first. The restriction to two pins is what makes the second trustworthy: a branch
-            // current is signed by the order the part stamped its nodes in, and for a part with two
-            // of them that order is its own two terminals — so "into the first pin" is a statement
-            // about the part rather than a guess about its stamping.
-            if (part is ICurrentReporting || (part.VoltageSourceCount == 1 && part.InternalNodeCount == 0))
-                amps = Sane(simulator.TerminalCurrent(part.Terminals[0]));
-        }
-
-        // A part with more pins than two gets no current and no voltage: there is no single answer
-        // to either. It may still be dissipating, and that is read below — a transistor's watts are
-        // the number worth having about it anyway.
-
-        // A part that models its own heating knows both numbers better than multiplying two of
-        // ours would: its dissipation is integrated over the switching it does between our
-        // samples, and its die temperature is the state variable that produced the parameters
-        // this solve just used.
-        double? watts = null;
-        double? celsius = null;
-
-        if (part is ISelfHeating thermal)
-        {
-            watts = Sane(thermal.PowerDissipation);
-            if (thermal.IsSelfHeating) celsius = Sane(thermal.JunctionTemperature);
-        }
-        else if (volts is { } v && amps is { } i)
-        {
-            watts = Sane(Math.Abs(v * i));
-        }
-
-        return new PartReading(part, volts, amps, watts, celsius);
+        return new PartReading(part, state.Volts, state.Amps, state.Watts, state.Celsius);
     }
-
-    /// <summary>A number, or null when the solver produced something that is not one.</summary>
-    private static double? Sane(double value) =>
-        double.IsNaN(value) || double.IsInfinity(value) ? null : value;
 
     /// <summary>
     /// A figure as it goes on the drawing, with everything below the floor written as a plain zero.

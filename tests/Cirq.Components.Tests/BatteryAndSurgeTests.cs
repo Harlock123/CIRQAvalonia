@@ -1,6 +1,7 @@
 using Cirq.Components.Nonlinear;
 using Cirq.Components.Passive;
 using Cirq.Components.Sources;
+using Cirq.Core.Probing;
 using Cirq.Core.Topology;
 using Cirq.Engine.Simulation;
 
@@ -213,5 +214,133 @@ public class SurgeSuppressorTests
         Assert.True(mov.AbsorbedJoules > 0, "it should be counting the energy");
         Assert.True(mov.IsWornOut, $"only absorbed {mov.AbsorbedJoules:g3} J of a 0.05 J rating");
         Assert.Contains("worn out", string.Join(" ", mov.Violations));
+    }
+}
+
+/// <summary>
+/// Which way a source says its current is going.
+/// <para>
+/// <see cref="ICurrentReporting"/> asks every part for the current flowing <b>into</b> it through
+/// the probed pin — the convention a clamp meter uses, so that clamping the two ends of anything
+/// reads equal and opposite. A source delivering power therefore reports a <i>negative</i> current
+/// into its positive pin, because the charge is coming out.
+/// </para>
+/// <para>
+/// This is tested across the three kinds of source together, and deliberately. The battery used to
+/// report the current it was delivering rather than the current going in, and it was the only part
+/// in the library doing so — which is exactly the shape of bug that survives: the magnitude was
+/// right, each end still read equal and opposite, and "current out of a battery" is such a natural
+/// phrase that the wrong sign looked like the right answer. Nothing but a comparison against its
+/// neighbours catches it.
+/// </para>
+/// </summary>
+public class SourceCurrentDirectionTests
+{
+    /// <summary>A source, a kilohm and a ground. Whatever the source is, the loop is the same.</summary>
+    private static (CircuitSimulator Sim, CircuitComponent Supply, Resistor R) Loop(CircuitComponent supply)
+    {
+        var circuit = new Circuit();
+
+        circuit.Add(supply);
+
+        var r = circuit.Add(new Resistor(1e3) { Name = "R1" });
+        var ground = circuit.Add(new Ground { Name = "GND1" });
+
+        circuit.Wires.Add(new WireSegment
+        {
+            SourceTerminal = supply.Terminals[0],
+            TargetTerminal = r.A,
+        });
+
+        circuit.Wires.Add(new WireSegment { SourceTerminal = r.B, TargetTerminal = ground.Pin });
+
+        circuit.Wires.Add(new WireSegment
+        {
+            SourceTerminal = supply.Terminals[1],
+            TargetTerminal = ground.Pin,
+        });
+
+        var sim = new CircuitSimulator(circuit);
+        sim.Reset();
+        sim.SolveOperatingPoint();
+
+        return (sim, supply, r);
+    }
+
+    /// <summary>The three kinds of source, which all have to agree about this.</summary>
+    public static TheoryData<string> Sources() => new("battery", "solar cell", "dc source");
+
+    private static CircuitComponent Make(string kind) => kind switch
+    {
+        "battery" => new Battery { Name = "BT1", Discharges = false },
+        "solar cell" => new SolarCell { Name = "PV1", Illumination = 1.0 },
+        _ => new DcVoltageSource(9.0) { Name = "V1" },
+    };
+
+    /// <summary>
+    /// Every source delivering into a load reports current flowing out of its positive pin, which
+    /// under the clamp meter's convention is a negative reading there.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(Sources))]
+    public void ADeliveringSourceReadsNegativeIntoItsPositivePin(string kind)
+    {
+        var (sim, supply, r) = Loop(Make(kind));
+
+        var intoPositive = sim.TerminalCurrent(supply.Terminals[0]);
+        var intoLoad = sim.TerminalCurrent(r.A);
+
+        Assert.True(intoLoad > 0, $"the load takes current in: {intoLoad}");
+
+        Assert.True(intoPositive < 0,
+            $"a {kind} delivering {intoLoad:0.###} A should read that as negative into its + pin, not {intoPositive}");
+
+        // And it is the same current: what leaves the source is what arrives at the load, because
+        // there is nowhere else in this circuit for it to be.
+        Assert.Equal(intoLoad, -intoPositive, 1e-6);
+    }
+
+    /// <summary>
+    /// Clamping the far end of a part that speaks for its own pins reads the same current the
+    /// other way round, which is what a clamp meter does and what the convention is for.
+    /// </summary>
+    [Theory]
+    [InlineData("battery")]
+    [InlineData("solar cell")]
+    public void TheTwoEndsOfAReportingSourceReadEqualAndOpposite(string kind)
+    {
+        var (sim, supply, _) = Loop(Make(kind));
+
+        Assert.Equal(
+            sim.TerminalCurrent(supply.Terminals[0]),
+            -sim.TerminalCurrent(supply.Terminals[1]),
+            1e-6);
+    }
+
+    /// <summary>
+    /// A source that does not implement <see cref="ICurrentReporting"/> falls back to its branch
+    /// current, and that reads the same at both ends rather than equal and opposite.
+    /// <para>
+    /// Pinned rather than fixed, because it is the documented limit of the fallback and not a
+    /// defect in this part: a branch is a property of the whole component, and on a package with
+    /// ten driven outputs there are ten branches and no way to say which pin was meant. The
+    /// magnitude and the sign are both right for the part as a whole. What is missing is any notion
+    /// of which end you clamped — so anything that needs that asks only parts that can answer.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void TheBranchFallbackCannotTellOneEndFromTheOther()
+    {
+        var (sim, supply, r) = Loop(Make("dc source"));
+
+        Assert.IsNotAssignableFrom<ICurrentReporting>(supply);
+
+        var first = sim.TerminalCurrent(supply.Terminals[0]);
+        var second = sim.TerminalCurrent(supply.Terminals[1]);
+
+        Assert.Equal(first, second, 1e-12);
+
+        // It is still the right current, and still signed as going into the part.
+        Assert.Equal(-sim.TerminalCurrent(r.A), first, 1e-6);
     }
 }

@@ -829,6 +829,9 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     /// <summary>Raised when the rule-check window should be opened.</summary>
     public event EventHandler? RequestRuleCheck;
 
+    /// <summary>Raised for the power budget window.</summary>
+    public event EventHandler? RequestPower;
+
     /// <summary>Raised when the spectrum window should be opened.</summary>
     public event EventHandler? RequestSpectrum;
 
@@ -1344,6 +1347,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
           Shift+F3     Decode the traces as a bus
           F4           Check circuit
           Ctrl+F4      Requirements — what it is supposed to do, checked
+          Ctrl+F5      Power — what every part dissipates against what it is rated for
           Shift+F4     Tolerance analysis
           F8           Reset
 
@@ -1415,6 +1419,9 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     /// </summary>
     [RelayCommand]
     private void ShowRuleCheck() => RequestRuleCheck?.Invoke(this, EventArgs.Empty);
+
+    [RelayCommand]
+    private void ShowPower() => RequestPower?.Invoke(this, EventArgs.Empty);
 
     /// <summary>
     /// Opens the spectrum window, which transforms the traces the scope has already recorded. It

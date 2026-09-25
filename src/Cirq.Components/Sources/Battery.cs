@@ -158,8 +158,21 @@ public partial class Battery : TwoTerminalComponent, ICurrentReporting
         StateOfCharge = Math.Clamp(StateOfCharge - (deltaMilliampHours / capacity), 0.0, 1.0);
     }
 
+    /// <summary>
+    /// Current into the cell through the probed pin, which is the opposite of what it is putting
+    /// out. <see cref="OutputCurrent"/> is what the cell delivers — positive when charge is leaving
+    /// the + pin — and <see cref="ICurrentReporting"/> asks for the current going the other way,
+    /// into the part, so that clamping either end of anything reads the way a meter does.
+    /// <para>
+    /// This used to report <see cref="OutputCurrent"/> itself, with the sign of a delivering cell
+    /// backwards against every other part in the library. A current probe on a battery read the
+    /// wrong way round, the dots on its wires ran the wrong way, and nothing was obviously broken:
+    /// the magnitude was right, and a battery is the one part where "current out" is such a natural
+    /// thing to say that the reading looked correct.
+    /// </para>
+    /// </summary>
     public double TerminalCurrent(Terminal terminal, MnaSystem system, SimulationState state) =>
-        ReferenceEquals(terminal, B) ? -OutputCurrent : OutputCurrent;
+        CurrentIntoPin(terminal, -OutputCurrent);
 
     public override void ResetState()
     {

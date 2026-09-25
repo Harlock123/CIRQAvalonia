@@ -7,7 +7,7 @@ using Cirq.Core.Topology;
 namespace Cirq.Components.Passive;
 
 /// <summary>Ideal linear resistor.</summary>
-public partial class Resistor : TwoTerminalComponent, ICurrentReporting, IToleranced, INoiseSource
+public partial class Resistor : TwoTerminalComponent, ICurrentReporting, IToleranced, INoiseSource, IPowerRated
 {
     public Resistor(double resistance = 1e3)
     {
@@ -32,6 +32,10 @@ public partial class Resistor : TwoTerminalComponent, ICurrentReporting, ITolera
 
     /// <summary>The value a tolerance applies to.</summary>
     public string TolerancedProperty => nameof(Resistance);
+
+    /// <summary>Watts it can dissipate continuously in free air. A quarter watt is the commonest through-hole part, and the one somebody reaching for "a resistor" has in the drawer.</summary>
+    [ObservableProperty]
+    public partial double PowerRating { get; set; } = 0.25;
 
     public override string ComponentType => "Resistor";
 

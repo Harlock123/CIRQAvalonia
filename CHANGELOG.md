@@ -8,6 +8,36 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**A power budget: what every part is dissipating, against what it is rated for.**
+**Simulate > Power...** (`Ctrl+F5`) ranks every part by how close it is to a limit, and says what
+the circuit costs to run. A semiconductor already worried about itself — a MOSFET reports its own
+watts, models its own die and complains when it is past either. A **resistor sitting at nine tenths
+of a watt in a quarter-watt package said nothing at all**, solved perfectly, and is one of the
+commonest ways a circuit that works on screen becomes a smell on the bench. Resistors, thermistors
+and LDRs now carry a power rating; "warm" starts at half of it, which is the margin the trade has
+used for as long as there have been resistors.
+
+It **averages across a run by default**, because the instant a switching circuit happens to be
+caught at is not a summary of it: a MOSFET mid-edge is dissipating watts and the same MOSFET a
+microsecond later is dissipating milliwatts. Put a battery on the sheet and it works out how long
+the circuit runs, from the capacity on the cell.
+
+A capacitor is not counted, and that is not an omission — it stores and returns its energy rather
+than spending it, and counting volts times amps as heat would put an imaginary watt in the budget
+of every filter in the library. Parts that dissipate say so; nothing about the topology can tell a
+capacitor from a resistor.
+
+### Fixed
+
+**A current probe on a battery read backwards.** The battery reported the current it was
+*delivering* where every other part in the library reports the current going *into* it — the
+convention a clamp meter uses. So a probe clamped on a cell read the right magnitude with the wrong
+sign, and the current-flow dots on its wires ran the wrong way. It was the only part doing this, and
+the shape of the mistake is why it lasted: each end still read equal and opposite, and "current out
+of a battery" is such a natural phrase that the wrong answer looked like the right one. Only a
+comparison against its neighbours catches it, and there is now a test that makes exactly that
+comparison across all three kinds of source.
+
 **The circuit now says what it is doing, not just what it is made of.** Every net's voltage and
 every part's current can be written straight onto the schematic — **View > Show Live Values**, or
 `Ctrl+L` — and the hover card carries the same figures whether or not the annotation is on. Finding

@@ -33,8 +33,19 @@ public enum ThermistorKind
 /// switch, so a temperature-sensing circuit can be exercised while the simulation runs.
 /// </para>
 /// </summary>
-public partial class Thermistor : TwoTerminalComponent, IInteractiveComponent, ICurrentReporting
+public partial class Thermistor : TwoTerminalComponent, IInteractiveComponent, ICurrentReporting, IPowerRated
 {
+    /// <summary>
+    /// Watts it can dissipate before it is measuring its own heating rather than the room.
+    /// <para>
+    /// The figure on a thermistor is not really a rating so much as a warning: pass enough current
+    /// through it and the reading it gives you is of a part warmed by the current you are measuring
+    /// it with, which is the one failure mode a temperature sensor has that nothing else does.
+    /// </para>
+    /// </summary>
+    [ObservableProperty]
+    public partial double PowerRating { get; set; } = 0.05;
+
     /// <summary>Temperature used for "cold", in degrees Celsius.</summary>
     public const double ColdTemperature = 0.0;
 
