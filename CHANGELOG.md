@@ -8,6 +8,18 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**The file format's version number now says when it may move, and a test holds it to that.** Adding
+something — a field, a part, a parameter, a whole new section — never bumps it: a build that has
+never heard of any of those already ignores what it does not recognise and opens the rest. The
+number moves only when the *meaning* of existing data changes, which is the one case where an older
+build would read a file successfully and be confidently wrong.
+
+The distinction matters because bumping it for an addition costs everything and buys nothing: every
+build already in the world would refuse every new file, for a change those builds could have
+ignored. Six tests take a real saved circuit, edit the JSON into something a later version might
+have written, and assert it still loads cleanly — which is the only way to test against a future
+that does not exist yet.
+
 ## [0.33.3] - 2026-09-24
 
 The dialog that offers back unsaved work, which could not be read. 186 components in 16

@@ -44,6 +44,28 @@ public sealed class CircuitFormatException : Exception
 /// </summary>
 public static class CircuitSerializer
 {
+    /// <summary>
+    /// The file format's version, and the number a build refuses to read above.
+    /// <para>
+    /// <b>Adding something never moves this.</b> A new optional field, a new component type, a new
+    /// parameter on an existing one, a new kind of record — all of those are already survivable by
+    /// a build that has never heard of them: unknown JSON members are ignored on load, an unknown
+    /// component type is a warning with the rest of the circuit still opening, and an unknown value
+    /// in a known field is kept and reported rather than quietly read as something else. A circuit
+    /// saved by a newer build opens in an older one, minus the parts it cannot represent.
+    /// </para>
+    /// <para>
+    /// It moves only when the <b>meaning of existing data changes</b> — a field that used to be
+    /// ohms becoming siemens, a sign convention flipping, a list that used to be ordered no longer
+    /// being. That is the one case where an old build would read the file successfully and be
+    /// confidently wrong, and refusing it outright is better than that.
+    /// </para>
+    /// <para>
+    /// Bumping it for an addition costs everything and buys nothing: every build already in the
+    /// world would refuse every new file, for a change those builds could have ignored. The
+    /// forward-compatibility tests exist to keep that distinction honest.
+    /// </para>
+    /// </summary>
     public const int CurrentVersion = 1;
 
     public const string FileExtension = ".cirq";
