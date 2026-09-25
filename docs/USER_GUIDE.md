@@ -125,6 +125,7 @@ each row links to the section that explains it.
 | Is anything **past what it is rated for** | [Ratings](#ratings) — every part against every limit it has, watched across a run | `Ctrl` `F5` |
 | How long will it run **on a battery** | [Ratings](#ratings) — the draw, and the arithmetic on the cell's capacity | `Ctrl` `F5` |
 | Does it meet what I **said it had to do** | [Requirements](#requirements) — written down, and checked | `Ctrl` `F4` |
+| How long does this take to get **through a gate** | [Between two traces](#measurements-between-two-traces) — propagation delay, skew, setup and hold | `Ctrl` `F4` |
 | Did my edit **break something else** | [A baseline](#a-baseline) — what it produced then, against what it produces now | `Ctrl` `F8` |
 | Where is the **current actually going** | [Current flow](#watching-the-current-move) — dots on the wires, in the View menu | — |
 | What is **this node sitting at** | [Live values](#what-the-circuit-is-doing) — volts on every net and amps through every part | `Ctrl` `L` |
@@ -3525,8 +3526,12 @@ A requirement is a **name**, a **trace**, one **measurement** off it, and a **li
 | **Settling time** | How long the step took to stay within two percent of where it ended up |
 | **Pulse width** | How long the first pulse stayed high |
 | **Slew rate** | Volts per second on the fastest edge |
+| **Propagation delay** | From an edge on one trace to the next edge on another |
+| **Skew** | The worst gap between two traces that should move together |
+| **Setup time** | How long the data was stable before the clock edge |
+| **Hold time** | And how long it stayed stable after it |
 
-The last five are the ones a real specification tends to be written in. "Settles within 2 % in
+The last nine are the ones a real specification tends to be written in. "Settles within 2 % in
 10 µs" is most of what a control loop is judged on, and until now there was no way to say it.
 
 **Overshoot and settling time are answers about a step**, and they are refused for anything that is
@@ -3545,6 +3550,30 @@ reset line is specified in microseconds rather than in percent.
 An edge that happens entirely between two samples gets **no** rise time rather than an interpolated
 one. Any number produced there would be a statement about the solver's step rather than about the
 circuit; what is true is that the edge is faster than this can resolve.
+
+### Measurements between two traces
+
+The last four need a second trace, and the row grows a **from** box when you pick one of them. A
+propagation delay is the gap between one signal moving and another moving because of it, so naming
+one trace is only half of the question.
+
+This is the number every logic datasheet leads with, and a library shipping twenty-one 74xx parts
+and fifteen 40xx parts had no way to measure it. Probe either side of a gate, and "this has to
+respond inside 40 ns" becomes a sentence the circuit can be held to.
+
+- **Propagation delay** times from any edge to any edge by default, so an inverting stage measures
+  the same as a non-inverting one. The time between them is the time between them.
+- **Skew** is the worst pairing across the capture, since it is a limit. Each edge is matched with
+  the nearest one going the same way on the other trace, and a pairing more than half a cycle apart
+  is thrown out as belonging to a different cycle — which is what stops an edge whose partner falls
+  past the end of the capture from reporting very nearly a whole period of skew.
+- **Setup** and **hold** are the tightest that occurred, not the average, because a part demands a
+  minimum and what matters is the closest the design came to breaking it.
+
+All four rest on the same question — when did this trace cross its own midpoint, and which way was
+it going — with the same hysteresis the single-trace measurements use. Without it a signal with a
+wobble on it crosses its midpoint many times per edge, and every one of these becomes a measurement
+of the noise.
 
 Press **Check** and each one comes back met, not met, or with nothing to measure. The third is not
 the second: a frequency that needed two cycles and got one has not been shown to be wrong, and

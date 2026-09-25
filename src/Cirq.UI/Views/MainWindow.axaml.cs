@@ -299,8 +299,8 @@ public partial class MainWindow : Window
                 _viewModel.Circuit.Title.Length > 0 ? _viewModel.Circuit.Title : "Circuit",
                 Notes: string.Empty,
                 Schematic: SchematicSvg(_viewModel.Circuit),
-                Specs: SpecCheck.EvaluateAll(
-                    _viewModel.Circuit.Specs, SpecsViewModel.Measurement(_viewModel.Circuit)),
+                Specs: SpecCheck.EvaluateAllFrom(
+                    _viewModel.Circuit.Specs, SpecsViewModel.Samples(_viewModel.Circuit)),
                 Explanations: CircuitExplainer.Explain(_viewModel.Circuit));
 
             DesignReport.Write(_viewModel.Circuit, report, path);

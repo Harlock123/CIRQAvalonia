@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using Cirq.Core.Primitives;
 using Cirq.Core.Probing;
 using Cirq.Core.Topology;
 using Cirq.Core.Verification;
@@ -16,12 +17,26 @@ public sealed partial class SpecRowViewModel : ObservableObject
     public SpecRowViewModel(DesignSpec spec)
     {
         Spec = spec;
+
+        // The second picker appears and disappears with the quantity, and the quantity is on the
+        // spec rather than on this — so the row has to hear about it to re-ask.
+        spec.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(DesignSpec.Quantity))
+                OnPropertyChanged(nameof(NeedsSecondTrace));
+        };
     }
 
     public DesignSpec Spec { get; }
 
     [ObservableProperty]
     public partial SpecResult? Result { get; set; }
+
+    /// <summary>
+    /// True for the measurements that are between two traces, so the row can offer the second
+    /// picker and hide it the rest of the time.
+    /// </summary>
+    public bool NeedsSecondTrace => SpecPairs.NeedsTwo(Spec.Quantity);
 
     /// <summary>"Met", "Not met", or a dash when there was nothing to measure.</summary>
     public string Verdict => Result?.Passed switch
@@ -147,7 +162,7 @@ public sealed partial class SpecsViewModel : ObservableObject
     [RelayCommand]
     public void Check()
     {
-        var results = SpecCheck.EvaluateAll(Rows.Select(r => r.Spec), Measure);
+        var results = SpecCheck.EvaluateAllFrom(Rows.Select(r => r.Spec), Samples(_circuit));
 
         var byId = results.ToDictionary(r => r.Spec.Id);
 
@@ -159,7 +174,22 @@ public sealed partial class SpecsViewModel : ObservableObject
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
-    private TraceMeasurements? Measure(string label) => Measurement(_circuit)(label);
+    /// <summary>
+    /// The samples a trace has recorded, which is what a requirement needing two traces has to be
+    /// given. Null for a trace that is not there; an empty list for one that is there and has
+    /// recorded nothing, which is a different answer — see <see cref="Measurement"/>.
+    /// </summary>
+    public static Func<string, IReadOnlyList<DataPoint>?> Samples(Circuit circuit)
+    {
+        ArgumentNullException.ThrowIfNull(circuit);
+
+        return label =>
+        {
+            var probe = circuit.Probes.FirstOrDefault(p => p.Label == label);
+
+            return probe is null ? null : probe.HistoryBuffer.ToArray();
+        };
+    }
 
     /// <summary>
     /// How a requirement gets at what a trace did: across the whole recording rather than the

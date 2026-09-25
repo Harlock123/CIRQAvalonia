@@ -62,6 +62,16 @@
                               SelectedValueBinding="{Binding Value}"
                               SelectedValue="{Binding Spec.Quantity, Mode=TwoWay}" />
 
+                    <!-- Only for the measurements that need a second trace, which is why it is
+                         hidden rather than left empty: a box nobody can fill in usefully is a box
+                         that invites somebody to try. -->
+                    <TextBlock Text="from" VerticalAlignment="Center" Opacity="0.6"
+                               IsVisible="{Binding NeedsSecondTrace}" />
+                    <ComboBox Width="110"
+                              IsVisible="{Binding NeedsSecondTrace}"
+                              ItemsSource="{Binding $parent[Window].((vm:SpecsViewModel)DataContext).Traces}"
+                              SelectedItem="{Binding Spec.Against, Mode=TwoWay}" />
+
                     <ComboBox Width="100"
                               ItemsSource="{x:Static vm:SpecsViewModel.Comparisons}"
                               DisplayMemberBinding="{Binding Label}"

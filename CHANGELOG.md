@@ -8,6 +8,21 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**Timing between two traces: propagation delay, skew, setup and hold.** Every measurement here was
+about a single waveform, and the most-quoted number on any logic datasheet is not — a propagation
+delay is the gap between one signal moving and another moving because of it. A library shipping
+twenty-one 74xx parts, fifteen 40xx parts and an event scheduler had no way to measure the figure
+those parts are sold on.
+
+A requirement using one of the four grows a **from** box for the second trace, so "this gate has to
+respond inside 40 ns" is now a sentence a circuit can be held to. Probe either side of a real gate
+and the delay measures back as the one the part was given.
+
+Skew is the worst pairing across the capture, matched nearest-edge but rejecting any pairing more
+than half a cycle apart. Both simpler rules were tried and both break at an end of the capture:
+pairing purely by nearest lets an edge whose partner falls outside the window pair with the previous
+cycle's, and two traces twelve nanoseconds apart come back as nearly a whole period.
+
 **One list of everything outside its ratings.** **Simulate > Ratings...** (`Ctrl+F5`, and what the
 Power window has become) gathers every limit in the circuit into one place, grouped by part.
 

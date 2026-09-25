@@ -1,3 +1,4 @@
+using Cirq.Core.Primitives;
 using Cirq.Core.Probing;
 using Cirq.Core.Units;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -55,6 +56,37 @@ public enum SpecQuantity
 
     /// <summary>Volts per second on the fastest edge — what an op-amp is sold on.</summary>
     SlewRate,
+
+    /// <summary>
+    /// Seconds from an edge on <see cref="DesignSpec.Against"/> to the next edge on
+    /// <see cref="DesignSpec.Trace"/> — the number on the front of every logic datasheet.
+    /// </summary>
+    PropagationDelay,
+
+    /// <summary>
+    /// The worst gap between two traces that are supposed to move together, in seconds. What a
+    /// clock distribution is judged on.
+    /// </summary>
+    Skew,
+
+    /// <summary>
+    /// How long the trace was already stable before the clock edge on <see cref="DesignSpec.Against"/>.
+    /// The tightest one that occurred, because a setup time is a minimum a part demands.
+    /// </summary>
+    SetupTime,
+
+    /// <summary>And how long it stayed stable after that edge.</summary>
+    HoldTime,
+}
+
+/// <summary>Which quantities need a second trace to mean anything.</summary>
+public static class SpecPairs
+{
+    public static bool NeedsTwo(SpecQuantity quantity) => quantity
+        is SpecQuantity.PropagationDelay
+        or SpecQuantity.Skew
+        or SpecQuantity.SetupTime
+        or SpecQuantity.HoldTime;
 }
 
 /// <summary>
@@ -82,6 +114,10 @@ public static class SpecWords
         SpecQuantity.SettlingTime => "settling time",
         SpecQuantity.PulseWidth => "pulse width",
         SpecQuantity.SlewRate => "slew rate",
+        SpecQuantity.PropagationDelay => "propagation delay",
+        SpecQuantity.Skew => "skew",
+        SpecQuantity.SetupTime => "setup time",
+        SpecQuantity.HoldTime => "hold time",
         _ => quantity.ToString(),
     };
 
@@ -133,6 +169,14 @@ public partial class DesignSpec : ObservableObject
     [ObservableProperty]
     public partial string Trace { get; set; } = string.Empty;
 
+    /// <summary>
+    /// The second trace, for the measurements that need one — the input a delay is timed from, the
+    /// clock a setup time is measured against, the other half of a skew. Empty for everything else,
+    /// and ignored there.
+    /// </summary>
+    [ObservableProperty]
+    public partial string Against { get; set; } = string.Empty;
+
     [ObservableProperty]
     public partial SpecQuantity Quantity { get; set; } = SpecQuantity.PeakToPeak;
 
@@ -163,7 +207,9 @@ public partial class DesignSpec : ObservableObject
         _ => $"{Label} within {Format(Tolerance)} of {Format(Limit)}",
     };
 
-    private string Label => $"{Trace} {SpecWords.Of(Quantity)}";
+    private string Label => SpecPairs.NeedsTwo(Quantity) && Against.Length > 0
+        ? $"{Trace} {SpecWords.Of(Quantity)} from {Against}"
+        : $"{Trace} {SpecWords.Of(Quantity)}";
 
     internal string Format(double value) => SiPrefix.Format(value, Unit);
 }
@@ -245,6 +291,12 @@ public static class SpecCheck
                 "waveform than the scope has recorded.");
         }
 
+        return Judge(spec, measured);
+    }
+
+    /// <summary>The verdict and its wording, once there is a number to hold against the limit.</summary>
+    private static SpecResult Judge(DesignSpec spec, double measured)
+    {
         var passed = spec.Comparison switch
         {
             SpecComparison.AtMost => measured <= spec.Limit,
@@ -269,6 +321,88 @@ public static class SpecCheck
         ArgumentNullException.ThrowIfNull(lookup);
 
         return [.. specs.Where(s => s.IsEnabled).Select(s => Evaluate(s, lookup(s.Trace)))];
+    }
+
+    /// <summary>
+    /// The same, given the samples rather than the measurements — which is what the measurements
+    /// that need two traces require.
+    /// <para>
+    /// A separate entry point rather than a change to the one above, because most requirements are
+    /// about one trace and most callers already have its measurements. This one measures what it
+    /// needs from the samples it is handed, which is the only way a delay between two traces can be
+    /// asked for at all.
+    /// </para>
+    /// </summary>
+    public static IReadOnlyList<SpecResult> EvaluateAllFrom(
+        IEnumerable<DesignSpec> specs, Func<string, IReadOnlyList<DataPoint>?> samples)
+    {
+        ArgumentNullException.ThrowIfNull(specs);
+        ArgumentNullException.ThrowIfNull(samples);
+
+        return [.. specs.Where(s => s.IsEnabled).Select(s => EvaluateFrom(s, samples))];
+    }
+
+    /// <summary>
+    /// Holds one specification against the traces it names, measuring them itself.
+    /// <para>
+    /// Named apart from <see cref="Evaluate(DesignSpec, TraceMeasurements?)"/> rather than
+    /// overloading it. Both second arguments are nullable reference types, so <c>Evaluate(spec,
+    /// null)</c> — which is how a caller says "there is no such trace", and which several tests
+    /// say — stops compiling the moment the second one exists. An overload set where passing null
+    /// is ambiguous is an overload set that will be got wrong.
+    /// </para>
+    /// </summary>
+    public static SpecResult EvaluateFrom(DesignSpec spec, Func<string, IReadOnlyList<DataPoint>?> samples)
+    {
+        ArgumentNullException.ThrowIfNull(spec);
+        ArgumentNullException.ThrowIfNull(samples);
+
+        if (!SpecPairs.NeedsTwo(spec.Quantity))
+        {
+            var found = samples(spec.Trace);
+
+            return Evaluate(spec, found is null ? null : TraceMeasurements.OfAll(found));
+        }
+
+        var subject = samples(spec.Trace);
+        var against = spec.Against.Length == 0 ? null : samples(spec.Against);
+
+        if (subject is null)
+        {
+            return new SpecResult(spec, null, null,
+                $"No trace called \"{spec.Trace}\" — probe it, or point the requirement at one " +
+                "that is there.");
+        }
+
+        if (spec.Against.Length == 0)
+        {
+            return new SpecResult(spec, null, null,
+                $"{SpecWords.Of(spec.Quantity)} is measured between two traces, and this " +
+                "requirement names only one. Say which trace it is against.");
+        }
+
+        if (against is null)
+        {
+            return new SpecResult(spec, null, null,
+                $"No trace called \"{spec.Against}\" to measure against.");
+        }
+
+        var measured = spec.Quantity switch
+        {
+            SpecQuantity.PropagationDelay => TraceTiming.PropagationDelay(against, subject),
+            SpecQuantity.Skew => TraceTiming.Skew(subject, against),
+            SpecQuantity.SetupTime => TraceTiming.SetupTime(subject, against),
+            _ => TraceTiming.HoldTime(subject, against),
+        };
+
+        if (measured is not { } value)
+        {
+            return new SpecResult(spec, null, null,
+                $"Nothing to measure yet: {SpecWords.Of(spec.Quantity)} needs an edge on each " +
+                "trace, in the right order, and the scope has not recorded one.");
+        }
+
+        return Judge(spec, value);
     }
 
     /// <summary>

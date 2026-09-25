@@ -101,6 +101,13 @@ public sealed class SpecRecord
     /// <summary>The probe label this requirement measures.</summary>
     public string Trace { get; set; } = string.Empty;
 
+    /// <summary>
+    /// The second probe, for the measurements that need one. Null in every file written before
+    /// those existed, and in every requirement that does not use one.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Against { get; set; }
+
     /// <summary>Stored by name so a new quantity can be added without moving the others.</summary>
     public string Quantity { get; set; } = nameof(Cirq.Core.Verification.SpecQuantity.PeakToPeak);
 
