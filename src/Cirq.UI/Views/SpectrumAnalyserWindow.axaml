@@ -26,14 +26,14 @@
 
         <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
           <TextBlock Text="Window" VerticalAlignment="Center" />
-          <ComboBox Width="150" SelectedItem="{Binding Window, Mode=TwoWay}"
+          <ComboBox AutomationProperties.Name="Window function" Width="150" SelectedItem="{Binding Window, Mode=TwoWay}"
                     ItemsSource="{Binding Source={x:Static vm:SpectrumViewModel.WindowOptions}}"
                     ToolTip.Tip="How the block is tapered before transforming. Hann is the general-purpose choice; Blackman-Harris picks a small component out from beside a large one; Rectangular is right only when the block holds a whole number of cycles." />
         </StackPanel>
 
         <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
           <TextBlock Text="Points" VerticalAlignment="Center" />
-          <ComboBox Width="90" SelectedItem="{Binding Size, Mode=TwoWay}"
+          <ComboBox AutomationProperties.Name="Transform size" Width="90" SelectedItem="{Binding Size, Mode=TwoWay}"
                     ItemsSource="{Binding Source={x:Static vm:SpectrumViewModel.SizeOptions}}"
                     ToolTip.Tip="More points is finer resolution over a longer stretch of signal; fewer follows a changing signal more closely." />
         </StackPanel>
@@ -43,14 +43,14 @@
 
         <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
           <TextBlock Text="Harmonics" VerticalAlignment="Center" />
-          <ComboBox Width="70" SelectedItem="{Binding HarmonicCount, Mode=TwoWay}"
+          <ComboBox AutomationProperties.Name="Harmonics to measure" Width="70" SelectedItem="{Binding HarmonicCount, Mode=TwoWay}"
                     ItemsSource="{Binding Source={x:Static vm:SpectrumViewModel.HarmonicCountOptions}}"
                     ToolTip.Tip="How many multiples of the fundamental to measure. Past the ninth they are usually below the floor, and on anything but a low fundamental they have run past the Nyquist limit anyway." />
         </StackPanel>
 
         <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
           <TextBlock Text="Fundamental" VerticalAlignment="Center" />
-          <TextBox Width="90" Text="{Binding FundamentalHz, Mode=TwoWay}"
+          <TextBox AutomationProperties.Name="Fundamental frequency, in hertz" Width="90" Text="{Binding FundamentalHz, Mode=TwoWay}"
                    PlaceholderText="auto" MinHeight="0" Padding="6,3"
                    ToolTip.Tip="The frequency to measure distortion against, in hertz. Leave at 0 to take the largest component — but state it when you know it: at heavy distortion a harmonic can be the biggest thing in the spectrum, and then the automatic answer is about a different question." />
         </StackPanel>

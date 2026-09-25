@@ -13,9 +13,9 @@
     <TextBlock Text="Ambient temperature" FontWeight="SemiBold" />
 
     <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-      <Slider Width="300" Minimum="-55" Maximum="175" TickFrequency="5" IsSnapToTickEnabled="True"
+      <Slider AutomationProperties.Name="Ambient temperature, in degrees Celsius" Width="300" Minimum="-55" Maximum="175" TickFrequency="5" IsSnapToTickEnabled="True"
               Value="{Binding AmbientCelsius, Mode=TwoWay}" VerticalAlignment="Center" />
-      <TextBox Width="72" Text="{Binding AmbientCelsius, Mode=TwoWay}" VerticalAlignment="Center" />
+      <TextBox AutomationProperties.Name="Ambient temperature, in degrees Celsius" Width="72" Text="{Binding AmbientCelsius, Mode=TwoWay}" VerticalAlignment="Center" />
       <TextBlock Text="°C" VerticalAlignment="Center" Opacity="0.7" />
       <Button Content="27 °C" Command="{Binding ResetCommand}" Padding="10,4" />
     </StackPanel>

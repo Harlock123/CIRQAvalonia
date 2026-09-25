@@ -14,7 +14,7 @@
          often as for the name of a circuit they half remember. -->
     <Border DockPanel.Dock="Top" Padding="14,12"
             BorderBrush="{DynamicResource PanelBorder}" BorderThickness="0,0,0,1">
-      <TextBox Name="SearchBox" PlaceholderText="Search examples..."
+      <TextBox AutomationProperties.Name="Search the examples" Name="SearchBox" PlaceholderText="Search examples..."
                Text="{Binding Search, Mode=TwoWay}" />
     </Border>
 
@@ -38,7 +38,11 @@
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:ExampleGroupViewModel">
                 <StackPanel>
-                  <ToggleButton Classes="groupHeader" IsChecked="{Binding IsExpanded, Mode=TwoWay}">
+                  <!-- Named from the data, because the content is a layout rather than a word: a screen
+                       reader reading this row would otherwise announce a chevron, a name and a
+                       count as three unrelated pieces of text. -->
+                  <ToggleButton Classes="groupHeader" IsChecked="{Binding IsExpanded, Mode=TwoWay}"
+                                AutomationProperties.Name="{Binding Name}">
                     <Grid ColumnDefinitions="14,*,Auto">
                       <TextBlock Text="{Binding Chevron}" FontSize="9"
                                  Foreground="{DynamicResource TextMuted}"

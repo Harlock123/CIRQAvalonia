@@ -33,7 +33,7 @@
 
         <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
           <TextBlock Text="Note" VerticalAlignment="Center" Opacity="0.8" FontSize="12" />
-          <TextBox Text="{Binding Note, Mode=TwoWay}" Width="260"
+          <TextBox AutomationProperties.Name="A note about this baseline" Text="{Binding Note, Mode=TwoWay}" Width="260"
                    PlaceholderText="what this run was, for whoever reads it later" />
         </StackPanel>
       </DockPanel>

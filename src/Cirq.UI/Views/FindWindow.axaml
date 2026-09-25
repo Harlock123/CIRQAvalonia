@@ -11,7 +11,7 @@
 
   <DockPanel Margin="14">
 
-    <TextBox DockPanel.Dock="Top" Name="Term" Text="{Binding Term, Mode=TwoWay}"
+    <TextBox AutomationProperties.Name="What to find on the sheet" DockPanel.Dock="Top" Name="Term" Text="{Binding Term, Mode=TwoWay}"
              PlaceholderText="R17, 4k7, Resistor, VCC…" FontSize="15" Padding="8,6" />
 
     <!-- Escape closes it and Enter goes to the top match; this is the half somebody can see,
@@ -22,7 +22,7 @@
       <Button Grid.Column="1" Name="CloseButton" Content="Close" MinWidth="88" Padding="14,5" />
     </Grid>
 
-    <ListBox Name="Results" Margin="0,10,0,0"
+    <ListBox AutomationProperties.Name="What was found" Name="Results" Margin="0,10,0,0"
              ItemsSource="{Binding Matches}"
              SelectedItem="{Binding Selected, Mode=TwoWay}"
              Background="Transparent">

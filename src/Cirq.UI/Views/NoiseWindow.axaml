@@ -24,18 +24,18 @@
             BorderBrush="{DynamicResource PanelBorder}" BorderThickness="0,0,0,1">
       <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
         <TextBlock Text="Output" VerticalAlignment="Center" />
-        <ComboBox Width="180" ItemsSource="{Binding Outputs}"
+        <ComboBox AutomationProperties.Name="Output to measure the noise at" Width="180" ItemsSource="{Binding Outputs}"
                   SelectedItem="{Binding Output, Mode=TwoWay}"
                   ToolTip.Tip="The node whose noise is being measured. Every generator in the circuit is referred to this point." />
 
         <TextBlock Text="from" VerticalAlignment="Center" Opacity="0.7" />
-        <TextBox Width="90" Text="{Binding StartHz, Mode=TwoWay}" />
+        <TextBox AutomationProperties.Name="Sweep from, in hertz" Width="90" Text="{Binding StartHz, Mode=TwoWay}" />
         <TextBlock Text="to" VerticalAlignment="Center" Opacity="0.7" />
-        <TextBox Width="90" Text="{Binding StopHz, Mode=TwoWay}" />
+        <TextBox AutomationProperties.Name="Sweep to, in hertz" Width="90" Text="{Binding StopHz, Mode=TwoWay}" />
         <TextBlock Text="Hz" VerticalAlignment="Center" Opacity="0.7" />
 
         <TextBlock Text="at" VerticalAlignment="Center" Opacity="0.7" />
-        <TextBox Width="52" Text="{Binding PointsPerDecade, Mode=TwoWay}" />
+        <TextBox AutomationProperties.Name="Points per decade" Width="52" Text="{Binding PointsPerDecade, Mode=TwoWay}" />
         <TextBlock Text="per decade" VerticalAlignment="Center" Opacity="0.7" />
 
         <Button Content="Measure" Command="{Binding RunCommand}" IsEnabled="{Binding !IsBusy}"

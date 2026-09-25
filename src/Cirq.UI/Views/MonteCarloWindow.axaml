@@ -25,19 +25,19 @@
 
         <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
           <TextBlock Text="Trials" VerticalAlignment="Center" />
-          <TextBox Width="74" Text="{Binding Trials, Mode=TwoWay}"
+          <TextBox AutomationProperties.Name="Number of builds" Width="74" Text="{Binding Trials, Mode=TwoWay}"
                    ToolTip.Tip="How many circuits to build and solve. A few hundred is enough to see the shape; a few thousand to see the corners." />
         </StackPanel>
 
         <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
           <TextBlock Text="Seed" VerticalAlignment="Center" />
-          <TextBox Width="60" Text="{Binding Seed, Mode=TwoWay}"
+          <TextBox AutomationProperties.Name="Random seed" Width="60" Text="{Binding Seed, Mode=TwoWay}"
                    ToolTip.Tip="The same seed gives exactly the same run. Change it for a different draw of the same parts." />
         </StackPanel>
 
         <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
           <TextBlock Text="Accept within ±" VerticalAlignment="Center" />
-          <TextBox Width="52" Text="{Binding AcceptableBandPercent, Mode=TwoWay}" />
+          <TextBox AutomationProperties.Name="Acceptable band, as a percentage" Width="52" Text="{Binding AcceptableBandPercent, Mode=TwoWay}" />
           <TextBlock Text="% of nominal" VerticalAlignment="Center" Opacity="0.7" />
         </StackPanel>
 
@@ -94,7 +94,7 @@
             <TextBlock Grid.Column="5" Text="IN SPEC" FontSize="10" Opacity="0.55" />
           </Grid>
 
-          <ListBox ItemsSource="{Binding Rows}" SelectedItem="{Binding Selected, Mode=TwoWay}"
+          <ListBox AutomationProperties.Name="Results, one per measurement" ItemsSource="{Binding Rows}" SelectedItem="{Binding Selected, Mode=TwoWay}"
                    Background="Transparent" MaxHeight="150">
             <ListBox.ItemTemplate>
               <DataTemplate>

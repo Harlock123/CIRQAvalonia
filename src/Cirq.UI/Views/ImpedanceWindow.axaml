@@ -24,15 +24,15 @@
             BorderBrush="{DynamicResource PanelBorder}" BorderThickness="0,0,0,1">
       <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
         <TextBlock Text="Look into" VerticalAlignment="Center" />
-        <ComboBox Width="160" ItemsSource="{Binding Probes}"
+        <ComboBox AutomationProperties.Name="Point to measure the impedance at" Width="160" ItemsSource="{Binding Probes}"
                   SelectedItem="{Binding Probe, Mode=TwoWay}"
                   DisplayMemberBinding="{Binding Label}"
                   ToolTip.Tip="The point to measure the impedance of. A probe with a reference is measured between its two points; one without is measured against ground." />
 
         <TextBlock Text="from" VerticalAlignment="Center" Opacity="0.7" />
-        <TextBox Width="80" Text="{Binding StartHz, Mode=TwoWay}" />
+        <TextBox AutomationProperties.Name="Sweep from, in hertz" Width="80" Text="{Binding StartHz, Mode=TwoWay}" />
         <TextBlock Text="to" VerticalAlignment="Center" Opacity="0.7" />
-        <TextBox Width="80" Text="{Binding StopHz, Mode=TwoWay}" />
+        <TextBox AutomationProperties.Name="Sweep to, in hertz" Width="80" Text="{Binding StopHz, Mode=TwoWay}" />
         <TextBlock Text="Hz" VerticalAlignment="Center" Opacity="0.7" />
 
         <Button Content="Measure" Command="{Binding RunCommand}" IsEnabled="{Binding !IsBusy}"

@@ -8,6 +8,18 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**Every control a person can operate now has a name a screen reader can read out.** There were
+none. Sixty-three of the application's hundred and ten interactive controls announced themselves as
+nothing at all — every number box in every analysis window, every picker, the temperature slider,
+the lists of findings. A button with a word on it gets a name from the word; a box you type a
+frequency into has no word, and the label beside it is separate text with no connection anything can
+follow.
+
+This is the other half of the keyboard work in 0.35.0: making the sheet operable without a mouse is
+not much use to somebody who cannot see which control they have landed on. A test walks every
+window and fails on a control that would announce nothing, and on one named after its own type,
+which passes the first check and tells nobody anything.
+
 **Large circuits are eight to twelve times faster.** A circuit matrix is nearly empty — three
 entries a row, under half a percent full — and the solver was eliminating it densely, which is N³
 and spends almost all of its time subtracting zero. Measured on a ladder that refactors every

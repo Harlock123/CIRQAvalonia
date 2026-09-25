@@ -24,14 +24,14 @@
             BorderBrush="{DynamicResource PanelBorder}" BorderThickness="0,0,0,1">
       <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
         <TextBlock Text="Break at" VerticalAlignment="Center" />
-        <ComboBox Width="150" ItemsSource="{Binding Probes}"
+        <ComboBox AutomationProperties.Name="Where the loop is broken" Width="150" ItemsSource="{Binding Probes}"
                   SelectedItem="{Binding Probe, Mode=TwoWay}"
                   ToolTip.Tip="Which loop probe to open. Break the loop where the impedance looking forward is much higher than the impedance looking back — an op-amp input is ideal, an op-amp output is not." />
 
         <TextBlock Text="from" VerticalAlignment="Center" Opacity="0.7" />
-        <TextBox Width="80" Text="{Binding StartHz, Mode=TwoWay}" />
+        <TextBox AutomationProperties.Name="Sweep from, in hertz" Width="80" Text="{Binding StartHz, Mode=TwoWay}" />
         <TextBlock Text="to" VerticalAlignment="Center" Opacity="0.7" />
-        <TextBox Width="80" Text="{Binding StopHz, Mode=TwoWay}" />
+        <TextBox AutomationProperties.Name="Sweep to, in hertz" Width="80" Text="{Binding StopHz, Mode=TwoWay}" />
         <TextBlock Text="Hz" VerticalAlignment="Center" Opacity="0.7" />
 
         <Button Content="Measure" Command="{Binding RunCommand}" IsEnabled="{Binding !IsBusy}"

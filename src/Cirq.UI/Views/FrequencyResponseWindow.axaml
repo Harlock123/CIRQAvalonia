@@ -30,19 +30,19 @@
 
           <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
             <TextBlock Text="From" VerticalAlignment="Center" />
-            <TextBox Width="92" Text="{Binding StartHz, Mode=TwoWay}" />
+            <TextBox AutomationProperties.Name="Sweep from, in hertz" Width="92" Text="{Binding StartHz, Mode=TwoWay}" />
             <TextBlock Text="Hz" VerticalAlignment="Center" Opacity="0.7" />
           </StackPanel>
 
           <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
             <TextBlock Text="to" VerticalAlignment="Center" />
-            <TextBox Width="92" Text="{Binding StopHz, Mode=TwoWay}" />
+            <TextBox AutomationProperties.Name="Sweep to, in hertz" Width="92" Text="{Binding StopHz, Mode=TwoWay}" />
             <TextBlock Text="Hz" VerticalAlignment="Center" Opacity="0.7" />
           </StackPanel>
 
           <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
             <TextBlock Text="Points / decade" VerticalAlignment="Center" />
-            <TextBox Width="58" Text="{Binding PointsPerDecade, Mode=TwoWay}" />
+            <TextBox AutomationProperties.Name="Points per decade" Width="58" Text="{Binding PointsPerDecade, Mode=TwoWay}" />
           </StackPanel>
 
           <Button Content="Sweep" Command="{Binding RunCommand}" IsEnabled="{Binding !IsBusy}"
@@ -56,21 +56,21 @@
                     VerticalAlignment="Center"
                     ToolTip.Tip="Run the whole sweep once per value, and put every curve on the same axes" />
 
-          <ComboBox Width="210" ItemsSource="{Binding Parameters}"
+          <ComboBox AutomationProperties.Name="What to step" Width="210" ItemsSource="{Binding Parameters}"
                     SelectedItem="{Binding Step, Mode=TwoWay}"
                     IsEnabled="{Binding IsStepping}"
                     DisplayMemberBinding="{Binding Display}" />
 
           <TextBlock Text="from" VerticalAlignment="Center" Opacity="0.7" />
-          <TextBox Width="80" Text="{Binding StepStart, Mode=TwoWay}"
+          <TextBox AutomationProperties.Name="Step from" Width="80" Text="{Binding StepStart, Mode=TwoWay}"
                    IsEnabled="{Binding IsStepping}" />
 
           <TextBlock Text="to" VerticalAlignment="Center" Opacity="0.7" />
-          <TextBox Width="80" Text="{Binding StepStop, Mode=TwoWay}"
+          <TextBox AutomationProperties.Name="Step to" Width="80" Text="{Binding StepStop, Mode=TwoWay}"
                    IsEnabled="{Binding IsStepping}" />
 
           <TextBlock Text="in" VerticalAlignment="Center" Opacity="0.7" />
-          <TextBox Width="48" Text="{Binding StepCount, Mode=TwoWay}"
+          <TextBox AutomationProperties.Name="Number of curves" Width="48" Text="{Binding StepCount, Mode=TwoWay}"
                    IsEnabled="{Binding IsStepping}" />
           <TextBlock Text="steps" VerticalAlignment="Center" Opacity="0.7" />
         </StackPanel>

@@ -24,13 +24,13 @@
             BorderBrush="{DynamicResource PanelBorder}" BorderThickness="0,0,0,1">
       <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
         <TextBlock Text="From" VerticalAlignment="Center" />
-        <ComboBox Width="150" ItemsSource="{Binding Inputs}"
+        <ComboBox AutomationProperties.Name="Input the zeros are measured from" Width="150" ItemsSource="{Binding Inputs}"
                   SelectedItem="{Binding Input, Mode=TwoWay}"
                   DisplayMemberBinding="{Binding Name}"
                   ToolTip.Tip="The source a transfer function goes in at. Only the zeros need it: the poles belong to the circuit however it is driven." />
 
         <TextBlock Text="to" VerticalAlignment="Center" Opacity="0.7" />
-        <ComboBox Width="150" ItemsSource="{Binding Outputs}"
+        <ComboBox AutomationProperties.Name="Output to analyse" Width="150" ItemsSource="{Binding Outputs}"
                   SelectedItem="{Binding Output, Mode=TwoWay}"
                   DisplayMemberBinding="{Binding Label}"
                   ToolTip.Tip="The probe the transfer function comes out at." />

@@ -279,6 +279,12 @@ Everything that changes the drawing used to need a pointer. Three keys cover it:
 - **Enter** drops the armed part in the middle of the view. With `Ctrl+F` to search the palette and
   **Enter** there to arm the first match, a part can be found and placed without touching a mouse.
 
+Every control that takes input — every number box, every picker, the temperature slider, the lists
+of findings — carries a name for a screen reader to read out. There were none before: a button with
+a word on it announces the word, but a box you type a frequency into has no word, and the label
+beside it is separate text with no connection anything can follow. Sixty-three of the application's
+hundred and ten interactive controls announced themselves as nothing at all.
+
 Notes and headings are skipped when stepping. They are on the drawing rather than in the circuit,
 and stepping through eight of them to reach a resistor is not stepping through the parts.
 

@@ -29,7 +29,7 @@
                  Text="Pick one to light its parts up on the drawing." />
     </StackPanel>
 
-    <ListBox ItemsSource="{Binding Found}" SelectedItem="{Binding Selected, Mode=TwoWay}"
+    <ListBox AutomationProperties.Name="What was recognised in the circuit" ItemsSource="{Binding Found}" SelectedItem="{Binding Selected, Mode=TwoWay}"
              Background="Transparent">
       <ListBox.ItemTemplate>
         <DataTemplate x:DataType="ex:Explanation">

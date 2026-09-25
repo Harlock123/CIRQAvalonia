@@ -36,7 +36,7 @@
                Opacity="0.7" TextAlignment="Center"
                Text="No problems found.&#x0a;&#x0a;This checks the wiring — grounds, supplies, floating pins,&#x0a;clashing outputs and net labels. Parts report their own&#x0a;faults on the canvas while the circuit runs." />
 
-    <ListBox ItemsSource="{Binding Rows}" SelectedItem="{Binding Selected, Mode=TwoWay}"
+    <ListBox AutomationProperties.Name="What the check found" ItemsSource="{Binding Rows}" SelectedItem="{Binding Selected, Mode=TwoWay}"
              IsVisible="{Binding !IsClean}" Background="Transparent">
       <ListBox.ItemTemplate>
         <DataTemplate>

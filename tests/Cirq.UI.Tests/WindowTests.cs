@@ -42,6 +42,8 @@ public class WindowTests(WindowSession session)
         "PoleZero", "Ratings",
         "RuleCheck", "Specs", "SpectrumAnalyser", "Stability", "TransientStep");
 
+    internal static Window BuildForTest(string name) => Build(name);
+
     private static Window Build(string name)
     {
         var circuit = Simple();
