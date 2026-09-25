@@ -21,7 +21,7 @@ CirqAvalonia.slnx
 └── tests/
     ├── Cirq.Engine.Tests/      Solver accuracy against closed-form solutions
     ├── Cirq.Components.Tests/  Behavioural tests for every analog and logic device
-    └── Cirq.UI.Tests/          View-model and controller integration
+    └── Cirq.UI.Tests/          View models, controllers, and every window opened for real
 ```
 
 `Cirq.Core` holds the stamping contract (`MnaSystem`, `SimulationState`) so components can
@@ -32,7 +32,7 @@ Core ← Engine ← Components ← UI, which keeps the whole engine headless-tes
 
 ```bash
 dotnet run --project src/Cirq.UI     # the editor
-dotnet test                          # 2450 tests
+dotnet test                          # 3428 tests
 ./scripts/build-guide.sh             # the user guide as a PDF
 ```
 
@@ -283,6 +283,21 @@ in: **overshoot**, **settling time** to two percent, fall time, pulse width and 
 two are refused for anything that is not a step, because the arithmetic would happily produce an
 overshoot for a sine and it would mean nothing.
 
+**Timing between two traces** — propagation delay, skew, setup and hold — is the other half of a
+mixed-signal simulator's measurements. Everything else here is about a single waveform, and the
+number every logic datasheet leads with is not: a delay is the gap between one signal moving and
+another moving because of it. Skew is matched nearest-edge with a half-cycle guard, because pairing
+purely by nearest lets an edge whose partner falls past the end of the capture pair with the
+previous cycle's, and two traces twelve nanoseconds apart come back as nearly a whole period.
+
+**Parameters** let the circuit name a number, so that several parts are set from one place: type `=`
+and the name into any of a part's numbers — `=Rf`, `=Rf / 10`, `=1 / (2 * pi * R * fc)`. A design is
+a handful of choices and a great many consequences of them, and typed as literals the consequences
+stop being consequences the first time a choice changes. The expression language is the one the
+scope already had for trace arithmetic, reused rather than reimplemented; underneath, a bound
+setting is still a plain number on the part, so the solver and 188 component types know nothing
+about it.
+
 **A baseline** is the rest of the answer. Requirements assert what somebody thought to assert; a
 baseline records the whole of what the circuit produced, so that an edit which breaks something
 three chapters away shows up as a change rather than as something noticed six weeks later. The
@@ -291,12 +306,18 @@ the same minimum, maximum and frequency — and each measurement is judged again
 something rather than against itself, because the mean of a symmetric waveform is numerically zero
 and two runs of the same circuit differ by several percent of it.
 
-**A power budget** ranks every part by how close it is to a limit. Semiconductors already worried
-about themselves; a resistor sitting at nine tenths of a watt in a quarter-watt package said nothing
-at all. It averages across a run rather than reading an instant, because a MOSFET caught mid-edge is
-dissipating watts and the same MOSFET a microsecond later is dissipating milliwatts. A capacitor is
-not counted: it stores and returns its energy rather than spending it, and nothing in the topology
-can tell it from a resistor — so the parts that dissipate say so.
+**Ratings** gather every limit in the circuit into one list. A part fails three ways — too hot, too
+many volts across it, too many amps through it — and each is checked against what it is sold for,
+alongside the die temperature and whatever the part itself has to say. Thirty-two component types
+already reported their own violations and those reached a hover card and a red ring about a dozen
+symbols bothered to draw, so a part could be complaining and drawing nothing at all.
+
+**Peaks for the limits and averages for the heat**, in one walk. Watts are thermal, so what matters
+is the mean over long enough for the part to warm up — which is why a MOSFET survives a pulse that
+would destroy it held on. Volts are not: a dielectric breaks down at the instant the peak arrives,
+and averaging is exactly the wrong thing to do to it. A capacitor is not counted as dissipating at
+all — it stores and returns its energy rather than spending it, and nothing in the topology can tell
+it from a resistor, so the parts that dissipate say so.
 
 **Live values** write each net's voltage and each part's current onto the schematic, and onto the
 hover card whether or not the annotation is on. Nothing ambiguous is shown: a package with ten pins
@@ -321,6 +342,11 @@ between them. It also takes **arithmetic on the traces** — `Out / In`, `db(Out
 
 A copy of the circuit is **autosaved** every minute while there are unsaved changes, and offered
 back on the next start.
+
+**The sheet can be edited without a mouse.** Arrows move the selection by a grid square and by one
+unit with Shift, Tab steps between parts — bringing one into view only when it is not already there
+— and Enter drops the armed part in the middle of the view, so with `Ctrl+F` to search the palette a
+part can be found and placed without a pointer.
 
 **Click a wire or a pin and the whole net lights up** — every wire on it, a dot on every pin, and
 the status bar naming what is on it. It comes from the netlist the solver uses rather than the
@@ -360,7 +386,14 @@ ground — is reported when the circuit is compiled rather than silently produci
 
 ## Verification
 
-Tests measure the solver against closed-form answers rather than recorded output:
+Tests measure the solver against closed-form answers rather than recorded output — a second-order
+step overshoots by `exp(−πζ/√(1−ζ²))` and a first-order one settles in `τ·ln(49)`, so the expected
+figure is arithmetic and not a recording of what this code happened to produce.
+
+The interface is **driven rather than reasoned about**: every window is opened on a headless
+Avalonia platform, clicked with a real pointer and typed at with real keys. That matters more than
+it sounds, because a raised `Click` event does not invoke a button's command — a test that raises
+one passes against a button that would never have fired.
 
 | Area | What is checked |
 | --- | --- |
@@ -460,6 +493,11 @@ Tests measure the solver against closed-form answers rather than recorded output
 | Eigenvalues | A triangular matrix giving its diagonal, a companion matrix giving its polynomial's roots, a real matrix's complex eigenvalues coming out conjugate, a rotation sitting on the unit circle, the whole spectrum summing to the trace and multiplying to the determinant, and six significant figures surviving a similarity that spans eighteen decades |
 | Self-heating | A part sitting at ambient until it is given a thermal resistance, the die then settling exactly where its own dissipation puts it, a hotter MOSFET dropping more and burning more for it, a worse heatsink always meaning a hotter die, the rise sitting on top of the ambient rather than instead of it, a diode's drop falling at the coefficient its own forward voltage implies rather than the textbook two millivolts, a bipolar drawing more current as it warms, the die lagging its dissipation through a transient and arriving in the end, and a runaway stopping at the rated junction temperature with the part saying so rather than the solver failing |
 | Requirements | At most and at least failing on the side they are meant to, within failing on both, a missing trace and an unmeasurable quantity coming back unknown rather than failed, margin reading as a fraction of the limit and going negative by how far it is exceeded, disabled requirements left out rather than passed, a summary keeping failures apart from gaps, and every requirement surviving a save — including one measuring something this version has never heard of, which is kept and reported rather than silently measuring the wrong thing |
+| Opening windows | Every window the menu opens, actually opened: laying out, closing from its own button and on Escape, and nothing in it drawn in a colour that cannot be read against its own background — plus the two dialogs built in code following the theme when it changes underneath them, which is the bug that shipped in 0.33.3 and which reverting that fix makes fail by name |
+| Ratings | A dissipation past its rating, a capacitor past its volts, an LED past its amps and a part's own complaint all reaching one list; peaks reported for the limits and the mean for the heat out of a single run; a part with no rating left out rather than listed with dashes; and the worst coming first, where worst means nearest a limit rather than largest |
+| Timing | A delay measuring back as the delay that was put in, an inverting stage timing the same as a non-inverting one, noise not inventing edges, skew staying small however the capture is cut — over four shifts chosen to break each of the two simpler pairing rules — setup and hold being the two halves of the data window, and a real gate's delay measured off its traces without asking the device |
+| Parameters | A value resolving to itself, one parameter written in terms of another in whatever order, pi always available, a cycle reported rather than iterated and a typo reading differently from one, a broken binding leaving the part's value alone, and both the expression and the number it works out to surviving a save |
+| Keyboard | Arrows moving the selection by a square and by one unit with Shift, a whole selection moving together, Tab stepping and wrapping in both directions, stepping scrolling only when it has to, Enter placing the armed part and placing nothing when none is armed, and annotations skipped — pressed as real keys at a real canvas in a real window |
 | Current flow | Nothing moving below a nanoamp, the speed logarithmic so a microamp is visibly moving and a milliamp visibly faster, saturating at the ceiling, the sign being the direction and nothing else, dots evenly spaced and still on their own wire after a day of running, a series loop carrying the same current all the way round with the signs describing one circulation, the return through ground known by what must follow from a two-terminal part, reversing the supply reversing every dot, and a junction's wires left out rather than guessed at |
 | Op-amp and flicker noise | An amplifier's voltage noise coming out times the noise gain rather than the signal gain, an inverting stage of gain −1 being twice as noisy as a follower, the measurement reading low at the closed-loop corner because the noise gain has started following the open-loop gain down, flicker being √2 the floor at the corner and rising as 1/√f below it, an amplifier noisier at one hertz than at a hundred kilohertz, small resistors making it a voltage-noise problem and large ones a current-noise problem, a JFET input beating a bipolar one against a megohm, a MOSFET's flicker corner being three orders above a bipolar's, and switching a corner off making the curve flat |
 | Noise | A resistor's density being exactly √(4kTR) and flat with frequency, two in parallel making the parallel value's noise with half the power each, an RC settling at √(kT/C) whatever the resistor is across three decades of it, a divider's shares going as 1/R so the smaller resistor dominates, contributors adding in quadrature to the total, cooling helping by the square root of the ratio, a diode's shot noise coming out at √(2qI)·r — which is 1/√2 of a resistor of the same slope — shot noise following the current rather than the temperature, a bipolar reporting both its generators with the base's leading on a current drive and the collector's on a stiff one, and probing ground or a circuit of ideal parts being refused rather than answered with a zero |
