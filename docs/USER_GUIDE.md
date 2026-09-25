@@ -36,25 +36,26 @@ the [README](../README.md), and what changed between releases is in the
 24. [Will it work with the parts you can buy](#will-it-work-with-the-parts-you-can-buy)
 25. [Temperature](#temperature)
 26. [Feeding it a real waveform](#feeding-it-a-real-waveform)
-27. [Ratings](#ratings)
-28. [Writing on the schematic](#writing-on-the-schematic)
-29. [Drawing part of a circuit as one block](#drawing-part-of-a-circuit-as-one-block)
-30. [Reusing a block](#reusing-a-block)
-31. [Plotting one trace against another](#plotting-one-trace-against-another)
-32. [Importing a SPICE model](#importing-a-spice-model)
-33. [Comparing and computing traces](#comparing-and-computing-traces)
-34. [Naming a net instead of drawing it](#naming-a-net-instead-of-drawing-it)
-35. [What is this circuit?](#what-is-this-circuit)
-36. [Checking the circuit](#checking-the-circuit)
-37. [Development boards](#development-boards)
-38. [Saving and loading](#saving-and-loading)
-39. [Printing](#printing)
-40. [Exporting](#exporting)
-41. [Appearance](#appearance)
-42. [What version is this](#what-version-is-this)
-43. [Closing a dialog](#closing-a-dialog)
-44. [Keyboard reference](#keyboard-reference)
-45. [When a circuit will not simulate](#when-a-circuit-will-not-simulate)
+27. [Parameters](#parameters)
+28. [Ratings](#ratings)
+29. [Writing on the schematic](#writing-on-the-schematic)
+30. [Drawing part of a circuit as one block](#drawing-part-of-a-circuit-as-one-block)
+31. [Reusing a block](#reusing-a-block)
+32. [Plotting one trace against another](#plotting-one-trace-against-another)
+33. [Importing a SPICE model](#importing-a-spice-model)
+34. [Comparing and computing traces](#comparing-and-computing-traces)
+35. [Naming a net instead of drawing it](#naming-a-net-instead-of-drawing-it)
+36. [What is this circuit?](#what-is-this-circuit)
+37. [Checking the circuit](#checking-the-circuit)
+38. [Development boards](#development-boards)
+39. [Saving and loading](#saving-and-loading)
+40. [Printing](#printing)
+41. [Exporting](#exporting)
+42. [Appearance](#appearance)
+43. [What version is this](#what-version-is-this)
+44. [Closing a dialog](#closing-a-dialog)
+45. [Keyboard reference](#keyboard-reference)
+46. [When a circuit will not simulate](#when-a-circuit-will-not-simulate)
 
 This guide is also attached to every [release](../../releases) as a PDF, with a contents page and
 the screenshots in place — the same document, laid out for reading away from the machine. Build it
@@ -122,6 +123,7 @@ each row links to the section that explains it.
 | Can I have **two circuits** open | [Two circuits at once](#two-circuits-at-once) — a second window, sharing a clipboard | `Ctrl` `Shift` `N` |
 | What does **temperature** do to it | [Temperature](#temperature) — set it, or sweep it like any other parameter | — |
 | How hot does the **part itself** get | [Self-heating](#when-a-part-heats-itself) — give it a thermal resistance and the loop closes | — |
+| Can I set several parts from **one number** | [Parameters](#parameters) — name it once, and write the rest in terms of it | `Ctrl` `F9` |
 | Is anything **past what it is rated for** | [Ratings](#ratings) — every part against every limit it has, watched across a run | `Ctrl` `F5` |
 | How long will it run **on a battery** | [Ratings](#ratings) — the draw, and the arithmetic on the cell's capacity | `Ctrl` `F5` |
 | Does it meet what I **said it had to do** | [Requirements](#requirements) — written down, and checked | `Ctrl` `F4` |
@@ -4183,6 +4185,65 @@ solver breakpoint, for the same reason the waveform source's corners are.
 
 ---
 
+## Parameters
+
+**Simulate > Parameters...** (`Ctrl+F9`) lets the circuit give a number a name, so that several
+parts can be set from one place.
+
+A design is usually a handful of choices and a great many consequences of those choices. Four
+resistors that are all the same feedback resistor; a capacitor that has to track a corner frequency;
+a divider whose ratio matters and whose absolute impedance does not. Typed as literals into a dozen
+boxes, **the consequences stop being consequences** the first time a choice changes — and nothing in
+the file records that they were ever related.
+
+Add a parameter, give it a name and a value, then set any part from it by typing **`=`** and the
+name into one of its numbers:
+
+```
+=Rf          the feedback resistor
+=Rf / 10     a tenth of it
+=1 / (2 * pi * R * fc)
+```
+
+The `=` is the spreadsheet's convention and is here for the spreadsheet's reason: the box already
+accepts `4k7` and `100n`, so an expression needs a mark that cannot be mistaken for a value. Nothing
+anybody would type as a resistance begins with an equals sign. Type a plain number over it and the
+binding is gone, which is how you would expect to undo one.
+
+Parameters may be written **in terms of each other**, in whatever order you like — a file is a list
+and a design is a graph, and insisting the list be sorted would be insisting you sort it. `pi` is
+always available, because most of the formulas anybody writes here need it.
+
+### What it tells you when it cannot
+
+A parameter that cannot be worked out says which kind of problem it is, because the two need
+different fixing:
+
+- **A typo** — "there is no parameter called `Rf`" — is a name to correct.
+- **A cycle** — "`a` depends on `b`, which cannot be worked out: these depend on each other" — is a
+  design to untangle. It is reported rather than iterated, because two parameters defined in terms
+  of each other genuinely have no value, and running round the loop a hundred times would be
+  inventing one.
+
+A part whose expression stops working **keeps the value it had**. Clearing it to zero would turn a
+typo in one box into a circuit that still solves and is quietly wrong.
+
+Each row also says which parts are set from it, so a parameter tells you what it is holding up
+before you change it.
+
+### What the file keeps
+
+The expression **and** the value it works out to. That is deliberate: a build that has never heard
+of parameters opens the file, finds ordinary numbers in every part, and gets a working circuit —
+having merely lost the fact that they were related. A circuit that uses none of this writes none of
+it, so an ordinary file is byte for byte what it was.
+
+Underneath, a bound setting is still a plain number on the part. An expression is a way of
+*setting* a value, not a second kind of value — which is why the solver, the parts list, the
+exporter and a hundred and eighty-eight component types know nothing about any of it.
+
+---
+
 ## Ratings
 
 **Simulate > Ratings...** (`Ctrl+F5`) is one list of every part that is near, or past, something it
@@ -5096,6 +5157,7 @@ Also available in the app at **Help > Keyboard Shortcuts**.
 | `Shift` `F4` | Tolerance analysis — will it work with the parts you can buy |
 | `Ctrl` `F5` | Ratings — every part against every limit it has, and how long a battery lasts |
 | `Ctrl` `F8` | Baseline — record what the circuit does now, and say what changed later |
+| `Ctrl` `F9` | Parameters — numbers the circuit gives names to, and the parts set from them |
 | Shift-click with the probe tool | Set the selected probe's second point, for a differential or power measurement |
 | Click a wire or a pin | Light up the whole net it is on, and say what is joined to it |
 | `F9` / `F10` | Collapse the palette / the properties panel |

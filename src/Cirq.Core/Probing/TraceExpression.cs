@@ -72,14 +72,34 @@ public static class TraceExpression
     }
 
     /// <summary>
+    /// The same arithmetic over plain numbers rather than over traces.
+    /// <para>
+    /// The expression <i>language</i> has two uses and only one implementation. A trace expression
+    /// works out <c>Out / In</c> at every recorded instant; a circuit parameter works out
+    /// <c>Rf / 10</c> once. Underneath they are the same parser and the same tree, evaluated
+    /// against a map of names to numbers — the trace version simply evaluates it many times, once
+    /// per sample. Writing a second parser for the second use is how two dialects of the same
+    /// notation end up in one application.
+    /// </para>
+    /// </summary>
+    public static double Number(
+        string expression, IReadOnlyDictionary<string, double> values, string noun = DefaultNoun)
+    {
+        ArgumentNullException.ThrowIfNull(values);
+
+        return Parse(expression, [.. values.Keys], null, noun).Evaluate(values);
+    }
+
+    /// <summary>
     /// Checks an expression against a set of names without needing any samples, so a box can go
     /// red as it is typed rather than when it is run. Null when it is fine.
     /// </summary>
-    public static string? Validate(string expression, IEnumerable<string> names)
+    public static string? Validate(
+        string expression, IEnumerable<string> names, string noun = DefaultNoun)
     {
         try
         {
-            Parse(expression, [.. names]);
+            Parse(expression, [.. names], null, noun);
             return null;
         }
         catch (ExpressionException ex)
@@ -89,11 +109,12 @@ public static class TraceExpression
     }
 
     /// <summary>The names an expression refers to, so a caller knows which traces it needs.</summary>
-    public static IReadOnlyList<string> NamesIn(string expression, IEnumerable<string> known)
+    public static IReadOnlyList<string> NamesIn(
+        string expression, IEnumerable<string> known, string noun = DefaultNoun)
     {
         var found = new List<string>();
 
-        Parse(expression, [.. known], found);
+        Parse(expression, [.. known], found, noun);
 
         return found;
     }
@@ -169,12 +190,21 @@ public static class TraceExpression
             ["sign"] = x => Math.Sign(x),
         };
 
-    private static INode Parse(string? expression, IReadOnlyList<string> names, List<string>? found = null)
+    /// <summary>
+    /// What an unresolvable name should be called when this is used for something other than
+    /// traces. The language is shared; the vocabulary in the error message should not be, because
+    /// "there is no trace called Rf" is a confusing thing to be told about a circuit parameter.
+    /// </summary>
+    public const string DefaultNoun = "trace";
+
+    private static INode Parse(
+        string? expression, IReadOnlyList<string> names, List<string>? found = null,
+        string noun = DefaultNoun)
     {
         if (string.IsNullOrWhiteSpace(expression))
             throw new ExpressionException("There is no expression to work out.");
 
-        var parser = new Parser(expression, names, found);
+        var parser = new Parser(expression, names, found, noun);
         var node = parser.ParseExpression();
 
         parser.ExpectEnd();
@@ -187,7 +217,7 @@ public static class TraceExpression
     /// more here than generality: the whole grammar is numbers, names, five operators and a
     /// handful of functions.
     /// </summary>
-    private sealed class Parser(string text, IReadOnlyList<string> names, List<string>? found)
+    private sealed class Parser(string text, IReadOnlyList<string> names, List<string>? found, string noun)
     {
         private int _at;
 
@@ -360,8 +390,8 @@ public static class TraceExpression
             if (match is null)
             {
                 throw new ExpressionException(names.Count == 0
-                    ? $"There is no trace called '{name}' — there are no traces at all."
-                    : $"There is no trace called '{name}'. There is: {string.Join(", ", names)}.");
+                    ? $"There is no {noun} called '{name}' — there are no {noun}s at all."
+                    : $"There is no {noun} called '{name}'. There is: {string.Join(", ", names)}.");
             }
 
             found?.Add(match);

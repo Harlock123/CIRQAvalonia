@@ -24,6 +24,13 @@ public sealed partial class InspectorViewModel : ObservableObject
         nameof(CircuitComponent.Terminals),
     ];
 
+    /// <summary>
+    /// The circuit the selected part belongs to, so a setting can be bound to one of its
+    /// parameters. Null until the inspector is given one, and a part in a circuit it does not know
+    /// about simply cannot be bound — it can still be edited as ordinary numbers.
+    /// </summary>
+    public Circuit? Circuit { get; set; }
+
     [ObservableProperty]
     public partial CircuitComponent? Component { get; set; }
 
@@ -43,6 +50,16 @@ public sealed partial class InspectorViewModel : ObservableObject
     public event EventHandler<bool>? ParameterChanged;
 
     partial void OnComponentChanged(CircuitComponent? value) => Rebuild(value);
+
+    /// <summary>
+    /// Re-reads every box from the part, for when something other than the inspector has changed
+    /// it — a parameter being edited rewrites the values of every setting bound to it, and the
+    /// boxes would otherwise go on showing what they last wrote.
+    /// </summary>
+    public void Refresh()
+    {
+        foreach (var parameter in Parameters.OfType<NumericParameterViewModel>()) parameter.Refresh();
+    }
 
     private void Rebuild(CircuitComponent? component)
     {
@@ -101,7 +118,7 @@ public sealed partial class InspectorViewModel : ObservableObject
         target.Add(parameter);
     }
 
-    private static ParameterViewModel? Build(CircuitComponent component, PropertyInfo property, string label)
+    private ParameterViewModel? Build(CircuitComponent component, PropertyInfo property, string label)
     {
         var type = property.PropertyType;
         var underlying = Nullable.GetUnderlyingType(type);
@@ -109,7 +126,8 @@ public sealed partial class InspectorViewModel : ObservableObject
         var effective = underlying ?? type;
 
         if (effective == typeof(double) || effective == typeof(int))
-            return new NumericParameterViewModel(component, property, label, ParameterNaming.UnitFor(property.Name), isNullable);
+            return new NumericParameterViewModel(
+                component, property, label, ParameterNaming.UnitFor(property.Name), isNullable, Circuit);
 
         if (effective == typeof(bool))
             return new BooleanParameterViewModel(component, property, label);

@@ -157,6 +157,9 @@
                   Command="{Binding ShowBusDecodeCommand}" />
         <MenuItem Header="_Tolerance Analysis..." InputGesture="Shift+F4"
                   Command="{Binding ShowMonteCarloCommand}" />
+        <MenuItem Header="Para_meters..." InputGesture="Ctrl+F9"
+                  Command="{Binding ShowParametersCommand}"
+                  ToolTip.Tip="Numbers the circuit gives names to, so several parts can be set from one place" />
         <MenuItem Header="_Baseline..." InputGesture="Ctrl+F8"
                   Command="{Binding ShowBaselineCommand}"
                   ToolTip.Tip="Record what the circuit does now, and afterwards say what changed" />

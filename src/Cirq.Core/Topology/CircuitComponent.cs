@@ -34,6 +34,24 @@ public abstract partial class CircuitComponent : ObservableObject
     /// <summary>The reference designator prefix used when auto-naming, e.g. "R" for resistors.</summary>
     public virtual string DesignatorPrefix => "U";
 
+    /// <summary>
+    /// Settings driven by an expression over the circuit's parameters rather than by a typed
+    /// number, keyed by property name.
+    /// <para>
+    /// Empty for almost every part, and for every part in every file written before parameters
+    /// existed. A part with an entry here still has an ordinary value in the property itself — the
+    /// expression is re-evaluated and written into it whenever the parameters change — so
+    /// everything that reads a component, from the solver to the parts list to the file format,
+    /// goes on reading a plain number and knows nothing about any of this.
+    /// </para>
+    /// <para>
+    /// That is the whole design: an expression is a way of <i>setting</i> a value, not a second
+    /// kind of value. A hundred and eighty-eight component types would otherwise each need to know
+    /// that their resistance might be an expression.
+    /// </para>
+    /// </summary>
+    public Dictionary<string, string> Expressions { get; } = [];
+
     public IReadOnlyList<Terminal> Terminals
     {
         get => _terminals;

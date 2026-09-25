@@ -24,6 +24,15 @@ public partial class Circuit : ObservableObject
     public ObservableCollection<Cirq.Core.Verification.DesignSpec> Specs { get; } = [];
 
     /// <summary>
+    /// The numbers this circuit gives names to, so that several parts can be set from one place.
+    /// <para>
+    /// Empty in every circuit that does not use them, which is most. See
+    /// <see cref="CircuitParameters"/> for what they are for.
+    /// </para>
+    /// </summary>
+    public ObservableCollection<CircuitParameter> Parameters { get; } = [];
+
+    /// <summary>
     /// What this circuit produced when somebody last said "this is right", kept so that what it
     /// produces next can be held against it.
     /// <para>

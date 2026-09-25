@@ -175,6 +175,7 @@ public partial class MainWindow : Window
         viewModel.RequestRuleCheck += async (_, _) => await ShowRuleCheckAsync();
         viewModel.RequestRatings += async (_, _) => await ShowRatingsAsync();
         viewModel.RequestBaseline += async (_, _) => await ShowBaselineAsync();
+        viewModel.RequestParameters += async (_, _) => await ShowParametersAsync();
         viewModel.RequestSpectrum += async (_, _) => await ShowSpectrumAsync();
         viewModel.RequestBusDecode += async (_, _) => await ShowBusDecodeAsync();
         viewModel.RequestMonteCarlo += async (_, _) => await ShowMonteCarloAsync();
@@ -533,6 +534,28 @@ public partial class MainWindow : Window
         var dialog = new RuleCheckWindow { DataContext = model };
 
         await dialog.ShowModal(this);
+    }
+
+    private async Task ShowParametersAsync()
+    {
+        if (_viewModel is null) return;
+
+        var model = new ParametersViewModel(_viewModel.Circuit);
+
+        // A parameter change rewrites part values, so the document is edited and the canvas and
+        // the inspector are both looking at numbers that have moved underneath them.
+        model.Changed += (_, _) =>
+        {
+            _viewModel.MarkModified();
+            _viewModel.Inspector.Refresh();
+            RefreshLiveState();
+        };
+
+        var dialog = new ParametersWindow { DataContext = model };
+
+        await dialog.ShowModal(this);
+
+        _viewModel.Simulation.InvalidateTopology();
     }
 
     private async Task ShowBaselineAsync()

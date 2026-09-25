@@ -225,6 +225,17 @@ public static class CircuitSerializer
             })];
         }
 
+        if (circuit.Parameters.Count > 0)
+        {
+            document.Parameters = [.. circuit.Parameters.Select(p => new ParameterRecord
+            {
+                Id = p.Id,
+                Name = p.Name,
+                Expression = p.Expression,
+                Note = p.Note,
+            })];
+        }
+
         if (!circuit.Baseline.IsEmpty)
         {
             document.Baseline = new BaselineRecord
@@ -343,6 +354,9 @@ public static class CircuitSerializer
                 ? JsonSerializer.SerializeToElement(value.ToString())
                 : SerializeValue(value);
         }
+
+        if (component.Expressions.Count > 0)
+            record.Expressions = new Dictionary<string, string>(component.Expressions);
 
         return record;
     }
@@ -585,6 +599,27 @@ public static class CircuitSerializer
             circuit.Specs.Add(spec);
         }
 
+        foreach (var record in document.Parameters ?? [])
+        {
+            circuit.Parameters.Add(new CircuitParameter
+            {
+                Id = record.Id == Guid.Empty ? Guid.NewGuid() : record.Id,
+                Name = record.Name,
+                Expression = record.Expression,
+                Note = record.Note,
+            });
+        }
+
+        // Worked out and written into the parts now, so that everything downstream — the solver,
+        // the parts list, the canvas — reads plain numbers and knows nothing about expressions.
+        // The values in the file are already right; this is what keeps them right when a parameter
+        // is edited, and what reports a binding that has stopped making sense.
+        if (circuit.Parameters.Count > 0 || circuit.Components.Any(c => c.Expressions.Count > 0))
+        {
+            foreach (var (_, problem) in CircuitParameters.Apply(circuit.Parameters, circuit.Components).Problems)
+                result.Warnings.Add(problem);
+        }
+
         if (document.Baseline is { } baseline) circuit.Baseline = Restore(baseline, result.Warnings);
 
         return result;
@@ -681,6 +716,14 @@ public static class CircuitSerializer
     {
         var properties = ComponentReflection.EditableProperties(component.GetType())
             .ToDictionary(p => p.Name, StringComparer.Ordinal);
+
+        foreach (var (property, expression) in record.Expressions ?? [])
+        {
+            // Kept whether or not the property is still there: a part that has lost a setting since
+            // the file was written is worth reporting when the parameters are next applied, rather
+            // than quietly dropping the binding here and leaving nothing to report.
+            component.Expressions[property] = expression;
+        }
 
         foreach (var (name, element) in record.Parameters)
         {

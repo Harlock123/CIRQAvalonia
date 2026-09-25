@@ -1,0 +1,77 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:Cirq.UI.ViewModels"
+        x:Class="Cirq.UI.Views.ParametersWindow"
+        x:DataType="vm:ParametersViewModel"
+        Title="Parameters"
+        Width="760" Height="520"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource PanelBackground}">
+
+  <DockPanel>
+
+    <!-- A way out that does not depend on a title bar, because a tiling window manager draws
+         none. Escape closes it too; this is the half somebody can see. -->
+    <Border DockPanel.Dock="Bottom" Padding="14,9"
+            BorderBrush="{DynamicResource PanelBorder}" BorderThickness="0,1,0,0">
+      <Button Name="CloseButton" Content="Close" MinWidth="88" Padding="14,5"
+              HorizontalAlignment="Right" />
+    </Border>
+
+    <Border DockPanel.Dock="Bottom" Padding="14,10"
+            BorderBrush="{DynamicResource PanelBorder}" BorderThickness="0,1,0,0">
+      <DockPanel>
+        <Button DockPanel.Dock="Right" Content="Add" Command="{Binding AddCommand}" Padding="18,5" />
+        <TextBlock Text="{Binding Summary}" VerticalAlignment="Center" Opacity="0.8"
+                   FontSize="12" TextWrapping="Wrap" />
+      </DockPanel>
+    </Border>
+
+    <Border DockPanel.Dock="Top" Padding="16,14,16,4">
+      <TextBlock TextWrapping="Wrap" FontSize="12" Opacity="0.8"
+                 Text="A number the circuit gives a name to. Set a part from one by typing = and the name into any of its numbers — &#x201c;=Rf&#x201d;, or &#x201c;=Rf / 10&#x201d;. Parameters may be written in terms of each other, and pi is always available." />
+    </Border>
+
+    <ScrollViewer>
+      <ItemsControl ItemsSource="{Binding Rows}" Margin="14,6,14,12">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:ParameterRowViewModel">
+            <Border Margin="0,3" Padding="10,8" CornerRadius="4"
+                    BorderBrush="{DynamicResource PanelBorder}" BorderThickness="1">
+              <StackPanel Spacing="5">
+
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <TextBox Width="110" Text="{Binding Parameter.Name, Mode=TwoWay}"
+                           PlaceholderText="Name" />
+
+                  <TextBlock Text="=" VerticalAlignment="Center" Opacity="0.6" />
+
+                  <TextBox Width="190" Text="{Binding Parameter.Expression, Mode=TwoWay}"
+                           PlaceholderText="10k, or Rf / 10" />
+
+                  <TextBox Width="180" Text="{Binding Parameter.Note, Mode=TwoWay}"
+                           PlaceholderText="what it is for" />
+
+                  <Button Content="✕" Padding="8,3"
+                          Command="{Binding $parent[Window].((vm:ParametersViewModel)DataContext).RemoveCommand}"
+                          CommandParameter="{Binding}" />
+                </StackPanel>
+
+                <TextBlock Text="{Binding Value}" FontSize="11" TextWrapping="Wrap"
+                           IsVisible="{Binding !HasProblem}" Opacity="0.8" />
+                <TextBlock Text="{Binding Value}" FontSize="11" TextWrapping="Wrap"
+                           IsVisible="{Binding HasProblem}"
+                           Foreground="{DynamicResource TextError}" />
+
+                <TextBlock Text="{Binding UsedBy}" FontSize="11" Opacity="0.55"
+                           IsVisible="{Binding IsUsed}" TextWrapping="Wrap" />
+
+              </StackPanel>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </ScrollViewer>
+
+  </DockPanel>
+</Window>

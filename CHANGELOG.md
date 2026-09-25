@@ -8,6 +8,28 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**Parameters: numbers the circuit gives names to.** **Simulate > Parameters...** (`Ctrl+F9`) names a
+value once, and any part is set from it by typing `=` and the name into one of its numbers — `=Rf`,
+or `=Rf / 10`, or `=1 / (2 * pi * R * fc)`. Parameters may be written in terms of each other, in
+whatever order, and `pi` is always there.
+
+A design is a handful of choices and a great many consequences of those choices. Typed as literals
+into a dozen boxes, the consequences stop being consequences the first time a choice changes, and
+nothing in the file records they were ever related.
+
+The `=` is the spreadsheet's convention for the spreadsheet's reason: the box already accepts `4k7`,
+so an expression needs a mark that cannot be mistaken for a value. A typo and a cycle get different
+sentences, because one is a name to correct and the other is a design to untangle — and a binding
+that stops working leaves the part holding the value it had, since clearing it to zero would turn a
+typo in one box into a circuit that still solves and is quietly wrong.
+
+The expression language is the one the scope already had for trace arithmetic, with the vocabulary
+in its error messages made to follow: "there is no trace called Rf" is a confusing thing to be told
+about a parameter. Underneath, a bound setting is still a plain number on the part — an expression
+is a way of *setting* a value, not a second kind of value, which is why the solver and a hundred
+and eighty-eight component types know nothing about any of it. The file keeps both, so an older
+build opens it and gets a working circuit with the right numbers in it.
+
 **Timing between two traces: propagation delay, skew, setup and hold.** Every measurement here was
 about a single waveform, and the most-quoted number on any logic datasheet is not — a propagation
 delay is the gap between one signal moving and another moving because of it. A library shipping

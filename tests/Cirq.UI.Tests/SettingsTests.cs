@@ -151,8 +151,25 @@ public class SettingsPersistenceTests : IDisposable
 /// </para>
 /// </summary>
 [Collection(WindowCollection.Name)]
-public class SettingsViewModelTests(WindowSession session)
+public class SettingsViewModelTests(WindowSession session) : IDisposable
 {
+    /// <summary>
+    /// Puts the application's theme back after each test.
+    /// <para>
+    /// Choosing a theme here really applies it now, to the one application the whole collection
+    /// shares — so a test that picks high contrast and walks away leaves the next one reading the
+    /// wrong answer. It passed alone and failed in the suite, which is the signature of exactly
+    /// this. Before there was an application to apply anything to, none of these tests changed
+    /// anything at all.
+    /// </para>
+    /// </summary>
+    public void Dispose()
+    {
+        session.Run(() => ThemeManager.Apply(AppTheme.System));
+
+        GC.SuppressFinalize(this);
+    }
+
     private static SettingsViewModel Create(AppTheme theme, out FakeSettingsStore store)
     {
         store = new FakeSettingsStore();

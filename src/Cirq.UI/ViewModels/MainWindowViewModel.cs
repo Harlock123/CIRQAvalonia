@@ -26,7 +26,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         Circuit = new Circuit { Title = "Untitled circuit" };
         Simulation = new SimulationController(Circuit);
         Scope = new ScopeViewModel(Circuit);
-        Inspector = new InspectorViewModel();
+        Inspector = new InspectorViewModel { Circuit = Circuit };
 
         RebuildPalette();
 
@@ -836,6 +836,9 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     /// <summary>Raised for the baseline window.</summary>
     public event EventHandler? RequestBaseline;
 
+    /// <summary>Raised for the parameters window.</summary>
+    public event EventHandler? RequestParameters;
+
     /// <summary>Raised when the spectrum window should be opened.</summary>
     public event EventHandler? RequestSpectrum;
 
@@ -1353,6 +1356,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
           Ctrl+F4      Requirements — what it is supposed to do, checked
           Ctrl+F5      Ratings — every part against every limit it has
           Ctrl+F8      Baseline — record what it does now, and say what changed later
+          Ctrl+F9      Parameters — numbers the circuit gives names to
           Shift+F4     Tolerance analysis
           F8           Reset
 
@@ -1430,6 +1434,9 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
     [RelayCommand]
     private void ShowBaseline() => RequestBaseline?.Invoke(this, EventArgs.Empty);
+
+    [RelayCommand]
+    private void ShowParameters() => RequestParameters?.Invoke(this, EventArgs.Empty);
 
     /// <summary>
     /// Reads a file of numbers into the selected waveform source.

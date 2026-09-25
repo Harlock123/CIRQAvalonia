@@ -54,6 +54,26 @@ public sealed class CircuitDocument
     /// </summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public BaselineRecord? Baseline { get; set; }
+
+    /// <summary>
+    /// The numbers this circuit gives names to. Null in every file that does not use them, which
+    /// is most — so an ordinary file is byte for byte what it was.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<ParameterRecord>? Parameters { get; set; }
+}
+
+/// <summary>One named number, as the file holds it.</summary>
+public sealed class ParameterRecord
+{
+    public Guid Id { get; set; }
+
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>A number or arithmetic over the other parameters, exactly as it was typed.</summary>
+    public string Expression { get; set; } = string.Empty;
+
+    public string Note { get; set; } = string.Empty;
 }
 
 /// <summary>A recorded set of traces, as the file holds them.</summary>
@@ -155,6 +175,18 @@ public sealed class ComponentRecord
     public Dictionary<string, JsonElement>? Construction { get; set; }
 
     public Dictionary<string, JsonElement> Parameters { get; set; } = [];
+
+    /// <summary>
+    /// Settings driven by an expression over the circuit's parameters rather than by a typed
+    /// number, keyed by property name. Null for almost every part.
+    /// <para>
+    /// The plain value is written out too, in <see cref="Parameters"/>, and that is deliberate: a
+    /// build that has never heard of expressions opens the file and gets a working circuit with
+    /// the right numbers in it, having merely lost the fact that they were related.
+    /// </para>
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, string>? Expressions { get; set; }
 
     /// <summary>
     /// Set only on a block, and only describing its <i>structure</i>. What is inside a block is
