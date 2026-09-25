@@ -600,6 +600,17 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         foreach (var component in loaded.Components) Circuit.Components.Add(component);
         foreach (var wire in loaded.Wires) Circuit.Wires.Add(wire);
         foreach (var probe in loaded.Probes) Circuit.Probes.Add(probe);
+
+        // Everything else the file holds. These are as much the document as the parts are: a
+        // circuit opened without its named numbers has parts pointing at names that no longer
+        // exist, and one opened without its pages arrives as every page drawn on top of the first.
+        foreach (var sheet in loaded.Sheets) Circuit.Sheets.Add(sheet);
+        foreach (var parameter in loaded.Parameters) Circuit.Parameters.Add(parameter);
+        foreach (var spec in loaded.Specs) Circuit.Specs.Add(spec);
+
+        Circuit.Baseline = loaded.Baseline;
+
+        RefreshSheets();
     }
 
     /// <summary>
@@ -685,8 +696,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             // export that quietly dropped them would be a picture of a different schematic from
             // the one on screen, which is the one thing an export must never be.
             var options = ShowLiveValues
-                ? request.Options with { Live = Readings() }
-                : request.Options;
+                ? request.Options with { Live = Readings(), Sheet = CurrentSheet }
+                : request.Options with { Sheet = CurrentSheet };
 
             var written = CircuitExporter.Export(Circuit, ScopeSource, request.Path, options);
 
@@ -774,6 +785,163 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
     [RelayCommand]
     private void ShowCompare() => RequestCompare?.Invoke(this, EventArgs.Empty);
+
+    // ---- sheets --------------------------------------------------------------
+
+    /// <summary>
+    /// Which page is on screen, or null for a drawing that has never been split.
+    /// <para>
+    /// The canvas draws, hit tests and selects through this, so a part on another page is not
+    /// merely hidden: it cannot be clicked, dragged or caught by a rubber band. The engine takes no
+    /// notice of it — every page is solved together, and two pages are joined by naming a net, the
+    /// same way two ends of one large page already are.
+    /// </para>
+    /// </summary>
+    [ObservableProperty]
+    public partial string? CurrentSheet { get; set; }
+
+    /// <summary>The tabs along the top of the canvas. Empty until the drawing has pages.</summary>
+    public ObservableCollection<SheetTabViewModel> SheetTabs { get; } = [];
+
+    /// <summary>True once there are pages, which is what puts the tab strip on screen.</summary>
+    public bool HasSheets => Circuit.Sheets.Count > 0;
+
+    /// <summary>What the strip says to the right of the tabs.</summary>
+    public string SheetSummary
+    {
+        get
+        {
+            if (!HasSheets) return string.Empty;
+
+            var here = Circuit.OnSheet(CurrentSheet).Count();
+            var all = Circuit.Components.Count;
+
+            return here == all
+                ? $"{here} parts"
+                : $"{here} of {all} parts";
+        }
+    }
+
+    partial void OnCurrentSheetChanged(string? value)
+    {
+        foreach (var tab in SheetTabs) tab.IsCurrent = string.Equals(tab.Name, value, StringComparison.Ordinal);
+
+        OnPropertyChanged(nameof(SheetSummary));
+        RequestRedraw?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>Goes to the next page, wrapping round. Nothing at all on an unsplit drawing.</summary>
+    [RelayCommand]
+    private void NextSheet() => StepSheet(1);
+
+    /// <summary>Goes to the previous page, wrapping round.</summary>
+    [RelayCommand]
+    private void PreviousSheet() => StepSheet(-1);
+
+    private void StepSheet(int by)
+    {
+        if (Circuit.Sheets.Count == 0) return;
+
+        var at = CurrentSheet is null ? 0 : Circuit.Sheets.IndexOf(CurrentSheet);
+        var next = ((at + by) % Circuit.Sheets.Count + Circuit.Sheets.Count) % Circuit.Sheets.Count;
+
+        ShowSheet(Circuit.Sheets[next]);
+    }
+
+    /// <summary>Puts one page on screen.</summary>
+    [RelayCommand]
+    private void ShowSheet(string? name)
+    {
+        if (name is null || !Circuit.Sheets.Contains(name)) return;
+
+        CurrentSheet = name;
+        StatusMessage = $"Sheet {name}";
+    }
+
+    /// <summary>
+    /// Adds a page and goes to it. The first one splits the drawing, which leaves everything
+    /// already on it on page one.
+    /// </summary>
+    [RelayCommand]
+    private void AddSheet()
+    {
+        var added = Circuit.AddSheet();
+
+        RefreshSheets();
+        CurrentSheet = added;
+        IsModified = true;
+        StatusMessage = $"Added {added}";
+    }
+
+    /// <summary>
+    /// Takes the current page out. What was on it moves to the page beside it rather than being
+    /// deleted, and the status line says where it went.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanRemoveSheet))]
+    private void RemoveSheet()
+    {
+        if (CurrentSheet is not { } name) return;
+
+        var moved = Circuit.OnSheet(name).Count();
+
+        if (!Circuit.RemoveSheet(name)) return;
+
+        RefreshSheets();
+        CurrentSheet = Circuit.Sheets.FirstOrDefault();
+        IsModified = true;
+        StatusMessage = moved == 0
+            ? $"Removed {name}"
+            : $"Removed {name}; its {moved} parts moved to {CurrentSheet}";
+    }
+
+    private bool CanRemoveSheet() => Circuit.Sheets.Count > 1 && CurrentSheet is not null;
+
+    /// <summary>
+    /// Renames the page a tab is for, which is what committing an edit in the tab does. False when
+    /// the name is blank or already taken, and the tab puts back what it was.
+    /// </summary>
+    public bool RenameSheet(string from, string to)
+    {
+        if (!Circuit.RenameSheet(from, to))
+        {
+            RefreshSheets();
+            StatusMessage = $"Could not rename {from}: a sheet needs a name of its own.";
+            return false;
+        }
+
+        var wanted = to.Trim();
+
+        // Before the rebuild rather than after: it keeps the view on a page that exists, and the
+        // page being looked at has just stopped existing under its old name.
+        if (string.Equals(CurrentSheet, from, StringComparison.Ordinal)) CurrentSheet = wanted;
+
+        RefreshSheets();
+
+        IsModified = true;
+        StatusMessage = $"Renamed {from} to {wanted}";
+
+        return true;
+    }
+
+    /// <summary>
+    /// Rebuilds the tabs from the document, and keeps the view on a page that exists — after a
+    /// load, a removal, or an undo that took the pages away underneath it.
+    /// </summary>
+    public void RefreshSheets()
+    {
+        SheetTabs.Clear();
+
+        foreach (var sheet in Circuit.Sheets) SheetTabs.Add(new SheetTabViewModel(sheet));
+
+        if (CurrentSheet is null || !Circuit.Sheets.Contains(CurrentSheet))
+            CurrentSheet = Circuit.Sheets.FirstOrDefault();
+        else
+            OnCurrentSheetChanged(CurrentSheet);
+
+        OnPropertyChanged(nameof(HasSheets));
+        OnPropertyChanged(nameof(SheetSummary));
+        RemoveSheetCommand.NotifyCanExecuteChanged();
+    }
 
     /// <summary>Raised when the find-on-sheet window should be opened.</summary>
     public event EventHandler? RequestFind;
@@ -1232,6 +1400,11 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             return;
         }
 
+        // Onto the page being looked at, which is also how a block copied from one page is moved to
+        // another: copy it there, paste it here.
+        if (CurrentSheet is { Length: > 0 } sheet && Circuit.Sheets.Contains(sheet))
+            foreach (var component in pasted) component.Sheet = sheet;
+
         // Selecting the copy is the point of pasting it: it lands offset from the original and is
         // almost always about to be dragged somewhere.
         foreach (var component in Circuit.Components) component.IsSelected = pasted.Contains(component);
@@ -1338,6 +1511,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
           Ctrl+F       Find a part in the palette
           Ctrl+Shift+F Find a part on the sheet — designator, value, kind or net
           Ctrl+F1      What is this circuit? — the drawing read back in words
+          Ctrl+PgDn/PgUp The next / previous sheet, on a drawing split into pages
           Arrows       Move the selection — Shift for one unit rather than one square
           Tab          Step to the next part on the sheet; Shift+Tab the previous
           Enter        Drop the armed part in the middle of the view
@@ -1756,6 +1930,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
         Simulation.Pause();
         Circuit.Clear();
+        RefreshSheets();
         SelectedComponent = null;
         Circuit.Title = "Untitled circuit";
         CurrentFilePath = null;
@@ -1775,6 +1950,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         Circuit.Clear();
         SelectedComponent = null;
         example.Build(this);
+        RefreshSheets();
 
         CurrentFilePath = null;
         Simulation.InvalidateTopology();

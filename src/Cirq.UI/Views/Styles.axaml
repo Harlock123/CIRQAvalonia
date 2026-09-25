@@ -101,6 +101,34 @@
     <Setter Property="Foreground" Value="{DynamicResource SymbolLabel}" />
   </Style>
 
+  <!-- A sheet tab. Flat until it is the page on screen, which is drawn as the canvas continuing
+       up into it: the tab and the drawing under it are one surface, and the others are behind. -->
+  <Style Selector="Button.sheet">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="{DynamicResource PanelBorder}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="4,4,0,0" />
+    <Setter Property="Padding" Value="11,3" />
+    <Setter Property="MinWidth" Value="0" />
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />
+    <Setter Property="Cursor" Value="Hand" />
+  </Style>
+
+  <Style Selector="Button.sheet:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource HoverBackground}" />
+  </Style>
+
+  <Style Selector="Button.sheet.current">
+    <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+
+  <Style Selector="Button.sheet.current /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource GroupHeaderBackground}" />
+  </Style>
+
   <!-- The chevron in an expanded panel's header. -->
   <Style Selector="Button.collapse">
     <Setter Property="Background" Value="Transparent" />

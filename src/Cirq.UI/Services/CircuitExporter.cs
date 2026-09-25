@@ -86,7 +86,8 @@ public sealed record ExportOptions(
     bool TransparentBackground = false,
     bool ShowInteractiveMarkers = false,
     bool IncludePartsList = false,
-    LiveSnapshot? Live = null);
+    LiveSnapshot? Live = null,
+    string? Sheet = null);
 
 /// <summary>An export the user has asked for: what to write, and where.</summary>
 public sealed record ExportRequest(string Path, ExportOptions Options);
@@ -245,7 +246,7 @@ public static class CircuitExporter
 
         if (wantsSchematic)
         {
-            var bounds = SchematicBounds(circuit);
+            var bounds = SchematicBounds(circuit, options);
 
             Sheet("Schematic", bounds.Width, bounds.Height,
                 canvas => DrawSchematic(canvas, circuit, bounds, options with
@@ -439,7 +440,7 @@ public static class CircuitExporter
         Circuit circuit, IScopeSource? scope, string path, ExportOptions options,
         bool includeSchematic, bool includeTraces)
     {
-        var schematic = includeSchematic ? SchematicBounds(circuit) : default;
+        var schematic = includeSchematic ? SchematicBounds(circuit, options) : default;
 
         var rows = options.IncludePartsList ? PartsList.For(circuit) : [];
         var table = options.IncludePartsList ? MeasurePartsList(rows) : default;
@@ -494,7 +495,7 @@ public static class CircuitExporter
     private static void WriteCombinedPdf(
         Circuit circuit, IScopeSource? scope, string path, ExportOptions options)
     {
-        var schematic = SchematicBounds(circuit);
+        var schematic = SchematicBounds(circuit, options);
 
         using var stream = File.Create(path);
         using var document = SKDocument.CreatePdf(stream);
@@ -532,12 +533,14 @@ public static class CircuitExporter
     // ---- drawing ---------------------------------------------------------
 
     /// <summary>
-    /// The whole circuit's extent with a margin round it, which is what "export the circuit"
-    /// means regardless of where the view happens to be scrolled.
+    /// The extent of what is being exported, with a margin round it — which is what "export the
+    /// circuit" means regardless of where the view happens to be scrolled. On a document split
+    /// into sheets it is the one sheet: drawn together they would overlap, since every page starts
+    /// its coordinates in the same corner.
     /// </summary>
-    private static Rect SchematicBounds(Circuit circuit)
+    private static Rect SchematicBounds(Circuit circuit, ExportOptions options)
     {
-        var bounds = CircuitRenderer.BoundsOf(circuit);
+        var bounds = CircuitRenderer.BoundsOf(circuit, options.Sheet);
 
         // An empty circuit still has to produce a valid file rather than a zero-sized one.
         if (bounds.Width <= 0 || bounds.Height <= 0)
@@ -599,7 +602,8 @@ public static class CircuitExporter
             // Selection is an editing state, not part of the drawing: a picture of the circuit
             // must not depend on what happened to be highlighted when it was taken.
             new CircuitRenderOptions(
-                1.0, null, options.ShowInteractiveMarkers, ShowSelection: false, Live: options.Live));
+                1.0, null, options.ShowInteractiveMarkers, ShowSelection: false, Live: options.Live,
+                Sheet: options.Sheet));
     }
 
     // ---- files -----------------------------------------------------------

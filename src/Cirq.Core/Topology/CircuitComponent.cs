@@ -142,6 +142,18 @@ public abstract partial class CircuitComponent : ObservableObject
     /// <summary>True when the component must be iterated by Newton-Raphson.</summary>
     public virtual bool IsNonlinear => false;
 
+    /// <summary>
+    /// Which sheet of the document this is drawn on, or empty for the first one.
+    /// <para>
+    /// A drawing concern and nothing else. Sheets are pages of one circuit, not separate circuits:
+    /// the solver is handed every part on every sheet at once, and two sheets are joined the way
+    /// two ends of a large sheet already are, by naming a net rather than drawing a wire to it.
+    /// Nothing in the engine knows this property exists.
+    /// </para>
+    /// </summary>
+    [ObservableProperty]
+    public partial string Sheet { get; set; } = string.Empty;
+
     /// <summary>Clears all internal history, returning the component to its power-on state.</summary>
     public virtual void ResetState() { }
 

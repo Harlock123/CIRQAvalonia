@@ -25,6 +25,11 @@ public static class ComponentReflection
         nameof(CircuitComponent.Y),
         nameof(CircuitComponent.RotationDegrees),
         nameof(CircuitComponent.IsSelected),
+
+        // Which page it is drawn on is placement, like X and Y, and is written as a field of the
+        // part's record rather than as one of its settings. Left in, it would appear in the
+        // properties panel as a thing to type into and in the file twice.
+        nameof(CircuitComponent.Sheet),
         nameof(CircuitComponent.Terminals),
     ];
 

@@ -45,17 +45,18 @@ the [README](../README.md), and what changed between releases is in the
 33. [Importing a SPICE model](#importing-a-spice-model)
 34. [Comparing and computing traces](#comparing-and-computing-traces)
 35. [Naming a net instead of drawing it](#naming-a-net-instead-of-drawing-it)
-36. [What is this circuit?](#what-is-this-circuit)
-37. [Checking the circuit](#checking-the-circuit)
-38. [Development boards](#development-boards)
-39. [Saving and loading](#saving-and-loading)
-40. [Printing](#printing)
-41. [Exporting](#exporting)
-42. [Appearance](#appearance)
-43. [What version is this](#what-version-is-this)
-44. [Closing a dialog](#closing-a-dialog)
-45. [Keyboard reference](#keyboard-reference)
-46. [When a circuit will not simulate](#when-a-circuit-will-not-simulate)
+36. [Sheets](#sheets)
+37. [What is this circuit?](#what-is-this-circuit)
+38. [Checking the circuit](#checking-the-circuit)
+39. [Development boards](#development-boards)
+40. [Saving and loading](#saving-and-loading)
+41. [Printing](#printing)
+42. [Exporting](#exporting)
+43. [Appearance](#appearance)
+44. [What version is this](#what-version-is-this)
+45. [Closing a dialog](#closing-a-dialog)
+46. [Keyboard reference](#keyboard-reference)
+47. [When a circuit will not simulate](#when-a-circuit-will-not-simulate)
 
 This guide is also attached to every [release](../../releases) as a PDF, with a contents page and
 the screenshots in place — the same document, laid out for reading away from the machine. Build it
@@ -88,6 +89,9 @@ Five regions, and they stay put:
 | **Properties** (right) | Parameters of whatever is selected, with the circuit's **controls** beneath |
 | **Scope** (bottom) | Timebase and vertical controls, the plot, and the trace list |
 | **Status bar** | Active tool, node and unknown counts, speed, and elapsed simulation time |
+
+A drawing spread over [sheets](#sheets) gets a sixth region: a strip of tabs along the top of the
+canvas, one per page. It is absent until you ask for a second page.
 
 Both side panels collapse to give the canvas more room — `F9` for the palette, `F10` for
 properties, or click the chevron in either panel's header. A collapsed panel leaves a labelled rail
@@ -4713,6 +4717,64 @@ circuit that no longer exists.
 
 ---
 
+## Sheets
+
+A drawing does not have to be one page. **View > Add Sheet** splits it into pages with a tab strip
+above the canvas — a supply page, a logic page, an I/O page — and each tab shows one of them.
+
+The first time you add a sheet you get two tabs, not one. Everything already drawn becomes **Sheet
+1** and the new page is **Sheet 2**, so splitting a schematic you have been working on costs one
+menu item and moves nothing.
+
+**Double-click the tab you are on** to rename it. `Ctrl` `PgDn` and `Ctrl` `PgUp` step between
+pages, and the strip says how much of the drawing is on the one you are looking at — `6 of 41
+parts`.
+
+### The pages are a drawing, not a circuit
+
+This is the part worth being clear about: **sheets change nothing about the circuit**. Every page is
+handed to the solver together, as one network. There is no such thing as simulating one sheet.
+
+Which means two pages are joined exactly the way two ends of one large page are joined — by
+[naming a net](#naming-a-net-instead-of-drawing-it). Put a `VCC` label on the supply page and a
+`VCC` label on the logic page and they are the same node, because they were always going to be. A
+wire cannot be drawn between pages, and does not need to be.
+
+Blocks are the other way of making a big schematic manageable, and they are not the same thing. A
+[block](#drawing-part-of-a-circuit-as-one-block) **hides** its contents behind one symbol and has
+pins you wire to. A sheet just puts the contents somewhere else — the parts are ordinary parts, at
+the top level, and the netlist is unchanged. Use a block for a section you want to reuse or stop
+looking at; use a sheet for a section you want to keep looking at, on its own page.
+
+### What the page you are on decides
+
+The page is not a filter drawn over everything. What is on another page is genuinely not there:
+
+- It is not drawn, and its wires are not drawn.
+- It cannot be clicked, dragged, hovered, tabbed to, or caught by a box selection.
+- Changing page clears the selection, so `Delete` cannot reach something you cannot see.
+- A part you place, and a part you paste, lands on the page in front of you. That is also how you
+  move something between pages: copy it, go to the other tab, paste.
+- Zoom to fit fits the page, not the document.
+- An export or a print gives you the page you are on. Pages all start their coordinates in the same
+  corner, so one file with all of them in it would be every page drawn on top of the first.
+
+Everything that is about the circuit rather than the drawing ignores pages entirely: the netlist,
+every analysis, the check, the ratings, the parts list, the netlist and BOM exports, and what the
+scope shows. A probe on the logic page keeps recording while you work on the supply page.
+
+### Taking a page out
+
+**View > Remove Sheet**, or the `✕` at the right of the strip, takes the current page out. What was
+on it **moves to the page beside it** rather than being deleted — losing a page should cost you the
+arrangement, not the circuit. The status bar says where it went. The last page cannot be removed,
+since a drawing is on at least one.
+
+A circuit saved with pages remembers them. One saved before you split it opens as one page with no
+tab strip at all, and stays that way until you ask for a second.
+
+---
+
 ## What is this circuit?
 
 **Simulate > What Is This Circuit?** (`Ctrl` `F1`) reads the drawing back in words.
@@ -5211,6 +5273,7 @@ Also available in the app at **Help > Keyboard Shortcuts**.
 | Shift-click with the probe tool | Set the selected probe's second point, for a differential or power measurement |
 | Click a wire or a pin | Light up the whole net it is on, and say what is joined to it |
 | `F9` / `F10` | Collapse the palette / the properties panel |
+| `Ctrl` `PgDn` / `Ctrl` `PgUp` | The next / previous sheet, on a drawing split into pages |
 | Arrow keys | Move the selection by one grid square — **Shift** for one unit, which is how to place something off the grid |
 | `Tab` / `Shift` `Tab` | Step to the next part on the sheet, and the previous. Brings it into view if it is not |
 | `Enter` | Drop the armed part in the middle of the view, for placing one without a pointer |

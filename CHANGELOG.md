@@ -8,6 +8,35 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**A drawing can be spread over sheets.** `View > Add Sheet` puts a strip of tabs above the canvas,
+and each tab is a page — a supply page, a logic page, an I/O page. Double-click the tab you are on
+to rename it; `Ctrl` `PgDn` and `Ctrl` `PgUp` step between them.
+
+Sheets change nothing about the circuit. Every page goes to the solver together, as one network, and
+two pages are joined exactly the way two ends of one large page are joined: by naming a net. That is
+also the difference between a sheet and a block, which is the feature people reach for and then find
+does something else — a block *hides* a section behind one symbol with pins, a sheet just puts an
+ordinary section of the schematic on another page.
+
+What is on another page is genuinely not there rather than hidden: it is not drawn, cannot be
+clicked, dragged, tabbed to or caught by a box selection, and changing page clears the selection, so
+`Delete` cannot reach something nobody can see. A part you place or paste lands on the page in front
+of you, which is also how a block is moved between pages. Export and print give you the page you are
+on, because every page starts its coordinates in the same corner and one file with all of them in it
+would be every page drawn on top of the first.
+
+The first sheet you add makes two: everything already drawn becomes page one without a single part
+being relabelled, so splitting a schematic you have been working on for a week costs one menu item.
+Removing a page moves what was on it to the page beside it rather than deleting it — losing a page
+should cost the arrangement, not the circuit — and the last page cannot be removed. A circuit saved
+before any of this opens as one page with no tab strip, and its file is byte-for-byte what it was.
+
+**Opening a circuit brought back its parts and left the rest of the document behind.** The named
+numbers, the requirements and the recorded baseline are all saved and were all being dropped on the
+way in — a circuit with parameters opened as one whose parts pointed at names that no longer existed.
+Sheets are what made it obvious, since a document that forgets its pages arrives as every page drawn
+on top of the first. Undo took the same path, so it had the same hole.
+
 **Find on the sheet can now change what it found.** Search for `10k`, pick a setting every match
 has, and set them all, bind them all to a parameter, or take the value they already share and give
 it a name. The picker only offers settings every match has, so a change cannot silently skip half of

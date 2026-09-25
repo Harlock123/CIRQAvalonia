@@ -64,6 +64,17 @@ public class CircuitCanvas : Control
     public static readonly StyledProperty<IReadOnlyDictionary<WireSegment, double>?> WireCurrentsProperty =
         AvaloniaProperty.Register<CircuitCanvas, IReadOnlyDictionary<WireSegment, double>?>(nameof(WireCurrents));
 
+    /// <summary>
+    /// Which page of the drawing is on screen, or null for a document that has only one.
+    /// <para>
+    /// Everything the canvas enumerates goes through <see cref="Visible"/> rather than through the
+    /// circuit directly, and that is not tidiness: a part left out of the drawing but still hit
+    /// tested is a part you can select, drag and delete without being able to see it.
+    /// </para>
+    /// </summary>
+    public static readonly StyledProperty<string?> SheetProperty =
+        AvaloniaProperty.Register<CircuitCanvas, string?>(nameof(Sheet));
+
     public static readonly StyledProperty<bool> ShowHoverDetailsProperty =
         AvaloniaProperty.Register<CircuitCanvas, bool>(nameof(ShowHoverDetails), true);
 
@@ -144,6 +155,41 @@ public class CircuitCanvas : Control
         get => GetValue(WireCurrentsProperty);
         set => SetValue(WireCurrentsProperty, value);
     }
+
+    public string? Sheet
+    {
+        get => GetValue(SheetProperty);
+        set => SetValue(SheetProperty, value);
+    }
+
+    /// <summary>
+    /// Leaves a page. Whatever was selected on it is dropped, because a selection nobody can see is
+    /// a Delete key pointed at parts on another page — and the handles, the hover and the pending
+    /// wire all belong to the page they were started on.
+    /// </summary>
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+
+        if (change.Property != SheetProperty) return;
+
+        if (Circuit is { } circuit)
+            foreach (var component in circuit.Components)
+                component.IsSelected = false;
+
+        if (SelectedComponent is { } chosen && !Visible.Contains(chosen)) SelectedComponent = null;
+
+        // A wire half-drawn on the page just left has nowhere to land, and the hover belongs to
+        // whatever the pointer was over there.
+        _wireStart = null;
+        _wireWaypoints.Clear();
+        _hoverTerminal = null;
+        _hoverComponent = null;
+    }
+
+    /// <summary>What is on the page being shown. Everything, for a document with one page.</summary>
+    private IReadOnlyList<CircuitComponent> Visible =>
+        Circuit is not { } circuit ? [] : [.. circuit.OnSheet(Sheet)];
 
     public bool ShowLiveValues
     {
@@ -242,7 +288,7 @@ public class CircuitCanvas : Control
             CircuitProperty, ActiveToolProperty, SelectedComponentProperty,
             ZoomProperty, GridSizeProperty, ShowGridProperty, PendingItemProperty, ShowHoverDetailsProperty,
             ShowCurrentFlowProperty, WireCurrentsProperty,
-            ShowLiveValuesProperty, LiveValuesProperty,
+            ShowLiveValuesProperty, LiveValuesProperty, SheetProperty,
             ShowInteractiveMarkersProperty);
     }
 
@@ -343,7 +389,7 @@ public class CircuitCanvas : Control
     private void FitTo(Size viewport)
     {
         var circuit = Circuit;
-        if (circuit is null || circuit.Components.Count == 0)
+        if (circuit is null || Visible.Count == 0)
         {
             Zoom = 1.0;
             _panOffset = new Point(viewport.Width / 2, viewport.Height / 2);
@@ -368,7 +414,7 @@ public class CircuitCanvas : Control
             maxY = Math.Max(maxY, y);
         }
 
-        foreach (var component in circuit.Components)
+        foreach (var component in Visible)
         {
             var bounds = VisualBoundsOf(component);
             Include(bounds.Left, bounds.Top);
@@ -377,7 +423,7 @@ public class CircuitCanvas : Control
 
         // Wires route orthogonally through waypoints that can sit well outside the parts they
         // join, so a circuit steered round an obstacle is wider than its components are.
-        foreach (var wire in circuit.Wires)
+        foreach (var wire in circuit.WiresOn(Sheet))
             foreach (var waypoint in wire.Waypoints)
                 Include(waypoint.X, waypoint.Y);
 
@@ -432,7 +478,7 @@ public class CircuitCanvas : Control
             CircuitRenderer.Draw(canvas, circuit,
                 new CircuitRenderOptions(
                     Zoom, SelectedComponent, ShowInteractiveMarkers, HighlightedNet: _highlightedNet,
-                    Live: ShowLiveValues ? LiveValues : null));
+                    Live: ShowLiveValues ? LiveValues : null, Sheet: Sheet));
 
             // Editing aids rather than part of the circuit, so they stay here and out of an export.
             DrawCurrentFlow(canvas, circuit);
@@ -468,7 +514,7 @@ public class CircuitCanvas : Control
         var seconds = Environment.TickCount64 / 1000.0;
         var radius = Math.Clamp(3.0 / Zoom, 1.5, 6.0);
 
-        foreach (var wire in circuit.Wires)
+        foreach (var wire in circuit.WiresOn(Sheet))
         {
             if (!currents.TryGetValue(wire, out var amps)) continue;
             if (wire.SourceTerminal is null || wire.TargetTerminal is null) continue;
@@ -561,7 +607,7 @@ public class CircuitCanvas : Control
     {
         var showAll = ActiveTool is EditorTool.Wire or EditorTool.Probe;
 
-        foreach (var component in circuit.Components)
+        foreach (var component in Visible)
         {
             foreach (var terminal in component.Terminals)
             {
@@ -627,7 +673,7 @@ public class CircuitCanvas : Control
         Terminal? best = null;
         var bestDistance = radius;
 
-        foreach (var component in circuit.Components)
+        foreach (var component in Visible)
         {
             foreach (var terminal in component.Terminals)
             {
@@ -647,9 +693,11 @@ public class CircuitCanvas : Control
         var circuit = Circuit;
         if (circuit is null) return null;
 
-        for (var i = circuit.Components.Count - 1; i >= 0; i--)
+        var visible = Visible;
+
+        for (var i = visible.Count - 1; i >= 0; i--)
         {
-            var component = circuit.Components[i];
+            var component = visible[i];
             if (BoundsOf(component).Contains(new Point(world.X, world.Y))) return component;
         }
 
@@ -720,7 +768,7 @@ public class CircuitCanvas : Control
 
         var tolerance = 6.0 / Zoom;
 
-        foreach (var wire in circuit.Wires)
+        foreach (var wire in circuit.WiresOn(Sheet))
         {
             if (wire.SourceTerminal is null || wire.TargetTerminal is null) continue;
             var path = CircuitRenderer.BuildWirePath(wire).ToList();
@@ -908,7 +956,7 @@ public class CircuitCanvas : Control
             // nothing to do but let it be a click on empty space.
             if (band.Width > 2 && band.Height > 2 && Circuit is { } circuit)
             {
-                var caught = ComponentsWithin(circuit, band);
+                var caught = ComponentsWithin(circuit, band, Sheet);
                 SetSelection(caught);
 
                 StatusChanged?.Invoke(this, caught.Count switch
@@ -961,6 +1009,10 @@ public class CircuitCanvas : Control
         var component = item.Create();
         component.X = position.X;
         component.Y = position.Y;
+
+        // Onto the page being looked at, or it would be placed where it cannot be seen.
+        if (Sheet is { Length: > 0 } sheet && circuit.Sheets.Contains(sheet)) component.Sheet = sheet;
+
         circuit.Add(component);
 
         SelectedComponent = component;
@@ -1231,7 +1283,12 @@ public class CircuitCanvas : Control
     /// </para>
     /// </summary>
     public static IReadOnlyList<CircuitComponent> ComponentsWithin(Circuit circuit, Rect band) =>
-        [.. circuit.Components.Where(c => band.Contains(BoundsOf(c)))];
+        ComponentsWithin(circuit, band, null);
+
+    /// <summary>The same, limited to one page of the drawing.</summary>
+    public static IReadOnlyList<CircuitComponent> ComponentsWithin(
+        Circuit circuit, Rect band, string? sheet) =>
+        [.. circuit.OnSheet(sheet).Where(c => band.Contains(BoundsOf(c)))];
 
     public void RotateSelection()
     {
@@ -1345,7 +1402,7 @@ public class CircuitCanvas : Control
         var circuit = Circuit;
         if (circuit is null) return false;
 
-        var parts = circuit.Components.Where(c => c is not IAnnotation).ToList();
+        var parts = Visible.Where(c => c is not IAnnotation).ToList();
 
         if (parts.Count == 0) return false;
 

@@ -32,7 +32,7 @@ Core ← Engine ← Components ← UI, which keeps the whole engine headless-tes
 
 ```bash
 dotnet run --project src/Cirq.UI     # the editor
-dotnet test                          # 3428 tests
+dotnet test                          # 3526 tests
 ./scripts/build-guide.sh             # the user guide as a PDF
 ```
 
@@ -530,6 +530,7 @@ one passes against a button that would never have fired.
 | Spectrum | The transform of a constant landing entirely in the first bin, a length that is not a power of two refused rather than quietly wrong, a sine reading its own amplitude under all three windows, the DC term in bin zero at its own value, the peak found past the DC lobe rather than in its skirt, a square wave's odd harmonics at a third, a fifth and a seventh with no even ones at all, a modulated carrier's sidebands at half the modulation depth and nothing at twice the spacing, windowing keeping an awkward tone from smearing across everything, unevenly spaced samples still giving the right frequency and amplitude, and a transform no larger than the samples support |
 | Power and interface | A PPTC carrying its hold current for ever and tripping on a fault to a trickle rather than to nothing, and cooling back far slower than it tripped; a solid-state relay commanded at a mains peak refusing to fire until the next zero crossing and then conducting properly; an LM324 running four independent followers off one supply pair with the fourth saturating exactly where its family's headroom says; an A4988 holding 0.8 A out of a supply that would otherwise force 4.3 A, reversing the winding rather than switching it off, and commanding intermediate currents when microstepping is selected; and a MAX232 making ±8.5 V from a single 5 V rail, inverting TTL onto the line and back, deciding with half a volt of hysteresis, and sagging its pump when the line load is heavier than the standard allows |
 | New devices | Tri-state outputs genuinely releasing a bus where a pull-down alone then decides it, a CAN bus going dominant whenever any node sends a zero and the recessive node knowing it lost, an IGBT conducting with a voltage offset where a MOSFET holds a resistance and still passing current after its gate has gone, a photodiode linear across decades with a thousandth of a phototransistor's current and saturating when its load resistor is too big, and a synchronous counter whose carry is gated by the enable that chains it |
+| Sheets | Each page showing its own parts and an unsplit drawing being all one page, a part naming a page that has been removed landing on the first rather than nowhere, the netlist being the same netlist however the pages are cut, the first added sheet making two without relabelling anything, a name already taken made unique, a rename bringing its parts and its tab, a blank or colliding one refused, removing a page moving what was on it rather than deleting it, the last page staying, a wire belonging to the page its ends are on, a band selection and a pasted part both respecting the page on screen, leaving a page dropping the selection on it while keeping a part on the page being gone to, and a saved circuit coming back with its pages, its tabs and the numbers it gives names to — plus a one-page circuit whose file is byte-for-byte what it always was |
 | Box selection | A part caught only when wholly inside the box and not when clipped, captions excluded from the test, a group copying with the wires between its members and without the ones leaving it, the copy keeping its shape, two pastes giving two separately wired groups, and a copied divider solving to the same midpoint voltage as the original |
 | Example browser | Every example filed under exactly one group and no group left empty or enormous, the flattened list carrying the group each came from, opening with something already described, searching narrowing to what matches across name, description and group, a search opening whatever it matched, an empty result saying so, selecting one row unmarking the rest, and opening and cancelling each closing with and without a choice |
 | Audio files | A WAV surviving a round trip to sixteen-bit accuracy, loud samples clipped rather than wrapped, 8/16/24/32-bit and stereo files read, a speaker's recording landing on a fixed grid at the frequency and level fed to it whatever the solver did, a microphone playing a clip instead of its tone, an unreadable file reported rather than thrown, and a clip going in one end of an LM386 and coming out the other carrying the gain |
@@ -642,6 +643,15 @@ what changed in values rather than in braces, matching parts by identity so one 
 is still the same part. **Design Report** writes one self-contained HTML page with the schematic as
 SVG, the requirements and their verdicts, and the parts. And **New Window** (`Ctrl+Shift+N`) opens
 a second editor sharing the clipboard, for comparing two designs or carrying a block between them.
+
+**A drawing can be spread over sheets.** `View > Add Sheet` puts a strip of tabs above the canvas —
+a supply page, a logic page, an I/O page — and what is on another page is genuinely not there: not
+drawn, not clickable, not caught by a box selection, and not left selected when the page changes. The
+circuit is unaffected: every page is solved together as one network, and two pages join the way two
+ends of one large page already do, by naming a net. That is the difference between a sheet and a
+block — a block hides its contents behind a symbol, a sheet just puts them on another page. The
+first sheet you add makes two, so splitting a schematic already drawn moves nothing; removing one
+moves its parts to the page beside it rather than deleting them.
 
 When the solver cannot find an answer it now says **where**: the net that was still moving, what is
 attached to it, and any part that said it had not settled — all of which name somewhere on the

@@ -33,6 +33,143 @@ public partial class Circuit : ObservableObject
     public ObservableCollection<CircuitParameter> Parameters { get; } = [];
 
     /// <summary>
+    /// The pages this drawing is spread over, in order. Empty for a circuit on one sheet, which is
+    /// most of them and every circuit written before sheets existed.
+    /// <para>
+    /// A real design is a power supply page, a logic page and an I/O page rather than one enormous
+    /// sheet, and the parts of it that connect do so by name. Blocks give <i>hierarchy</i> — a
+    /// section drawn as one symbol — which is a different thing: a block hides its contents, a
+    /// sheet just puts them somewhere else.
+    /// </para>
+    /// </summary>
+    public ObservableCollection<string> Sheets { get; } = [];
+
+    /// <summary>
+    /// What is drawn on one sheet. Everything, when the document has no sheets — a circuit that has
+    /// never been split is one page whatever anything is labelled.
+    /// </summary>
+    public IEnumerable<CircuitComponent> OnSheet(string? sheet) =>
+        Sheets.Count == 0 || sheet is null
+            ? Components
+            : Components.Where(c => Belongs(c, sheet));
+
+    /// <summary>
+    /// Whether a part belongs to a sheet. A part whose sheet is empty, or names one that has since
+    /// been removed, is on the first — better somewhere visible than nowhere at all.
+    /// </summary>
+    public bool Belongs(CircuitComponent component, string sheet)
+    {
+        ArgumentNullException.ThrowIfNull(component);
+
+        if (Sheets.Count == 0) return true;
+
+        var own = component.Sheet;
+
+        return own.Length == 0 || !Sheets.Contains(own)
+            ? sheet == Sheets[0]
+            : string.Equals(own, sheet, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Adds a page, and returns what it ended up called.
+    /// <para>
+    /// The first call splits a drawing that has never been split. Everything already on it becomes
+    /// page one without being relabelled — a part that names no sheet is on the first — so a
+    /// circuit drawn before sheets existed acquires them without a single part moving.
+    /// </para>
+    /// </summary>
+    public string AddSheet(string? name = null)
+    {
+        if (Sheets.Count == 0) Sheets.Add("Sheet 1");
+
+        var wanted = string.IsNullOrWhiteSpace(name) ? $"Sheet {Sheets.Count + 1}" : name.Trim();
+        var chosen = wanted;
+
+        for (var i = 2; Sheets.Any(s => string.Equals(s, chosen, StringComparison.OrdinalIgnoreCase)); i++)
+            chosen = $"{wanted} {i}";
+
+        Sheets.Add(chosen);
+
+        return chosen;
+    }
+
+    /// <summary>
+    /// Renames a page, bringing what is on it along. False when there is no such page, when the
+    /// new name is blank, or when something else already has it.
+    /// </summary>
+    public bool RenameSheet(string from, string to)
+    {
+        var index = IndexOfSheet(from);
+        if (index < 0) return false;
+
+        var wanted = to?.Trim() ?? string.Empty;
+        if (wanted.Length == 0) return false;
+        if (string.Equals(wanted, Sheets[index], StringComparison.Ordinal)) return true;
+        if (Sheets.Any(s => string.Equals(s, wanted, StringComparison.OrdinalIgnoreCase))) return false;
+
+        // Parts name the page they are on, so they follow the name. The ones naming nothing are
+        // left alone: they are on the first page by saying nothing, and writing the name into them
+        // would turn an implicit arrangement into a permanent one.
+        foreach (var component in Components)
+            if (string.Equals(component.Sheet, Sheets[index], StringComparison.Ordinal))
+                component.Sheet = wanted;
+
+        Sheets[index] = wanted;
+
+        return true;
+    }
+
+    /// <summary>
+    /// Takes a page out, moving what was on it to the page beside it.
+    /// <para>
+    /// Deleting the parts would be the other reading, and the wrong one: the pages are a way of
+    /// arranging a drawing, so losing one should cost the arrangement rather than the circuit.
+    /// Anything that has to go can be selected and deleted, which says so.
+    /// </para>
+    /// <para>
+    /// The last page cannot be removed — a drawing is on at least one.
+    /// </para>
+    /// </summary>
+    public bool RemoveSheet(string name)
+    {
+        var index = IndexOfSheet(name);
+        if (index < 0 || Sheets.Count <= 1) return false;
+
+        var moved = Sheets[index == 0 ? 1 : index - 1];
+
+        foreach (var component in Components.Where(c => Belongs(c, Sheets[index])).ToList())
+            component.Sheet = moved;
+
+        Sheets.RemoveAt(index);
+
+        return true;
+    }
+
+    private int IndexOfSheet(string? name)
+    {
+        if (name is null) return -1;
+
+        for (var i = 0; i < Sheets.Count; i++)
+            if (string.Equals(Sheets[i], name, StringComparison.Ordinal)) return i;
+
+        return -1;
+    }
+
+    /// <summary>
+    /// The wires drawn on one sheet.
+    /// <para>
+    /// A wire has no sheet of its own: it is on the page its ends are on. That cannot disagree with
+    /// itself, because a wire is drawn by clicking two pins and only one page's pins are on screen
+    /// — and it means splitting a drawing into sheets never has to move the wires, only the parts.
+    /// A part connects to another page by name, which is what net labels are for.
+    /// </para>
+    /// </summary>
+    public IEnumerable<WireSegment> WiresOn(string? sheet) =>
+        Sheets.Count == 0 || sheet is null
+            ? Wires
+            : Wires.Where(w => w.SourceTerminal?.Owner is { } owner && Belongs(owner, sheet));
+
+    /// <summary>
     /// What this circuit produced when somebody last said "this is right", kept so that what it
     /// produces next can be held against it.
     /// <para>
@@ -103,12 +240,20 @@ public partial class Circuit : ObservableObject
 
     public void Remove(WireSegment wire) => Wires.Remove(wire);
 
+    /// <summary>
+    /// Empties the document — everything saved with it, not only the parts. A page arrangement, a
+    /// set of named numbers or a recorded baseline left behind from the last circuit would belong
+    /// to nothing.
+    /// </summary>
     public void Clear()
     {
         Probes.Clear();
         Specs.Clear();
         Wires.Clear();
         Components.Clear();
+        Parameters.Clear();
+        Sheets.Clear();
+        Baseline = Cirq.Core.Probing.TraceBaseline.Empty;
     }
 
     /// <summary>Resolves the current topology into a netlist.</summary>

@@ -126,6 +126,11 @@
                   IsChecked="{Binding IsPaletteExpanded, Mode=TwoWay}" />
         <MenuItem Header="P_roperties Panel" InputGesture="F10" ToggleType="CheckBox"
                   IsChecked="{Binding IsInspectorExpanded, Mode=TwoWay}" />
+        <Separator />
+        <MenuItem Header="_Add Sheet" Command="{Binding AddSheetCommand}"
+                  ToolTip.Tip="Spread this drawing over pages — a supply page, a logic page. They join by net name, and the circuit is solved as one" />
+        <MenuItem Header="Re_move Sheet" Command="{Binding RemoveSheetCommand}"
+                  ToolTip.Tip="Take the current page out; what is on it moves to the page beside it" />
       </MenuItem>
 
       <MenuItem Header="_Simulate">
@@ -327,8 +332,58 @@
       <GridSplitter Grid.Column="1" Background="{DynamicResource SplitterBackground}" IsVisible="{Binding IsPaletteExpanded}" />
 
       <!-- Canvas over scope -->
-      <Grid Grid.Column="2" RowDefinitions="*,4,300">
-        <controls:CircuitCanvas Grid.Row="0" Name="Canvas"
+      <Grid Grid.Column="2" RowDefinitions="Auto,*,4,300">
+
+        <!-- Sheet tabs. Absent entirely until the drawing has been split, because a strip with one
+             tab on it is a row of furniture that explains nothing. Add Sheet under the View menu
+             is how the first one arrives. -->
+        <Border Grid.Row="0" IsVisible="{Binding HasSheets}" Padding="8,5,8,0"
+                Background="{DynamicResource PanelBackground}">
+          <DockPanel>
+
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4"
+                        VerticalAlignment="Bottom">
+              <TextBlock Text="{Binding SheetSummary}" VerticalAlignment="Center" Opacity="0.6"
+                         FontSize="11" Margin="0,0,6,3" />
+              <Button Content="+" Classes="sheet" Command="{Binding AddSheetCommand}"
+                      AutomationProperties.Name="Add a sheet"
+                      ToolTip.Tip="Another page of this drawing" />
+              <Button Content="&#x2715;" Classes="sheet" Command="{Binding RemoveSheetCommand}"
+                      AutomationProperties.Name="Remove this sheet"
+                      ToolTip.Tip="Take this page out. What is on it moves to the page beside it — nothing is deleted" />
+            </StackPanel>
+
+            <ItemsControl Name="SheetTabs" ItemsSource="{Binding SheetTabs}"
+                          AutomationProperties.Name="Sheets">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <StackPanel Orientation="Horizontal" Spacing="3" />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:SheetTabViewModel">
+                  <Button Classes="sheet" Classes.current="{Binding IsCurrent}"
+                          AutomationProperties.Name="{Binding Name}"
+                          Click="OnSheetTabClicked" DoubleTapped="OnSheetTabDoubleTapped"
+                          ToolTip.Tip="Double-click the page you are on to rename it">
+                    <Panel>
+                      <TextBlock Text="{Binding Name}" IsVisible="{Binding !IsEditing}" />
+                      <TextBox Text="{Binding Name, Mode=TwoWay}" IsVisible="{Binding IsEditing}"
+                               AutomationProperties.Name="What to call this sheet"
+                               MinWidth="80" Padding="0" FontSize="12" BorderThickness="0"
+                               Background="Transparent"
+                               KeyDown="OnSheetNameKeyDown" LostFocus="OnSheetNameCommitted" />
+                    </Panel>
+                  </Button>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+          </DockPanel>
+        </Border>
+
+        <controls:CircuitCanvas Grid.Row="1" Name="Canvas"
+                                Sheet="{Binding CurrentSheet}"
                                 Circuit="{Binding Circuit}"
                                 ActiveTool="{Binding ActiveTool}"
                                 SelectedComponent="{Binding SelectedComponent, Mode=TwoWay}"
@@ -341,9 +396,9 @@
                                 SnapToGrid="{Binding SnapToGrid}"
                                 GridSize="{Binding GridSize}" />
 
-        <GridSplitter Grid.Row="1" Background="{DynamicResource SplitterBackground}" />
+        <GridSplitter Grid.Row="2" Background="{DynamicResource SplitterBackground}" />
 
-        <Border Grid.Row="2" Classes="panel" BorderThickness="0,1,0,0">
+        <Border Grid.Row="3" Classes="panel" BorderThickness="0,1,0,0">
           <views:ScopePanel Name="Scope" DataContext="{Binding Scope}" />
         </Border>
       </Grid>

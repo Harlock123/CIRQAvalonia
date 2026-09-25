@@ -122,6 +122,7 @@ public static class CircuitSerializer
         copy.X = record.X;
         copy.Y = record.Y;
         copy.RotationDegrees = record.Rotation;
+        copy.Sheet = record.Sheet ?? string.Empty;
 
         ApplyParameters(copy, record, collected);
 
@@ -224,6 +225,8 @@ public static class CircuitSerializer
                 IsEnabled = spec.IsEnabled,
             })];
         }
+
+        if (circuit.Sheets.Count > 0) document.Sheets = [.. circuit.Sheets];
 
         if (circuit.Parameters.Count > 0)
         {
@@ -358,6 +361,8 @@ public static class CircuitSerializer
         if (component.Expressions.Count > 0)
             record.Expressions = new Dictionary<string, string>(component.Expressions);
 
+        if (component.Sheet.Length > 0) record.Sheet = component.Sheet;
+
         return record;
     }
 
@@ -469,6 +474,7 @@ public static class CircuitSerializer
             component.Name = record.Name;
             component.X = record.X;
             component.Y = record.Y;
+            component.Sheet = record.Sheet ?? string.Empty;
             component.RotationDegrees = record.Rotation;
 
             ApplyParameters(component, record, result.Warnings);
@@ -598,6 +604,8 @@ public static class CircuitSerializer
 
             circuit.Specs.Add(spec);
         }
+
+        foreach (var sheet in document.Sheets ?? []) circuit.Sheets.Add(sheet);
 
         foreach (var record in document.Parameters ?? [])
         {

@@ -25,6 +25,11 @@ namespace Cirq.UI.Rendering;
 /// export: it answers a question somebody asked on the canvas rather than being part of the
 /// drawing.
 /// </param>
+/// <param name="Sheet">
+/// Which page of the drawing to draw, or null for a document with one page. A part on another
+/// sheet is not drawn and, because the canvas hit tests through the same filter, cannot be
+/// selected either.
+/// </param>
 /// <param name="Live">
 /// What the circuit was doing at the last solved point — each net's voltage and each part's
 /// current — written onto the drawing. Null leaves it off, which is the default and what an
@@ -42,7 +47,8 @@ public sealed record CircuitRenderOptions(
     bool ShowProbes = true,
     bool ShowSelection = true,
     NetHighlight? HighlightedNet = null,
-    LiveSnapshot? Live = null);
+    LiveSnapshot? Live = null,
+    string? Sheet = null);
 
 /// <summary>
 /// Draws a whole circuit — wires, symbols, captions and probes — onto any <see cref="ISymbolCanvas"/>.
@@ -75,7 +81,7 @@ public static class CircuitRenderer
 
     private static void DrawWires(ISymbolCanvas canvas, Circuit circuit, CircuitRenderOptions options)
     {
-        foreach (var wire in circuit.Wires)
+        foreach (var wire in circuit.WiresOn(options.Sheet))
         {
             if (wire.SourceTerminal is null || wire.TargetTerminal is null) continue;
 
@@ -97,7 +103,7 @@ public static class CircuitRenderer
         }
 
         // Junction dots wherever three or more wire ends meet.
-        foreach (var junction in FindJunctions(circuit))
+        foreach (var junction in FindJunctions(circuit, options.Sheet))
             canvas.DrawEllipse(CanvasTheme.WireBrush, null, new Point(junction.X, junction.Y), 4, 4);
     }
 
@@ -128,10 +134,10 @@ public static class CircuitRenderer
         yield return new CorePoint(to.X, from.Y);
     }
 
-    private static IEnumerable<CorePoint> FindJunctions(Circuit circuit)
+    private static IEnumerable<CorePoint> FindJunctions(Circuit circuit, string? sheet)
     {
         var counts = new Dictionary<(double, double), int>();
-        foreach (var wire in circuit.Wires)
+        foreach (var wire in circuit.WiresOn(sheet))
         {
             if (wire.SourceTerminal is null || wire.TargetTerminal is null) continue;
             foreach (var terminal in new[] { wire.SourceTerminal, wire.TargetTerminal })
@@ -154,9 +160,11 @@ public static class CircuitRenderer
         // Annotations first, so a box drawn round a section ends up behind the parts in it rather
         // than over the top of them. Ordering them here rather than sorting the circuit keeps the
         // document's order — which is what undo and the parts list use — unchanged.
-        var ordered = circuit.Components
+        var onSheet = circuit.OnSheet(options.Sheet).ToList();
+
+        var ordered = onSheet
             .Where(c => c is IAnnotation)
-            .Concat(circuit.Components.Where(c => c is not IAnnotation));
+            .Concat(onSheet.Where(c => c is not IAnnotation));
 
         foreach (var component in ordered)
         {
@@ -283,7 +291,7 @@ public static class CircuitRenderer
                 new Point(net.At.X + NetReadingReach, net.At.Y - NetReadingRise), options.Zoom);
         }
 
-        foreach (var component in Flattening.Flatten(circuit.Components))
+        foreach (var component in Flattening.Flatten(circuit.OnSheet(options.Sheet)))
         {
             if (component is IAnnotation) continue;
             if (live.For(component) is not { } reading) continue;
@@ -391,19 +399,24 @@ public static class CircuitRenderer
     /// return for nothing at all.
     /// </para>
     /// </summary>
-    public static Rect BoundsOf(Circuit circuit)
+    public static Rect BoundsOf(Circuit circuit) => BoundsOf(circuit, null);
+
+    /// <summary>
+    /// The rectangle one sheet of a circuit occupies. The whole circuit when it has no sheets.
+    /// </summary>
+    public static Rect BoundsOf(Circuit circuit, string? sheet)
     {
         var bounds = default(Rect);
         var any = false;
 
-        foreach (var component in circuit.Components)
+        foreach (var component in circuit.OnSheet(sheet))
         {
             var box = VisualBounds(component);
             bounds = any ? bounds.Union(box) : box;
             any = true;
         }
 
-        foreach (var wire in circuit.Wires)
+        foreach (var wire in circuit.WiresOn(sheet))
         {
             if (wire.SourceTerminal is null || wire.TargetTerminal is null) continue;
 

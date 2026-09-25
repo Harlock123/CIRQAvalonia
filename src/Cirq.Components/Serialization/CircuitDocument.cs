@@ -61,6 +61,13 @@ public sealed class CircuitDocument
     /// </summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<ParameterRecord>? Parameters { get; set; }
+
+    /// <summary>
+    /// The pages this drawing is spread over. Null for a circuit on one sheet, which is most of
+    /// them — so an ordinary file is byte for byte what it was.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<string>? Sheets { get; set; }
 }
 
 /// <summary>One named number, as the file holds it.</summary>
@@ -167,6 +174,13 @@ public sealed class ComponentRecord
     public double Y { get; set; }
 
     public double Rotation { get; set; }
+
+    /// <summary>
+    /// Which sheet this is drawn on. Null for a part on the only sheet, and in every file written
+    /// before sheets existed — where it means the same thing.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Sheet { get; set; }
 
     /// <summary>
     /// Values a component needs at construction time because they shape its pins — a gate's input

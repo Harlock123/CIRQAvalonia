@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using Cirq.UI.Controls;
 using Cirq.UI.Services;
 using Cirq.Components.Explaining;
@@ -299,7 +300,7 @@ public partial class MainWindow : Window
             var report = new ReportContent(
                 _viewModel.Circuit.Title.Length > 0 ? _viewModel.Circuit.Title : "Circuit",
                 Notes: string.Empty,
-                Schematic: SchematicSvg(_viewModel.Circuit),
+                Schematic: SchematicSvg(_viewModel.Circuit, _viewModel.CurrentSheet),
                 Specs: SpecCheck.EvaluateAllFrom(
                     _viewModel.Circuit.Specs, SpecsViewModel.Samples(_viewModel.Circuit)),
                 Explanations: CircuitExplainer.Explain(_viewModel.Circuit));
@@ -318,7 +319,7 @@ public partial class MainWindow : Window
     /// The schematic as SVG, through the ordinary exporter so the drawing in a report is the same
     /// drawing an export produces — and a temporary file, because that is the exporter's door.
     /// </summary>
-    private static string? SchematicSvg(Cirq.Core.Topology.Circuit circuit)
+    private static string? SchematicSvg(Cirq.Core.Topology.Circuit circuit, string? sheet)
     {
         var temporary = Path.Combine(Path.GetTempPath(), $"cirq-report-{Guid.NewGuid():N}.svg");
 
@@ -326,7 +327,7 @@ public partial class MainWindow : Window
         {
             CircuitExporter.Export(
                 circuit, null, temporary,
-                new ExportOptions(ExportFormat.Svg, ExportContent.Schematic));
+                new ExportOptions(ExportFormat.Svg, ExportContent.Schematic, Sheet: sheet));
 
             var svg = File.ReadAllText(temporary);
 
@@ -636,7 +637,8 @@ public partial class MainWindow : Window
                     ExportFormat.Pdf,
                     model.Content,
                     IncludePartsList: model.IncludePartsList,
-                    Live: _viewModel.ShowLiveValues ? _viewModel.Readings() : null),
+                    Live: _viewModel.ShowLiveValues ? _viewModel.Readings() : null,
+                    Sheet: _viewModel.CurrentSheet),
                 model.Setup);
 
             _viewModel.StatusMessage = PrintService.Send(path).Message;
@@ -763,6 +765,17 @@ public partial class MainWindow : Window
         {
             switch (e.Key)
             {
+                // Sheets, on a drawing split into pages. Ctrl-held because PageDown on its own
+                // belongs to whatever list has the focus.
+                case Key.PageDown:
+                    _viewModel?.NextSheetCommand.Execute(null);
+                    e.Handled = true;
+                    return;
+                case Key.PageUp:
+                    _viewModel?.PreviousSheetCommand.Execute(null);
+                    e.Handled = true;
+                    return;
+
                 case Key.OemPlus or Key.Add:
                     _viewModel?.ZoomInCommand.Execute(null);
                     e.Handled = true;
@@ -824,4 +837,91 @@ public partial class MainWindow : Window
 
         base.OnKeyDown(e);
     }
+
+    // ---- sheet tabs ------------------------------------------------------
+
+    /// <summary>
+    /// Goes to the page a tab is for.
+    /// <para>
+    /// Handled here rather than by a command on the tab, because a tab is a button wrapped round a
+    /// label and a text box, and the interesting half of it — the rename — is an interaction rather
+    /// than a command anyway.
+    /// </para>
+    /// </summary>
+    private void OnSheetTabClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (_viewModel is null) return;
+        if (Tab(sender) is not { } tab) return;
+
+        // A click while the name is being typed is a click in the box, not a change of page.
+        if (tab.IsEditing) return;
+
+        _viewModel.ShowSheetCommand.Execute(tab.Committed);
+    }
+
+    /// <summary>
+    /// Starts renaming the page on screen. Only that one: double-clicking another tab is somebody
+    /// going to it twice, and putting them into a rename they did not ask for.
+    /// </summary>
+    private void OnSheetTabDoubleTapped(object? sender, TappedEventArgs e)
+    {
+        if (Tab(sender) is not { } tab || !tab.IsCurrent) return;
+
+        tab.Committed = tab.Name;
+        tab.IsEditing = true;
+
+        // The box only exists once the tab has been told to show it, so the focus waits a beat.
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (sender is not Control control) return;
+
+            if (control.GetVisualDescendants().OfType<TextBox>().FirstOrDefault() is not { } box)
+                return;
+
+            box.Focus();
+            box.SelectAll();
+        });
+
+        e.Handled = true;
+    }
+
+    private void OnSheetNameKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (Tab(sender) is not { } tab) return;
+
+        switch (e.Key)
+        {
+            case Key.Enter:
+                Commit(tab);
+                e.Handled = true;
+                break;
+
+            case Key.Escape:
+                // Back to the name it had, which is the whole point of remembering it.
+                tab.Name = tab.Committed;
+                tab.IsEditing = false;
+                e.Handled = true;
+                break;
+        }
+    }
+
+    private void OnSheetNameCommitted(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (Tab(sender) is { IsEditing: true } tab) Commit(tab);
+    }
+
+    private void Commit(SheetTabViewModel tab)
+    {
+        tab.IsEditing = false;
+
+        if (string.Equals(tab.Name, tab.Committed, StringComparison.Ordinal)) return;
+
+        // A name the document will not take — blank, or one another page already has — puts back
+        // what it was and says so on the status line, rather than leaving a tab claiming a name
+        // that nothing on disk agrees with.
+        if (_viewModel?.RenameSheet(tab.Committed, tab.Name) != true) tab.Name = tab.Committed;
+    }
+
+    private static SheetTabViewModel? Tab(object? sender) =>
+        (sender as Control)?.DataContext as SheetTabViewModel;
 }
