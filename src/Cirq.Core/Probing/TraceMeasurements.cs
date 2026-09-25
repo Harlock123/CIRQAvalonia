@@ -26,6 +26,16 @@ namespace Cirq.Core.Probing;
 /// <param name="Frequency">Hertz, or null when fewer than two cycles are on screen.</param>
 /// <param name="DutyCycle">Fraction of a cycle spent above the midpoint, or null.</param>
 /// <param name="RiseTime">Ten to ninety percent on the first clean rising edge, or null.</param>
+/// <param name="FallTime">Ninety to ten percent on the first clean falling edge, or null.</param>
+/// <param name="Overshoot">
+/// How far past its settled value the trace went on the way there, as a fraction of the step it
+/// took. Null unless the trace actually is a step that settled — see <see cref="Settled"/>.
+/// </param>
+/// <param name="SettlingTime">
+/// From the moment the trace left its starting value to the last moment it was further than
+/// <see cref="SettlingBand"/> from where it ended up. Null on the same terms as the overshoot.
+/// </param>
+/// <param name="PulseWidth">How long the first complete pulse spent above the midpoint, or null.</param>
 public readonly record struct TraceMeasurements(
     int Count,
     double Minimum,
@@ -34,8 +44,27 @@ public readonly record struct TraceMeasurements(
     double Rms,
     double? Frequency,
     double? DutyCycle,
-    double? RiseTime)
+    double? RiseTime,
+    double? FallTime = null,
+    double? Overshoot = null,
+    double? SettlingTime = null,
+    double? PulseWidth = null)
 {
+    /// <summary>
+    /// How close to its final value a step has to get, as a fraction of the step, before it counts
+    /// as settled. Two percent is the figure control loops are specified in; five is the other
+    /// common one, and stating which is the only thing that makes a settling time comparable
+    /// between two datasheets.
+    /// </summary>
+    public const double SettlingBand = 0.02;
+
+    /// <summary>
+    /// Volts per second on the fastest edge, derived from the rise time the way a datasheet
+    /// derives it: the eighty percent of the swing that the ten-to-ninety measurement covers,
+    /// divided by how long it took. Null when there is no clean edge to measure.
+    /// </summary>
+    public double? SlewRate => RiseTime is { } rise and > 0 ? PeakToPeak * 0.8 / rise : null;
+
     /// <summary>Peak to peak, which is the number people mean by "how big is it".</summary>
     public double PeakToPeak => Maximum - Minimum;
 
@@ -93,12 +122,17 @@ public readonly record struct TraceMeasurements(
         var rms = Math.Sqrt(squares / samples.Count);
 
         var crossings = RisingCrossings(samples, minimum, maximum);
+        var (overshoot, settling) = StepFrom(samples, minimum, maximum);
 
         return new TraceMeasurements(
             samples.Count, minimum, maximum, mean, rms,
             FrequencyFrom(crossings),
             DutyFrom(samples, crossings, minimum, maximum),
-            RiseTimeFrom(samples, minimum, maximum));
+            EdgeTime(samples, minimum, maximum, rising: true),
+            EdgeTime(samples, minimum, maximum, rising: false),
+            overshoot,
+            settling,
+            PulseWidthFrom(samples, crossings, minimum, maximum));
     }
 
     /// <summary>
@@ -212,19 +246,35 @@ public readonly record struct TraceMeasurements(
     }
 
     /// <summary>
-    /// Ten to ninety percent of the first rising edge that goes all the way from one to the other
-    /// without turning back. That qualification matters: a ringing edge crosses ninety percent,
-    /// falls below it and crosses again, and timing to the last crossing would report a rise time
-    /// that is mostly settling.
+    /// Ten to ninety percent of the first edge that goes all the way from one to the other without
+    /// turning back, in whichever direction was asked for.
+    /// <para>
+    /// That qualification matters: a ringing edge crosses ninety percent, falls below it and
+    /// crosses again, and timing to the last crossing would report a rise time that is mostly
+    /// settling. Settling is its own measurement, below, and conflating the two makes both useless.
+    /// </para>
+    /// <para>
+    /// The two directions are one method because they are one measurement read upside down. Two
+    /// copies of this drifted apart in every codebase that has ever had them.
+    /// </para>
+    /// <para>
+    /// An edge that happens entirely between two samples gets <b>no</b> time rather than an
+    /// interpolated one. Both thresholds are crossed in the same interval and the loop wants them
+    /// in different ones, which looks like an oversight and is the right answer: any number
+    /// produced there would be a statement about the sample interval rather than about the
+    /// circuit. What is true is that the edge is faster than this can resolve.
+    /// </para>
     /// </summary>
-    private static double? RiseTimeFrom(
-        IReadOnlyList<DataPoint> samples, double minimum, double maximum)
+    private static double? EdgeTime(
+        IReadOnlyList<DataPoint> samples, double minimum, double maximum, bool rising)
     {
         var amplitude = maximum - minimum;
         if (amplitude <= 0) return null;
 
-        var low = minimum + (amplitude * 0.1);
-        var high = minimum + (amplitude * 0.9);
+        // The level the edge starts from and the one it arrives at. A fall runs from ninety down
+        // to ten, which is the same two lines crossed the other way about.
+        var from = minimum + (amplitude * (rising ? 0.1 : 0.9));
+        var to = minimum + (amplitude * (rising ? 0.9 : 0.1));
 
         double? leftAt = null;
 
@@ -233,27 +283,157 @@ public readonly record struct TraceMeasurements(
             var previous = samples[i - 1].Value;
             var value = samples[i].Value;
 
-            // Left the ten percent line going up: start the clock.
             if (leftAt is null)
             {
-                if (previous < low && value >= low) leftAt = Interpolate(samples[i - 1], samples[i], low);
+                if (Crossed(previous, value, from, rising))
+                    leftAt = Interpolate(samples[i - 1], samples[i], from);
+
                 continue;
             }
 
-            // Fell back below it before arriving: it was not the edge, so wait for the next one.
-            if (value < low)
+            // Fell back past the starting line before arriving: it was not the edge.
+            if (rising ? value < from : value > from)
             {
                 leftAt = null;
                 continue;
             }
 
-            if (previous < high && value >= high)
-            {
-                var arrived = Interpolate(samples[i - 1], samples[i], high);
-                var rise = arrived - leftAt.Value;
+            if (!Crossed(previous, value, to, rising)) continue;
 
-                return rise > 0 ? rise : null;
-            }
+            var span = Interpolate(samples[i - 1], samples[i], to) - leftAt.Value;
+
+            return span > 0 ? span : null;
+        }
+
+        return null;
+    }
+
+    /// <summary>True when the trace went through a level between two samples, the right way.</summary>
+    private static bool Crossed(double previous, double value, double level, bool rising) =>
+        rising ? previous < level && value >= level : previous > level && value <= level;
+
+    /// <summary>
+    /// How far past its final value the trace went, and how long it took to stay near it.
+    /// <para>
+    /// Both are answers about a <b>step</b>, and both are null for anything that is not one. That
+    /// is the whole difficulty: overshoot on a sine is a number the arithmetic will happily
+    /// produce — the peak is above the mean, after all — and it means nothing at all, so it has to
+    /// be refused rather than computed. A trace counts as a step when it ends up somewhere
+    /// different from where it started and is not still moving when the samples run out.
+    /// </para>
+    /// <para>
+    /// The settling time is measured from when the trace <i>left</i> its starting value rather than
+    /// from the first sample, because a capture that begins a millisecond before the edge would
+    /// otherwise report a millisecond of settling that is really a millisecond of waiting.
+    /// </para>
+    /// </summary>
+    private static (double? Overshoot, double? SettlingTime) StepFrom(
+        IReadOnlyList<DataPoint> samples, double minimum, double maximum)
+    {
+        var amplitude = maximum - minimum;
+        if (amplitude <= 0) return (null, null);
+
+        // Where it settled: averaged over a tenth of the capture, because by then it is flat by
+        // assumption and a single noisy sample should not decide the answer.
+        var tail = Math.Max(samples.Count / 10, 1);
+        var finished = Average(samples, samples.Count - tail, samples.Count);
+
+        // Where it began: a handful of samples and no more. Averaging the first tenth the way the
+        // last tenth is averaged looks symmetrical and is wrong, because the trace is flat at the
+        // end and is not at the beginning — that is the whole of what a step is. A one millisecond
+        // exponential inside a fifty millisecond capture is already at 0.8 a tenth of the way in,
+        // so the "starting value" came out as four fifths of the step and every step in the suite
+        // was rejected for not having moved far enough.
+        var started = Average(samples, 0, Math.Min(3, samples.Count));
+
+        var step = finished - started;
+
+        // It has to have moved by a good part of its own range to be a step rather than a wobble
+        // on top of one level — which is what a sine, a ripple and a clock all are. A third rather
+        // than a half, so that a badly damped step which overshoots by most of its own size again
+        // still counts as the step it plainly is.
+        if (Math.Abs(step) < amplitude * (1.0 / 3.0)) return (null, null);
+
+        var band = Math.Abs(step) * SettlingBand;
+
+        // And it has to have stopped moving. A ramp that is still climbing at the last sample has
+        // not settled anywhere, so it has no settling time and no overshoot.
+        for (var i = samples.Count - tail; i < samples.Count; i++)
+            if (Math.Abs(samples[i].Value - finished) > band)
+                return (null, null);
+
+        // Past the far side of the step: the peak beyond it, as a fraction of the step taken.
+        var beyond = step > 0 ? maximum - finished : finished - minimum;
+        var overshoot = Math.Max(beyond, 0) / Math.Abs(step);
+
+        var left = Departure(samples, started, band);
+        var last = LastOutside(samples, finished, band);
+
+        var settling = left is { } from && last > from ? last - from : (double?)null;
+
+        return (overshoot, settling);
+    }
+
+    /// <summary>When the trace first got further than the band from where it began.</summary>
+    private static double? Departure(IReadOnlyList<DataPoint> samples, double started, double band)
+    {
+        foreach (var sample in samples)
+            if (Math.Abs(sample.Value - started) > band)
+                return sample.Time;
+
+        return null;
+    }
+
+    /// <summary>The last moment the trace was further than the band from where it ended up.</summary>
+    private static double LastOutside(IReadOnlyList<DataPoint> samples, double finished, double band)
+    {
+        for (var i = samples.Count - 1; i >= 0; i--)
+            if (Math.Abs(samples[i].Value - finished) > band)
+                return samples[i].Time;
+
+        return samples[0].Time;
+    }
+
+    private static double Average(IReadOnlyList<DataPoint> samples, int from, int to)
+    {
+        var sum = 0.0;
+        var count = 0;
+
+        for (var i = Math.Max(from, 0); i < Math.Min(to, samples.Count); i++)
+        {
+            sum += samples[i].Value;
+            count++;
+        }
+
+        return count == 0 ? 0 : sum / count;
+    }
+
+    /// <summary>
+    /// How long the first complete pulse spent above the midpoint.
+    /// <para>
+    /// Measured between a rising crossing and the falling one after it, so a pulse cut off by the
+    /// end of the capture is not reported as a short one. This is the figure a datasheet gives as
+    /// a minimum for a reset line or a clock, and the duty cycle does not answer it: the same duty
+    /// at twice the frequency is half the pulse.
+    /// </para>
+    /// </summary>
+    private static double? PulseWidthFrom(
+        IReadOnlyList<DataPoint> samples, List<double> crossings, double minimum, double maximum)
+    {
+        if (crossings.Count == 0) return null;
+
+        var middle = Midpoint(minimum, maximum);
+        var start = crossings[0];
+
+        for (var i = 1; i < samples.Count; i++)
+        {
+            if (samples[i].Time <= start) continue;
+
+            if (samples[i - 1].Value <= middle || samples[i].Value > middle) continue;
+
+            var fell = Interpolate(samples[i - 1], samples[i], middle);
+
+            return fell > start ? fell - start : null;
         }
 
         return null;

@@ -8,6 +8,25 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**Requirements can now be written the way a specification is.** Five new measurements — **fall
+time**, **overshoot**, **settling time**, **pulse width** and **slew rate** — join the eight that
+were there. "Settles within 2 % in 10 µs" is most of what a control loop is judged on, and there
+was no way to say it.
+
+Overshoot and settling time are refused for anything that is not a step, which matters more than it
+looks: the arithmetic would happily produce an overshoot for a sine, and it would mean nothing. The
+settling time is timed from when the trace *left* its starting value, so a capture that began a
+millisecond before the edge does not report a millisecond of settling that is really waiting. An
+edge faster than the sampling gets no rise time rather than an interpolated one — any number there
+would be a statement about the solver's step rather than about the circuit.
+
+**A Bode plot can carry a family of curves.** Tick **Step** in the frequency response window and the
+whole sweep runs once per value of any parameter on the canvas. DC sweeps and transients could both
+already do this and the response could not, which is where the question comes up most: what the
+feedback resistor does to the peaking, how far the corner moves across a capacitor's tolerance
+band. Each pass re-solves the bias point, because a small-signal sweep linearises about it and a
+parameter worth stepping usually moves it.
+
 **Two ways to feed a circuit something other than a sine.** A function generator offers five
 shapes, and a supply brownout, a startup ramp, a load step and a measured capture off a bench scope
 are none of them.

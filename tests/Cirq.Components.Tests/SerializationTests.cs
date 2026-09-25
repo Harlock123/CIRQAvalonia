@@ -90,6 +90,13 @@ public class SerializationTests
     /// <summary>
     /// A file written by a newer version, measuring something this one has never heard of, keeps
     /// the requirement and says so rather than silently measuring the wrong thing.
+    /// <para>
+    /// The name is deliberately one nobody will ever implement. This test used to forge
+    /// <c>SettlingTime</c>, on the reasonable grounds that there was no such quantity — and then a
+    /// release added one, and the test failed for the best possible reason: the future it was
+    /// pretending to read had arrived. A plausible name is the wrong choice here, because the point
+    /// is to stand in for whatever comes next rather than to guess it.
+    /// </para>
     /// </summary>
     [Fact]
     public void AnUnknownQuantityIsKeptAndReported()
@@ -97,18 +104,20 @@ public class SerializationTests
         var circuit = new Circuit();
 
         circuit.Add(new Resistor(1e3) { Name = "R1" });
-        circuit.Specs.Add(new DesignSpec { Name = "Settling", Trace = "Out" });
+        circuit.Specs.Add(new DesignSpec { Name = "Something later", Trace = "Out" });
+
+        const string fromTheFuture = "AQuantityThisVersionHasNeverHeardOf";
 
         var json = CircuitSerializer.ToJson(circuit)
-            .Replace("\"PeakToPeak\"", "\"SettlingTime\"", StringComparison.Ordinal);
+            .Replace("\"PeakToPeak\"", $"\"{fromTheFuture}\"", StringComparison.Ordinal);
 
         var result = CircuitSerializer.FromJson(json);
 
         var spec = Assert.Single(result.Circuit.Specs);
 
-        Assert.Equal("Settling", spec.Name);
+        Assert.Equal("Something later", spec.Name);
         Assert.False(spec.IsEnabled);
-        Assert.Contains(result.Warnings, w => w.Contains("SettlingTime", StringComparison.Ordinal));
+        Assert.Contains(result.Warnings, w => w.Contains(fromTheFuture, StringComparison.Ordinal));
     }
 
     /// <summary>Every component type the palette can place, instantiated through its own factory.</summary>

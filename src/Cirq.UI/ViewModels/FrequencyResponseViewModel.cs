@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using Cirq.Core.Topology;
+using Cirq.Core.Units;
 using Cirq.Engine.Simulation;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -33,6 +34,57 @@ public sealed partial class FrequencyResponseViewModel : ObservableObject
     public FrequencyResponseViewModel(Circuit circuit)
     {
         _circuit = circuit;
+
+        Parameters.Add(SweepOption.Temperature(circuit));
+
+        foreach (var option in SweepOption.Discover(circuit)) Parameters.Add(option);
+
+        Step = Parameters.FirstOrDefault(o => !o.IsTemperature);
+    }
+
+    /// <summary>
+    /// Everything on the canvas that could be stepped. The same list the DC sweep offers, and
+    /// deliberately the same: "which of these can I vary" should not have two different answers
+    /// depending on which window is asking.
+    /// </summary>
+    public ObservableCollection<SweepOption> Parameters { get; } = [];
+
+    /// <summary>
+    /// Whether the sweep is run once per value of a parameter rather than once.
+    /// <para>
+    /// Off by default, because one curve is what somebody opening this window usually wants and a
+    /// family of five takes five times as long to produce.
+    /// </para>
+    /// </summary>
+    [ObservableProperty]
+    public partial bool IsStepping { get; set; }
+
+    /// <summary>What to step.</summary>
+    [ObservableProperty]
+    public partial SweepOption? Step { get; set; }
+
+    [ObservableProperty]
+    public partial double StepStart { get; set; }
+
+    [ObservableProperty]
+    public partial double StepStop { get; set; } = 1.0;
+
+    /// <summary>How many values. Four or five is a family; twenty is a smear.</summary>
+    [ObservableProperty]
+    public partial int StepCount { get; set; } = 4;
+
+    /// <summary>
+    /// Choosing something to step fills the range in from whatever it is set to now, so the
+    /// defaults are in the right decade rather than being zero to one for a 4k7 resistor.
+    /// </summary>
+    partial void OnStepChanged(SweepOption? value)
+    {
+        if (value is null) return;
+
+        var current = value.Current;
+
+        StepStart = current;
+        StepStop = Math.Abs(current) < 1e-12 ? 1.0 : current * 4.0;
     }
 
     /// <summary>Lowest frequency to solve, in hertz.</summary>
@@ -105,9 +157,78 @@ public sealed partial class FrequencyResponseViewModel : ObservableObject
         simulator.SolveOperatingPoint();
         simulator.ResolveProbes();
 
-        var result = new AcSweep(simulator).Run(
-            new AcSweepRequest(StartHz, StopHz, Math.Max(PointsPerDecade, 2)));
+        var request = new AcSweepRequest(StartHz, StopHz, Math.Max(PointsPerDecade, 2));
 
+        if (IsStepping && Step is not null)
+        {
+            Family(simulator, request);
+            return;
+        }
+
+        var result = new AcSweep(simulator).Run(request);
+
+        Collect(result, string.Empty);
+
+        Status = Summarise(result);
+    }
+
+    /// <summary>
+    /// One sweep per value, all on the same axes.
+    /// <para>
+    /// What the plot is read for is how the response <i>moves</i> — where the corner goes as the
+    /// capacitor changes, which feedback resistor stops it peaking — and that is a question about
+    /// the family rather than about any one curve in it. So the summary is the corners against the
+    /// values rather than a corner per trace.
+    /// </para>
+    /// </summary>
+    private void Family(CircuitSimulator simulator, AcSweepRequest request)
+    {
+        var target = Step!.IsTemperature
+            ? SweepTarget.OverTemperature(StepStart, StepStop, Math.Max(StepCount, 2))
+            : new SweepTarget(Step.Component, Step.PropertyName, StepStart, StepStop, Math.Max(StepCount, 2));
+
+        var family = new SteppedAcSweep(simulator).Run(new AcStepRequest(request, target));
+
+        var name = Step.IsTemperature ? "T" : Step.Component!.Name;
+
+        foreach (var pass in family.Runs)
+        {
+            if (pass.Result is null) continue;
+
+            Collect(pass.Result, $" @ {name} = {SiPrefix.Format(pass.Value, Step.Unit)}");
+        }
+
+        List<string> parts = [];
+
+        foreach (var pass in family.Runs)
+        {
+            var value = SiPrefix.Format(pass.Value, Step.Unit);
+
+            if (pass.Result is null)
+            {
+                parts.Add($"{value}: would not solve");
+                continue;
+            }
+
+            // The first probe's corner stands for the pass. A family with four probes and five
+            // values is twenty corners, which is a table rather than a line.
+            var corner = pass.Result.Traces
+                .Select(t => pass.Result.CornerOf(t.Label))
+                .FirstOrDefault(c => c is not null);
+
+            parts.Add(corner is null
+                ? $"{value}: no corner in span"
+                : $"{value}: −3 dB at {SiPrefix.Format(corner.Value, "Hz")}");
+        }
+
+        Status = parts.Count == 0
+            ? "Nothing came back from any pass."
+            : $"{name} stepped — {string.Join("   ·   ", parts)}";
+    }
+
+    /// <summary>Turns one sweep's traces into curves, with a suffix for which pass they came from.</summary>
+    private void Collect(AcSweepResult result, string suffix)
+    {
         foreach (var trace in result.Traces)
         {
             List<double> decibels = [];
@@ -119,10 +240,9 @@ public sealed partial class FrequencyResponseViewModel : ObservableObject
                 degrees.Add(trace.Degrees(i));
             }
 
-            Curves.Add(new ResponseCurve(trace.Label, result.Frequencies, decibels, degrees));
+            Curves.Add(new ResponseCurve(
+                trace.Label + suffix, result.Frequencies, decibels, degrees));
         }
-
-        Status = Summarise(result);
     }
 
     /// <summary>

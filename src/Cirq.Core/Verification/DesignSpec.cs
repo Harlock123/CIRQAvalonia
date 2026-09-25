@@ -30,6 +30,31 @@ public enum SpecQuantity
 
     /// <summary>Ten to ninety percent, in seconds.</summary>
     RiseTime,
+
+    /// <summary>Ninety to ten percent, in seconds — the other half of an edge specification.</summary>
+    FallTime,
+
+    /// <summary>
+    /// How far past its settled value a step went, as a fraction. 0.1 is ten percent overshoot,
+    /// which is most of what a control loop is judged on.
+    /// </summary>
+    Overshoot,
+
+    /// <summary>
+    /// How long a step took to stay within two percent of where it ended up, in seconds. The other
+    /// half of what a control loop is judged on, and the one a fast loop wins on.
+    /// </summary>
+    SettlingTime,
+
+    /// <summary>
+    /// How long the first pulse stayed high, in seconds. Not the same question as the duty cycle:
+    /// the same duty at twice the frequency is half the pulse, and a reset line is specified in
+    /// microseconds rather than in percent.
+    /// </summary>
+    PulseWidth,
+
+    /// <summary>Volts per second on the fastest edge — what an op-amp is sold on.</summary>
+    SlewRate,
 }
 
 /// <summary>
@@ -52,6 +77,11 @@ public static class SpecWords
         SpecQuantity.Frequency => "frequency",
         SpecQuantity.DutyCycle => "duty cycle",
         SpecQuantity.RiseTime => "rise time",
+        SpecQuantity.FallTime => "fall time",
+        SpecQuantity.Overshoot => "overshoot",
+        SpecQuantity.SettlingTime => "settling time",
+        SpecQuantity.PulseWidth => "pulse width",
+        SpecQuantity.SlewRate => "slew rate",
         _ => quantity.ToString(),
     };
 
@@ -186,6 +216,11 @@ public static class SpecCheck
                 SpecQuantity.Frequency => measurements.Frequency,
                 SpecQuantity.DutyCycle => measurements.DutyCycle,
                 SpecQuantity.RiseTime => measurements.RiseTime,
+                SpecQuantity.FallTime => measurements.FallTime,
+                SpecQuantity.Overshoot => measurements.Overshoot,
+                SpecQuantity.SettlingTime => measurements.SettlingTime,
+                SpecQuantity.PulseWidth => measurements.PulseWidth,
+                SpecQuantity.SlewRate => measurements.SlewRate,
                 _ => null,
             };
 

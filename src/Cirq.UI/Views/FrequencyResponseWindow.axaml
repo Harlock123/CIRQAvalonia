@@ -24,27 +24,57 @@
     <Border DockPanel.Dock="Top" Padding="14,12"
             Background="{DynamicResource PanelBackground}"
             BorderBrush="{DynamicResource PanelBorder}" BorderThickness="0,0,0,1">
-      <StackPanel Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
+      <StackPanel Spacing="10">
 
-        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-          <TextBlock Text="From" VerticalAlignment="Center" />
-          <TextBox Width="92" Text="{Binding StartHz, Mode=TwoWay}" />
-          <TextBlock Text="Hz" VerticalAlignment="Center" Opacity="0.7" />
+        <StackPanel Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
+
+          <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+            <TextBlock Text="From" VerticalAlignment="Center" />
+            <TextBox Width="92" Text="{Binding StartHz, Mode=TwoWay}" />
+            <TextBlock Text="Hz" VerticalAlignment="Center" Opacity="0.7" />
+          </StackPanel>
+
+          <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+            <TextBlock Text="to" VerticalAlignment="Center" />
+            <TextBox Width="92" Text="{Binding StopHz, Mode=TwoWay}" />
+            <TextBlock Text="Hz" VerticalAlignment="Center" Opacity="0.7" />
+          </StackPanel>
+
+          <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+            <TextBlock Text="Points / decade" VerticalAlignment="Center" />
+            <TextBox Width="58" Text="{Binding PointsPerDecade, Mode=TwoWay}" />
+          </StackPanel>
+
+          <Button Content="Sweep" Command="{Binding RunCommand}" IsEnabled="{Binding !IsBusy}"
+                  Padding="18,5" />
         </StackPanel>
 
-        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-          <TextBlock Text="to" VerticalAlignment="Center" />
-          <TextBox Width="92" Text="{Binding StopHz, Mode=TwoWay}" />
-          <TextBlock Text="Hz" VerticalAlignment="Center" Opacity="0.7" />
+        <!-- A family of curves rather than one: the same parameter picker the DC sweep offers,
+             because "what can I vary" should not have two answers depending on the window. -->
+        <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+          <CheckBox Content="Step" IsChecked="{Binding IsStepping, Mode=TwoWay}"
+                    VerticalAlignment="Center"
+                    ToolTip.Tip="Run the whole sweep once per value, and put every curve on the same axes" />
+
+          <ComboBox Width="210" ItemsSource="{Binding Parameters}"
+                    SelectedItem="{Binding Step, Mode=TwoWay}"
+                    IsEnabled="{Binding IsStepping}"
+                    DisplayMemberBinding="{Binding Display}" />
+
+          <TextBlock Text="from" VerticalAlignment="Center" Opacity="0.7" />
+          <TextBox Width="80" Text="{Binding StepStart, Mode=TwoWay}"
+                   IsEnabled="{Binding IsStepping}" />
+
+          <TextBlock Text="to" VerticalAlignment="Center" Opacity="0.7" />
+          <TextBox Width="80" Text="{Binding StepStop, Mode=TwoWay}"
+                   IsEnabled="{Binding IsStepping}" />
+
+          <TextBlock Text="in" VerticalAlignment="Center" Opacity="0.7" />
+          <TextBox Width="48" Text="{Binding StepCount, Mode=TwoWay}"
+                   IsEnabled="{Binding IsStepping}" />
+          <TextBlock Text="steps" VerticalAlignment="Center" Opacity="0.7" />
         </StackPanel>
 
-        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-          <TextBlock Text="Points / decade" VerticalAlignment="Center" />
-          <TextBox Width="58" Text="{Binding PointsPerDecade, Mode=TwoWay}" />
-        </StackPanel>
-
-        <Button Content="Sweep" Command="{Binding RunCommand}" IsEnabled="{Binding !IsBusy}"
-                Padding="18,5" />
       </StackPanel>
     </Border>
 

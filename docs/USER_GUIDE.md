@@ -104,6 +104,7 @@ each row links to the section that explains it.
 | What does it do to **each frequency** | [Frequency response](#frequency-response) — a Bode plot of gain and phase | `F7` |
 | What does this **part's curve** look like | [DC sweep](#dc-sweeps-and-the-curve-tracer) — a diode's exponential, a transistor's fan | `Shift` `F7` |
 | How does the answer change if I **try other values** | [Step a parameter](#stepping-a-parameter-across-a-transient) — one whole run per value, overlaid | `Ctrl` `Shift` `F7` |
+| How does the **response** change if I try other values | [A family of curves](#a-family-of-curves), in the frequency response window | `F7` |
 | What **frequencies are in** this waveform | [Spectrum](#what-is-in-a-signal) — the FFT of what was recorded | `F3` |
 | How **distorted** is my amplifier | [Distortion](#distortion), under the spectrum — THD, THD+N and the harmonics | `F3` |
 | **Will it oscillate** | [Stability](#stability) — loop gain, phase margin, gain margin | `Ctrl` `F7` |
@@ -597,6 +598,28 @@ Things worth doing with it:
 - **Resonances you did not put there.** An unterminated stub of transmission line looks like a
   short circuit at its quarter-wave frequency. That is nearly impossible to find by stepping a
   generator and obvious the moment it is plotted.
+
+### A family of curves
+
+Tick **Step**, choose something on the canvas, and the whole sweep runs once per value with every
+curve on the same axes. DC sweeps and transients could both already do this; the response could
+not, and it is where the question comes up most.
+
+"What does the feedback resistor do to the peaking", "how far does the corner move across the
+capacitor's tolerance band", "which gate resistor stops it ringing" are all questions about a
+*family* of responses. Answered one sweep at a time they mean writing four sets of numbers down and
+comparing them by hand.
+
+The line under the plot then gives **a corner per pass** rather than per trace, because what the
+plot is read for is how the response moves.
+
+**Each pass re-solves the bias point**, and that matters more here than it does for a stepped
+transient: a small-signal sweep linearises about the operating point, and a parameter worth
+stepping usually moves it. Sweeping four values about one stale bias point would give four curves
+of a circuit that exists at only one of them. A value the circuit will not bias at loses that pass
+and no other — the family is more useful with a gap in it than not at all.
+
+Four or five values is a family. Twenty is a smear.
 
 ### What it is, and what it is not
 
@@ -3484,6 +3507,42 @@ A requirement is a **name**, a **trace**, one **measurement** off it, and a **li
 | **At most** | ripple, overshoot, dissipation — things with a ceiling |
 | **At least** | swing, margin, headroom — things with a floor |
 | **Within** | a regulated output, where too low fails as surely as too high |
+
+### What can be measured
+
+| Measurement | What it is |
+| --- | --- |
+| Minimum / Maximum | The extremes — a rail's droop, the peak a part has to survive |
+| Mean | What a DC meter reads |
+| RMS | What an AC meter reads |
+| Peak to peak | Ripple, swing, "how big is it" |
+| Frequency | Hertz, from the midpoint crossings |
+| Duty cycle | Fraction of a cycle spent high |
+| Rise time / **fall time** | Ten to ninety percent, and ninety to ten |
+| **Overshoot** | How far past its settled value a step went, as a fraction of the step |
+| **Settling time** | How long the step took to stay within two percent of where it ended up |
+| **Pulse width** | How long the first pulse stayed high |
+| **Slew rate** | Volts per second on the fastest edge |
+
+The last five are the ones a real specification tends to be written in. "Settles within 2 % in
+10 µs" is most of what a control loop is judged on, and until now there was no way to say it.
+
+**Overshoot and settling time are answers about a step**, and they are refused for anything that is
+not one. That refusal matters more than it looks: the arithmetic would happily produce an overshoot
+for a sine — its peak is above its mean, after all — and the number would mean nothing whatever. A
+trace counts as a step when it ends up somewhere different from where it started and has stopped
+moving by the time the samples run out. A ramp that is still climbing has not settled anywhere.
+
+The settling time is measured from when the trace **left** its starting value, not from the first
+sample. A capture that began a millisecond before the edge would otherwise report a millisecond of
+settling that is really a millisecond of waiting.
+
+**Pulse width is not the duty cycle.** The same duty at twice the frequency is half the pulse, and a
+reset line is specified in microseconds rather than in percent.
+
+An edge that happens entirely between two samples gets **no** rise time rather than an interpolated
+one. Any number produced there would be a statement about the solver's step rather than about the
+circuit; what is true is that the edge is faster than this can resolve.
 
 Press **Check** and each one comes back met, not met, or with nothing to measure. The third is not
 the second: a frequency that needed two cycles and got one has not been shown to be wrong, and
