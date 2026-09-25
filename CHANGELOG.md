@@ -8,6 +8,31 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**Two ways to feed a circuit something other than a sine.** A function generator offers five
+shapes, and a supply brownout, a startup ramp, a load step and a measured capture off a bench scope
+are none of them.
+
+**Sources > Waveform Source** plays back a list of points — SPICE's PWL source, written the way
+anybody would say it: `0 0; 1m 0; 1.01m 5; 5m 5` is a five volt pulse with ten microsecond edges.
+**File > Import Waveform...** reads a CSV off a scope or a data logger, or a WAV, straight into one.
+Scale, offset and a time scale reshape the table without editing it.
+
+**Digital I/O > Pattern Generator** drives four logic lines from a written sequence — a row per
+line, a character per step, which is the logic analyser's own notation read backwards. A counter
+that should reset on the third pulse, a state machine that has to see a particular sequence: until
+now the only way to produce either was to sit in front of the circuit flipping a toggle while it
+ran.
+
+Every corner of a waveform and every step boundary of a pattern is a **solver breakpoint**. Without
+that the transient loop takes the largest step the error allows and walks straight over a two
+microsecond glitch, producing a smooth, plausible, entirely wrong answer.
+
+Imported samples are **copied into the circuit rather than referenced**: a source pointing at a file
+on disk is a circuit that opens differently on another machine. Long files are resampled rather than
+truncated — the whole recording at lower resolution instead of the first fraction of it at full —
+and the resampling averages across each stride rather than picking one sample in six, because
+picking aliases and an aliased waveform is a different waveform that looks entirely plausible.
+
 **A power budget: what every part is dissipating, against what it is rated for.**
 **Simulate > Power...** (`Ctrl+F5`) ranks every part by how close it is to a limit, and says what
 the circuit costs to run. A semiconductor already worried about itself — a MOSFET reports its own

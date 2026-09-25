@@ -6,6 +6,7 @@ using Cirq.Core.Topology;
 using Cirq.Components.Hierarchy;
 using Cirq.Components.Passive;
 using Cirq.Components.Serialization;
+using Cirq.Components.Sources;
 using Cirq.UI.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -1422,6 +1423,47 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
     [RelayCommand]
     private void ShowPower() => RequestPower?.Invoke(this, EventArgs.Empty);
+
+    /// <summary>
+    /// Reads a file of numbers into the selected waveform source.
+    /// <para>
+    /// A command rather than a button beside the property, because the properties panel builds its
+    /// rows by reflecting over a part's settings and knows nothing about any particular one of
+    /// them. Teaching it about this would mean teaching it about parts, which is the thing that
+    /// keeps it working for every part that has ever been added without being touched.
+    /// </para>
+    /// </summary>
+    [RelayCommand]
+    private async Task ImportWaveformAsync()
+    {
+        if (FileDialogs is null) return;
+
+        if (SelectedComponent is not WaveformSource source)
+        {
+            StatusMessage = "Select a Waveform Source first — this reads a file into one.";
+            return;
+        }
+
+        var path = await FileDialogs.PickWaveformPathAsync();
+        if (path is null) return;
+
+        try
+        {
+            var imported = WaveformImport.Read(path);
+
+            source.Points = imported.Points;
+
+            StatusMessage = $"Imported {Path.GetFileName(path)} into {source.Name}: {imported.Note}";
+
+            IsModified = true;
+            Simulation.InvalidateTopology();
+        }
+        catch (Exception ex) when (ex is IOException or InvalidDataException
+                                      or UnauthorizedAccessException or FormatException)
+        {
+            await FileDialogs.ReportAsync("Could not import that waveform", ex.Message);
+        }
+    }
 
     /// <summary>
     /// Opens the spectrum window, which transforms the traces the scope has already recorded. It

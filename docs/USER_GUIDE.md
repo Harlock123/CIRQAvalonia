@@ -34,25 +34,26 @@ the [README](../README.md), and what changed between releases is in the
 22. [Measuring between two points, and measuring power](#measuring-between-two-points-and-measuring-power)
 23. [Will it work with the parts you can buy](#will-it-work-with-the-parts-you-can-buy)
 24. [Temperature](#temperature)
-25. [Power](#power)
-26. [Writing on the schematic](#writing-on-the-schematic)
-27. [Drawing part of a circuit as one block](#drawing-part-of-a-circuit-as-one-block)
-28. [Reusing a block](#reusing-a-block)
-29. [Plotting one trace against another](#plotting-one-trace-against-another)
-30. [Importing a SPICE model](#importing-a-spice-model)
-31. [Comparing and computing traces](#comparing-and-computing-traces)
-32. [Naming a net instead of drawing it](#naming-a-net-instead-of-drawing-it)
-33. [What is this circuit?](#what-is-this-circuit)
-34. [Checking the circuit](#checking-the-circuit)
-35. [Development boards](#development-boards)
-36. [Saving and loading](#saving-and-loading)
-37. [Printing](#printing)
-38. [Exporting](#exporting)
-39. [Appearance](#appearance)
-40. [What version is this](#what-version-is-this)
-41. [Closing a dialog](#closing-a-dialog)
-42. [Keyboard reference](#keyboard-reference)
-43. [When a circuit will not simulate](#when-a-circuit-will-not-simulate)
+25. [Feeding it a real waveform](#feeding-it-a-real-waveform)
+26. [Power](#power)
+27. [Writing on the schematic](#writing-on-the-schematic)
+28. [Drawing part of a circuit as one block](#drawing-part-of-a-circuit-as-one-block)
+29. [Reusing a block](#reusing-a-block)
+30. [Plotting one trace against another](#plotting-one-trace-against-another)
+31. [Importing a SPICE model](#importing-a-spice-model)
+32. [Comparing and computing traces](#comparing-and-computing-traces)
+33. [Naming a net instead of drawing it](#naming-a-net-instead-of-drawing-it)
+34. [What is this circuit?](#what-is-this-circuit)
+35. [Checking the circuit](#checking-the-circuit)
+36. [Development boards](#development-boards)
+37. [Saving and loading](#saving-and-loading)
+38. [Printing](#printing)
+39. [Exporting](#exporting)
+40. [Appearance](#appearance)
+41. [What version is this](#what-version-is-this)
+42. [Closing a dialog](#closing-a-dialog)
+43. [Keyboard reference](#keyboard-reference)
+44. [When a circuit will not simulate](#when-a-circuit-will-not-simulate)
 
 This guide is also attached to every [release](../../releases) as a PDF, with a contents page and
 the screenshots in place — the same document, laid out for reading away from the machine. Build it
@@ -151,13 +152,13 @@ Three of those are worth separating, because they are easy to confuse:
 
 Click a palette entry, then click the canvas. The part lands where you click, snapped to the grid.
 
-The palette holds **186 components in 16 categories**:
+The palette holds **188 components in 16 categories**:
 
 | Category | Count | Contents |
 | --- | --- | --- |
 | Passive | 11 | Resistor, capacitor, electrolytic capacitor, inductor, transformer, centre-tapped transformer, potentiometer, crystal, ferrite bead, **common-mode choke** and transmission line — see [below](#common-mode-chokes) |
 | Switches | 4 | SPST, SPDT, push button, **8-way DIP switch** |
-| Sources | 14 | Ground, **net label**, **loop probe**, DC voltage, DC current, **voltage- and current-controlled sources**, function generator, battery, solar cell, **noise source**, and the three **annotations** — note, heading and area — see [below](#writing-on-the-schematic) |
+| Sources | 15 | Ground, **net label**, **loop probe**, DC voltage, DC current, **voltage- and current-controlled sources**, function generator, **waveform source**, battery, solar cell, **noise source**, and the three **annotations** — note, heading and area — see [below](#feeding-it-a-real-waveform) |
 | Semiconductors | 13 | 1N4148, 1N4001, Schottky, zeners, **varactor**, **photodiode**, bridge rectifier, SCR, triac, diac, TVS and varistor — see [below](#three-ways-to-measure-light) |
 | Transistors | 11 | NPN and PNP bipolars, N- and P-channel MOSFETs, three JFETs and an **IGBT** — see [below](#the-igbt) |
 | LEDs & Displays | 9 | Six LED colours, seven-segment displays, **HD44780 character LCD** — see [below](#the-character-lcd) |
@@ -167,7 +168,7 @@ The palette holds **186 components in 16 categories**:
 | 74xx Series | 21 | Counters (including the synchronous **74161**), decoders, flip-flops, shift registers, the **74245 bus transceiver** and **74373 latch**, multiplexers, Schmitt inverter — see [below](#sharing-a-bus) |
 | 40xx Series | 15 | CMOS gates, counters, flip-flops, analog switches and a **4046 phase-locked loop** — see [below](#phase-locked-loops) |
 | Buses | 17 | I2C master, EEPROM, port expander, DS1307 clock, ADS1115 ADC, MCP4725 DAC and INA219 current sensor, SPI master and **MCP3008 ADC**, 1-Wire master and DS18B20 thermometer, serial terminal and device, **RS-485**, **CAN** and **RS-232 (MAX232)** transceivers, level shifter — see [below](#making-its-own-rails) |
-| Digital I/O | 8 | Logic toggle, clock, rotary encoder, oscillator module, ADC and DAC bridges, and a **2K × 8 SRAM and ROM** — see [below](#something-worth-addressing) |
+| Digital I/O | 9 | Logic toggle, clock, **pattern generator**, rotary encoder, oscillator module, ADC and DAC bridges, and a **2K × 8 SRAM and ROM** — see [below](#something-worth-addressing) |
 | Sensors & Actuators | 18 | DC motor, LDR, thermistors, buzzers, speaker, microphone, servo, stepper in **unipolar and bipolar** wirings, thermocouple, load cell, HC-SR04 ranger, Hall switch, phototransistor, **reed switch** and **PIR motion sensor** — see [below](#sensors-and-actuators) |
 | Switching & Isolation | 11 | Relay, fuses and a **resettable PPTC**, optocouplers, ULN2003, H-bridge, **A4988 microstepping driver**, **solid-state relay**, **MOSFET gate driver** — see [below](#regulating-a-current-instead-of-applying-a-voltage) |
 | Dev Boards | 4 | Raspberry Pi, Arduino Uno / Nano / Mega — see [below](#development-boards) |
@@ -3948,6 +3949,92 @@ What this changes:
 exceeds one — every degree adds more dissipation than it took to produce — and there is no
 temperature the part settles at. It stops at the **Maximum Junction Temperature** it is rated for
 and says so on its hover card, rather than the solver failing with a message about time steps.
+
+---
+
+## Feeding it a real waveform
+
+A function generator offers five shapes, and a great many real questions are not any of them. A
+supply brownout, a startup ramp, a load step, a measured capture off a bench scope, a few seconds
+of music through a filter: none of those is a sine, a square, a triangle, a sawtooth or a constant.
+
+**Sources > Waveform Source** plays back a list of points instead of a shape from a menu. It is
+SPICE's PWL source with a friendlier notation:
+
+```
+0 0; 1m 0; 1.01m 5; 5m 5; 5.01m 0
+```
+
+Times in seconds, values in volts, pairs separated by semicolons or newlines, and either number may
+carry an SI prefix — `1m 4.5` is four and a half volts at a millisecond. That example is a five volt
+pulse lasting four milliseconds with ten microsecond edges, which is a thing that takes one line to
+say and no line at all to say with a function generator.
+
+| Setting | What it does |
+| --- | --- |
+| Ending | **Hold** the last value, **Repeat** from the start, or fall to **Zero** |
+| Scale / Offset | Multiply and shift every value, without editing the table |
+| Time Scale | Stretch the time axis — two plays it at half speed, a half plays it twice as fast |
+| Start Delay | Wait before the first point |
+
+**Every corner is a solver breakpoint**, and that is what makes it accurate rather than
+approximately accurate. Between breakpoints the transient loop takes the largest step the local
+error allows, so a source that never declared a corner would invite it to step clean over a two
+microsecond glitch — producing a smooth, plausible and entirely wrong answer.
+
+Interpolation between points is **linear**, deliberately. A spline through measured samples invents
+overshoot that was never in the measurement, and it invents it at the sharp edge, which is the part
+of the waveform somebody imported a real capture to look at.
+
+### Importing a capture
+
+**File > Import Waveform...** reads a file into the selected waveform source:
+
+- **CSV or plain text.** Two columns are taken as time and value — which is what a bench scope, a
+  data logger and this application's own [trace export](#exporting) all write. One column is taken
+  as values a millisecond apart, and the note says so; use **Time Scale** if they were not. A
+  header row is skipped by failing to parse rather than by being recognised, which handles every
+  spelling of one.
+- **WAV.** Any of the common uncompressed layouts, mixed to mono. You say what full scale is worth
+  in volts, because audio is stored as a fraction of full scale with no units in it at all.
+
+**The samples are copied into the circuit, not referenced.** A source that pointed at a file on
+disk would be a circuit that opens differently — or not at all — on another machine, or on the same
+machine next month. A stimulus that silently changes is worse than one you have to import again.
+
+Long files are **resampled rather than truncated**, to at most 8192 points. A second of CD audio is
+forty-four thousand samples, a saved circuit is a text file somebody may want to read, and it is
+more resolution than a transient at any sane time step will visit anyway. Resampling averages
+across each stride rather than picking one sample in six: taking every sixth sample aliases, and an
+aliased waveform is a different, lower-frequency waveform that looks entirely plausible.
+
+### A pattern, on the digital side
+
+The digital palette had a clock and a toggle — something that changes forever at a fixed rate, and
+something a person operates. Neither is a stimulus. A counter that should reset on the third pulse,
+a shift register being loaded, a state machine that has to see a particular sequence to reach the
+state you are debugging: all of those need a pattern, and the only way to produce one was to sit in
+front of the circuit flipping a toggle while it ran.
+
+**Digital I/O > Pattern Generator** drives four lines from a written sequence — the logic
+analyser's own notation, read backwards:
+
+```
+0011 0011
+0000 1111
+```
+
+A row per line, a character per step. `0` and `1` are levels; `-`, `z` and `Z` release the line, so
+a pattern can share a bus with something else. Spaces are ignored, which is the only way a long
+pattern stays countable. That example is a two-bit count, written the way it appears on a timing
+diagram.
+
+A row shorter than the longest one **holds its last value** rather than going unknown, so a line
+that stays constant is a single character instead of padding. A line the pattern says nothing about
+is released rather than driven low — this part has no opinion about a row nobody wrote.
+
+Set the step **Rate**, whether it **Repeats**, and a **Start Delay**. Every step boundary is a
+solver breakpoint, for the same reason the waveform source's corners are.
 
 ---
 

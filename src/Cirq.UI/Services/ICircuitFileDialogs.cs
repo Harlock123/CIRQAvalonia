@@ -9,6 +9,12 @@ public interface ICircuitFileDialogs
     /// <summary>Asks for a circuit to open; null when the user cancels.</summary>
     Task<string?> PickOpenPathAsync();
 
+    /// <summary>
+    /// A file of numbers to play into a waveform source — a CSV off a scope, a WAV. Null when the
+    /// picker was cancelled.
+    /// </summary>
+    Task<string?> PickWaveformPathAsync();
+
     /// <summary>Asks where to save; null when the user cancels.</summary>
     Task<string?> PickSavePathAsync(string suggestedFileName);
 

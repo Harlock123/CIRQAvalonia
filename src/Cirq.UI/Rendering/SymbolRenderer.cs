@@ -94,6 +94,7 @@ public static class SymbolRenderer
             case VoltageControlledVoltageSource: DrawControlledSource(context, pen, zoom, true); break;
             case VoltageControlledCurrentSource: DrawControlledSource(context, pen, zoom, false); break;
             case FunctionGenerator fg: DrawFunctionGenerator(context, pen, fg); break;
+            case WaveformSource: DrawWaveformSource(context, pen); break;
             case Led led: DrawLed(context, pen, led); break;
             case DcMotor motor: DrawMotor(context, pen, zoom, motor); break;
             case LightDependentResistor ldr: DrawLdr(context, pen, zoom, ldr); break;
@@ -124,6 +125,7 @@ public static class SymbolRenderer
             case LogicGate gate: DrawLogicGate(context, pen, gate); break;
             case LogicToggle toggle: DrawToggle(context, pen, zoom, toggle); break;
             case ClockSource: DrawClock(context, pen); break;
+            case PatternGenerator generator: DrawPatternGenerator(context, pen, zoom, generator); break;
             case DeveloperBoard board: DrawBoard(context, pen, zoom, board); break;
             case AdcBridge: DrawBridge(context, pen, zoom, "A/D"); break;
             case DacBridge: DrawBridge(context, pen, zoom, "D/A"); break;
@@ -1844,6 +1846,31 @@ public static class SymbolRenderer
         context.DrawGeometry(null, pen, SymbolPath.Polyline(points, false));
     }
 
+    /// <summary>
+    /// The arbitrary source: the generator's circle, with something in it that is plainly not one
+    /// of the five shapes.
+    /// <para>
+    /// A pulse with a decaying tail, drawn from nothing anybody would call a waveform setting. The
+    /// point of the symbol is to be distinguishable from the function generator beside it on the
+    /// sheet at a glance, and a shape that could be a setting of that part would not be.
+    /// </para>
+    /// </summary>
+    private static void DrawWaveformSource(ISymbolCanvas context, IPen pen)
+    {
+        context.DrawLine(pen, new Point(-30, 0), new Point(-18, 0));
+        context.DrawLine(pen, new Point(18, 0), new Point(30, 0));
+        context.DrawEllipse(CanvasTheme.SymbolFill, pen, new Point(0, 0), 18, 18);
+
+        List<Point> points =
+        [
+            new(-12, 6), new(-8, 6), new(-8, -7), new(-3, -7),
+            new(-3, 2), new(1, 2), new(1, -4), new(5, -4),
+            new(5, 6), new(12, 6),
+        ];
+
+        context.DrawGeometry(null, pen, SymbolPath.Polyline(points, false));
+    }
+
     // ---- semiconductors --------------------------------------------------
 
     private static void DrawDiode(ISymbolCanvas context, IPen pen)
@@ -2568,6 +2595,10 @@ public static class SymbolRenderer
         // where the default puts the captions.
         Servo or StepperMotor => 44.0,
 
+        // The body is ten units per pin either side of centre, so its captions have to clear
+        // whatever it was built with rather than a fixed height.
+        PatternGenerator generator => (Math.Max(generator.Terminals.Count, 1) * 10.0) + 14.0,
+
         // The ranger's board reaches 40 either side, the centre-tapped secondary 32.
         UltrasonicRanger => 54.0,
         CentreTappedTransformer => 48.0,
@@ -2798,6 +2829,41 @@ public static class SymbolRenderer
             new(2, 6), new(2, -6), new(10, -6), new(10, 6), new(13, 6),
         };
         context.DrawGeometry(null, pen, SymbolPath.Polyline(points, false));
+    }
+
+    /// <summary>
+    /// The pattern generator: a body tall enough for its pins, with two staggered rows of pulses
+    /// inside it — a timing diagram, which is what it plays.
+    /// </summary>
+    private static void DrawPatternGenerator(
+        ISymbolCanvas context, IPen pen, double zoom, PatternGenerator generator)
+    {
+        var half = Math.Max(generator.Terminals.Count, 1) * 10.0;
+
+        context.DrawRectangle(
+            CanvasTheme.SymbolFill, pen, new RoundedRect(new Rect(-22, -half, 40, half * 2), 4));
+
+        foreach (var terminal in generator.Terminals)
+            context.DrawLine(pen, new Point(18, terminal.CanvasOffset.Y), new Point(30, terminal.CanvasOffset.Y));
+
+        if (zoom <= 0.4) return;
+
+        // Two rows of a pattern, the lower one at half the rate of the upper, which is what the
+        // default pattern is and what one looks like on an analyser.
+        foreach (var (row, step) in (( double, double )[])[(-7, 7.0), (7, 14.0)])
+        {
+            List<Point> points = [new(-16, row + 4)];
+
+            for (var x = -16.0; x < 14.0; x += step)
+            {
+                points.Add(new Point(x, row - 4));
+                points.Add(new Point(Math.Min(x + (step / 2), 14), row - 4));
+                points.Add(new Point(Math.Min(x + (step / 2), 14), row + 4));
+                points.Add(new Point(Math.Min(x + step, 14), row + 4));
+            }
+
+            context.DrawGeometry(null, pen, SymbolPath.Polyline(points, false));
+        }
     }
 
     private static void DrawBridge(ISymbolCanvas context, IPen pen, double zoom, string label)

@@ -84,6 +84,8 @@
                   Command="{Binding UngroupSelectionCommand}" />
         <MenuItem Header="Block _Library..." Command="{Binding ShowBlockLibraryCommand}" />
         <MenuItem Header="Import SPICE _Model..." Command="{Binding ShowSpiceImportCommand}" />
+        <MenuItem Header="Import _Waveform..." Command="{Binding ImportWaveformCommand}"
+                  ToolTip.Tip="Read a CSV or a WAV into the selected Waveform Source" />
         <Separator />
         <MenuItem Header="_Rotate" InputGesture="R" Command="{Binding RotateSelectionCommand}" />
         <MenuItem Header="_Delete" InputGesture="Delete" Command="{Binding DeleteSelectionCommand}" />

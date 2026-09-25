@@ -125,6 +125,8 @@ public static class ComponentCatalog
             new("Noise Source", "Adds band-limited random volts — the reason hysteresis exists",
                 () => new NoiseSource()),
             new("Function Generator", "Sine, square, triangle, sawtooth", () => new FunctionGenerator()),
+            new("Waveform Source", "Plays back a list of points — a load step, a brownout, or a real capture imported from a CSV or a WAV",
+                () => new WaveformSource()),
         ]),
 
         new("Semiconductors",
@@ -340,6 +342,8 @@ public static class ComponentCatalog
         [
             new("Logic Toggle", "Manually switched logic level", () => new LogicToggle()),
             new("Clock", "Free-running logic clock", () => new ClockSource(1e3)),
+            new("Pattern Generator", "Drives a written sequence of bits onto four lines — a timing diagram, played",
+                () => new PatternGenerator()),
             new("Rotary Encoder", "Quadrature contacts, bounce and all — double-click to turn it",
                 () => new RotaryEncoder()),
             new("Oscillator", "Crystal oscillator can — a square wave, a supply and an enable",

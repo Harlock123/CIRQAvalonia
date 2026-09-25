@@ -42,6 +42,28 @@ public sealed class StorageProviderFileDialogs : ICircuitFileDialogs
         return files.Count > 0 ? files[0].TryGetLocalPath() : null;
     }
 
+    public async Task<string?> PickWaveformPathAsync()
+    {
+        var storage = TopLevel.GetTopLevel(_owner)?.StorageProvider;
+        if (storage is null) return null;
+
+        var files = await storage.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Import waveform",
+            AllowMultiple = false,
+            FileTypeFilter =
+            [
+                new FilePickerFileType("Waveform data")
+                {
+                    Patterns = ["*.csv", "*.txt", "*.wav", "*.wave"],
+                },
+                FilePickerFileTypes.All,
+            ],
+        });
+
+        return files.Count > 0 ? files[0].TryGetLocalPath() : null;
+    }
+
     public async Task<string?> PickSavePathAsync(string suggestedFileName)
     {
         var storage = TopLevel.GetTopLevel(_owner)?.StorageProvider;

@@ -35,6 +35,11 @@ internal sealed class FakeFileDialogs : ICircuitFileDialogs
 
     public Task<string?> PickOpenPathAsync() => Task.FromResult(OpenPath);
 
+    /// <summary>The file an import should read, or null to stand in for a cancelled picker.</summary>
+    public string? WaveformPath { get; set; }
+
+    public Task<string?> PickWaveformPathAsync() => Task.FromResult(WaveformPath);
+
     public Task<string?> PickSavePathAsync(string suggestedFileName)
     {
         LastSuggestedName = suggestedFileName;
