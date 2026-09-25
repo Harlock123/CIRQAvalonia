@@ -18,8 +18,6 @@ public partial class AboutWindow : Window
     {
         InitializeComponent();
 
-        this.FindControl<Button>("CloseButton")!.Click += (_, _) => Close();
-
         var copy = this.FindControl<Button>("CopyButton")!;
         copy.Click += async (_, _) =>
         {

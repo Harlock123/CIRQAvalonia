@@ -49,8 +49,9 @@ the [README](../README.md), and what changed between releases is in the
 37. [Exporting](#exporting)
 38. [Appearance](#appearance)
 39. [What version is this](#what-version-is-this)
-40. [Keyboard reference](#keyboard-reference)
-41. [When a circuit will not simulate](#when-a-circuit-will-not-simulate)
+40. [Closing a dialog](#closing-a-dialog)
+41. [Keyboard reference](#keyboard-reference)
+42. [When a circuit will not simulate](#when-a-circuit-will-not-simulate)
 
 This guide is also attached to every [release](../../releases) as a PDF, with a contents page and
 the screenshots in place — the same document, laid out for reading away from the machine. Build it
@@ -4697,6 +4698,15 @@ no version stamped on it and says **development build** rather than claiming one
 **Copy details** puts the whole lot on the clipboard as plain text. If you are reporting a problem,
 paste that in — it saves transcribing four version numbers, and the one people get wrong is
 usually the one that mattered.
+
+---
+
+## Closing a dialog
+
+Every window that opens over the schematic — conditions, an analysis, the requirements list —
+closes with **Escape** or with the **Close** button at its bottom right. Neither depends on the
+window having a title bar, which matters because a tiling window manager does not draw one: on
+Hyprland, Sway or i3 there is no ✕ in the corner to fall back on.
 
 ---
 

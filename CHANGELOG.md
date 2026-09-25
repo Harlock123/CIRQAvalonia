@@ -8,6 +8,25 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+### Fixed
+
+**Dialogs could not be closed from inside them.** Seventeen of the twenty-two had no close button
+and no key binding, so on a desktop that draws no title bar — Hyprland, Sway, i3 — the only way out
+was the window manager's own close command, which the application never mentioned. Reported against
+**Conditions**, which is where somebody sets the ambient temperature and then wants to go back and
+run the circuit at it.
+
+Every dialog now closes on **Escape** and carries a visible **Close** button. Both are wired
+centrally, by the helper every dialog is shown through, so a dialog added later cannot forget them —
+and a test asserts that every dialog has a visible way out and that none is shown any other way. It
+went unnoticed for so long because it is invisible on a desktop with title bars.
+
+**Recovering a second window's work never happened.** A window other than the first keeps its own
+autosave snapshot, and the first window is supposed to offer those back on the next start. The flag
+that decided which window was the first was passed in as a constructor argument, and the one call
+site that had to pass it lost the argument in an unrelated revert — leaving it false everywhere and
+the recovery silently dead. A window now counts which one it is rather than being told.
+
 ## [0.33.1] - 2026-09-23
 
 Documentation only — nothing in the application changed, so there is no need to update for it

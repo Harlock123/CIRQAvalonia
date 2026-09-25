@@ -25,5 +25,10 @@
     <TextBlock TextWrapping="Wrap" Opacity="0.65" FontSize="12"
                Text="Every semiconductor junction in the circuit reads this, so it moves diode drops, transistor gains and leakage together. It is saved with the circuit, and Simulate &gt; DC Sweep can sweep it. Press Reset afterwards to rebuild at the new temperature." />
 
+    <!-- A way out that does not depend on a title bar, because a tiling window manager draws
+         none. Escape closes it too; this is the half somebody can see. -->
+    <Button Name="CloseButton" Content="Close" MinWidth="88" Padding="14,5"
+            HorizontalAlignment="Right" Margin="0,6,0,0" />
+
   </StackPanel>
 </Window>

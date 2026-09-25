@@ -18,14 +18,7 @@ public partial class MainWindow : Window
     private MainWindowViewModel? _viewModel;
 
     public MainWindow()
-        : this(first: false)
     {
-    }
-
-    public MainWindow(bool first)
-    {
-        _first = first;
-
         InitializeComponent();
 
         // The canvas shows live state (LED brightness, logic levels, probe readouts), so it is
@@ -94,8 +87,16 @@ public partial class MainWindow : Window
     /// True for the window the application opened with. Only that one goes looking for snapshots
     /// belonging to windows that are not there any more — a window opened later has not lost
     /// anything, and asking it to offer somebody else's work would be strange.
+    /// <para>
+    /// Counted rather than passed in. It was a constructor argument first, and the one call site
+    /// that had to pass it lost the argument in an unrelated revert — leaving the flag false
+    /// everywhere and the recovery it guards silently dead, with nothing to notice it. A window
+    /// can work out which one it is without being told.
+    /// </para>
     /// </summary>
-    private readonly bool _first;
+    private readonly bool _first = System.Threading.Interlocked.Increment(ref _opened) == 1;
+
+    private static int _opened;
 
     /// <summary>
     /// Another editor, with its own circuit, simulation, scope and history — and the clipboard
@@ -202,7 +203,7 @@ public partial class MainWindow : Window
     private async Task ShowAboutAsync()
     {
         var dialog = new AboutWindow { DataContext = new AboutViewModel() };
-        await dialog.ShowDialog(this);
+        await dialog.ShowModal(this);
     }
 
     private async Task ShowExamplesAsync()
@@ -212,7 +213,7 @@ public partial class MainWindow : Window
         var browser = new ExampleBrowserViewModel();
         var dialog = new ExampleBrowserWindow { DataContext = browser };
 
-        await dialog.ShowDialog(this);
+        await dialog.ShowModal(this);
 
         if (browser.Chosen is { } example) _viewModel.LoadExampleCommand.Execute(example);
     }
@@ -226,7 +227,7 @@ public partial class MainWindow : Window
             DataContext = new FrequencyResponseViewModel(_viewModel.Circuit),
         };
 
-        await dialog.ShowDialog(this);
+        await dialog.ShowModal(this);
     }
 
     private async Task ShowDcSweepAsync()
@@ -238,7 +239,7 @@ public partial class MainWindow : Window
             DataContext = new DcSweepViewModel(_viewModel.Circuit),
         };
 
-        await dialog.ShowDialog(this);
+        await dialog.ShowModal(this);
     }
 
     private async Task ShowTransientStepAsync()
@@ -250,7 +251,7 @@ public partial class MainWindow : Window
             DataContext = new TransientStepViewModel(_viewModel.Circuit),
         };
 
-        await dialog.ShowDialog(this);
+        await dialog.ShowModal(this);
     }
 
     private async Task ShowNoiseAsync()
@@ -262,7 +263,7 @@ public partial class MainWindow : Window
             DataContext = new NoiseViewModel(_viewModel.Circuit),
         };
 
-        await dialog.ShowDialog(this);
+        await dialog.ShowModal(this);
     }
 
     private async Task ShowStabilityAsync()
@@ -274,7 +275,7 @@ public partial class MainWindow : Window
             DataContext = new StabilityViewModel(_viewModel.Circuit),
         };
 
-        await dialog.ShowDialog(this);
+        await dialog.ShowModal(this);
     }
 
     private async Task WriteReportAsync()
@@ -364,7 +365,7 @@ public partial class MainWindow : Window
             if (parts.Count > 0) _canvas?.CentreOn(parts[0]);
         };
 
-        await new ExplainWindow { DataContext = model }.ShowDialog(this);
+        await new ExplainWindow { DataContext = model }.ShowModal(this);
     }
 
     private async Task ShowCompareAsync()
@@ -388,7 +389,7 @@ public partial class MainWindow : Window
         // showing a list that would otherwise be read as a list of edits.
         if (problem is not null) await dialogs.ReportAsync("Compare", problem);
 
-        await new CompareWindow { DataContext = model }.ShowDialog(this);
+        await new CompareWindow { DataContext = model }.ShowModal(this);
     }
 
     private async Task ShowFindAsync()
@@ -399,7 +400,7 @@ public partial class MainWindow : Window
 
         model.RequestGoTo += (_, component) => _viewModel.GoTo(component);
 
-        await new FindWindow { DataContext = model }.ShowDialog(this);
+        await new FindWindow { DataContext = model }.ShowModal(this);
     }
 
     private async Task ShowImpedanceAsync()
@@ -411,7 +412,7 @@ public partial class MainWindow : Window
             DataContext = new ImpedanceViewModel(_viewModel.Circuit),
         };
 
-        await dialog.ShowDialog(this);
+        await dialog.ShowModal(this);
     }
 
     private async Task ShowPoleZeroAsync()
@@ -423,7 +424,7 @@ public partial class MainWindow : Window
             DataContext = new PoleZeroViewModel(_viewModel.Circuit),
         };
 
-        await dialog.ShowDialog(this);
+        await dialog.ShowModal(this);
     }
 
     private async Task ShowSpecsAsync()
@@ -437,7 +438,7 @@ public partial class MainWindow : Window
 
         var dialog = new SpecsWindow { DataContext = model };
 
-        await dialog.ShowDialog(this);
+        await dialog.ShowModal(this);
     }
 
     private async Task ShowSpectrumAsync()
@@ -449,7 +450,7 @@ public partial class MainWindow : Window
             DataContext = new SpectrumViewModel(_viewModel.Circuit),
         };
 
-        await dialog.ShowDialog(this);
+        await dialog.ShowModal(this);
     }
 
     private async Task ShowSpiceImportAsync()
@@ -462,7 +463,7 @@ public partial class MainWindow : Window
                 _viewModel.UserModels, _viewModel.Circuit, _viewModel.Blocks),
         };
 
-        await dialog.ShowDialog(this);
+        await dialog.ShowModal(this);
     }
 
     private async Task ShowBlockLibraryAsync()
@@ -474,7 +475,7 @@ public partial class MainWindow : Window
             DataContext = new BlockLibraryViewModel(_viewModel),
         };
 
-        await dialog.ShowDialog(this);
+        await dialog.ShowModal(this);
     }
 
     private async Task ShowConditionsAsync()
@@ -489,7 +490,7 @@ public partial class MainWindow : Window
 
         var dialog = new ConditionsWindow { DataContext = model };
 
-        await dialog.ShowDialog(this);
+        await dialog.ShowModal(this);
     }
 
     private async Task ShowMonteCarloAsync()
@@ -501,7 +502,7 @@ public partial class MainWindow : Window
             DataContext = new MonteCarloViewModel(_viewModel.Circuit),
         };
 
-        await dialog.ShowDialog(this);
+        await dialog.ShowModal(this);
     }
 
     private async Task ShowBusDecodeAsync()
@@ -513,7 +514,7 @@ public partial class MainWindow : Window
             DataContext = new BusDecodeViewModel(_viewModel.Circuit),
         };
 
-        await dialog.ShowDialog(this);
+        await dialog.ShowModal(this);
     }
 
     private async Task ShowRuleCheckAsync()
@@ -529,7 +530,7 @@ public partial class MainWindow : Window
 
         var dialog = new RuleCheckWindow { DataContext = model };
 
-        await dialog.ShowDialog(this);
+        await dialog.ShowModal(this);
     }
 
     /// <summary>
@@ -589,7 +590,7 @@ public partial class MainWindow : Window
             DataContext = new SettingsViewModel(app.SettingsStore, app.Settings),
         };
 
-        await dialog.ShowDialog(this);
+        await dialog.ShowModal(this);
     }
 
     private void RefreshLiveState()

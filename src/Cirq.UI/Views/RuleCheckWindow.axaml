@@ -10,6 +10,14 @@
 
   <DockPanel Margin="0">
 
+
+    <!-- A way out that does not depend on a title bar, because a tiling window manager draws
+         none. Escape closes it too; this is the half somebody can see. -->
+    <Border DockPanel.Dock="Bottom" Padding="14,9"
+            BorderBrush="{DynamicResource PanelBorder}" BorderThickness="0,1,0,0">
+      <Button Name="CloseButton" Content="Close" MinWidth="88" Padding="14,5"
+              HorizontalAlignment="Right" />
+    </Border>
     <Border DockPanel.Dock="Bottom" Padding="14,10"
             BorderBrush="{DynamicResource PanelBorder}" BorderThickness="0,1,0,0">
       <DockPanel>
