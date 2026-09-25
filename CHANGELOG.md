@@ -8,6 +8,11 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+## [0.33.2] - 2026-09-24
+
+Two fixes, one of them reported and one found while fixing it. 186 components in 16 categories,
+87 worked examples, 3069 tests.
+
 ### Fixed
 
 **Dialogs could not be closed from inside them.** Seventeen of the twenty-two had no close button
@@ -1677,7 +1682,8 @@ First public build of CirqAvalonia — an electronic circuit analyzer and mixed-
 
 **501 tests** measure the solver against closed-form answers rather than recorded output.
 
-[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.33.1...HEAD
+[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.33.2...HEAD
+[0.33.2]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.33.1...v0.33.2
 [0.33.1]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.33.0...v0.33.1
 [0.33.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.32.0...v0.33.0
 [0.32.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.31.0...v0.32.0
