@@ -9,6 +9,7 @@
     <PackageReference Include="xunit.runner.visualstudio" />
     <PackageReference Include="coverlet.collector" />
     <PackageReference Include="SkiaSharp" />
+    <PackageReference Include="Avalonia.Headless" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/Cirq.Core/Cirq.Core.csproj" />

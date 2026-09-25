@@ -377,6 +377,28 @@ public sealed class StorageProviderFileDialogs : ICircuitFileDialogs
     /// </summary>
     private async Task<bool> ShowDialogAsync(string title, string message, string confirmText, string? cancelText)
     {
+        var built = BuildDialog(title, message, confirmText, cancelText);
+
+        await built.Window.ShowModal(_owner);
+
+        return built.Answer();
+    }
+
+    /// <summary>A dialog built but not shown, and a way to read what it was answered with.</summary>
+    internal sealed record CodeBuiltDialog(Window Window, Func<bool> Answer);
+
+    /// <summary>
+    /// Builds the dialog without showing it.
+    /// <para>
+    /// Separate from showing it so that a test can have one. A modal cannot be awaited from a test
+    /// — the call does not return until the window is gone — so the only way to look at one of
+    /// these is to build it and stop there. These two dialogs are between them the whole of the UI
+    /// that has ever shipped broken, so being able to look at them is worth a seam.
+    /// </para>
+    /// </summary>
+    internal static CodeBuiltDialog BuildDialog(
+        string title, string message, string confirmText, string? cancelText)
+    {
         var result = false;
 
         var confirm = new Button
@@ -451,7 +473,6 @@ public sealed class StorageProviderFileDialogs : ICircuitFileDialogs
             },
         };
 
-        await dialog.ShowModal(_owner);
-        return result;
+        return new CodeBuiltDialog(dialog, () => result);
     }
 }

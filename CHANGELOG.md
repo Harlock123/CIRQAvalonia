@@ -8,6 +8,21 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**The suite opens windows now.** Three thousand tests and not one of them had ever constructed one
+— which is why both of the UI bugs that have ever shipped got out: a dialog with no way to close
+it, and a dialog drawn in the light palette while the application around it was dark, its buttons
+pale grey on pale grey. Neither is visible from a view model, and neither is visible from the XAML.
+
+Every window is now opened for real, on a headless Avalonia platform, and clicked with a real
+pointer — which matters more than it sounds, because a raised `Click` event does not invoke a
+button's command, so a test that raises one passes against a button that would never have fired.
+Each window has to lay out, has to close from its own button, has to close on Escape, and has to
+have nothing in it drawn in a colour that cannot be read against its own background.
+
+The theme test is the interesting one: it builds a dialog while the application says Light, turns
+the application dark underneath it, and asks what colour the dialog is now. Reverting the actual
+fix that shipped in 0.33.3 makes it fail, with the reason in the message.
+
 ## [0.34.0] - 2026-09-24
 
 Five things the circuit could not tell you before: what it is doing, what it costs to run, what it

@@ -34,10 +34,26 @@ public static class Dialog
         ArgumentNullException.ThrowIfNull(dialog);
         ArgumentNullException.ThrowIfNull(owner);
 
-        CloseOnEscape(dialog);
-        WireCloseButton(dialog);
+        Wire(dialog);
 
         return dialog.ShowDialog(owner);
+    }
+
+    /// <summary>
+    /// Everything that makes a window closable, without showing it.
+    /// <para>
+    /// Separated from <see cref="ShowModal"/> so that it can be applied to a window a test has
+    /// opened. A test cannot await a modal dialog — the call does not return until the window is
+    /// gone, which is the thing being tested — so the wiring has to be reachable on its own, and
+    /// it has to be <i>this</i> wiring rather than a copy of it.
+    /// </para>
+    /// </summary>
+    public static void Wire(Window dialog)
+    {
+        ArgumentNullException.ThrowIfNull(dialog);
+
+        CloseOnEscape(dialog);
+        WireCloseButton(dialog);
     }
 
     /// <summary>

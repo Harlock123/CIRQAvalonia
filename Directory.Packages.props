@@ -15,6 +15,13 @@
     <PackageVersion Include="Avalonia.Fonts.Inter" Version="$(AvaloniaVersion)" />
         <PackageVersion Include="Avalonia.Skia" Version="$(AvaloniaVersion)" />
     <PackageVersion Include="ScottPlot.Avalonia" Version="5.1.59" />
+    <!-- Drives real windows in tests without a display: the suite can open a dialog, press its
+         button and assert what happened. Pinned to $(AvaloniaVersion) like the rest of Avalonia,
+         because a headless platform and the framework it stands in for have to be the same one.
+         The base package rather than Avalonia.Headless.XUnit, which from 12.0 depends on xunit v3
+         and would collide with the v2 the rest of this suite is written against — the session is
+         driven by hand instead, which is a dozen lines. -->
+    <PackageVersion Include="Avalonia.Headless" Version="$(AvaloniaVersion)" />
     <!-- Already in the tree underneath Avalonia and ScottPlot; referenced explicitly because the
          exporter draws on it directly, and pinned to the version both of those agree on. -->
     <PackageVersion Include="SkiaSharp" Version="3.119.0" />
