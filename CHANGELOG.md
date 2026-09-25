@@ -8,6 +8,15 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+## [0.34.0] - 2026-09-24
+
+Five things the circuit could not tell you before: what it is doing, what it costs to run, what it
+does to a waveform that is not a sine, whether it settles the way the specification says, and
+whether your last edit changed anything else. 188 components in 16 categories, 87 worked examples,
+3276 tests.
+
+### Added
+
 **A baseline: what the circuit produced then, against what it produces now.**
 **Simulate > Baseline...** (`Ctrl+F8`) records the whole answer, so that an edit which breaks
 something three chapters away from what you touched shows up as a change rather than as something
@@ -93,17 +102,6 @@ than spending it, and counting volts times amps as heat would put an imaginary w
 of every filter in the library. Parts that dissipate say so; nothing about the topology can tell a
 capacitor from a resistor.
 
-### Fixed
-
-**A current probe on a battery read backwards.** The battery reported the current it was
-*delivering* where every other part in the library reports the current going *into* it — the
-convention a clamp meter uses. So a probe clamped on a cell read the right magnitude with the wrong
-sign, and the current-flow dots on its wires ran the wrong way. It was the only part doing this, and
-the shape of the mistake is why it lasted: each end still read equal and opposite, and "current out
-of a battery" is such a natural phrase that the wrong answer looked like the right one. Only a
-comparison against its neighbours catches it, and there is now a test that makes exactly that
-comparison across all three kinds of source.
-
 **The circuit now says what it is doing, not just what it is made of.** Every net's voltage and
 every part's current can be written straight onto the schematic — **View > Show Live Values**, or
 `Ctrl+L` — and the hover card carries the same figures whether or not the annotation is on. Finding
@@ -133,6 +131,17 @@ build already in the world would refuse every new file, for a change those build
 ignored. Six tests take a real saved circuit, edit the JSON into something a later version might
 have written, and assert it still loads cleanly — which is the only way to test against a future
 that does not exist yet.
+
+### Fixed
+
+**A current probe on a battery read backwards.** The battery reported the current it was
+*delivering* where every other part in the library reports the current going *into* it — the
+convention a clamp meter uses. So a probe clamped on a cell read the right magnitude with the wrong
+sign, and the current-flow dots on its wires ran the wrong way. It was the only part doing this, and
+the shape of the mistake is why it lasted: each end still read equal and opposite, and "current out
+of a battery" is such a natural phrase that the wrong answer looked like the right one. Only a
+comparison against its neighbours catches it, and there is now a test that makes exactly that
+comparison across all three kinds of source.
 
 ## [0.33.3] - 2026-09-24
 
