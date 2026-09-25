@@ -8,6 +8,14 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+## [0.36.0] - 2026-09-25
+
+A drawing can be more than one page. Large circuits solve eight to twelve times faster. Everything a
+search finds can be changed at once, and every control in the application can finally say what it is
+to a screen reader. 188 components in 16 categories, 87 worked examples, 3530 tests.
+
+### Added
+
 **A drawing can be spread over sheets.** `View > Add Sheet` puts a strip of tabs above the canvas,
 and each tab is a page — a supply page, a logic page, an I/O page. Double-click the tab you are on
 to rename it; `Ctrl` `PgDn` and `Ctrl` `PgUp` step between them.
@@ -30,12 +38,6 @@ being relabelled, so splitting a schematic you have been working on for a week c
 Removing a page moves what was on it to the page beside it rather than deleting it — losing a page
 should cost the arrangement, not the circuit — and the last page cannot be removed. A circuit saved
 before any of this opens as one page with no tab strip, and its file is byte-for-byte what it was.
-
-**Opening a circuit brought back its parts and left the rest of the document behind.** The named
-numbers, the requirements and the recorded baseline are all saved and were all being dropped on the
-way in — a circuit with parameters opened as one whose parts pointed at names that no longer existed.
-Sheets are what made it obvious, since a document that forgets its pages arrives as every page drawn
-on top of the first. Undo took the same path, so it had the same hole.
 
 **Find on the sheet can now change what it found.** Search for `10k`, pick a setting every match
 has, and set them all, bind them all to a parameter, or take the value they already share and give
@@ -60,6 +62,8 @@ not much use to somebody who cannot see which control they have landed on. A tes
 window and fails on a control that would announce nothing, and on one named after its own type,
 which passes the first check and tells nobody anything.
 
+### Changed
+
 **Large circuits are eight to twelve times faster.** A circuit matrix is nearly empty — three
 entries a row, under half a percent full — and the solver was eliminating it densely, which is N³
 and spends almost all of its time subtracting zero. Measured on a ladder that refactors every
@@ -78,6 +82,14 @@ to the last bit. The reordering is an optimisation that can decline: a matrix th
 non-singular, like a bus with no pull-ups, can pivot to exactly zero in one order and 1e-20 in
 another, so a failure there falls back to the order the circuit was stamped in rather than being
 reported.
+
+### Fixed
+
+**Opening a circuit brought back its parts and left the rest of the document behind.** The named
+numbers, the requirements and the recorded baseline are all saved and were all being dropped on the
+way in — a circuit with parameters opened as one whose parts pointed at names that no longer existed.
+Sheets are what made it obvious, since a document that forgets its pages arrives as every page drawn
+on top of the first. Undo took the same path, so it had the same hole.
 
 ## [0.35.0] - 2026-09-25
 
@@ -2010,7 +2022,10 @@ First public build of CirqAvalonia — an electronic circuit analyzer and mixed-
 
 **501 tests** measure the solver against closed-form answers rather than recorded output.
 
-[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.33.3...HEAD
+[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.36.0...HEAD
+[0.36.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.35.0...v0.36.0
+[0.35.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.34.0...v0.35.0
+[0.34.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.33.3...v0.34.0
 [0.33.3]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.33.2...v0.33.3
 [0.33.2]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.33.1...v0.33.2
 [0.33.1]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.33.0...v0.33.1
