@@ -24,6 +24,18 @@ public partial class Circuit : ObservableObject
     public ObservableCollection<Cirq.Core.Verification.DesignSpec> Specs { get; } = [];
 
     /// <summary>
+    /// What this circuit produced when somebody last said "this is right", kept so that what it
+    /// produces next can be held against it.
+    /// <para>
+    /// Part of the document rather than of the session, for the same reason the requirements are:
+    /// a baseline that lives in one person's running application is not a baseline. Empty until
+    /// one is taken.
+    /// </para>
+    /// </summary>
+    public Cirq.Core.Probing.TraceBaseline Baseline { get; set; } =
+        Cirq.Core.Probing.TraceBaseline.Empty;
+
+    /// <summary>
     /// The temperature everything in this circuit is at, in degrees Celsius. 27 °C is what every
     /// model in the library is characterised at, and what a datasheet means by "room temperature".
     /// <para>

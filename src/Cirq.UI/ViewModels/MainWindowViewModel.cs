@@ -833,6 +833,9 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     /// <summary>Raised for the power budget window.</summary>
     public event EventHandler? RequestPower;
 
+    /// <summary>Raised for the baseline window.</summary>
+    public event EventHandler? RequestBaseline;
+
     /// <summary>Raised when the spectrum window should be opened.</summary>
     public event EventHandler? RequestSpectrum;
 
@@ -1349,6 +1352,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
           F4           Check circuit
           Ctrl+F4      Requirements — what it is supposed to do, checked
           Ctrl+F5      Power — what every part dissipates against what it is rated for
+          Ctrl+F8      Baseline — record what it does now, and say what changed later
           Shift+F4     Tolerance analysis
           F8           Reset
 
@@ -1423,6 +1427,9 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
     [RelayCommand]
     private void ShowPower() => RequestPower?.Invoke(this, EventArgs.Empty);
+
+    [RelayCommand]
+    private void ShowBaseline() => RequestBaseline?.Invoke(this, EventArgs.Empty);
 
     /// <summary>
     /// Reads a file of numbers into the selected waveform source.

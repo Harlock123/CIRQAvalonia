@@ -29,31 +29,32 @@ the [README](../README.md), and what changed between releases is in the
 17. [Impedance](#impedance)
 18. [Poles and Zeros](#poles-and-zeros)
 19. [Requirements](#requirements)
-20. [Noise](#noise)
-21. [Reading a bus](#reading-a-bus)
-22. [Measuring between two points, and measuring power](#measuring-between-two-points-and-measuring-power)
-23. [Will it work with the parts you can buy](#will-it-work-with-the-parts-you-can-buy)
-24. [Temperature](#temperature)
-25. [Feeding it a real waveform](#feeding-it-a-real-waveform)
-26. [Power](#power)
-27. [Writing on the schematic](#writing-on-the-schematic)
-28. [Drawing part of a circuit as one block](#drawing-part-of-a-circuit-as-one-block)
-29. [Reusing a block](#reusing-a-block)
-30. [Plotting one trace against another](#plotting-one-trace-against-another)
-31. [Importing a SPICE model](#importing-a-spice-model)
-32. [Comparing and computing traces](#comparing-and-computing-traces)
-33. [Naming a net instead of drawing it](#naming-a-net-instead-of-drawing-it)
-34. [What is this circuit?](#what-is-this-circuit)
-35. [Checking the circuit](#checking-the-circuit)
-36. [Development boards](#development-boards)
-37. [Saving and loading](#saving-and-loading)
-38. [Printing](#printing)
-39. [Exporting](#exporting)
-40. [Appearance](#appearance)
-41. [What version is this](#what-version-is-this)
-42. [Closing a dialog](#closing-a-dialog)
-43. [Keyboard reference](#keyboard-reference)
-44. [When a circuit will not simulate](#when-a-circuit-will-not-simulate)
+20. [A baseline](#a-baseline)
+21. [Noise](#noise)
+22. [Reading a bus](#reading-a-bus)
+23. [Measuring between two points, and measuring power](#measuring-between-two-points-and-measuring-power)
+24. [Will it work with the parts you can buy](#will-it-work-with-the-parts-you-can-buy)
+25. [Temperature](#temperature)
+26. [Feeding it a real waveform](#feeding-it-a-real-waveform)
+27. [Power](#power)
+28. [Writing on the schematic](#writing-on-the-schematic)
+29. [Drawing part of a circuit as one block](#drawing-part-of-a-circuit-as-one-block)
+30. [Reusing a block](#reusing-a-block)
+31. [Plotting one trace against another](#plotting-one-trace-against-another)
+32. [Importing a SPICE model](#importing-a-spice-model)
+33. [Comparing and computing traces](#comparing-and-computing-traces)
+34. [Naming a net instead of drawing it](#naming-a-net-instead-of-drawing-it)
+35. [What is this circuit?](#what-is-this-circuit)
+36. [Checking the circuit](#checking-the-circuit)
+37. [Development boards](#development-boards)
+38. [Saving and loading](#saving-and-loading)
+39. [Printing](#printing)
+40. [Exporting](#exporting)
+41. [Appearance](#appearance)
+42. [What version is this](#what-version-is-this)
+43. [Closing a dialog](#closing-a-dialog)
+44. [Keyboard reference](#keyboard-reference)
+45. [When a circuit will not simulate](#when-a-circuit-will-not-simulate)
 
 This guide is also attached to every [release](../../releases) as a PDF, with a contents page and
 the screenshots in place — the same document, laid out for reading away from the machine. Build it
@@ -124,6 +125,7 @@ each row links to the section that explains it.
 | Is anything **past what it is rated for** | [Power](#power) — every part's dissipation against its rating, averaged across a run | `Ctrl` `F5` |
 | How long will it run **on a battery** | [Power](#power) — the draw, and the arithmetic on the cell's capacity | `Ctrl` `F5` |
 | Does it meet what I **said it had to do** | [Requirements](#requirements) — written down, and checked | `Ctrl` `F4` |
+| Did my edit **break something else** | [A baseline](#a-baseline) — what it produced then, against what it produces now | `Ctrl` `F8` |
 | Where is the **current actually going** | [Current flow](#watching-the-current-move) — dots on the wires, in the View menu | — |
 | What is **this node sitting at** | [Live values](#what-the-circuit-is-doing) — volts on every net and amps through every part | `Ctrl` `L` |
 | Is this **better than what I had** | [Keep a reference](#comparing-and-computing-traces), change the circuit, compare | — |
@@ -3559,6 +3561,61 @@ is not a check.
 
 ---
 
+## A baseline
+
+**Simulate > Baseline...** (`Ctrl+F8`) records what the circuit produced, so that what it produces
+next can be held against it.
+
+Requirements assert the handful of things you thought to assert. This is the rest of the answer.
+Run the circuit until it is doing what it should, write a note about what this run is, and press
+**Record**. From then on **Compare again** says what moved — which is the question "did my edit
+break something three chapters away", and the one nothing else here answers.
+
+| Status | What it means |
+| --- | --- |
+| **Same** | Nothing about this trace moved |
+| **Moved** | Something did, and the rows under it say what, from what, to what |
+| **New** | A probe added since, so nothing has ever been checked against it |
+| **Gone** | The baseline has this trace and the circuit no longer does |
+
+Each trace also gets a **worst deviation**: the largest gap between the two shapes at the same
+moment, and what fraction of the trace's own swing that is. The fraction is the figure worth
+reading — half a volt out on a five volt swing is a different statement from half a volt out on
+five millivolts.
+
+**The shape is compared as well as the numbers**, because two waveforms can measure the same and be
+entirely different. A sine and a triangle of the same peak to peak have the same minimum, the same
+maximum and the same frequency; only the shape tells them apart.
+
+### Why there is a threshold
+
+A change has to be more than **one percent** to be reported. Compared exactly, every run differs
+from every other: the solver chooses its own time steps, and a step landing a nanosecond elsewhere
+moves a measured rise time in the last few digits. A comparison that reported that would report it
+every time, and a report that is never empty is a report nobody reads.
+
+Each measurement is judged against a scale that means something rather than against itself. The
+**mean** is what forces this: the mean of a symmetric waveform is numerically zero — a few times
+ten to the minus seventeen, wherever the last bit of the arithmetic landed — so two runs of the
+*same* circuit differ by several percent of it. Against the waveform's swing, which is what it is a
+mean of, the same difference is one part in ten to the sixteenth.
+
+### What is stored
+
+The **shape**, thinned to 256 points, and nothing else. The measurements are worked out again when
+the file is read rather than stored — so a release that fixes a measurement fixes it for baselines
+taken before the fix, instead of holding new runs against an old bug forever.
+
+A capture is ten thousand points per probe, and a circuit file is a text file somebody may want to
+read. 256 points is plenty to see that a waveform moved, and catching a change in a single sample
+of ten thousand would mostly catch changes the solver's own step size invented.
+
+Taking a baseline **does not move the file format's version**: it is a new section, and an older
+build already ignores what it does not recognise. A circuit with no baseline writes none, so an
+ordinary file is byte for byte what it was.
+
+---
+
 ## Noise
 
 **Simulate > Noise...** (`Shift+F5`) measures the floor under everything: how much noise a circuit
@@ -5009,6 +5066,7 @@ Also available in the app at **Help > Keyboard Shortcuts**.
 | `F4` | Check circuit — the wiring mistakes no part can report about itself |
 | `Shift` `F4` | Tolerance analysis — will it work with the parts you can buy |
 | `Ctrl` `F5` | Power — what every part dissipates against its rating, and how long a battery lasts |
+| `Ctrl` `F8` | Baseline — record what the circuit does now, and say what changed later |
 | Shift-click with the probe tool | Set the selected probe's second point, for a differential or power measurement |
 | Click a wire or a pin | Light up the whole net it is on, and say what is joined to it |
 | `F9` / `F10` | Collapse the palette / the properties panel |

@@ -174,6 +174,7 @@ public partial class MainWindow : Window
         viewModel.RequestSpecs += async (_, _) => await ShowSpecsAsync();
         viewModel.RequestRuleCheck += async (_, _) => await ShowRuleCheckAsync();
         viewModel.RequestPower += async (_, _) => await ShowPowerAsync();
+        viewModel.RequestBaseline += async (_, _) => await ShowBaselineAsync();
         viewModel.RequestSpectrum += async (_, _) => await ShowSpectrumAsync();
         viewModel.RequestBusDecode += async (_, _) => await ShowBusDecodeAsync();
         viewModel.RequestMonteCarlo += async (_, _) => await ShowMonteCarloAsync();
@@ -530,6 +531,21 @@ public partial class MainWindow : Window
         model.RevealRequested += (_, components) => _viewModel.Reveal(components);
 
         var dialog = new RuleCheckWindow { DataContext = model };
+
+        await dialog.ShowModal(this);
+    }
+
+    private async Task ShowBaselineAsync()
+    {
+        if (_viewModel is null) return;
+
+        var model = new BaselineViewModel(_viewModel.Circuit);
+
+        // Taking or forgetting a baseline edits the document, and a document that changed without
+        // being marked changed is a document somebody closes without being asked.
+        model.Changed += (_, _) => _viewModel.MarkModified();
+
+        var dialog = new BaselineWindow { DataContext = model };
 
         await dialog.ShowModal(this);
     }

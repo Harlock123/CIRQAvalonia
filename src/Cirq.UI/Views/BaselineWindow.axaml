@@ -1,0 +1,98 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:Cirq.UI.ViewModels"
+        x:Class="Cirq.UI.Views.BaselineWindow"
+        x:DataType="vm:BaselineViewModel"
+        Title="Baseline"
+        Width="820" Height="600"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource PanelBackground}">
+
+  <DockPanel>
+
+    <!-- A way out that does not depend on a title bar, because a tiling window manager draws
+         none. Escape closes it too; this is the half somebody can see. -->
+    <Border DockPanel.Dock="Bottom" Padding="14,9"
+            BorderBrush="{DynamicResource PanelBorder}" BorderThickness="0,1,0,0">
+      <Button Name="CloseButton" Content="Close" MinWidth="88" Padding="14,5"
+              HorizontalAlignment="Right" />
+    </Border>
+
+    <Border DockPanel.Dock="Bottom" Padding="14,10"
+            BorderBrush="{DynamicResource PanelBorder}" BorderThickness="0,1,0,0">
+      <DockPanel>
+        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8"
+                    VerticalAlignment="Center">
+          <Button Content="Compare again" Command="{Binding CompareCommand}" Padding="14,5" />
+          <Button Content="Forget" Command="{Binding ClearCommand}" Padding="14,5"
+                  IsEnabled="{Binding HasBaseline}"
+                  ToolTip.Tip="Throw the baseline away, for when the circuit is meant to have changed" />
+          <Button Content="Record" Command="{Binding RecordCommand}" Padding="18,5"
+                  ToolTip.Tip="Take what the probes are showing now as the answer everything after this is held against" />
+        </StackPanel>
+
+        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+          <TextBlock Text="Note" VerticalAlignment="Center" Opacity="0.8" FontSize="12" />
+          <TextBox Text="{Binding Note, Mode=TwoWay}" Width="260"
+                   PlaceholderText="what this run was, for whoever reads it later" />
+        </StackPanel>
+      </DockPanel>
+    </Border>
+
+    <!-- The verdict first, because it is what somebody opened the window to read. -->
+    <Border DockPanel.Dock="Top" Padding="16,14,16,10">
+      <StackPanel Spacing="6">
+        <TextBlock Text="{Binding Summary}" FontSize="14" TextWrapping="Wrap" />
+        <TextBlock Text="{Binding Recorded}" IsVisible="{Binding HasBaseline}"
+                   FontSize="11" Opacity="0.7" TextWrapping="Wrap" />
+      </StackPanel>
+    </Border>
+
+    <ScrollViewer IsVisible="{Binding HasRows}">
+      <ItemsControl ItemsSource="{Binding Rows}" Margin="14,0,14,12">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:BaselineRowViewModel">
+            <Border Margin="0,4" Padding="10,8" CornerRadius="4"
+                    Background="{DynamicResource GroupHeaderBackground}">
+              <StackPanel Spacing="6">
+
+                <Grid ColumnDefinitions="64,140,*">
+                  <Border Grid.Column="0" CornerRadius="3" Padding="6,1" Height="20"
+                          HorizontalAlignment="Left" VerticalAlignment="Center"
+                          Background="{DynamicResource PanelBackground}">
+                    <TextBlock Text="{Binding Status}" FontSize="10" VerticalAlignment="Center"
+                               Foreground="{DynamicResource TextMuted}" />
+                  </Border>
+                  <TextBlock Grid.Column="1" Text="{Binding Label}" FontSize="13"
+                             VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                  <TextBlock Grid.Column="2" Text="{Binding Deviation}" FontSize="11"
+                             VerticalAlignment="Center" Opacity="0.8" />
+                </Grid>
+
+                <TextBlock Text="{Binding Note}" IsVisible="{Binding HasNote}"
+                           FontSize="11" Opacity="0.75" TextWrapping="Wrap" />
+
+                <ItemsControl ItemsSource="{Binding Changes}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:ChangeRowViewModel">
+                      <Grid ColumnDefinitions="140,110,110,*" Margin="2,2">
+                        <TextBlock Grid.Column="0" Text="{Binding Quantity}" FontSize="11"
+                                   Opacity="0.8" />
+                        <TextBlock Grid.Column="1" Text="{Binding Was}" FontSize="11" />
+                        <TextBlock Grid.Column="2" Text="{Binding Now}" FontSize="11" />
+                        <TextBlock Grid.Column="3" Text="{Binding Moved}" FontSize="11"
+                                   Opacity="0.8" />
+                      </Grid>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+              </StackPanel>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </ScrollViewer>
+
+  </DockPanel>
+</Window>

@@ -8,6 +8,28 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**A baseline: what the circuit produced then, against what it produces now.**
+**Simulate > Baseline...** (`Ctrl+F8`) records the whole answer, so that an edit which breaks
+something three chapters away from what you touched shows up as a change rather than as something
+noticed six weeks later. Requirements assert the handful of things you thought to assert; this is
+the rest.
+
+It compares the **shape** as well as the measurements, because two waveforms can measure the same
+and be entirely different — a sine and a triangle of the same peak to peak share a minimum, a
+maximum and a frequency. A change has to be more than one percent to be reported: every run differs
+from every other in the last few digits, and a report that is never empty is a report nobody reads.
+
+Each measurement is judged against a scale that means something rather than against itself, and the
+mean is what forces that. The mean of a symmetric waveform is numerically zero — a few times ten to
+the minus seventeen — so two runs of the *same* circuit differ by several percent of it. Against the
+swing, the same difference is one part in ten to the sixteenth.
+
+The baseline is saved with the circuit, as the shape thinned to 256 points. Its measurements are
+worked out again on the way in rather than stored, so a release that fixes a measurement fixes it
+for baselines taken before the fix instead of holding new runs against an old bug. Taking one does
+not move the file format's version: it is a new section, and an older build already ignores what it
+does not recognise.
+
 **Requirements can now be written the way a specification is.** Five new measurements — **fall
 time**, **overshoot**, **settling time**, **pulse width** and **slew rate** — join the eight that
 were there. "Settles within 2 % in 10 µs" is most of what a control loop is judged on, and there

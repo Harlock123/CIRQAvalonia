@@ -47,6 +47,48 @@ public sealed class CircuitDocument
     /// </summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<SpecRecord>? Specs { get; set; }
+
+    /// <summary>
+    /// What the circuit produced when somebody last said "this is right". Null until a baseline is
+    /// taken, so an ordinary file is byte-for-byte what it was.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public BaselineRecord? Baseline { get; set; }
+}
+
+/// <summary>A recorded set of traces, as the file holds them.</summary>
+public sealed class BaselineRecord
+{
+    public DateTimeOffset Taken { get; set; }
+
+    public string Note { get; set; } = string.Empty;
+
+    public List<BaselineTraceRecord> Traces { get; set; } = [];
+}
+
+/// <summary>
+/// One trace of a baseline: its name, its unit, and a thinned copy of its shape.
+/// <para>
+/// The times and the values are two flat arrays rather than a list of pairs, and that is worth a
+/// line. A pair per point writes <c>{"time":...,"value":...}</c> two hundred and fifty-six times
+/// per trace, which is about three times the size for exactly the same numbers — and the file this
+/// lives in is one somebody may open in an editor.
+/// </para>
+/// <para>
+/// The measurements are <b>not</b> stored. They are worked out again from the samples when the file
+/// is read, which costs nothing and means a release that fixes a measurement fixes it for baselines
+/// taken before the fix rather than holding new runs against an old bug.
+/// </para>
+/// </summary>
+public sealed class BaselineTraceRecord
+{
+    public string Label { get; set; } = string.Empty;
+
+    public string Unit { get; set; } = "V";
+
+    public List<double> Times { get; set; } = [];
+
+    public List<double> Values { get; set; } = [];
 }
 
 /// <summary>One written-down requirement, exactly as the panel holds it.</summary>

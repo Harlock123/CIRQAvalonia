@@ -157,6 +157,9 @@
                   Command="{Binding ShowBusDecodeCommand}" />
         <MenuItem Header="_Tolerance Analysis..." InputGesture="Shift+F4"
                   Command="{Binding ShowMonteCarloCommand}" />
+        <MenuItem Header="_Baseline..." InputGesture="Ctrl+F8"
+                  Command="{Binding ShowBaselineCommand}"
+                  ToolTip.Tip="Record what the circuit does now, and afterwards say what changed" />
         <MenuItem Header="P_ower..." InputGesture="Ctrl+F5"
                   Command="{Binding ShowPowerCommand}"
                   ToolTip.Tip="What every part is dissipating against what it is rated for, what the circuit draws, and how long a battery would last" />

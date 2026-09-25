@@ -278,12 +278,41 @@ failing with a message about time steps.
 **Requirements** are the other half of a simulator. Every analysis here produces numbers; a
 requirement is a name, one of those numbers and a limit, held against what the circuit did and
 saved with the file. The answer is three-way — met, not met, or nothing to measure — because the
-third is not the second.
+third is not the second. Thirteen quantities, including the ones a datasheet is actually written
+in: **overshoot**, **settling time** to two percent, fall time, pulse width and slew rate. The first
+two are refused for anything that is not a step, because the arithmetic would happily produce an
+overshoot for a sine and it would mean nothing.
+
+**A baseline** is the rest of the answer. Requirements assert what somebody thought to assert; a
+baseline records the whole of what the circuit produced, so that an edit which breaks something
+three chapters away shows up as a change rather than as something noticed six weeks later. The
+shape is compared as well as the measurements — a sine and a triangle of the same peak to peak have
+the same minimum, maximum and frequency — and each measurement is judged against a scale that means
+something rather than against itself, because the mean of a symmetric waveform is numerically zero
+and two runs of the same circuit differ by several percent of it.
+
+**A power budget** ranks every part by how close it is to a limit. Semiconductors already worried
+about themselves; a resistor sitting at nine tenths of a watt in a quarter-watt package said nothing
+at all. It averages across a run rather than reading an instant, because a MOSFET caught mid-edge is
+dissipating watts and the same MOSFET a microsecond later is dissipating milliwatts. A capacitor is
+not counted: it stores and returns its energy rather than spending it, and nothing in the topology
+can tell it from a resistor — so the parts that dissipate say so.
+
+**Live values** write each net's voltage and each part's current onto the schematic, and onto the
+hover card whether or not the annotation is on. Nothing ambiguous is shown: a package with ten pins
+has no single current through it, ground is zero everywhere by definition, and anything below a
+microvolt is written as a plain zero rather than dressed up as `450pV`.
 
 **Current flow** puts moving dots on the wires, at a rate set by what each is carrying and in the
 direction it is going. Logarithmic, because a microamp of base current beside an amp of collector
 current would otherwise be indistinguishable from stopped. Where a junction divides the current the
 wires stay dark rather than being guessed at.
+
+**Arbitrary stimulus.** A waveform source plays back a list of points — SPICE's PWL source — and
+reads a scope CSV or a WAV straight into one; a pattern generator drives four logic lines from a
+written sequence, a row per line and a character per step. Every corner and every step boundary is a
+solver breakpoint, which is what stops the transient loop walking over a two microsecond glitch
+nothing declared.
 
 The scope can **keep a reference**: take a copy of what is on screen, change the circuit, and see
 both curves on the same axes — because what you are looking for after an edit is the difference

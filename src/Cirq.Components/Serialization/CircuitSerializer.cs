@@ -224,6 +224,22 @@ public static class CircuitSerializer
             })];
         }
 
+        if (!circuit.Baseline.IsEmpty)
+        {
+            document.Baseline = new BaselineRecord
+            {
+                Taken = circuit.Baseline.Taken,
+                Note = circuit.Baseline.Note,
+                Traces = [.. circuit.Baseline.Traces.Select(trace => new BaselineTraceRecord
+                {
+                    Label = trace.Label,
+                    Unit = trace.Unit,
+                    Times = [.. trace.Samples.Select(p => p.Time)],
+                    Values = [.. trace.Samples.Select(p => p.Value)],
+                })],
+            };
+        }
+
         return document;
     }
 
@@ -567,7 +583,45 @@ public static class CircuitSerializer
             circuit.Specs.Add(spec);
         }
 
+        if (document.Baseline is { } baseline) circuit.Baseline = Restore(baseline, result.Warnings);
+
         return result;
+    }
+
+    /// <summary>
+    /// A recorded baseline, back off the file.
+    /// <para>
+    /// A trace whose two arrays are different lengths is dropped rather than truncated: the pairing
+    /// between a time and a value is the whole of what the record means, and half a pairing is not
+    /// a shorter waveform, it is an unknown one.
+    /// </para>
+    /// </summary>
+    private static TraceBaseline Restore(BaselineRecord record, ICollection<string> warnings)
+    {
+        List<BaselineTrace> traces = [];
+
+        foreach (var trace in record.Traces)
+        {
+            if (trace.Times.Count != trace.Values.Count)
+            {
+                warnings.Add(
+                    $"The baseline for \"{trace.Label}\" has {trace.Times.Count} times against " +
+                    $"{trace.Values.Count} values, so it was left out.");
+
+                continue;
+            }
+
+            if (trace.Times.Count < 2) continue;
+
+            List<DataPoint> samples = new(trace.Times.Count);
+
+            for (var i = 0; i < trace.Times.Count; i++)
+                samples.Add(new DataPoint(trace.Times[i], trace.Values[i]));
+
+            traces.Add(new BaselineTrace(trace.Label, trace.Unit, samples));
+        }
+
+        return new TraceBaseline(record.Taken, record.Note, traces);
     }
 
     private static CircuitComponent? TryCreate(ComponentRecord record, ICollection<string> warnings)
