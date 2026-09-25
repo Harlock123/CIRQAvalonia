@@ -1293,6 +1293,125 @@ public class CircuitCanvas : Control
 
     // ---- keyboard --------------------------------------------------------
 
+    /// <summary>
+    /// Moves whatever is selected by one grid square, or by one unit with Shift held.
+    /// <para>
+    /// The canvas has always needed a mouse to move anything, which is a fair thing to notice
+    /// before calling something finished. It is also simply faster: a part that is one square out
+    /// is two keystrokes rather than a drag that has to be aimed.
+    /// </para>
+    /// </summary>
+    /// <returns>False when there was nothing selected to move.</returns>
+    public bool NudgeSelection(double dx, double dy, bool fine = false)
+    {
+        var circuit = Circuit;
+        if (circuit is null) return false;
+
+        var moving = Selection;
+
+        if (moving.Count == 0)
+        {
+            if (SelectedComponent is not { } single) return false;
+            moving = [single];
+        }
+
+        // One unit rather than one grid square with Shift, which is the finer control the modifier
+        // usually means — and which is the only way to place something off the grid deliberately.
+        var step = fine ? 1.0 : Math.Max(GridSize, 1.0);
+
+        foreach (var component in moving)
+        {
+            component.X += dx * step;
+            component.Y += dy * step;
+        }
+
+        RaiseTopologyChanged();
+        InvalidateVisual();
+
+        return true;
+    }
+
+    /// <summary>
+    /// Selects the next part on the sheet, wrapping at the end, and scrolls it into view.
+    /// <para>
+    /// In the order the parts were added, which is the order the file lists them and the order the
+    /// parts list shows them. Any order would do so long as it is the same one every time; this one
+    /// has the advantage of already being what the rest of the application means by "the parts".
+    /// </para>
+    /// </summary>
+    /// <returns>False when the sheet is empty.</returns>
+    public bool SelectNext(int direction = 1)
+    {
+        var circuit = Circuit;
+        if (circuit is null) return false;
+
+        var parts = circuit.Components.Where(c => c is not IAnnotation).ToList();
+
+        if (parts.Count == 0) return false;
+
+        var current = SelectedComponent is null ? -1 : parts.IndexOf(SelectedComponent);
+
+        // From nothing, forwards starts at the first and backwards at the last.
+        var next = current < 0
+            ? (direction > 0 ? 0 : parts.Count - 1)
+            : ((current + direction) % parts.Count + parts.Count) % parts.Count;
+
+        SetSelection([parts[next]]);
+        ScrollIntoView(parts[next]);
+        InvalidateVisual();
+
+        return true;
+    }
+
+    /// <summary>
+    /// Pans so that a part is on screen, leaving the view alone when it already is.
+    /// <para>
+    /// Leaving it alone matters more than the scrolling does: stepping through six parts that are
+    /// all visible should not move the drawing about underneath somebody.
+    /// </para>
+    /// </summary>
+    public void ScrollIntoView(CircuitComponent component)
+    {
+        ArgumentNullException.ThrowIfNull(component);
+
+        var box = VisualBoundsOf(component);
+
+        var topLeft = WorldToScreen(new CorePoint(box.X, box.Y));
+        var bottomRight = WorldToScreen(new CorePoint(box.Right, box.Bottom));
+
+        const double margin = 40;
+
+        var dx = topLeft.X < margin ? margin - topLeft.X
+            : bottomRight.X > Bounds.Width - margin ? Bounds.Width - margin - bottomRight.X
+            : 0;
+
+        var dy = topLeft.Y < margin ? margin - topLeft.Y
+            : bottomRight.Y > Bounds.Height - margin ? Bounds.Height - margin - bottomRight.Y
+            : 0;
+
+        if (dx == 0 && dy == 0) return;
+
+        _panOffset = new Point(_panOffset.X + (dx / Zoom), _panOffset.Y + (dy / Zoom));
+        _viewAdjustedByUser = true;
+    }
+
+    /// <summary>
+    /// Drops the armed part in the middle of the view, for placing one without a pointer.
+    /// <para>
+    /// The middle rather than beside the selection: it is where the eye already is, and it is the
+    /// one place that is certainly on screen.
+    /// </para>
+    /// </summary>
+    /// <returns>False when nothing was armed.</returns>
+    public bool PlacePendingAtCentre()
+    {
+        if (PendingItem is not { } pending) return false;
+
+        PlaceComponent(pending, Snap(ScreenToWorld(new Point(Bounds.Width / 2, Bounds.Height / 2))));
+
+        return true;
+    }
+
     protected override void OnKeyDown(KeyEventArgs e)
     {
         // The accelerators go first. V on its own picks the Select tool, so Ctrl+V has to be
@@ -1329,6 +1448,27 @@ public class CircuitCanvas : Control
                 break;
             case Key.F:
                 ZoomToFit();
+                break;
+
+            case Key.Left or Key.Right or Key.Up or Key.Down:
+                var fine = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
+
+                e.Handled = NudgeSelection(
+                    e.Key == Key.Left ? -1 : e.Key == Key.Right ? 1 : 0,
+                    e.Key == Key.Up ? -1 : e.Key == Key.Down ? 1 : 0,
+                    fine);
+
+                break;
+
+            case Key.Tab:
+                // Handled either way, so focus does not leave the canvas for the palette when
+                // there is nothing on the sheet to step to.
+                SelectNext(e.KeyModifiers.HasFlag(KeyModifiers.Shift) ? -1 : 1);
+                e.Handled = true;
+                break;
+
+            case Key.Enter:
+                e.Handled = PlacePendingAtCentre();
                 break;
         }
 

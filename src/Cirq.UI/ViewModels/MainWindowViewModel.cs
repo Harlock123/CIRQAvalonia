@@ -1338,6 +1338,9 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
           Ctrl+F       Find a part in the palette
           Ctrl+Shift+F Find a part on the sheet — designator, value, kind or net
           Ctrl+F1      What is this circuit? — the drawing read back in words
+          Arrows       Move the selection — Shift for one unit rather than one square
+          Tab          Step to the next part on the sheet; Shift+Tab the previous
+          Enter        Drop the armed part in the middle of the view
           Ctrl+L       Show live values — volts on every net, amps through every part
 
         Simulation

@@ -40,7 +40,7 @@ public class ThemedDialogTests(WindowSession session)
         {
             // Built while the application says Light, which is exactly the moment these dialogs
             // are really built — at startup, before the desktop has answered.
-            application.RequestedThemeVariant = ThemeVariant.Light;
+            Wear(application, ThemeVariant.Light);
 
             var built = StorageProviderFileDialogs.BuildDialog(title, "a message", confirm, cancel);
             var dialog = built.Window;
@@ -50,8 +50,7 @@ public class ThemedDialogTests(WindowSession session)
             var light = Background(dialog);
 
             // And now the desktop answers, the way it does a moment after startup.
-            application.RequestedThemeVariant = ThemeVariant.Dark;
-            Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+            Wear(application, ThemeVariant.Dark);
 
             var dark = Background(dialog);
 
@@ -67,7 +66,7 @@ public class ThemedDialogTests(WindowSession session)
         }
         finally
         {
-            application.RequestedThemeVariant = was;
+            Wear(application, was);
         }
     });
 
@@ -85,7 +84,7 @@ public class ThemedDialogTests(WindowSession session)
 
         try
         {
-            application.RequestedThemeVariant = variant == "Dark" ? ThemeVariant.Dark : ThemeVariant.Light;
+            Wear(application, variant == "Dark" ? ThemeVariant.Dark : ThemeVariant.Light);
 
             var dialog = StorageProviderFileDialogs
                 .BuildDialog("Recover unsaved work", "a message", "Recover", "Discard")
@@ -115,9 +114,28 @@ public class ThemedDialogTests(WindowSession session)
         }
         finally
         {
-            application.RequestedThemeVariant = was;
+            Wear(application, was);
         }
     });
+
+    /// <summary>
+    /// Puts the application into a theme and drops what was cached from the last one.
+    /// <para>
+    /// Setting the variant directly is what the desktop does to us, which is why these tests do it
+    /// — but the application itself only ever changes theme through
+    /// <see cref="Cirq.UI.Services.ThemeManager"/>, which raises the notification that empties the
+    /// canvas palette. Skipping that leaves a cached palette from the previous theme in place for
+    /// whatever renders next, which is a coupling between tests and not a thing worth having.
+    /// </para>
+    /// </summary>
+    private static void Wear(Application application, ThemeVariant variant)
+    {
+        application.RequestedThemeVariant = variant;
+
+        Cirq.UI.Rendering.CanvasTheme.Invalidate();
+
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+    }
 
     private static Color Background(Visual visual) =>
         visual switch

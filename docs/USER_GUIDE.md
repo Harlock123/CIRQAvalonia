@@ -265,6 +265,23 @@ for.
 It is an overlay rather than part of the drawing, so it never appears in an export: a still of
 moving dots is a row of marks in whatever positions the clock happened to be at.
 
+### Working without a mouse
+
+Everything that changes the drawing used to need a pointer. Three keys cover it:
+
+- **Arrow keys** move whatever is selected by one grid square, and by one unit with **Shift** held
+  — which is the only way to put something off the grid deliberately. A whole selection moves
+  together.
+- **Tab** steps to the next part on the sheet and **Shift+Tab** to the previous, wrapping at the
+  ends, in the order the parts list shows them. A part that is off screen is brought into view;
+  parts that are already on screen leave the view alone, because moving the drawing about
+  underneath somebody reading it is worse than not scrolling.
+- **Enter** drops the armed part in the middle of the view. With `Ctrl+F` to search the palette and
+  **Enter** there to arm the first match, a part can be found and placed without touching a mouse.
+
+Notes and headings are skipped when stepping. They are on the drawing rather than in the circuit,
+and stepping through eight of them to reach a resistor is not stepping through the parts.
+
 ### What the circuit is doing
 
 **View > Show Live Values**, or `Ctrl+L`, writes each net's voltage and each part's current onto
@@ -5161,6 +5178,9 @@ Also available in the app at **Help > Keyboard Shortcuts**.
 | Shift-click with the probe tool | Set the selected probe's second point, for a differential or power measurement |
 | Click a wire or a pin | Light up the whole net it is on, and say what is joined to it |
 | `F9` / `F10` | Collapse the palette / the properties panel |
+| Arrow keys | Move the selection by one grid square — **Shift** for one unit, which is how to place something off the grid |
+| `Tab` / `Shift` `Tab` | Step to the next part on the sheet, and the previous. Brings it into view if it is not |
+| `Enter` | Drop the armed part in the middle of the view, for placing one without a pointer |
 | `Ctrl+L` | Show live values — write each net's voltage and each part's current onto the schematic |
 | View menu | **Mark Interactive Parts** rings everything you can double-click; **Describe Parts on Hover** turns the hover card off; **Show Current Flow** puts moving dots on the wires; **Show Live Values** annotates the drawing with what it is doing |
 | `Ctrl+N` / `Ctrl+O` / `Ctrl+S` / `Ctrl+Shift+S` | New / open / save / save as |

@@ -8,6 +8,16 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**The sheet can be edited without a mouse.** Arrow keys move the selection by one grid square, and
+by one unit with Shift — which is the only way to put something off the grid deliberately. **Tab**
+steps to the next part and **Shift+Tab** to the previous, bringing one into view when it is off
+screen and leaving the view alone when it is not. **Enter** drops the armed part in the middle of
+the view, so with `Ctrl+F` to search the palette a part can be found and placed without a pointer.
+
+The canvas has always answered R, W, V, P, F, Delete and Escape, and has always needed a pointer for
+everything that actually changes the drawing. Notes and headings are skipped when stepping: they are
+on the drawing rather than in the circuit.
+
 **Parameters: numbers the circuit gives names to.** **Simulate > Parameters...** (`Ctrl+F9`) names a
 value once, and any part is set from it by typing `=` and the name into one of its numbers — `=Rf`,
 or `=Rf / 10`, or `=1 / (2 * pi * R * fc)`. Parameters may be written in terms of each other, in
