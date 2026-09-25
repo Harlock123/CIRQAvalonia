@@ -42,11 +42,15 @@ public sealed record ComponentSummary(
 
     private static readonly Dictionary<Type, PropertyInfo?> ViolationProperties = [];
 
-    public static ComponentSummary For(CircuitComponent component)
+    /// <param name="live">
+    /// What the part was measured doing at the last solved point, or null when nothing has been
+    /// solved or the caller is not tracking it.
+    /// </param>
+    public static ComponentSummary For(CircuitComponent component, PartReading? live = null)
     {
         ArgumentNullException.ThrowIfNull(component);
 
-        List<SummaryRow> rows = [];
+        List<SummaryRow> rows = [.. Measured(live)];
         var hidden = 0;
 
         foreach (var property in Ordered(component.GetType()))
@@ -67,6 +71,35 @@ public sealed record ComponentSummary(
             rows,
             ViolationsOf(component),
             ComponentMarkings.For(component));
+    }
+
+    /// <summary>
+    /// What the part is doing, which goes above what it is set to.
+    /// <para>
+    /// Above, and pushing settings into the "+n more" line where there is not room for both,
+    /// because the ordering follows what the reader came for. Somebody hovering a part in a
+    /// stopped circuit wants to know it is a 4k7; somebody hovering the same part in a running one
+    /// already knows that and wants to know it is passing 40 mA. The second question is the one
+    /// that could not be answered any other way.
+    /// </para>
+    /// <para>
+    /// The units are spelled the way a meter would read them rather than the way the properties
+    /// are named: <c>Across</c> and <c>Through</c> rather than <c>Voltage</c> and <c>Current</c>,
+    /// which say the same thing with more words and less direction.
+    /// </para>
+    /// </summary>
+    private static IEnumerable<SummaryRow> Measured(PartReading? live)
+    {
+        if (live is null) yield break;
+
+        if (live.Amps is { } amps) yield return new SummaryRow("Through", SiPrefix.Format(amps, "A"));
+        if (live.Volts is { } volts) yield return new SummaryRow("Across", SiPrefix.Format(volts, "V"));
+        if (live.Watts is { } watts) yield return new SummaryRow("Dissipating", SiPrefix.Format(watts, "W"));
+
+        // Spelled out rather than run through the SI formatter: a die at 85 °C is not at 85 degrees
+        // kilo-anything, and "85.0m°C" is how that goes wrong.
+        if (live.Celsius is { } celsius)
+            yield return new SummaryRow("Die", $"{celsius:0.#} °C");
     }
 
     /// <summary>

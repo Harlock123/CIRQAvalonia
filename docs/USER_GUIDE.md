@@ -4750,7 +4750,8 @@ Also available in the app at **Help > Keyboard Shortcuts**.
 | Shift-click with the probe tool | Set the selected probe's second point, for a differential or power measurement |
 | Click a wire or a pin | Light up the whole net it is on, and say what is joined to it |
 | `F9` / `F10` | Collapse the palette / the properties panel |
-| View menu | **Mark Interactive Parts** rings everything you can double-click; **Describe Parts on Hover** turns the hover card off; **Show Current Flow** puts moving dots on the wires |
+| `Ctrl+L` | Show live values — write each net's voltage and each part's current onto the schematic |
+| View menu | **Mark Interactive Parts** rings everything you can double-click; **Describe Parts on Hover** turns the hover card off; **Show Current Flow** puts moving dots on the wires; **Show Live Values** annotates the drawing with what it is doing |
 | `Ctrl+N` / `Ctrl+O` / `Ctrl+S` / `Ctrl+Shift+S` | New / open / save / save as |
 | `Ctrl+P` | Print — a sheet each for the schematic, the traces and the parts list |
 | `Ctrl+E` | Export — PNG, JPEG, BMP, SVG, PDF, a SPICE netlist, the traces as CSV, or the parts list as a BOM |

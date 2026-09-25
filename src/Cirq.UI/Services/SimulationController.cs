@@ -129,6 +129,44 @@ public sealed partial class SimulationController : ObservableObject, IDisposable
         _wireCurrents = WireCurrentsService.For(Circuit, Simulator);
     }
 
+    /// <summary>
+    /// Whether each net's voltage and each part's current are read off as the run goes. Off unless
+    /// something is showing them, on the same terms as <see cref="TrackWireCurrents"/>.
+    /// </summary>
+    public bool TrackLiveValues { get; set; }
+
+    private LiveSnapshot _liveValues = LiveSnapshot.Empty;
+
+    /// <summary>
+    /// What every net was sitting at and every part was doing at the last solved point.
+    /// <para>
+    /// A snapshot swapped wholesale, for the reason <see cref="WireCurrents"/> is: it is written on
+    /// the worker thread and read on the UI one, and a reader has to get either the whole of one
+    /// answer or the whole of another rather than a dictionary halfway through being filled.
+    /// </para>
+    /// </summary>
+    public LiveSnapshot LiveValues => _liveValues;
+
+    /// <summary>Reads them now, for when nothing is running. Same caveat as the currents.</summary>
+    public void RefreshLiveValues()
+    {
+        if (IsRunning) return;
+
+        lock (_gate) SnapshotLiveValues();
+    }
+
+    private void SnapshotLiveValues()
+    {
+        if (!TrackLiveValues || Simulator is null)
+        {
+            if (!_liveValues.IsEmpty) _liveValues = LiveSnapshot.Empty;
+
+            return;
+        }
+
+        _liveValues = Services.LiveValues.For(Circuit, Simulator);
+    }
+
     /// <summary>Marks the topology as changed so the next run recompiles the netlist.</summary>
     public void InvalidateTopology()
     {
@@ -227,6 +265,7 @@ public sealed partial class SimulationController : ObservableObject, IDisposable
                 Status = $"Stepped to {FormatTime(SimulationTime)}";
                 CheckBoards();
                 SnapshotWireCurrents();
+                SnapshotLiveValues();
             }
             catch (Exception ex)
             {
@@ -326,6 +365,7 @@ public sealed partial class SimulationController : ObservableObject, IDisposable
 
                     // Inside the lock, so the matrix is not being written while it is read.
                     SnapshotWireCurrents();
+                    SnapshotLiveValues();
                 }
             }
             catch (Exception ex)

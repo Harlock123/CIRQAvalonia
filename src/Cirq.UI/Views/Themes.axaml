@@ -41,6 +41,7 @@
       <SolidColorBrush x:Key="TerminalFill" Color="#758BA1" />
       <SolidColorBrush x:Key="TerminalHover" Color="#FFD24A" />
       <SolidColorBrush x:Key="NetHighlight" Color="#59E0FF" />
+      <SolidColorBrush x:Key="LiveValue" Color="#D9A8FF" />
       <SolidColorBrush x:Key="SegmentUnlit" Color="#46282E36" />
 
       <SolidColorBrush x:Key="PlotBackground" Color="#0E1116" />
@@ -80,6 +81,7 @@
       <SolidColorBrush x:Key="TerminalFill" Color="#606F7F" />
       <SolidColorBrush x:Key="TerminalHover" Color="#B45309" />
       <SolidColorBrush x:Key="NetHighlight" Color="#0067B8" />
+      <SolidColorBrush x:Key="LiveValue" Color="#6D28D9" />
       <SolidColorBrush x:Key="SegmentUnlit" Color="#3AB8C2CC" />
 
       <SolidColorBrush x:Key="PlotBackground" Color="#FFFFFF" />
@@ -130,6 +132,7 @@
       <SolidColorBrush x:Key="TerminalFill" Color="#CCCCCC" />
       <SolidColorBrush x:Key="TerminalHover" Color="#FFFF00" />
       <SolidColorBrush x:Key="NetHighlight" Color="#FF5CF5" />
+      <SolidColorBrush x:Key="LiveValue" Color="#E0B0FF" />
       <SolidColorBrush x:Key="SegmentUnlit" Color="#80333333" />
 
       <SolidColorBrush x:Key="PlotBackground" Color="#000000" />

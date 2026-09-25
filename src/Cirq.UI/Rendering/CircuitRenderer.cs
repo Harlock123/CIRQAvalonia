@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Media;
 using Cirq.Core.Topology;
+using Cirq.UI.Services;
 using CorePoint = Cirq.Core.Primitives.Point;
 
 namespace Cirq.UI.Rendering;
@@ -24,13 +25,24 @@ namespace Cirq.UI.Rendering;
 /// export: it answers a question somebody asked on the canvas rather than being part of the
 /// drawing.
 /// </param>
+/// <param name="Live">
+/// What the circuit was doing at the last solved point — each net's voltage and each part's
+/// current — written onto the drawing. Null leaves it off, which is the default and what an
+/// unsolved circuit has to use.
+/// <para>
+/// Unlike the moving dots, this one <i>is</i> part of the drawing when it is on: a schematic with
+/// the operating point marked on it is a thing somebody prints and takes to a bench, so it goes
+/// through here rather than being an overlay the canvas keeps to itself.
+/// </para>
+/// </param>
 public sealed record CircuitRenderOptions(
     double Zoom,
     CircuitComponent? SelectedComponent = null,
     bool ShowInteractiveMarkers = true,
     bool ShowProbes = true,
     bool ShowSelection = true,
-    NetHighlight? HighlightedNet = null);
+    NetHighlight? HighlightedNet = null,
+    LiveSnapshot? Live = null);
 
 /// <summary>
 /// Draws a whole circuit — wires, symbols, captions and probes — onto any <see cref="ISymbolCanvas"/>.
@@ -54,6 +66,9 @@ public static class CircuitRenderer
         DrawComponents(canvas, circuit, options);
 
         if (options.ShowProbes) DrawProbes(canvas, circuit, options);
+
+        // Last, so the figures sit over the wires they belong to rather than under them.
+        if (options.Live is { } live) DrawLiveValues(canvas, circuit, live, options);
     }
 
     // ---- wires -----------------------------------------------------------
@@ -239,6 +254,133 @@ public static class CircuitRenderer
                     new Point(mast.X + 30, mast.Y + 5), 10, options.Zoom, CanvasTheme.LabelBrush);
         }
     }
+
+    // ---- live values -----------------------------------------------------
+
+    /// <summary>
+    /// The measured figures: one voltage per net, and one line beside each part saying what is
+    /// going through it.
+    /// <para>
+    /// Both are gated on zoom, harder than the captions are. A net voltage is four characters of
+    /// small text sitting on a wire, and at a zoom where the part captions are merely tight these
+    /// are already a grey smudge along every conductor — which is worse than nothing, because it
+    /// obscures the drawing underneath while conveying none of its own content.
+    /// </para>
+    /// </summary>
+    private static void DrawLiveValues(
+        ISymbolCanvas canvas, Circuit circuit, LiveSnapshot live, CircuitRenderOptions options)
+    {
+        if (options.Zoom < LiveValueZoom) return;
+
+        foreach (var net in live.Nets)
+        {
+            // Up and to the right of the anchor, which is the net's own topmost terminal. Directly
+            // above was tried and is worse: the topmost terminal of a net that hangs off the bottom
+            // of a part is that part's lower pin, so "above it" is inside the symbol — and a plate
+            // punched through the middle of a resistor makes the resistor look broken.
+            Plated(
+                canvas, net.Text,
+                new Point(net.At.X + NetReadingReach, net.At.Y - NetReadingRise), options.Zoom);
+        }
+
+        foreach (var component in Flattening.Flatten(circuit.Components))
+        {
+            if (component is IAnnotation) continue;
+            if (live.For(component) is not { } reading) continue;
+
+            var text = reading.Text;
+            if (text.Length == 0) continue;
+
+            // On the same line as the marked value, just past the end of it.
+            //
+            // Two other places were tried. Beside the symbol puts the figure through the middle of
+            // a resistor drawn horizontally and through the wire leaving a source drawn vertically,
+            // because a part's sides are where its leads are. A line of its own below the value
+            // lands on the designator of whatever is drawn underneath, which on a schematic is very
+            // often the next part in the same series string — exactly the pair you were comparing.
+            // Sharing the caption line adds no new row to collide with at all.
+            var value = component.ValueLabel;
+            var shift = value.Length == 0
+                ? 0.0
+                : (Screen(value) / 2) + ReadingGap + (Screen(text, ReadingSize) / 2);
+
+            var at = new Point(
+                component.X + (shift / options.Zoom),
+                component.Y + SymbolRenderer.LabelOffset(component));
+
+            Plated(canvas, text, at, options.Zoom);
+        }
+    }
+
+    /// <summary>
+    /// Roughly how wide a caption is on screen, from its character count. See
+    /// <see cref="Plated"/> for why this is counted rather than measured.
+    /// </summary>
+    private static double Screen(string text, double size = CaptionSize) =>
+        text.Length * ReadingAdvance * size;
+
+    /// <summary>
+    /// A measured figure on a plate of the canvas colour, so it can be read where it lands.
+    /// <para>
+    /// The plate is what makes this legible at all. These figures go where the circuit is, not in
+    /// the margins — a net's voltage is only useful next to the net — so they land on wires, on
+    /// symbol outlines and occasionally on each other. Small text crossed by a two-pixel stroke is
+    /// not small text that can be read, and the alternative of finding clear space for every one of
+    /// them is a label-placement problem nobody has ever finished solving.
+    /// </para>
+    /// <para>
+    /// The plate is sized by counting characters rather than by measuring them. Measuring means
+    /// asking a font system, and this same code draws an export that may be running with no window
+    /// and no font service at all — the same reason <see cref="ProbeReach"/> is a constant. A plate
+    /// a few units too wide costs nothing; the text is centred in it either way.
+    /// </para>
+    /// </summary>
+    private static void Plated(ISymbolCanvas canvas, string text, Point centre, double zoom)
+    {
+        using (canvas.PushTransform(
+                   Matrix.CreateScale(1 / zoom, 1 / zoom) * Matrix.CreateTranslation(centre.X, centre.Y)))
+        {
+            var width = (text.Length * ReadingAdvance * ReadingSize) + (ReadingPad * 2);
+            var height = (ReadingSize * 1.25) + ReadingPad;
+
+            canvas.DrawRectangle(
+                CanvasTheme.BackgroundBrush, null,
+                new RoundedRect(new Rect(-width / 2, -height / 2, width, height), 3));
+
+            canvas.DrawText(text, default, ReadingSize, CanvasTheme.LiveValueBrush, SymbolTextAlign.Centre);
+        }
+    }
+
+    /// <summary>
+    /// Below this zoom the figures are dropped. Higher than the captions' own threshold because
+    /// they are smaller text and there are more of them.
+    /// </summary>
+    private const double LiveValueZoom = 0.6;
+
+    /// <summary>On-screen size of a measured figure, in points.</summary>
+    private const double ReadingSize = 9.0;
+
+    /// <summary>
+    /// Width of an average character as a fraction of the point size, for sizing the plate. Fitted
+    /// to the strings this actually draws, which are digits, a decimal point, an SI prefix and a
+    /// unit — a narrower population than prose, and one with no descenders to speak of.
+    /// </summary>
+    private const double ReadingAdvance = 0.58;
+
+    /// <summary>Clear space around the text inside its plate, in screen units.</summary>
+    private const double ReadingPad = 3.0;
+
+    /// <summary>How far above its anchor terminal a net's voltage is written.</summary>
+    private const double NetReadingRise = 11.0;
+
+    /// <summary>And how far to the right of it.</summary>
+    private const double NetReadingReach = 20.0;
+
+    /// <summary>Clear space between the marked value and the reading that follows it.</summary>
+    private const double ReadingGap = 7.0;
+
+    /// <summary>Point size of the designator and value captions, which this has to sit beside.</summary>
+    private const double CaptionSize = 11.0;
 
     // ---- bounds ----------------------------------------------------------
 

@@ -263,6 +263,42 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         RequestRedraw?.Invoke(this, EventArgs.Empty);
     }
 
+    /// <summary>
+    /// Whether each net's voltage and each part's current are written onto the schematic.
+    /// <para>
+    /// Off unless asked for, and for the opposite reason to the moving dots: this one is not
+    /// expensive, it is <i>crowded</i>. A figure against every net on a circuit with thirty of them
+    /// is thirty pieces of small text among the wires, which is exactly what somebody laying out a
+    /// drawing does not want and exactly what somebody debugging one does.
+    /// </para>
+    /// <para>
+    /// The readings reach the hover card either way — see
+    /// <see cref="Services.LiveValues"/> — because one card on the part under the pointer is not
+    /// crowded by definition.
+    /// </para>
+    /// </summary>
+    [ObservableProperty]
+    public partial bool ShowLiveValues { get; set; }
+
+    partial void OnShowLiveValuesChanged(bool value)
+    {
+        if (value) Simulation.RefreshLiveValues();
+
+        RequestRedraw?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// The measured figures as they stand, for something that is about to draw the circuit
+    /// somewhere other than the canvas. Empty when nothing has been solved.
+    /// </summary>
+    public Services.LiveSnapshot Readings()
+    {
+        Simulation.TrackLiveValues = true;
+        Simulation.RefreshLiveValues();
+
+        return Simulation.LiveValues;
+    }
+
     [ObservableProperty]
     public partial double GridSize { get; set; } = 10.0;
 
@@ -644,7 +680,14 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
         try
         {
-            var written = CircuitExporter.Export(Circuit, ScopeSource, request.Path, request.Options);
+            // The figures follow the editor: what is on the drawing is what comes out of it. An
+            // export that quietly dropped them would be a picture of a different schematic from
+            // the one on screen, which is the one thing an export must never be.
+            var options = ShowLiveValues
+                ? request.Options with { Live = Readings() }
+                : request.Options;
+
+            var written = CircuitExporter.Export(Circuit, ScopeSource, request.Path, options);
 
             StatusMessage = written.Count == 1
                 ? $"Exported {Path.GetFileName(written[0])}"
@@ -1285,6 +1328,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
           Ctrl+F       Find a part in the palette
           Ctrl+Shift+F Find a part on the sheet — designator, value, kind or net
           Ctrl+F1      What is this circuit? — the drawing read back in words
+          Ctrl+L       Show live values — volts on every net, amps through every part
 
         Simulation
           F5           Run or pause

@@ -569,7 +569,8 @@ public partial class MainWindow : Window
                 new ExportOptions(
                     ExportFormat.Pdf,
                     model.Content,
-                    IncludePartsList: model.IncludePartsList),
+                    IncludePartsList: model.IncludePartsList,
+                    Live: _viewModel.ShowLiveValues ? _viewModel.Readings() : null),
                 model.Setup);
 
             _viewModel.StatusMessage = PrintService.Send(path).Message;
@@ -607,6 +608,23 @@ public partial class MainWindow : Window
         else if (_canvas is not null)
         {
             _canvas.WireCurrents = null;
+        }
+
+        // Read whenever anything could show them: the annotation on the drawing, or the hover card,
+        // which carries them even with the annotation off. Both off and nothing is worked out.
+        var wantsReadings = _viewModel.ShowLiveValues || _viewModel.ShowHoverDetails;
+
+        _viewModel.Simulation.TrackLiveValues = wantsReadings;
+
+        if (wantsReadings && _canvas is not null)
+        {
+            if (!_viewModel.Simulation.IsRunning) _viewModel.Simulation.RefreshLiveValues();
+
+            _canvas.LiveValues = _viewModel.Simulation.LiveValues;
+        }
+        else if (_canvas is not null)
+        {
+            _canvas.LiveValues = null;
         }
 
         _canvas?.InvalidateVisual();

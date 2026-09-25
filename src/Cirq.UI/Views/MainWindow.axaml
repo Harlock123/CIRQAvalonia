@@ -116,6 +116,9 @@
         <MenuItem Header="Show Current _Flow" ToggleType="CheckBox"
                   IsChecked="{Binding ShowCurrentFlow, Mode=TwoWay}"
                   ToolTip.Tip="Dots along each wire, moving at a rate set by the current in it" />
+        <MenuItem Header="Show _Live Values" InputGesture="Ctrl+L" ToggleType="CheckBox"
+                  IsChecked="{Binding ShowLiveValues, Mode=TwoWay}"
+                  ToolTip.Tip="Write each net's voltage and each part's current onto the schematic" />
         <Separator />
         <MenuItem Header="Component _Palette" InputGesture="F9" ToggleType="CheckBox"
                   IsChecked="{Binding IsPaletteExpanded, Mode=TwoWay}" />
@@ -323,6 +326,7 @@
                                 ShowInteractiveMarkers="{Binding ShowInteractiveMarkers}"
                                 ShowHoverDetails="{Binding ShowHoverDetails}"
                                 ShowCurrentFlow="{Binding ShowCurrentFlow}"
+                                ShowLiveValues="{Binding ShowLiveValues}"
                                 SnapToGrid="{Binding SnapToGrid}"
                                 GridSize="{Binding GridSize}" />
 

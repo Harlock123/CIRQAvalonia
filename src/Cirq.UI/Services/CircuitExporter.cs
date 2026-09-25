@@ -68,6 +68,16 @@ public enum ExportContent
 /// the way a bill of materials is. It goes below everything else on a single sheet, and gets a
 /// page of its own in the combined PDF.
 /// </param>
+/// <param name="Live">
+/// Measured figures to write onto the schematic — each net's voltage, each part's current. Null
+/// leaves them off, which is the default.
+/// <para>
+/// Unlike the interactive markers, these are not a hint to whoever is driving the editor: a
+/// schematic with its operating point marked on it is a thing somebody prints and takes to a
+/// bench, and having to read the voltages off a screen beside it is exactly what the printout was
+/// meant to avoid. So the caller passes them when the editor is showing them.
+/// </para>
+/// </param>
 public sealed record ExportOptions(
     ExportFormat Format,
     ExportContent Content = ExportContent.Schematic,
@@ -75,7 +85,8 @@ public sealed record ExportOptions(
     double RasterScale = 2.0,
     bool TransparentBackground = false,
     bool ShowInteractiveMarkers = false,
-    bool IncludePartsList = false);
+    bool IncludePartsList = false,
+    LiveSnapshot? Live = null);
 
 /// <summary>An export the user has asked for: what to write, and where.</summary>
 public sealed record ExportRequest(string Path, ExportOptions Options);
@@ -587,7 +598,8 @@ public static class CircuitExporter
         CircuitRenderer.Draw(symbols, circuit,
             // Selection is an editing state, not part of the drawing: a picture of the circuit
             // must not depend on what happened to be highlighted when it was taken.
-            new CircuitRenderOptions(1.0, null, options.ShowInteractiveMarkers, ShowSelection: false));
+            new CircuitRenderOptions(
+                1.0, null, options.ShowInteractiveMarkers, ShowSelection: false, Live: options.Live));
     }
 
     // ---- files -----------------------------------------------------------

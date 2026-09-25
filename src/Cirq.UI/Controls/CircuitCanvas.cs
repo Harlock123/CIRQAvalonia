@@ -67,6 +67,21 @@ public class CircuitCanvas : Control
     public static readonly StyledProperty<bool> ShowHoverDetailsProperty =
         AvaloniaProperty.Register<CircuitCanvas, bool>(nameof(ShowHoverDetails), true);
 
+    /// <summary>
+    /// Whether the measured figures are written onto the drawing. The hover card shows them
+    /// regardless — one card on the part under the pointer costs nothing and hides nothing, which
+    /// is not true of a figure against every net at once.
+    /// </summary>
+    public static readonly StyledProperty<bool> ShowLiveValuesProperty =
+        AvaloniaProperty.Register<CircuitCanvas, bool>(nameof(ShowLiveValues));
+
+    /// <summary>
+    /// What the circuit was doing at the last solved point, refreshed by whoever is running it.
+    /// Null, or an empty snapshot, leaves the readings off the card as well as off the drawing.
+    /// </summary>
+    public static readonly StyledProperty<LiveSnapshot?> LiveValuesProperty =
+        AvaloniaProperty.Register<CircuitCanvas, LiveSnapshot?>(nameof(LiveValues));
+
     public Circuit? Circuit
     {
         get => GetValue(CircuitProperty);
@@ -128,6 +143,18 @@ public class CircuitCanvas : Control
     {
         get => GetValue(WireCurrentsProperty);
         set => SetValue(WireCurrentsProperty, value);
+    }
+
+    public bool ShowLiveValues
+    {
+        get => GetValue(ShowLiveValuesProperty);
+        set => SetValue(ShowLiveValuesProperty, value);
+    }
+
+    public LiveSnapshot? LiveValues
+    {
+        get => GetValue(LiveValuesProperty);
+        set => SetValue(LiveValuesProperty, value);
     }
 
     /// <summary>Whether components that can be double-clicked are marked as such.</summary>
@@ -215,6 +242,7 @@ public class CircuitCanvas : Control
             CircuitProperty, ActiveToolProperty, SelectedComponentProperty,
             ZoomProperty, GridSizeProperty, ShowGridProperty, PendingItemProperty, ShowHoverDetailsProperty,
             ShowCurrentFlowProperty, WireCurrentsProperty,
+            ShowLiveValuesProperty, LiveValuesProperty,
             ShowInteractiveMarkersProperty);
     }
 
@@ -403,7 +431,8 @@ public class CircuitCanvas : Control
         {
             CircuitRenderer.Draw(canvas, circuit,
                 new CircuitRenderOptions(
-                    Zoom, SelectedComponent, ShowInteractiveMarkers, HighlightedNet: _highlightedNet));
+                    Zoom, SelectedComponent, ShowInteractiveMarkers, HighlightedNet: _highlightedNet,
+                    Live: ShowLiveValues ? LiveValues : null));
 
             // Editing aids rather than part of the circuit, so they stay here and out of an export.
             DrawCurrentFlow(canvas, circuit);
@@ -491,7 +520,11 @@ public class CircuitCanvas : Control
         if (!ShowHoverDetails || _hoverComponent is not { } component) return;
         if (_isPanning || _isBanding || _isDraggingComponent) return;
 
-        HoverCard.Draw(context, ComponentSummary.For(component), _hoverPointer, Bounds.Size);
+        // The card carries the readings whether or not the drawing is annotated: it describes one
+        // part, and the reason the annotation has a switch is that it describes all of them.
+        HoverCard.Draw(
+            context, ComponentSummary.For(component, LiveValues?.For(component)),
+            _hoverPointer, Bounds.Size);
     }
 
     private void DrawGrid(DrawingContext context)

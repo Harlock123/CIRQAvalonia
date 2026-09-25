@@ -8,6 +8,24 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**The circuit now says what it is doing, not just what it is made of.** Every net's voltage and
+every part's current can be written straight onto the schematic — **View > Show Live Values**, or
+`Ctrl+L` — and the hover card carries the same figures whether or not the annotation is on. Finding
+out what a node was sitting at used to cost placing a probe; resting the pointer on a resistor used
+to tell you it was a 4k7 while declining to mention it was passing 40 mA and dissipating a watt.
+
+What is deliberately not shown is anything ambiguous. A current is reported for a two-terminal part
+and for nothing else: a package with ten pins has no single current through it, and a figure picked
+from among them would be a plausible answer to a question nobody asked. A part that models its own
+heating reports its die temperature and its dissipation, which it knows better than multiplying two
+of our numbers would. Ground is left off — it is zero everywhere by definition — and figures below
+a microvolt or a picoamp are written as a plain zero rather than dressed up as `450pV`, which reads
+as a measurement of something at a resolution no instrument has.
+
+The figures go on the drawing rather than in the margin, so they sit on plates of the canvas colour
+and can be read where they land. They follow into an export and onto a printout: a schematic with
+its operating point marked on it is a thing you take to a bench.
+
 **The file format's version number now says when it may move, and a test holds it to that.** Adding
 something — a field, a part, a parameter, a whole new section — never bumps it: a build that has
 never heard of any of those already ignores what it does not recognise and opens the rest. The

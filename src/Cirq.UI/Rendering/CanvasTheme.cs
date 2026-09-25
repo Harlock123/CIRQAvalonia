@@ -33,6 +33,7 @@ public static class CanvasTheme
         IBrush TerminalHover,
         IBrush Probe,
         IBrush NetHighlight,
+        IBrush LiveValue,
         IBrush Error,
         Color GridDot,
         Color GridMajor,
@@ -50,6 +51,7 @@ public static class CanvasTheme
         ThemeManager.Brush("TerminalHover"),
         ThemeManager.Brush("TerminalHover"),
         ThemeManager.Brush("NetHighlight"),
+        ThemeManager.Brush("LiveValue"),
         ThemeManager.Brush("TextError"),
         ThemeManager.Color("CanvasGridDot"),
         ThemeManager.Color("CanvasGridMajor"),
@@ -101,6 +103,7 @@ public static class CanvasTheme
                 TerminalHover: ink,
                 Probe: new ImmutableSolidColorBrush(Color.FromRgb(0x88, 0x22, 0x22)),
                 NetHighlight: new ImmutableSolidColorBrush(Color.FromRgb(0x00, 0x55, 0xAA)),
+                LiveValue: new ImmutableSolidColorBrush(Color.FromRgb(0x5B, 0x21, 0xB6)),
                 Error: new ImmutableSolidColorBrush(Color.FromRgb(0xAA, 0x00, 0x00)),
                 GridDot: Color.FromRgb(0xDD, 0xDD, 0xDD),
                 GridMajor: Color.FromRgb(0xCC, 0xCC, 0xCC),
@@ -128,6 +131,18 @@ public static class CanvasTheme
     /// sharing two colours is how a highlight stops answering the question.
     /// </summary>
     public static IBrush NetHighlightBrush => Current.NetHighlight;
+
+    /// <summary>
+    /// The colour a measured figure is written in — a net's voltage, a part's current.
+    /// <para>
+    /// Its own entry, and a fourth meaning rather than a borrowed one. A live figure has to be
+    /// distinguishable at a glance from the value printed under a part, because the whole point of
+    /// it is that one is what the part <i>is</i> and the other is what it is <i>doing</i>: a
+    /// resistor marked 4k7 with 4.7 V across it would otherwise be two numbers in the same ink
+    /// saying entirely different things.
+    /// </para>
+    /// </summary>
+    public static IBrush LiveValueBrush => Current.LiveValue;
 
     /// <summary>Used to ring a part that is being used outside its ratings.</summary>
     public static IBrush ErrorBrush => Current.Error;
