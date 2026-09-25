@@ -118,6 +118,7 @@ each row links to the section that explains it.
 | What have I **wired wrong** | [Check circuit](#checking-the-circuit) — the mistakes no part can report about itself | `F4` |
 | Why **will it not solve** | [When it will not converge](#when-a-circuit-will-not-simulate) — the solver names the net and the part | — |
 | **What is this circuit** | [What is this circuit?](#what-is-this-circuit) — the drawing read back in words | `Ctrl` `F1` |
+| How do I change **all of these at once** | [Changing what was found](#changing-what-was-found) — set, bind, or name what they share | `Ctrl` `Shift` `F` |
 | What did I **change** | [Compare](#comparing-with-a-saved-circuit) — this against a file, in values rather than braces | — |
 | How do I **hand this to somebody** | [A design report](#a-design-report) — drawing, requirements and parts on one page | — |
 | Can I have **two circuits** open | [Two circuits at once](#two-circuits-at-once) — a second window, sharing a clipboard | `Ctrl` `Shift` `N` |
@@ -433,7 +434,7 @@ there is.
 
 ### Finding something on the sheet
 
-**Edit > Find on Sheet...** (`Ctrl` `Shift` `F`) goes to a part by name.
+**Edit > Find on Sheet...** (`Ctrl` `Shift` `F`) goes to a part by name — and changes every part it found, if you want it to.
 
 `Ctrl` `F` searches the *palette*, for a part to place. This searches the drawing you already have,
 which past about twenty parts is a different and more frequent question: where is `R17`, which one
@@ -449,6 +450,32 @@ what you typed, then values, then kinds of part, then nets — because a designa
 what is being looked for. It is the thing printed in an error message, quoted in a parts list and
 written on a note. Blocks are searched inside too: a part does not stop existing because somebody
 tidied it away.
+
+#### Changing what was found
+
+Once something is found, the row at the bottom changes it — all of it at once. Pick a setting every
+match has, and:
+
+- **Set** gives them all that value. `12k`, `4k7`, `100n`: the same notation the properties panel
+  takes.
+- **Bind** points them all at a parameter, or at arithmetic over the parameters — `Rf`, or
+  `Rf / 4`. The same thing typing `=Rf` into one part does, done to all of them.
+- **Make a parameter** takes the value they *already share*, gives it the name you type, and binds
+  them all to it.
+
+The picker only offers settings **every** match has, so a change cannot silently skip half of them,
+and anything it could not apply is named rather than counted — "three were skipped" is the
+beginning of a question.
+
+That third button is the migration path for every circuit drawn before
+[parameters](#parameters) existed. Those have their choices typed into a dozen boxes as literals,
+and no amount of naming a parameter afterwards connects them to it: search for `10k`, type `Rf`,
+and the four resistors that were all coincidentally the same number become four parts that are the
+same number *on purpose*. It is refused if they do not all agree, because a name for a number they
+do not share would be a name for a number that is not there.
+
+Setting a plain value on a part that was bound breaks the binding, which is the only way to undo
+one and the way you would expect to.
 
 ### Copying
 

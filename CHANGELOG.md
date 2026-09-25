@@ -8,6 +8,17 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**Find on the sheet can now change what it found.** Search for `10k`, pick a setting every match
+has, and set them all, bind them all to a parameter, or take the value they already share and give
+it a name. The picker only offers settings every match has, so a change cannot silently skip half of
+them, and anything it could not apply is named rather than counted.
+
+The third of those is the migration path for every circuit drawn before parameters existed. Those
+have their choices typed into a dozen boxes as literals, and no amount of naming a parameter
+afterwards connects them to it — so four resistors that were all coincidentally 10k become four
+parts that are the same number on purpose. It is refused when they do not all agree, because a name
+for a number they do not share would be a name for a number that is not there.
+
 **Every control a person can operate now has a name a screen reader can read out.** There were
 none. Sixty-three of the application's hundred and ten interactive controls announced themselves as
 nothing at all — every number box in every analysis window, every picker, the temperature slider,

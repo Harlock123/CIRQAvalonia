@@ -401,6 +401,15 @@ public partial class MainWindow : Window
 
         var model = new FindViewModel(_viewModel.Circuit);
 
+        // A bulk change edits the document and moves values the canvas and inspector are showing.
+        model.Changed += (_, _) =>
+        {
+            _viewModel.MarkModified();
+            _viewModel.Inspector.Refresh();
+            _viewModel.Simulation.InvalidateTopology();
+            RefreshLiveState();
+        };
+
         model.RequestGoTo += (_, component) => _viewModel.GoTo(component);
 
         await new FindWindow { DataContext = model }.ShowModal(this);
