@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.LogicalTree;
 
 namespace Cirq.UI.Views;
 
@@ -49,7 +50,14 @@ public static class Dialog
     /// </summary>
     private static void WireCloseButton(Window dialog)
     {
-        if (dialog.FindControl<Button>("CloseButton") is not { } button) return;
+        // Walked rather than looked up by name. FindControl needs a XAML name scope and throws
+        // outright when there is none, which is every window built in code — so the lookup that
+        // works for twenty-two dialogs takes down the four that are assembled by hand.
+        var button = dialog.GetLogicalDescendants()
+            .OfType<Button>()
+            .FirstOrDefault(b => b.Name == "CloseButton");
+
+        if (button is null) return;
 
         button.Click += (_, _) => dialog.Close();
     }

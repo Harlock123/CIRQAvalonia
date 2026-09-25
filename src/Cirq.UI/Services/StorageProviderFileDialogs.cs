@@ -1,8 +1,10 @@
 using Avalonia.Controls;
 using Avalonia.Layout;
+using Avalonia.Markup.Xaml.MarkupExtensions;
 using Avalonia.Media;
 using Avalonia.Platform.Storage;
 using Cirq.Components.Serialization;
+using Cirq.UI.Views;
 
 namespace Cirq.UI.Services;
 
@@ -234,9 +236,18 @@ public sealed class StorageProviderFileDialogs : ICircuitFileDialogs
             SizeToContent = SizeToContent.Height,
             CanResize = false,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            Background = ThemeManager.Brush("PanelBackground"),
             ShowInTaskbar = false,
+
         };
+
+        // Bound rather than fetched, and that is the whole of the bug these dialogs had.
+        //
+        // Both of them are built at startup, before the theme variant has settled: asked at that
+        // moment, the application says Light, and it becomes Dark a moment later once the windows
+        // are realised. Fetching a brush there froze the light one into a dialog the rest of the
+        // application then painted dark around — pale buttons on a pale panel, which is how it was
+        // reported: "the only thing I can see is the text". Binding follows.
+        dialog[!Window.BackgroundProperty] = new DynamicResourceExtension("PanelBackground");
 
         var ok = new Button
         {
@@ -300,7 +311,7 @@ public sealed class StorageProviderFileDialogs : ICircuitFileDialogs
             },
         };
 
-        await dialog.ShowDialog(_owner);
+        await dialog.ShowModal(_owner);
         return chosen;
     }
 
@@ -311,7 +322,6 @@ public sealed class StorageProviderFileDialogs : ICircuitFileDialogs
             Content = text,
             IsChecked = isChecked,
             IsEnabled = isEnabled,
-            Foreground = ThemeManager.Brush("TextPrimary"),
         };
 
     private static TextBlock Caption(string text) => new()
@@ -319,7 +329,6 @@ public sealed class StorageProviderFileDialogs : ICircuitFileDialogs
         Text = text,
         FontSize = 11,
         Opacity = 0.7,
-        Foreground = ThemeManager.Brush("TextPrimary"),
     };
 
     public Task<bool> ConfirmDiscardChangesAsync(string circuitTitle) =>
@@ -333,7 +342,7 @@ public sealed class StorageProviderFileDialogs : ICircuitFileDialogs
         ShowDialogAsync(
             "Recover unsaved work",
             $"CirqAvalonia was working on {name} when it last stopped, and kept a copy from " +
-            $"{age}." + "\n\nOpen it?",
+            $"{age}.",
             confirmText: "Recover",
             cancelText: "Discard");
 
@@ -370,9 +379,18 @@ public sealed class StorageProviderFileDialogs : ICircuitFileDialogs
             SizeToContent = SizeToContent.Height,
             CanResize = false,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            Background = ThemeManager.Brush("PanelBackground"),
             ShowInTaskbar = false,
+
         };
+
+        // Bound rather than fetched, and that is the whole of the bug these dialogs had.
+        //
+        // Both of them are built at startup, before the theme variant has settled: asked at that
+        // moment, the application says Light, and it becomes Dark a moment later once the windows
+        // are realised. Fetching a brush there froze the light one into a dialog the rest of the
+        // application then painted dark around — pale buttons on a pale panel, which is how it was
+        // reported: "the only thing I can see is the text". Binding follows.
+        dialog[!Window.BackgroundProperty] = new DynamicResourceExtension("PanelBackground");
 
         confirm.Click += (_, _) =>
         {
@@ -405,14 +423,13 @@ public sealed class StorageProviderFileDialogs : ICircuitFileDialogs
                 {
                     Text = message,
                     TextWrapping = TextWrapping.Wrap,
-                    Foreground = ThemeManager.Brush("TextPrimary"),
                     FontSize = 13,
                 },
                 buttons,
             },
         };
 
-        await dialog.ShowDialog(_owner);
+        await dialog.ShowModal(_owner);
         return result;
     }
 }

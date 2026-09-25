@@ -58,23 +58,60 @@ public partial class DialogEscapeTests
     }
 
     /// <summary>
-    /// And every dialog is shown through the helper that binds Escape, rather than through
-    /// <c>ShowDialog</c> directly. One call site that forgets is one dialog that traps somebody.
+    /// And every dialog anywhere is shown through the helper that binds Escape, rather than
+    /// through <c>ShowDialog</c> directly. One call site that forgets is one dialog that traps
+    /// somebody.
+    /// <para>
+    /// The whole of the UI project, not just the main window. The first version of this checked
+    /// only <c>MainWindow</c>, and the four dialogs built in code elsewhere — confirm, report,
+    /// recover, export — went on being shown the old way, unchecked. The recovery one was then
+    /// reported as broken.
+    /// </para>
     /// </summary>
     [Fact]
     public void EveryDialogIsShownThroughTheHelper()
     {
-        var path = Path.Combine(Views, "MainWindow.axaml.cs");
+        var root = Path.Combine(DocPlot.RepoRoot, "src", "Cirq.UI");
+
+        List<string> offenders = [];
+
+        foreach (var file in Directory.EnumerateFiles(root, "*.cs", SearchOption.AllDirectories))
+        {
+            // The helper is where the one real call lives.
+            if (Path.GetFileName(file) == "Dialog.cs") continue;
+            if (file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}")) continue;
+            if (file.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}")) continue;
+
+            var code = File.ReadAllText(file);
+
+            if (RawShowDialog().IsMatch(code)) offenders.Add(Path.GetFileName(file));
+        }
+
+        Assert.True(offenders.Count == 0,
+            "these call ShowDialog directly instead of ShowModal, which binds Escape and wires " +
+            "the close button: " + string.Join(", ", offenders));
+    }
+
+    /// <summary>
+    /// A dialog built in code must not fix its colours at construction.
+    /// <para>
+    /// Both of the code-built ones are made at startup, before the theme variant has settled:
+    /// asked then, the application says Light and becomes Dark a moment later. A brush fetched at
+    /// that point is frozen light into a dialog the rest of the application paints dark around,
+    /// which is pale buttons on a pale panel and is exactly how this was reported. A binding
+    /// follows the theme; a fetch does not.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void CodeBuiltDialogsBindTheirColoursRatherThanFetchingThem()
+    {
+        var path = Path.Combine(
+            DocPlot.RepoRoot, "src", "Cirq.UI", "Services", "StorageProviderFileDialogs.cs");
+
         var code = File.ReadAllText(path);
 
-        var raw = RawShowDialog().Matches(code).Count;
-
-        Assert.True(raw == 0,
-            $"MainWindow.axaml.cs calls ShowDialog directly {raw} time(s). Use ShowModal, which " +
-            "binds Escape and wires the close button.");
-
-        // And it really is showing them some other way, rather than not showing them at all.
-        Assert.True(code.Contains(".ShowModal(this)", StringComparison.Ordinal));
+        Assert.DoesNotContain("ThemeManager.Brush", code, StringComparison.Ordinal);
+        Assert.Contains("DynamicResourceExtension", code, StringComparison.Ordinal);
     }
 
     [GeneratedRegex(@"\.ShowDialog\(")]

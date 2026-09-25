@@ -8,6 +8,25 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+### Fixed
+
+**The recovery prompt was unreadable, and its question was not the answer.** The dialog offering
+back an unsaved circuit came up in the light palette while the rest of the application was dark, so
+its **Discard** and **Recover** buttons were pale grey on pale grey and effectively invisible — the
+only legible thing was the message, which ended "Open it?", so that is what people clicked.
+
+It is two bugs. The dialogs built in code are constructed at startup, **before the theme variant
+has settled**: asked at that moment the application answers Light, and it becomes Dark a moment
+later once the windows are realised. Fetching a brush there freezes the light one into a dialog the
+rest of the application then paints dark around. The colours are bound now rather than fetched, so
+they follow. And the message no longer asks a question the buttons do not answer — the buttons are
+the question.
+
+The code-built dialogs also close on Escape now, like every other one, and the check that every
+dialog is shown through the helper covers the whole application rather than only the main window.
+The four built in code were missed by the first version of it, which is why this one was still
+broken after the last release.
+
 ## [0.33.2] - 2026-09-24
 
 Two fixes, one of them reported and one found while fixing it. 186 components in 16 categories,
