@@ -8,6 +8,25 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**Large circuits are eight to twelve times faster.** A circuit matrix is nearly empty — three
+entries a row, under half a percent full — and the solver was eliminating it densely, which is N³
+and spends almost all of its time subtracting zero. Measured on a ladder that refactors every
+Newton iteration: 402 unknowns went from 9.3 ms a time point to 1.1, and 1602 from 238 ms to 22 —
+four time points a second became forty-five.
+
+Two things were needed and only one was obvious. Running the inner loop over the columns the pivot
+row actually has something in, done alone, made it **twice as slow**: the unknowns arrive numbered
+in the order parts were added, so a node is routinely coupled to one several hundred rows away, the
+elimination fills in the whole band, and iterating indirectly over rows that have become dense
+anyway is just a slower way of doing dense arithmetic. Reordering them first — Reverse
+Cuthill-McKee — is what makes the sparsity survive being eliminated.
+
+Below forty-eight unknowns, which is most circuits, the elimination is the dense one it always was,
+to the last bit. The reordering is an optimisation that can decline: a matrix that is barely
+non-singular, like a bus with no pull-ups, can pivot to exactly zero in one order and 1e-20 in
+another, so a failure there falls back to the order the circuit was stamped in rather than being
+reported.
+
 ## [0.35.0] - 2026-09-25
 
 Every limit a part is sold against, gathered into one list. Four measurements the circuit could not
