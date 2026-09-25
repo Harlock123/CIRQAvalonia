@@ -8,6 +8,11 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+## [0.33.3] - 2026-09-24
+
+The dialog that offers back unsaved work, which could not be read. 186 components in 16
+categories, 87 worked examples, 3070 tests.
+
 ### Fixed
 
 **The recovery prompt was unreadable, and its question was not the answer.** The dialog offering
@@ -1701,7 +1706,8 @@ First public build of CirqAvalonia — an electronic circuit analyzer and mixed-
 
 **501 tests** measure the solver against closed-form answers rather than recorded output.
 
-[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.33.2...HEAD
+[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.33.3...HEAD
+[0.33.3]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.33.2...v0.33.3
 [0.33.2]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.33.1...v0.33.2
 [0.33.1]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.33.0...v0.33.1
 [0.33.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.32.0...v0.33.0
