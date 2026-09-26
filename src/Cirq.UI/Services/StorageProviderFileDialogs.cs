@@ -85,9 +85,10 @@ public sealed class StorageProviderFileDialogs : ICircuitFileDialogs
         return Path.HasExtension(path) ? path : path + CircuitSerializer.FileExtension;
     }
 
-    public async Task<ExportRequest?> PickExportAsync(string suggestedFileName, bool hasTraces)
+    public async Task<ExportRequest?> PickExportAsync(
+        string suggestedFileName, bool hasTraces, bool hasSheets)
     {
-        var options = await AskExportOptionsAsync(hasTraces);
+        var options = await AskExportOptionsAsync(hasTraces, hasSheets);
         if (options is null) return null;
 
         var storage = TopLevel.GetTopLevel(_owner)?.StorageProvider;
@@ -137,7 +138,7 @@ public sealed class StorageProviderFileDialogs : ICircuitFileDialogs
     /// The export dialog. Built in code like the other two, which keeps the whole file-dialog
     /// surface in one place rather than spreading it across another XAML file.
     /// </summary>
-    private async Task<ExportOptions?> AskExportOptionsAsync(bool hasTraces)
+    private async Task<ExportOptions?> AskExportOptionsAsync(bool hasTraces, bool hasSheets)
     {
         ExportOptions? chosen = null;
 
@@ -179,6 +180,18 @@ public sealed class StorageProviderFileDialogs : ICircuitFileDialogs
             Content = "Include a parts list",
             [ToolTip.TipProperty] =
                 "A table of what the circuit is made of: quantity, designators, part and value",
+        };
+
+        // Only for a drawing that has pages. Absent rather than greyed on a single-sheet circuit:
+        // an option that cannot mean anything is better not there at all.
+        var everySheet = new CheckBox
+        {
+            Content = "Every sheet",
+            IsVisible = hasSheets,
+            IsChecked = hasSheets,
+            [ToolTip.TipProperty] =
+                "A PDF gets a page per sheet; the picture formats get a file per sheet, named " +
+                "after it. Unticked, you get the page you are looking at.",
         };
 
         var contentPanel = new StackPanel
@@ -299,7 +312,8 @@ public sealed class StorageProviderFileDialogs : ICircuitFileDialogs
                 AsSingleFile: oneFile.IsChecked == true,
                 RasterScale: scale.SelectedIndex + 1,
                 TransparentBackground: transparent.IsChecked == true,
-                IncludePartsList: partsList.IsChecked == true);
+                IncludePartsList: partsList.IsChecked == true,
+                AllSheets: everySheet.IsChecked == true);
 
             dialog.Close();
         };
@@ -323,6 +337,7 @@ public sealed class StorageProviderFileDialogs : ICircuitFileDialogs
                 scalePanel,
                 transparent,
                 partsList,
+                everySheet,
                 new StackPanel
                 {
                     Orientation = Orientation.Horizontal,

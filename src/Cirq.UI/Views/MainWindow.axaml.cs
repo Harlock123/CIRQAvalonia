@@ -660,7 +660,10 @@ public partial class MainWindow : Window
                     model.Content,
                     IncludePartsList: model.IncludePartsList,
                     Live: _viewModel.ShowLiveValues ? _viewModel.Readings() : null,
-                    Sheet: _viewModel.CurrentSheet),
+                    Sheet: _viewModel.CurrentSheet,
+                    // Paper gets the whole document: a printed schematic missing two of its three
+                    // pages is not a printed schematic.
+                    AllSheets: true),
                 model.Setup);
 
             _viewModel.StatusMessage = PrintService.Send(path).Message;

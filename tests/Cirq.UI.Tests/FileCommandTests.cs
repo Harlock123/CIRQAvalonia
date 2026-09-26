@@ -65,11 +65,15 @@ internal sealed class FakeFileDialogs : ICircuitFileDialogs
 
     public bool LastExportOfferedTraces { get; private set; }
 
-    public Task<ExportRequest?> PickExportAsync(string suggestedFileName, bool hasTraces)
+    /// <summary>Whether the dialog was told the drawing has pages, which is what offers all of them.</summary>
+    public bool LastExportOfferedSheets { get; private set; }
+
+    public Task<ExportRequest?> PickExportAsync(string suggestedFileName, bool hasTraces, bool hasSheets)
     {
         ExportPrompts++;
         LastSuggestedName = suggestedFileName;
         LastExportOfferedTraces = hasTraces;
+        LastExportOfferedSheets = hasSheets;
         return Task.FromResult(ExportRequest);
     }
 }

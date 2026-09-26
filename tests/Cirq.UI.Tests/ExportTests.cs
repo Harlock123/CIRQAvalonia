@@ -387,6 +387,95 @@ public class ExportTests : IDisposable
             Assert.True(new FileInfo(path).Length > 200, $"{format} wrote only {new FileInfo(path).Length} bytes");
         }
     }
+
+    // ---- a drawing with pages ------------------------------------------------
+
+    /// <summary>A two-page drawing: a resistor on each, so a page can be told from the other.</summary>
+    private static Circuit Split()
+    {
+        var circuit = new Circuit { Title = "Split rig" };
+
+        circuit.Sheets.Add("Power");
+        circuit.Sheets.Add("Logic");
+
+        circuit.Add(new Resistor(1e3) { Name = "R1", X = 0, Y = 0, Sheet = "Power" });
+        circuit.Add(new Resistor(2e3) { Name = "R2", X = 0, Y = 0, Sheet = "Logic" });
+        circuit.Add(new Ground { X = 0, Y = 120, Sheet = "Power" });
+
+        return circuit;
+    }
+
+    [Fact]
+    public void EverySheetGetsItsOwnFile()
+    {
+        var written = CircuitExporter.Export(
+            Split(), null, Path_("split.png"),
+            new ExportOptions(ExportFormat.Png, ExportContent.Schematic, AllSheets: true));
+
+        Assert.Equal(2, written.Count);
+        Assert.EndsWith("split-Power.png", written[0]);
+        Assert.EndsWith("split-Logic.png", written[1]);
+        Assert.All(written, p => Assert.True(new FileInfo(p).Length > 100));
+
+        // Different pages, so different pictures: the same file twice would mean the sheet was
+        // not being applied.
+        Assert.NotEqual(
+            File.ReadAllBytes(written[0]).Length,
+            File.ReadAllBytes(written[1]).Length);
+    }
+
+    [Fact]
+    public void EverySheetInOnePdfRatherThanSeveralFiles()
+    {
+        var written = CircuitExporter.Export(
+            Split(), null, Path_("split.pdf"),
+            new ExportOptions(ExportFormat.Pdf, ExportContent.Schematic, AllSheets: true));
+
+        var file = Assert.Single(written);
+
+        var text = File.ReadAllText(file, System.Text.Encoding.Latin1);
+
+        // Two pages in the one document. A PDF has pages; a PNG does not, which is why they are
+        // handled differently.
+        Assert.Equal(2, System.Text.RegularExpressions.Regex.Matches(text, @"/Type\s*/Page[^s]").Count);
+    }
+
+    [Fact]
+    public void WithoutAskingItIsStillOnePage()
+    {
+        var written = CircuitExporter.Export(
+            Split(), null, Path_("one.png"),
+            new ExportOptions(ExportFormat.Png, ExportContent.Schematic, Sheet: "Logic"));
+
+        var file = Assert.Single(written);
+
+        Assert.EndsWith("one.png", file);
+    }
+
+    [Fact]
+    public void AOnePageDrawingIgnoresTheRequestEntirely()
+    {
+        var written = CircuitExporter.Export(
+            Rig(), null, Path_("plain.png"),
+            new ExportOptions(ExportFormat.Png, ExportContent.Schematic, AllSheets: true));
+
+        // Nothing is split, so there is nothing to fan out over and the name stays the one asked
+        // for rather than growing a suffix nobody wanted.
+        var file = Assert.Single(written);
+
+        Assert.EndsWith("plain.png", file);
+    }
+
+    [Fact]
+    public void PrintingGivesAPageToEachSheet()
+    {
+        var pages = CircuitExporter.WritePrintable(
+            Split(), null, Path_("printed.pdf"),
+            new ExportOptions(ExportFormat.Pdf, ExportContent.Schematic, AllSheets: true),
+            new PageSetup());
+
+        Assert.Equal(2, pages);
+    }
 }
 
 /// <summary>The menu command around the exporter: what it asks, and what it does with the answer.</summary>

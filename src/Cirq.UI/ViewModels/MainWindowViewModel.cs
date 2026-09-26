@@ -700,7 +700,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     {
         if (FileDialogs is null) return;
 
-        var request = await FileDialogs.PickExportAsync(DocumentName, ScopeSource?.HasTraces == true);
+        var request = await FileDialogs.PickExportAsync(
+            DocumentName, ScopeSource?.HasTraces == true, Circuit.Sheets.Count > 1);
         if (request is null) return;
 
         try

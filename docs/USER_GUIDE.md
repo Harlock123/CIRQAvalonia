@@ -4946,8 +4946,11 @@ The page is not a filter drawn over everything. What is on another page is genui
 - A part you place, and a part you paste, lands on the page in front of you. That is also how you
   move something between pages: copy it, go to the other tab, paste.
 - Zoom to fit fits the page, not the document.
-- An export or a print gives you the page you are on. Pages all start their coordinates in the same
-  corner, so one file with all of them in it would be every page drawn on top of the first.
+- An export gives you the page you are on, or **every page** if you tick *Every sheet*: a PDF gets a
+  page each, and the picture formats get a file each, named `circuit-Power.png`. They cannot be one
+  image, because every page starts its coordinates in the same corner and stacking them would draw
+  each on top of the first. A **print** always gives you every page — a printed schematic missing
+  two of its three sheets is not a printed schematic.
 
 Everything that is about the circuit rather than the drawing ignores pages entirely: the netlist,
 every analysis, the check, the ratings, the parts list, the netlist and BOM exports, and what the
@@ -5274,7 +5277,8 @@ so it can be printed later or kept.
 ## Exporting
 
 `File > Export...`, or `Ctrl+E`, writes the schematic and the traces out — as a picture, or as
-text. It asks three things.
+text. It asks three things — four for a drawing spread over [sheets](#sheets), where **Every sheet**
+decides whether you get all of them or the one you are looking at.
 
 ![The export dialog over the schematic: What to export with Schematic selected and Oscilloscope traces and Both beneath it, a greyed When exporting both section offering one file or a file each plus a combined PDF, a Format list showing PNG, a Resolution list showing 2x, and checkboxes for a transparent background and a parts list](images/10-export-dialog.png)
 

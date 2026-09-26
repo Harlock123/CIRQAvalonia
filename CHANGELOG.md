@@ -8,6 +8,15 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**An export or a print can have every sheet in it.** 0.36.0 made both respect the page you were
+looking at, which was necessary — every page starts its coordinates in the same corner, so one image
+of a split drawing is every page drawn on top of the first — and left the other half undone. A
+three-page schematic could not be printed properly at all.
+
+Now *Every sheet* in the export dialog gives a PDF a page each and the picture formats a file each,
+named `circuit-Power.png`. Printing does not ask: paper gets the whole document, one sheet per page,
+each headed with its name.
+
 **The worst case can include the temperature.** Tick *and over* beside the worst-case button in
 *Simulate > Tolerance* and the temperature becomes one more axis to push, with two boxes for the
 range.

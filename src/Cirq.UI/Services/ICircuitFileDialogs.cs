@@ -40,5 +40,10 @@ public interface ICircuitFileDialogs
     /// False when there is nothing on the scope, which greys out the options that would produce
     /// an empty half.
     /// </param>
-    Task<ExportRequest?> PickExportAsync(string suggestedFileName, bool hasTraces);
+    /// <param name="hasSheets">
+    /// True when the drawing is spread over pages, which offers the choice of exporting all of
+    /// them. Hidden rather than greyed for a one-page drawing: an option that cannot mean anything
+    /// is better absent than present and inert.
+    /// </param>
+    Task<ExportRequest?> PickExportAsync(string suggestedFileName, bool hasTraces, bool hasSheets);
 }

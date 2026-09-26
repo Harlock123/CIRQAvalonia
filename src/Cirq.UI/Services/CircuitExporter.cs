@@ -87,7 +87,8 @@ public sealed record ExportOptions(
     bool ShowInteractiveMarkers = false,
     bool IncludePartsList = false,
     LiveSnapshot? Live = null,
-    string? Sheet = null);
+    string? Sheet = null,
+    bool AllSheets = false);
 
 /// <summary>An export the user has asked for: what to write, and where.</summary>
 public sealed record ExportRequest(string Path, ExportOptions Options);
@@ -216,8 +217,14 @@ public static class CircuitExporter
         using var stream = File.Create(path);
         using var document = SKDocument.CreatePdf(stream);
 
+        // A split drawing prints as a page each. Printing only the page somebody happened to be
+        // looking at would be a printed document that is not the document.
+        var sheets = options.AllSheets && circuit.Sheets.Count > 1
+            ? circuit.Sheets.ToList()
+            : [options.Sheet ?? string.Empty];
+
         var pages = 0;
-        var total = (wantsSchematic ? 1 : 0) + (hasTraces ? 1 : 0) + (rows.Count > 0 ? 1 : 0);
+        var total = (wantsSchematic ? sheets.Count : 0) + (hasTraces ? 1 : 0) + (rows.Count > 0 ? 1 : 0);
 
         if (total == 0) total = 1;
 
@@ -246,14 +253,21 @@ public static class CircuitExporter
 
         if (wantsSchematic)
         {
-            var bounds = SchematicBounds(circuit, options);
-
-            Sheet("Schematic", bounds.Width, bounds.Height,
-                canvas => DrawSchematic(canvas, circuit, bounds, options with
+            foreach (var sheet in sheets)
+            {
+                var drawn = options with
                 {
                     // Always opaque on paper, whatever the export dialog last said.
                     TransparentBackground = false,
-                }));
+                    Sheet = sheet.Length == 0 ? options.Sheet : sheet,
+                };
+
+                var bounds = SchematicBounds(circuit, drawn);
+                var caption = sheets.Count > 1 ? $"Schematic — {sheet}" : "Schematic";
+
+                Sheet(caption, bounds.Width, bounds.Height,
+                    canvas => DrawSchematic(canvas, circuit, bounds, drawn));
+            }
         }
 
         if (hasTraces && scope is not null)
@@ -387,8 +401,12 @@ public static class CircuitExporter
         ArgumentNullException.ThrowIfNull(circuit);
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
 
-        // The text formats are not drawings and share none of the layout below.
+        // The text formats are not drawings and share none of the layout below. A netlist or a
+        // parts list is about the circuit rather than about a page of it, so sheets do not come
+        // into it: there is one netlist however the drawing is cut up.
         if (IsText(options.Format)) return [WriteText(circuit, path, options)];
+
+        if (options.AllSheets && circuit.Sheets.Count > 1) return EverySheet(circuit, scope, path, options);
 
         var wantsTraces = options.Content is ExportContent.Traces or ExportContent.Both;
         var hasTraces = wantsTraces && scope is { HasTraces: true };
@@ -431,6 +449,86 @@ public static class CircuitExporter
         written.Add(combinedPath);
 
         return written;
+    }
+
+    /// <summary>
+    /// Every page of a split drawing.
+    /// <para>
+    /// One PDF with a page each, because that is what a PDF is for and a reader can turn the pages;
+    /// one file each for the picture formats, named after the sheet, because a PNG has no pages and
+    /// stacking them into one image would put every page on top of the first — which is the same
+    /// reason a single-sheet export shows only the page you are on.
+    /// </para>
+    /// </summary>
+    private static IReadOnlyList<string> EverySheet(
+        Circuit circuit, IScopeSource? scope, string path, ExportOptions options)
+    {
+        var wantsTraces = options.Content is ExportContent.Traces or ExportContent.Both;
+        var hasTraces = wantsTraces && scope is { HasTraces: true };
+
+        if (options.Format == ExportFormat.Pdf)
+        {
+            WriteSheetedPdf(circuit, hasTraces ? scope : null, path, options);
+            return [path];
+        }
+
+        var directory = Path.GetDirectoryName(path) ?? ".";
+        var stem = Path.GetFileNameWithoutExtension(path);
+        var extension = Extension(options.Format);
+
+        List<string> written = [];
+
+        foreach (var sheet in circuit.Sheets)
+        {
+            var name = string.Concat(sheet.Split(Path.GetInvalidFileNameChars()));
+            var each = Path.Combine(directory, $"{stem}-{name}{extension}");
+
+            // The traces belong to the circuit rather than to a page of it, so they go on the
+            // first sheet's file and are not repeated on every one.
+            var first = ReferenceEquals(sheet, circuit.Sheets[0]) || sheet == circuit.Sheets[0];
+
+            WriteSheet(
+                circuit, first && hasTraces ? scope : null, each, options with { Sheet = sheet },
+                includeSchematic: options.Content != ExportContent.Traces,
+                includeTraces: first && hasTraces);
+
+            written.Add(each);
+        }
+
+        return written;
+    }
+
+    /// <summary>One PDF, one page per sheet, with the traces after them.</summary>
+    private static void WriteSheetedPdf(
+        Circuit circuit, IScopeSource? scope, string path, ExportOptions options)
+    {
+        using var stream = File.Create(path);
+        using var document = SKDocument.CreatePdf(stream);
+
+        if (options.Content != ExportContent.Traces)
+        {
+            foreach (var sheet in circuit.Sheets)
+            {
+                var page = options with { Sheet = sheet };
+                var bounds = SchematicBounds(circuit, page);
+
+                var canvas = document.BeginPage((float)bounds.Width, (float)bounds.Height);
+
+                PaintBackground(canvas, bounds.Width, bounds.Height, options);
+                DrawSchematic(canvas, circuit, bounds, page);
+                document.EndPage();
+            }
+        }
+
+        if (scope is { HasTraces: true })
+        {
+            var height = TraceWidth * TraceAspect;
+            var canvas = document.BeginPage((float)TraceWidth, (float)height);
+
+            PaintBackground(canvas, TraceWidth, height, options);
+            DrawScope(canvas, scope, new SKRect(0, 0, (float)TraceWidth, (float)height));
+            document.EndPage();
+        }
     }
 
     // ---- sheets ----------------------------------------------------------
