@@ -157,8 +157,14 @@ for archive in "${archives[@]}"; do
 
   clikind="$(identify "$cli")"
 
-  if [ "$clikind" != "$expected" ]; then
-    printf '%-44s %-9s %s\n' "$base" "${human}MB" "FAIL  cirq is '$clikind', expected '$expected'"
+  # The same format and architecture as the application, but not the same subsystem: a Windows
+  # command-line tool is a console binary, and one built as a GUI binary would open without a
+  # console to print into. So the expectation is the application's with "gui" swapped for
+  # "console", which is also what makes this check catch a cirq built for the wrong machine.
+  cliexpected="${expected/ gui/ console}"
+
+  if [ "$clikind" != "$cliexpected" ]; then
+    printf '%-44s %-9s %s\n' "$base" "${human}MB" "FAIL  cirq is '$clikind', expected '$cliexpected'"
     failures=$((failures + 1))
     continue
   fi
