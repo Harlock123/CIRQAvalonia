@@ -8,6 +8,15 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+## [0.37.0] - 2026-09-25
+
+The engine without the editor, on a command line that exits non-zero when a circuit stops meeting
+its requirements. A scope that triggers. A solver that chooses its own step, and lands on the
+instant a part switches. And the requirements held against the circuit across a whole temperature
+range rather than at one point. 188 components in 16 categories, 87 worked examples, 3618 tests.
+
+### Added
+
 **`cirq`: the engine with no window.** A second executable in the same archive, for a build machine
 or a container where there is no display.
 
@@ -113,6 +122,8 @@ on the same converter at the same ceiling — wrong with a fixed step, right wit
 An RC charging curve takes about a thirtieth of the steps for the same accuracy. A circuit with
 nothing in it that integrates — logic and resistors — is left alone entirely, because there is no
 truncation error to control and the step is already decided by when the logic changes.
+
+### Fixed
 
 **Opening a circuit was dropping its temperature too.** The same bug as the parameters and the
 baseline in 0.36.0, in the same place and found the same way: the conditions are saved, and the open
@@ -2132,7 +2143,8 @@ First public build of CirqAvalonia — an electronic circuit analyzer and mixed-
 
 **501 tests** measure the solver against closed-form answers rather than recorded output.
 
-[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.36.0...HEAD
+[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.37.0...HEAD
+[0.37.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.36.0...v0.37.0
 [0.36.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.35.0...v0.36.0
 [0.35.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.34.0...v0.35.0
 [0.34.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.33.3...v0.34.0
