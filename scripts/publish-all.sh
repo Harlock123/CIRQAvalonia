@@ -20,6 +20,10 @@ shift || true
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROJECT="$ROOT/src/Cirq.UI/Cirq.UI.csproj"
+# The command-line tool ships beside the application: it is the same engine with no window, for a
+# build machine that has no display. Published separately because it is a separate executable, into
+# the same package because somebody who downloads the release should have both.
+CLI="$ROOT/src/Cirq.Cli/Cirq.Cli.csproj"
 DIST="$ROOT/dist"
 STAGE="$DIST/.stage"
 
@@ -98,6 +102,40 @@ for rid in "${RIDS[@]}"; do
   else
     cp "$out/Cirq.UI" "$pkg/CirqAvalonia"
     chmod +x "$pkg/CirqAvalonia"
+  fi
+
+  # The command-line tool. Its failure is not the release's failure: a missing cirq is worth
+  # saying out loud, and not worth throwing away six working platform builds over.
+  cliout="$STAGE/$rid-cli"
+  clilog="$STAGE/$rid-cli.log"
+
+  if dotnet publish "$CLI" \
+      --configuration Release \
+      --runtime "$rid" \
+      --self-contained true \
+      --output "$cliout" \
+      --nologo \
+      --verbosity quiet \
+      -p:PublishSingleFile=true \
+      -p:IncludeNativeLibrariesForSelfExtract=true \
+      -p:EnableCompressionInSingleFile=true \
+      -p:PublishTrimmed=false \
+      -p:PublishReadyToRun=false \
+      -p:DebugType=none \
+      -p:DebugSymbols=false \
+      -p:SatelliteResourceLanguages=en \
+      -p:Version="$VERSION" \
+      -p:InformationalVersion="$VERSION" \
+      > "$clilog" 2>&1; then
+    if [[ "$rid" == win-* ]]; then
+      cp "$cliout/cirq.exe" "$pkg/cirq.exe"
+    else
+      cp "$cliout/cirq" "$pkg/cirq"
+      chmod +x "$pkg/cirq"
+    fi
+  else
+    echo "      cirq (command line) FAILED — see $clilog"
+    tail -n 6 "$clilog" | sed 's/^/      /'
   fi
 
   cp "$ROOT/README.md" "$pkg/"

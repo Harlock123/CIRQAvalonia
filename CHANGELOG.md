@@ -8,6 +8,29 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**`cirq`: the engine with no window.** A second executable in the same archive, for a build machine
+or a container where there is no display.
+
+```
+cirq check <circuit.cirq>     Hold it to the requirements saved in it
+cirq run <circuit.cirq>       Run it and write the traces as CSV
+cirq netlist <circuit.cirq>   Write it out as a SPICE netlist
+cirq info <circuit.cirq>      What is in it: parts, nets, probes, requirements
+```
+
+`check` is the reason for the rest of it. A circuit's requirements are saved in the circuit, and
+until now the only way to find out whether they were met was to open the application and look —
+which means they were checked when somebody remembered to, which means they were not checked. This
+runs the circuit and **exits 1 when a requirement is not met**, so a design can be tested the way
+the code around it is. `--over temperature` does the whole range check from the window instead, and
+`--over R1.Resistance` sweeps a part.
+
+It has no Avalonia reference and no argument-parsing library: the first because it has to run where
+there is no display, the second because it is a few dozen lines and a library would be a third of
+the download. The whole program is a function taking a list of strings and two writers, which is
+why its tests drive exactly what the executable does, exit code included — a command-line tool whose
+behaviour can only be checked by running a process is a command-line tool nobody checks.
+
 **A net label says where else its net goes.** Sheets are joined by naming a net, which is the one
 thing about them that fails silently: a `VCC` label that reaches the logic page looks exactly like a
 `VCC` label that goes nowhere, and `VCC1` here against `VCC` there is two nets that look like one.

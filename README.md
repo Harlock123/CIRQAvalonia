@@ -32,7 +32,8 @@ Core ← Engine ← Components ← UI, which keeps the whole engine headless-tes
 
 ```bash
 dotnet run --project src/Cirq.UI     # the editor
-dotnet test                          # 3530 tests
+dotnet run --project src/Cirq.Cli    # the same engine, no window
+dotnet test                          # 3618 tests
 ./scripts/build-guide.sh             # the user guide as a PDF
 ```
 
@@ -88,6 +89,37 @@ trade for everyone. The plan has not changed — a Developer ID certificate, har
 notarized `.app` bundle — and when it happens this whole section goes away.
 
 On Linux, mark it executable if your extractor dropped the bit: `chmod +x CirqAvalonia`.
+
+## The command line
+
+`cirq` is the engine with no window, shipped in the same archive as the application, for a build
+machine or a container where there is no display:
+
+```
+cirq check <circuit.cirq>     Hold it to the requirements saved in it
+cirq run <circuit.cirq>       Run it and write the traces as CSV
+cirq netlist <circuit.cirq>   Write it out as a SPICE netlist
+cirq info <circuit.cirq>      What is in it: parts, nets, probes, requirements
+```
+
+`check` is the reason for the rest. It runs the circuit, holds it to the requirements saved in it,
+and **exits 1 if any of them is not met** — so a circuit can be tested the way the code around it
+is. `--over temperature` does the same across a range, and `--over R1.Resistance` across a part.
+Exit codes are 0 met, 1 not met, 2 the command itself was wrong.
+
+```
+$ cirq check reference.cirq --for 1e-4 --over temperature
+  FAIL  Vf mean at least 600mV — met from -40 °C to -4.3 °C
+
+Vf mean at least 600mV — it holds from -40 °C to -4.3 °C.
+$ echo $?
+1
+```
+
+No Avalonia, deliberately: it references the document, the engine and the requirements, none of
+which know what a window is. The argument parsing is a few dozen lines rather than a library, for
+the same reason — and the whole program is a function taking a list of strings and two writers, so
+the tests drive exactly what the executable does, exit code included.
 
 ## Building releases
 
@@ -566,6 +598,7 @@ one passes against a button that would never have fired.
 | Spectrum | The transform of a constant landing entirely in the first bin, a length that is not a power of two refused rather than quietly wrong, a sine reading its own amplitude under all three windows, the DC term in bin zero at its own value, the peak found past the DC lobe rather than in its skirt, a square wave's odd harmonics at a third, a fifth and a seventh with no even ones at all, a modulated carrier's sidebands at half the modulation depth and nothing at twice the spacing, windowing keeping an awkward tone from smearing across everything, unevenly spaced samples still giving the right frequency and amplitude, and a transform no larger than the samples support |
 | Power and interface | A PPTC carrying its hold current for ever and tripping on a fault to a trickle rather than to nothing, and cooling back far slower than it tripped; a solid-state relay commanded at a mains peak refusing to fire until the next zero crossing and then conducting properly; an LM324 running four independent followers off one supply pair with the fourth saturating exactly where its family's headroom says; an A4988 holding 0.8 A out of a supply that would otherwise force 4.3 A, reversing the winding rather than switching it off, and commanding intermediate currents when microstepping is selected; and a MAX232 making ±8.5 V from a single 5 V rail, inverting TTL onto the line and back, deciding with half a volt of hysteresis, and sagging its pump when the line load is heavier than the standard allows |
 | New devices | Tri-state outputs genuinely releasing a bus where a pull-down alone then decides it, a CAN bus going dominant whenever any node sends a zero and the recessive node knowing it lost, an IGBT conducting with a voltage offset where a MOSFET holds a resistance and still passing current after its gate has gone, a photodiode linear across decades with a thousandth of a phototransistor's current and saturating when its load resistor is too big, and a synchronous counter whose carry is gated by the enable that chains it |
+| The command line | Every command against a real circuit file: a met requirement exiting 0 and an unmet one exiting 1, a circuit with no requirements or no probes being a misuse rather than a quiet pass, a file that is not there and a file that is not a circuit both reported rather than thrown, a number that is not a number refused before anything runs, the range check finding where a requirement gives out and passing over a range it survives, sweeping a part instead of the temperature, sweeping something that is not there, run writing a CSV with a real reading in it, netlist going to the screen and to a file, info naming the sheets — and help for a command describing that command rather than all of them |
 | Off-page nets | A net found on every page that names it and matched the way the netlist matches names, a label reporting the other pages its net is on and nothing when it stays put, an unsplit drawing having no crossings at all, following one walking the pages in order and coming back round, a net on one page having nowhere to go, and a part that is not a label not being a crossing |
 | Sheets | Each page showing its own parts and an unsplit drawing being all one page, a part naming a page that has been removed landing on the first rather than nowhere, the netlist being the same netlist however the pages are cut, the first added sheet making two without relabelling anything, a name already taken made unique, a rename bringing its parts and its tab, a blank or colliding one refused, removing a page moving what was on it rather than deleting it, the last page staying, a wire belonging to the page its ends are on, a band selection and a pasted part both respecting the page on screen, leaving a page dropping the selection on it while keeping a part on the page being gone to, and a saved circuit coming back with its pages, its tabs and the numbers it gives names to — plus the strip itself built in a real window, its tabs clicked through hit testing with the canvas following the one that was clicked, and a one-page circuit whose file is byte-for-byte what it always was |
 | Box selection | A part caught only when wholly inside the box and not when clipped, captions excluded from the test, a group copying with the wires between its members and without the ones leaving it, the copy keeping its shape, two pastes giving two separately wired groups, and a copied divider solving to the same midpoint voltage as the original |

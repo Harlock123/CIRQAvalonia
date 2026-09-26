@@ -145,6 +145,24 @@ for archive in "${archives[@]}"; do
     continue
   fi
 
+  # The command-line tool ships in the same archive, and has to be for the same machine: a cirq
+  # built for the wrong architecture is a cirq that will not start on the one it was downloaded to.
+  cli="$(find "$out" -type f -name 'cirq' -o -type f -name 'cirq.exe' | head -1)"
+
+  if [ -z "$cli" ]; then
+    printf '%-44s %-9s %s\n' "$base" "${human}MB" "FAIL  no cirq command-line tool inside"
+    failures=$((failures + 1))
+    continue
+  fi
+
+  clikind="$(identify "$cli")"
+
+  if [ "$clikind" != "$expected" ]; then
+    printf '%-44s %-9s %s\n' "$base" "${human}MB" "FAIL  cirq is '$clikind', expected '$expected'"
+    failures=$((failures + 1))
+    continue
+  fi
+
   printf '%-44s %-9s %s\n' "$base" "${human}MB" "ok    $actual"
 done
 

@@ -124,7 +124,10 @@ public sealed record SpecSweepResult(
               $"{first.Spec.Describe()} — {where}.";
     }
 
-    private string Format(double value) => SiPrefix.Format(value, Unit, 3);
+    // Degrees are not an SI-prefixed quantity: "-4.29°C" reads as a unit somebody has mangled,
+    // where "-4.3 °C" is a temperature.
+    private string Format(double value) =>
+        Unit == "°C" ? $"{value:0.#} °C" : SiPrefix.Format(value, Unit, 3);
 }
 
 /// <summary>

@@ -52,11 +52,12 @@ the [README](../README.md), and what changed between releases is in the
 40. [Saving and loading](#saving-and-loading)
 41. [Printing](#printing)
 42. [Exporting](#exporting)
-43. [Appearance](#appearance)
-44. [What version is this](#what-version-is-this)
-45. [Closing a dialog](#closing-a-dialog)
-46. [Keyboard reference](#keyboard-reference)
-47. [When a circuit will not simulate](#when-a-circuit-will-not-simulate)
+43. [The command line](#the-command-line)
+44. [Appearance](#appearance)
+45. [What version is this](#what-version-is-this)
+46. [Closing a dialog](#closing-a-dialog)
+47. [Keyboard reference](#keyboard-reference)
+48. [When a circuit will not simulate](#when-a-circuit-will-not-simulate)
 
 This guide is also attached to every [release](../../releases) as a PDF, with a contents page and
 the screenshots in place — the same document, laid out for reading away from the machine. Build it
@@ -5309,6 +5310,69 @@ about and the designators can be selected as text.
 The verdict goes at the top, before anything else. A report whose verdict is on page four is a
 report whose verdict nobody knows.
 
+
+## The command line
+
+Everything above happens in a window. `cirq` is the same engine with no window at all — for a build
+machine, a container, or anywhere else there is no display — and it ships in the same archive as the
+application.
+
+```
+cirq check <circuit.cirq>     Hold it to the requirements saved in it
+cirq run <circuit.cirq>       Run it and write the traces as CSV
+cirq netlist <circuit.cirq>   Write it out as a SPICE netlist
+cirq info <circuit.cirq>      What is in it: parts, nets, probes, requirements
+```
+
+### Checking a circuit the way you check code
+
+`cirq check` is the reason the rest of it exists:
+
+```
+$ cirq check reference.cirq --for 1e-4
+  FAIL  Vf mean at least 600mV — not met: 547.8mV
+
+1 of 1 requirement(s) not met after 100µs.
+$ echo $?
+1
+```
+
+It exits **0** when every requirement is met, **1** when one is not, and **2** when the command
+itself was wrong — no such file, a number that is not a number. That is the whole point: the
+requirements are saved in the circuit, and until there was a command that returned a number, the
+only way to find out whether they were met was to open the application and look — which means they
+were checked when somebody remembered to, which means they were not checked.
+
+`--over` runs the same check across a range, exactly as
+[Requirements Over a Range](#requirements) does in the window:
+
+```
+$ cirq check reference.cirq --for 1e-4 --over temperature
+  FAIL  Vf mean at least 600mV — met from -40 °C to -4.3 °C
+
+Vf mean at least 600mV — it holds from -40 °C to -4.3 °C.
+```
+
+`--from`, `--to` and `--points` set the range; `--over R1.Resistance` sweeps a part instead of the
+temperature. `--quiet` prints the verdict line and nothing else.
+
+### The others
+
+`cirq run` runs the circuit and writes what every probe recorded as a CSV — one column per probe,
+`--for` seconds long, `--every` seconds apart — for feeding into whatever else you use to look at
+numbers.
+
+`cirq netlist` writes the SPICE deck, to the screen or to a file with `-o`. Anything with no SPICE
+element is named on the error stream rather than dropped silently, so redirecting the deck to a file
+still shows you what was left out.
+
+`cirq info` says what is in a circuit without running it: how many parts, wires and nodes, the
+sheets, the probes, the requirements, the named parameters, and what temperature it is set to run
+at. It is the quickest way to find out what a `.cirq` file somebody sent you actually contains.
+
+Every command takes `--help`.
+
+---
 
 ## Appearance
 

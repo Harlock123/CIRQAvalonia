@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Cirq.Cli</RootNamespace>
+    <AssemblyName>cirq</AssemblyName>
+    <!-- No Avalonia, and deliberately: this has to run where there is no display — a build
+         machine, a container, somebody's CI. Everything it needs is the document, the engine and
+         the requirements, none of which know what a window is. -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Cirq.Core/Cirq.Core.csproj" />
+    <ProjectReference Include="../Cirq.Engine/Cirq.Engine.csproj" />
+    <ProjectReference Include="../Cirq.Components/Cirq.Components.csproj" />
+  </ItemGroup>
+
+</Project>
