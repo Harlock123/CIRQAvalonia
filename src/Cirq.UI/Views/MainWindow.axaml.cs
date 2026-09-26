@@ -632,7 +632,8 @@ public partial class MainWindow : Window
 
         var scope = this.FindControl<ScopePanel>("Scope");
 
-        var model = new PrintViewModel(scope?.HasTraces == true, PrintService.CanSpoolDirectly())
+        var model = new PrintViewModel(
+            scope?.HasTraces == true, PrintService.CanSpoolDirectly(), _viewModel.Circuit)
         {
             IncludeTraces = false,
         };

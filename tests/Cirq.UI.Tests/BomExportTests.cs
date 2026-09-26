@@ -49,7 +49,7 @@ public class BomExportTests : IDisposable
 
         var lines = File.ReadAllLines(_path);
 
-        Assert.Equal("Quantity,Designators,Part,Value", lines[0]);
+        Assert.Equal("Quantity,Designators,Part,Value,Footprint", lines[0]);
 
         // Three 10k resistors are one line; the 4k7 is another.
         Assert.Contains(lines, l => l.StartsWith("3,", StringComparison.Ordinal) && l.Contains("10"));
@@ -105,5 +105,51 @@ public class BomExportTests : IDisposable
     {
         Assert.True(CircuitExporter.IsText(ExportFormat.Bom));
         Assert.False(CircuitExporter.IsRaster(ExportFormat.Bom));
+    }
+
+    /// <summary>
+    /// The footprint is half of what somebody ordering the parts needs, and it is the column a
+    /// board house asks for. Empty for a part nobody has said anything about, which is most of them.
+    /// </summary>
+    [Fact]
+    public void TheFootprintIsAColumn()
+    {
+        var circuit = Rig();
+
+        foreach (var part in circuit.Components.OfType<Resistor>().Take(1))
+            part.Footprint = "Resistor_SMD:R_0805_2012Metric";
+
+        CircuitExporter.Export(circuit, null, _path, new ExportOptions(ExportFormat.Bom));
+
+        var lines = File.ReadAllLines(_path);
+
+        // Quoted only when it has to be, like every other field here.
+        Assert.Contains(lines, l => l.EndsWith(",Resistor_SMD:R_0805_2012Metric", StringComparison.Ordinal));
+        Assert.Contains(lines, l => l.EndsWith(",", StringComparison.Ordinal));
+
+        // And the one with a footprint is its own line, apart from the two without.
+        Assert.Contains(lines, l => l.StartsWith("1,R1,", StringComparison.Ordinal));
+        Assert.Contains(lines, l => l.StartsWith("2,\"R2, R3\",", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// Two parts alike on the drawing but to be built as different packages are two lines. They
+    /// are two things to order, and a bill of materials that merged them would be an order for the
+    /// wrong parts.
+    /// </summary>
+    [Fact]
+    public void ThePackageSplitsALineThatWouldOtherwiseBeOne()
+    {
+        var circuit = new Circuit();
+
+        circuit.Add(new Resistor(10e3) { Name = "R1", Footprint = "R_0805" });
+        circuit.Add(new Resistor(10e3) { Name = "R2", Footprint = "R_0805" });
+        circuit.Add(new Resistor(10e3) { Name = "R3", Footprint = "R_2512" });
+
+        var rows = PartsList.For(circuit);
+
+        Assert.Equal(2, rows.Count);
+        Assert.Contains(rows, r => r.Quantity == 2 && r.Footprint == "R_0805");
+        Assert.Contains(rows, r => r.Quantity == 1 && r.Footprint == "R_2512");
     }
 }

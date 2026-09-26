@@ -466,4 +466,81 @@ public class PrintingTests : IDisposable
             Assert.IsNotAssignableFrom<Avalonia.AvaloniaObject>(brush);
         }
     }
+
+    // ---- the title block -----------------------------------------------------
+
+    /// <summary>
+    /// The fields a title block carries are the ones a printed drawing is filed and built from.
+    /// A revision nobody can read off the sheet is a revision nobody knows.
+    /// </summary>
+    [Fact]
+    public void TheTitleBlockCarriesTheRevisionAndWhoDrewIt()
+    {
+        var circuit = Divider("Bench supply");
+
+        var plain = Path_("plain.pdf");
+
+        CircuitExporter.WritePrintable(
+            circuit, null, plain, new ExportOptions(ExportFormat.Pdf), new PageSetup());
+
+        circuit.Revision = "C";
+        circuit.Author = "A. Technician";
+
+        var filled = Path_("filled.pdf");
+
+        CircuitExporter.WritePrintable(
+            circuit, null, filled, new ExportOptions(ExportFormat.Pdf), new PageSetup());
+
+        // Skia writes text as glyphs, so the comparison is by size: the filled-in block carries
+        // more than the dashes it replaced.
+        Assert.True(new FileInfo(filled).Length > new FileInfo(plain).Length,
+            "the revision and the name added nothing to the page");
+    }
+
+    [Fact]
+    public void EverySheetOfASplitDrawingIsNumberedInTheBlock()
+    {
+        var circuit = Divider("Split supply");
+
+        circuit.Sheets.Add("Power");
+        circuit.Sheets.Add("Logic");
+
+        foreach (var part in circuit.Components) part.Sheet = "Power";
+
+        var path = Path_("numbered.pdf");
+
+        var pages = CircuitExporter.WritePrintable(
+            circuit, null, path,
+            new ExportOptions(ExportFormat.Pdf, ExportContent.Schematic, AllSheets: true),
+            new PageSetup());
+
+        // Two sheets, so two pages, each one of two — which is what the PAGE cell says.
+        Assert.Equal(2, pages);
+        Assert.True(new FileInfo(path).Length > 200);
+    }
+
+    [Fact]
+    public void TheBlockCanBeTurnedOff()
+    {
+        var circuit = Divider("Bench supply");
+
+        circuit.Revision = "C";
+        circuit.Author = "A. Technician";
+
+        var with = Path_("with.pdf");
+        var without = Path_("without.pdf");
+
+        CircuitExporter.WritePrintable(
+            circuit, null, with, new ExportOptions(ExportFormat.Pdf),
+            new PageSetup(IncludeHeader: true));
+
+        CircuitExporter.WritePrintable(
+            circuit, null, without, new ExportOptions(ExportFormat.Pdf),
+            new PageSetup(IncludeHeader: false));
+
+        Assert.True(new FileInfo(with).Length > new FileInfo(without).Length);
+
+        // And the drawing gets the space back when it is off.
+        Assert.Equal(0, new PageSetup(IncludeHeader: false).HeaderPoints);
+    }
 }

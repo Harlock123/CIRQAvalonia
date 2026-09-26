@@ -34,9 +34,10 @@ public enum PageOrientation
 /// which is what you want when the drawing is going to be measured — and which may overflow.
 /// </param>
 /// <param name="IncludeHeader">
-/// Adds a line across the top with the circuit's name and the date. Paper leaves the screen, and a
+/// Adds a title block across the top: what the drawing is, which sheet this is, the revision, who
+/// drew it, the date, and the page number. Paper leaves the screen and does not come back, and a
 /// schematic with nothing on it saying what it is becomes a schematic of something nobody can
-/// remember.
+/// remember — or worse, one somebody builds from the wrong revision.
 /// </param>
 public sealed record PageSetup(
     PaperSize Paper = PaperSize.A4,
@@ -45,8 +46,15 @@ public sealed record PageSetup(
     bool FitToPage = true,
     bool IncludeHeader = true)
 {
-    /// <summary>Height of the header band, in points. Zero when there is no header.</summary>
-    public double HeaderPoints => IncludeHeader ? 28.0 : 0.0;
+    /// <summary>
+    /// Height of the title block, in points. Zero when there is none.
+    /// <para>
+    /// Two rows: a small caption naming each field, and the field itself under it. A block that
+    /// printed the values alone would save eleven points and leave somebody guessing whether the
+    /// middle one is the revision or the sheet.
+    /// </para>
+    /// </summary>
+    public double HeaderPoints => IncludeHeader ? 42.0 : 0.0;
 
     /// <summary>The sheet's width in points, after the orientation is applied.</summary>
     public double WidthPoints =>

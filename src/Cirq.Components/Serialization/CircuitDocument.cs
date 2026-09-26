@@ -35,6 +35,14 @@ public sealed class CircuitDocument
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? AdaptiveTimeStep { get; set; }
 
+    /// <summary>What revision the drawing is at, when somebody has said.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Revision { get; set; }
+
+    /// <summary>Who drew it, when somebody has said.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Author { get; set; }
+
     /// <summary>
     /// The SPICE cards for any imported models the circuit uses, carried in the file so it opens
     /// complete somewhere else.

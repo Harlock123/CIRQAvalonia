@@ -39,7 +39,17 @@
     <StackPanel Spacing="4">
       <CheckBox Content="Fit to the page" IsChecked="{Binding FitToPage}"
                 ToolTip.Tip="Scales a large schematic down so it fits. Turned off, it prints at its natural size and may run off the sheet." />
-      <CheckBox Content="Header with the circuit's name and the date" IsChecked="{Binding IncludeHeader}" />
+      <CheckBox Content="Title block across the top of every sheet" IsChecked="{Binding IncludeHeader}"
+                ToolTip.Tip="What the drawing is, which sheet this is, the revision, who drew it, the date and the page number" />
+    </StackPanel>
+
+    <StackPanel Orientation="Horizontal" Spacing="8" IsEnabled="{Binding IncludeHeader}">
+      <TextBlock Text="Rev" VerticalAlignment="Center" Opacity="0.7" Width="30" />
+      <TextBox Width="70" AutomationProperties.Name="The revision this drawing is at"
+               Text="{Binding Revision, Mode=TwoWay}" />
+      <TextBlock Text="Drawn by" VerticalAlignment="Center" Opacity="0.7" />
+      <TextBox Width="150" AutomationProperties.Name="Who drew this"
+               Text="{Binding Author, Mode=TwoWay}" />
     </StackPanel>
 
     <TextBlock Text="{Binding Summary}" TextWrapping="Wrap" Opacity="0.8" FontSize="12" />

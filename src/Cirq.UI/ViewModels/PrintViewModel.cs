@@ -1,3 +1,4 @@
+using Cirq.Core.Topology;
 using Cirq.UI.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
 
@@ -9,10 +10,37 @@ namespace Cirq.UI.ViewModels;
 /// </summary>
 public sealed partial class PrintViewModel : ObservableObject
 {
-    public PrintViewModel(bool hasTraces, bool canSpool)
+    private readonly Circuit? _circuit;
+
+    public PrintViewModel(bool hasTraces, bool canSpool, Circuit? circuit = null)
     {
         HasTraces = hasTraces;
         CanSpool = canSpool;
+        _circuit = circuit;
+
+        Revision = circuit?.Revision ?? string.Empty;
+        Author = circuit?.Author ?? string.Empty;
+    }
+
+    /// <summary>
+    /// The revision and who drew it, edited here because this is where somebody notices they are
+    /// blank — and written straight back to the circuit, because they belong to the drawing rather
+    /// than to this print of it.
+    /// </summary>
+    [ObservableProperty]
+    public partial string Revision { get; set; }
+
+    [ObservableProperty]
+    public partial string Author { get; set; }
+
+    partial void OnRevisionChanged(string value)
+    {
+        if (_circuit is not null) _circuit.Revision = value;
+    }
+
+    partial void OnAuthorChanged(string value)
+    {
+        if (_circuit is not null) _circuit.Author = value;
     }
 
     /// <summary>False when there is nothing on the scope, so those choices are not offered.</summary>

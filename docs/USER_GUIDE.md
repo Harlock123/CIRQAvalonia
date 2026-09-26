@@ -5249,9 +5249,20 @@ scale *up*: a small circuit blown up to fill a page looks like a mistake, and th
 out at a size somebody chose. Turn it off when the print is going to be measured, and accept that
 a big schematic may run off the edge.
 
-**The header** puts the circuit's name, the date and the sheet number across the top. Paper leaves
-the screen and does not come back, and a schematic with nothing on it saying what it is becomes a
-schematic of something nobody can remember.
+**The title block** runs across the top of every sheet, in six labelled cells:
+
+| TITLE | SHEET | REV | DRAWN | DATE | PAGE |
+| --- | --- | --- | --- | --- | --- |
+| Regulated bench supply | Schematic — Power | C | A. Technician | 2026-09-26 | 2 of 3 |
+
+Paper leaves the screen and does not come back. A schematic with nothing on it saying what it is
+becomes a schematic of something nobody can remember — and one with no revision on it is worse than
+that, because somebody will build from it.
+
+**Rev** and **Drawn by** are boxes in the print dialog, and what you type goes into the circuit
+rather than into that one print: they belong to the drawing. A field nobody has filled in prints as
+a dash, which reads as "not stated" rather than as an accident. The whole block can be turned off,
+and the drawing gets the space back when it is.
 
 ### It prints in ink, whatever theme you are using
 
@@ -5364,6 +5375,12 @@ cards back through the [SPICE importer](#importing-a-spice-model), which is a re
 independent pieces of code agreeing. They have **not** been run through ngspice, because it is not
 installed on the machine this was built on. Expect them to be right; do not expect them to be
 certified.
+
+**Parts list** (`.csv`) writes the bill of materials: quantity, designators, part, value and
+**footprint**. Two parts alike on the drawing but to be built as different packages are two lines,
+because they are two things to order — and the footprint column is the other half of what somebody
+ordering actually needs. Set each part's *Footprint* in the properties panel; parts without one
+leave the column empty.
 
 **CSV** (`.csv`) writes the recorded traces as numbers — a header naming each column with its
 unit, then a row per sample. For a spreadsheet to fit a curve, a script to compare two runs, or a

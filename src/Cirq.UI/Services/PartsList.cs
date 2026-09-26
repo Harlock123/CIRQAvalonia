@@ -10,7 +10,12 @@ namespace Cirq.UI.Services;
 /// <param name="Designators">Their reference designators, in order, e.g. "R1, R2, R7".</param>
 /// <param name="Part">What the part is, e.g. "Resistor" or "NE555".</param>
 /// <param name="Value">Its value as the schematic shows it, e.g. "10k". Empty for parts without one.</param>
-public sealed record PartsListRow(int Quantity, string Designators, string Part, string Value);
+/// <param name="Footprint">
+/// What it is to be built as, when somebody has said. Empty for a part with none — which is most of
+/// them, most of the time, and not a problem until the board is being laid out.
+/// </param>
+public sealed record PartsListRow(
+    int Quantity, string Designators, string Part, string Value, string Footprint = "");
 
 /// <summary>
 /// Turns a circuit into the list of things you would have to buy to build it.
@@ -29,7 +34,10 @@ public static class PartsList
 
         var groups = circuit.Components
             .Where(IsPart)
-            .GroupBy(c => (c.ComponentType, c.ValueLabel))
+            // Grouped by the footprint as well as by the value: two 10k resistors that are to be
+            // built as different packages are two lines on an order, however alike they look on
+            // the drawing.
+            .GroupBy(c => (c.ComponentType, c.ValueLabel, Footprint: c.Footprint.Trim()))
             .Select(group =>
             {
                 var ordered = group.OrderBy(c => c.DesignatorPrefix, StringComparer.Ordinal)
@@ -43,7 +51,8 @@ public static class PartsList
                         ordered.Count,
                         string.Join(", ", ordered.Select(Designator)),
                         group.Key.ComponentType,
-                        group.Key.ValueLabel),
+                        group.Key.ValueLabel,
+                        group.Key.Footprint),
                     First = ordered[0],
                 };
             })

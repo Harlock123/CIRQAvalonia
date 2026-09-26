@@ -191,6 +191,9 @@ public static class CircuitSerializer
 
         if (circuit.AdaptiveTimeStep) document.AdaptiveTimeStep = true;
 
+        if (circuit.Revision.Trim().Length > 0) document.Revision = circuit.Revision.Trim();
+        if (circuit.Author.Trim().Length > 0) document.Author = circuit.Author.Trim();
+
         foreach (var probe in circuit.Probes)
         {
             if (probe.TargetTerminal?.Owner is null) continue;
@@ -549,6 +552,8 @@ public static class CircuitSerializer
             circuit.AmbientTemperatureCelsius = ambient;
 
         circuit.AdaptiveTimeStep = document.AdaptiveTimeStep ?? false;
+        circuit.Revision = document.Revision ?? string.Empty;
+        circuit.Author = document.Author ?? string.Empty;
 
         foreach (var record in document.Probes)
         {

@@ -1,3 +1,4 @@
+using System.Globalization;
 using Avalonia;
 using Avalonia.Media;
 using Cirq.Core.Topology;
@@ -165,14 +166,17 @@ public static class CircuitExporter
 
             var bom = new System.Text.StringBuilder();
 
-            bom.AppendLine("Quantity,Designators,Part,Value");
+            // The footprint is a column rather than a separate export: a bill of materials is what
+            // somebody orders and builds from, and "which package" is half of what they need.
+            bom.AppendLine("Quantity,Designators,Part,Value,Footprint");
 
             foreach (var row in rows)
             {
-                bom.Append(row.Quantity.ToString(System.Globalization.CultureInfo.InvariantCulture))
+                bom.Append(row.Quantity.ToString(CultureInfo.InvariantCulture))
                    .Append(',').Append(Quote(row.Designators))
                    .Append(',').Append(Quote(row.Part))
                    .Append(',').Append(Quote(row.Value))
+                   .Append(',').Append(Quote(row.Footprint))
                    .AppendLine();
             }
 
@@ -335,34 +339,67 @@ public static class CircuitExporter
         if (!page.IncludeHeader) return;
 
         var margin = (float)Math.Max(page.MarginPoints, 0);
-        var baseline = margin + 11f;
+        var right = (float)page.WidthPoints - margin;
+        var height = (float)page.HeaderPoints - 8f;
 
-        using var text = new SKPaint
+        using var ink = new SKPaint { Color = SKColors.Black, IsAntialias = true };
+        using var faint = new SKPaint { Color = new SKColor(0x88, 0x88, 0x88), IsAntialias = true };
+
+        using var rules = new SKPaint
         {
-            Color = SKColors.Black,
+            Color = new SKColor(0x66, 0x66, 0x66),
+            StrokeWidth = 0.7f,
+            Style = SKPaintStyle.Stroke,
             IsAntialias = true,
         };
 
-        using var title = new SKFont(SKTypeface.Default, 11f);
-        using var small = new SKFont(SKTypeface.Default, 8.5f);
+        using var label = new SKFont(SKTypeface.Default, 6.5f);
+        using var value = new SKFont(SKTypeface.Default, 10f);
 
         var name = string.IsNullOrWhiteSpace(circuit.Title) ? "Untitled circuit" : circuit.Title;
 
-        canvas.DrawText($"{name} — {caption}", margin, baseline, SKTextAlign.Left, title, text);
+        // The fields a title block carries, in the order every drawing office puts them: what it
+        // is, which sheet of it this is, what revision, who drew it, when, and where in the set.
+        (string Label, string Text, float Weight)[] cells =
+        [
+            ("TITLE", name, 3.0f),
+            ("SHEET", caption, 2.0f),
+            ("REV", Given(circuit.Revision), 0.7f),
+            ("DRAWN", Given(circuit.Author), 1.2f),
+            ("DATE", DateTime.Now.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), 1.1f),
+            ("PAGE", total > 1 ? $"{number} of {total}" : "1 of 1", 0.9f),
+        ];
 
-        var stamp = total > 1
-            ? $"{DateTime.Now:yyyy-MM-dd HH:mm}   ·   {number} of {total}"
-            : $"{DateTime.Now:yyyy-MM-dd HH:mm}";
+        var total_weight = cells.Sum(c => c.Weight);
+        var box = new SKRect(margin, margin, right, margin + height);
 
-        canvas.DrawText(
-            stamp, (float)page.WidthPoints - margin, baseline, SKTextAlign.Right, small, text);
+        canvas.DrawRect(box, rules);
 
-        // A rule under it, so the header reads as a header rather than as part of the drawing.
-        using var line = new SKPaint { Color = new SKColor(0x99, 0x99, 0x99), StrokeWidth = 0.6f };
+        var x = margin;
 
-        canvas.DrawLine(
-            margin, baseline + 6f, (float)page.WidthPoints - margin, baseline + 6f, line);
+        foreach (var (field, text, weight) in cells)
+        {
+            var width = (right - margin) * (weight / total_weight);
+
+            if (x > margin + 0.5f) canvas.DrawLine(x, box.Top, x, box.Bottom, rules);
+
+            canvas.DrawText(field, x + 4f, box.Top + 10f, SKTextAlign.Left, label, faint);
+
+            // Clipped to its own cell, so a long title stops at the divider rather than running
+            // across the next field and being read as part of it.
+            var depth = canvas.Save();
+
+            canvas.ClipRect(new SKRect(x, box.Top, x + width - 2f, box.Bottom));
+            canvas.DrawText(text, x + 4f, box.Bottom - 7f, SKTextAlign.Left, value, ink);
+            canvas.RestoreToCount(depth);
+
+            x += width;
+        }
     }
+
+    /// <summary>A field nobody filled in, drawn as a dash rather than as nothing.</summary>
+    private static string Given(string text) =>
+        string.IsNullOrWhiteSpace(text) ? "—" : text.Trim();
 
     /// <summary>Margin left around the schematic, in schematic units.</summary>
     private const double Margin = 28.0;

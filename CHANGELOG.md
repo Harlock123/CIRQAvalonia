@@ -8,6 +8,20 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**A printed sheet has a title block.** Six labelled cells across the top — what the drawing is,
+which sheet this is, the revision, who drew it, the date, and the page number — where there used to
+be one line of text. **Rev** and **Drawn by** are boxes in the print dialog, and what you type goes
+into the circuit rather than into that one print, because they belong to the drawing. A field nobody
+has filled in prints as a dash, which reads as "not stated" rather than as an accident.
+
+A schematic with nothing on it saying what it is becomes a schematic nobody can identify; one with
+no revision on it is worse, because somebody will build from it.
+
+**The bill of materials carries the footprint.** Every part gained a `Footprint` in 0.38.0 for the
+KiCad netlist, and the BOM — which is what somebody actually orders from — did not have it. It is
+now a column, and two parts alike on the drawing but to be built as different packages are two
+lines, because they are two things to order.
+
 ## [0.38.0] - 2026-09-26
 
 A source you write the behaviour of as a formula. A worst case that includes the temperature. Every

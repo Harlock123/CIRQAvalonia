@@ -622,6 +622,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         Circuit.Baseline = loaded.Baseline;
         Circuit.AmbientTemperatureCelsius = loaded.AmbientTemperatureCelsius;
         Circuit.AdaptiveTimeStep = loaded.AdaptiveTimeStep;
+        Circuit.Revision = loaded.Revision;
+        Circuit.Author = loaded.Author;
 
         RefreshSheets();
     }

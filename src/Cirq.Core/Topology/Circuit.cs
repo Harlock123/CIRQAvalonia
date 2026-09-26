@@ -196,6 +196,20 @@ public partial class Circuit : ObservableObject
     public partial double AmbientTemperatureCelsius { get; set; } = 27.0;
 
     /// <summary>
+    /// The revision this drawing is at — "A", "1.2", "rev C", whatever the shop uses. Empty until
+    /// somebody sets one, and printed in the title block when they have.
+    /// </summary>
+    [ObservableProperty]
+    public partial string Revision { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Who drew it. Empty by default, because guessing from the machine's user name would put a
+    /// name on a drawing that nobody chose to put there.
+    /// </summary>
+    [ObservableProperty]
+    public partial string Author { get; set; } = string.Empty;
+
+    /// <summary>
     /// Whether the solver may choose its own time step for this circuit: shorter where the waveform
     /// bends, longer where it does not, and landing on the instant a part switches.
     /// <para>
@@ -273,6 +287,8 @@ public partial class Circuit : ObservableObject
         // 85 °C would be a new drawing quietly running somewhere nobody asked for.
         AmbientTemperatureCelsius = 27.0;
         AdaptiveTimeStep = false;
+        Revision = string.Empty;
+        Author = string.Empty;
     }
 
     /// <summary>Resolves the current topology into a netlist.</summary>
