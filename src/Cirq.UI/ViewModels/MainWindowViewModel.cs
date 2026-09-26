@@ -609,6 +609,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         foreach (var spec in loaded.Specs) Circuit.Specs.Add(spec);
 
         Circuit.Baseline = loaded.Baseline;
+        Circuit.AmbientTemperatureCelsius = loaded.AmbientTemperatureCelsius;
+        Circuit.AdaptiveTimeStep = loaded.AdaptiveTimeStep;
 
         RefreshSheets();
     }

@@ -189,6 +189,8 @@ public static class CircuitSerializer
         if (Math.Abs(circuit.AmbientTemperatureCelsius - 27.0) > 1e-9)
             document.AmbientTemperatureCelsius = circuit.AmbientTemperatureCelsius;
 
+        if (circuit.AdaptiveTimeStep) document.AdaptiveTimeStep = true;
+
         foreach (var probe in circuit.Probes)
         {
             if (probe.TargetTerminal?.Owner is null) continue;
@@ -545,6 +547,8 @@ public static class CircuitSerializer
 
         if (document.AmbientTemperatureCelsius is { } ambient)
             circuit.AmbientTemperatureCelsius = ambient;
+
+        circuit.AdaptiveTimeStep = document.AdaptiveTimeStep ?? false;
 
         foreach (var record in document.Probes)
         {

@@ -25,6 +25,16 @@
     <TextBlock TextWrapping="Wrap" Opacity="0.65" FontSize="12"
                Text="Every semiconductor junction in the circuit reads this, so it moves diode drops, transistor gains and leakage together. It is saved with the circuit, and Simulate &gt; DC Sweep can sweep it. Press Reset afterwards to rebuild at the new temperature." />
 
+    <Border BorderBrush="{DynamicResource PanelBorder}" BorderThickness="0,1,0,0" Margin="0,4,0,0" />
+
+    <TextBlock Text="Time step" FontWeight="SemiBold" />
+
+    <CheckBox AutomationProperties.Name="Let the solver choose the time step"
+              IsChecked="{Binding AdaptiveTimeStep, Mode=TwoWay}"
+              Content="Let the solver choose the time step" />
+
+    <TextBlock Text="{Binding StepNote}" TextWrapping="Wrap" Opacity="0.8" />
+
     <!-- A way out that does not depend on a title bar, because a tiling window manager draws
          none. Escape closes it too; this is the half somebody can see. -->
     <Button Name="CloseButton" Content="Close" MinWidth="88" Padding="14,5"

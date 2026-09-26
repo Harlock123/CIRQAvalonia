@@ -22,7 +22,11 @@ public sealed class CircuitSimulator
     private readonly List<CircuitComponent> _components = [];
     private readonly List<CircuitComponent> _nonlinear = [];
     private readonly List<IBreakpointSource> _breakpointSources = [];
+    private readonly List<IIntegrating> _integrating = [];
+    private readonly List<IStepCrossing> _crossings = [];
     private double[] _iterationDelta = [];
+    private double? _suggestedStep;
+    private bool _errorMeasured;
     private double _lastProbeSampleTime = double.NegativeInfinity;
     private LuSolver? _lu;
 
@@ -54,6 +58,23 @@ public sealed class CircuitSimulator
     /// <summary>Number of delta cycles used by the most recent time point.</summary>
     public int LastDeltaCycles { get; private set; }
 
+    /// <summary>
+    /// How much truncation error the most recent accepted step carried, as a multiple of the
+    /// tolerance: under one is inside it. Zero when nothing in the circuit integrates, and when the
+    /// adaptive controller is off and therefore nothing was measured.
+    /// </summary>
+    public double LastStepError { get; private set; }
+
+    /// <summary>
+    /// Steps solved and then thrown away because they were too long — either too much truncation
+    /// error, or a part reporting that it switched partway through. Not the same as a step retried
+    /// because Newton would not converge, which is counted in <see cref="RetriedSteps"/>.
+    /// </summary>
+    public long RejectedSteps { get; private set; }
+
+    /// <summary>Steps retaken because the non-linear solve did not converge.</summary>
+    public long RetriedSteps { get; private set; }
+
     /// <summary>Raised after every accepted time point, on the thread driving the simulation.</summary>
     public event Action<CircuitSimulator>? TimePointAccepted;
 
@@ -68,6 +89,9 @@ public sealed class CircuitSimulator
         _components.Clear();
         _nonlinear.Clear();
         _breakpointSources.Clear();
+        _integrating.Clear();
+        _crossings.Clear();
+        _suggestedStep = null;
         // Blocks are flattened for the solve: their contents stamp into the same matrix as
         // everything else, and in the same order they were drawn.
         _components.AddRange(Flattening.Flatten(Circuit.Components));
@@ -86,6 +110,8 @@ public sealed class CircuitSimulator
             for (var i = 0; i < auxiliary; i++) branches[(c.Id, i)] = next++;
             if (c.IsNonlinear) _nonlinear.Add(c);
             if (c is IBreakpointSource bp) _breakpointSources.Add(bp);
+            if (c is IIntegrating integrating) _integrating.Add(integrating);
+            if (c is IStepCrossing crossing) _crossings.Add(crossing);
         }
 
         System = new MnaSystem(Netlist, Netlist.NodeCount, branches);
@@ -200,7 +226,25 @@ public sealed class CircuitSimulator
     /// transition falls inside it so the analog solver lands exactly on the edge.
     /// </summary>
     /// <returns>The step actually taken, in seconds.</returns>
-    public double Step() => Step(Settings.TimeStep);
+    public double Step() => Step(Ceiling());
+
+    /// <summary>
+    /// The longest step the next time point may take when nobody says otherwise: the configured
+    /// step, or what the adaptive controller asked for last time it accepted one.
+    /// </summary>
+    private double Ceiling()
+    {
+        if (!Settings.AdaptiveTimeStep) return Settings.TimeStep;
+
+        // Nothing integrates, so there is no truncation error to control and nothing for a
+        // controller to do: a purely digital circuit is governed by when its logic changes, and the
+        // steps between those are as long as they are allowed to be. Starting such a run at the
+        // nominal step and refusing to grow it — there being no estimate to justify growing — would
+        // make adaptive mode slower than the fixed mode it replaces, for no accuracy at all.
+        if (_integrating.Count == 0) return Settings.MaxTimeStep;
+
+        return Math.Clamp(_suggestedStep ?? Settings.TimeStep, Settings.MinTimeStep, Settings.MaxTimeStep);
+    }
 
     /// <summary>Advances one time point of at most <paramref name="requestedStep"/> seconds.</summary>
     public double Step(double requestedStep)
@@ -211,20 +255,44 @@ public sealed class CircuitSimulator
             State.IsFirstTransientStep = true;
         }
 
-        var dt = Math.Clamp(requestedStep, Settings.MinTimeStep, Settings.MaxTimeStep);
+        // In adaptive mode the controller's own ceiling applies as well as the caller's: a caller
+        // asking for a millisecond is saying "no more than this", not "a millisecond is safe", and
+        // the first step of a run has no history to judge a long one by.
+        var ceiling = Ceiling();
+        var asked = Settings.AdaptiveTimeStep ? Math.Min(requestedStep, ceiling) : requestedStep;
+
+        var dt = Math.Clamp(asked, Settings.MinTimeStep, Settings.MaxTimeStep);
+
+        // Whether this step is the length the controller chose, or a shorter one somebody else
+        // imposed. It matters because only the first kind says anything about accuracy: a step cut
+        // to land on a gate delay ten nanoseconds away is not evidence that ten nanoseconds is all
+        // the circuit can take, and a controller that learned from it would ratchet itself down to
+        // the floor and stay there — which is exactly what it did before this was distinguished.
+        var governed = Settings.AdaptiveTimeStep && requestedStep >= ceiling;
 
         // Never step over a pending logic transition or a source discontinuity: land on it instead.
         if (NextInterruptAfter(State.Time) is { } next)
         {
             var toEvent = next - State.Time;
-            if (toEvent > 0 && toEvent < dt) dt = Math.Max(toEvent, Settings.MinTimeStep);
+            if (toEvent > 0 && toEvent < dt)
+            {
+                dt = Math.Max(toEvent, Settings.MinTimeStep);
+                governed = false;
+            }
         }
 
         var attempts = 0;
+        var rejections = 0;
+
+        // The length of the last *accepted* step, captured before the loop: a step retaken is not a
+        // step that happened, and an error estimate extrapolating from one would be extrapolating
+        // along a line the circuit never travelled.
+        var accepted = State.TimeStep <= 0 ? dt : State.TimeStep;
+
         while (true)
         {
             var target = State.Time + dt;
-            State.PreviousTimeStep = State.TimeStep <= 0 ? dt : State.TimeStep;
+            State.PreviousTimeStep = accepted;
             State.TimeStep = dt;
             State.Time = target;
 
@@ -232,15 +300,38 @@ public sealed class CircuitSimulator
             {
                 foreach (var c in _components) c.BeginTimeStep(State);
                 SolveTimePoint(target);
-                break;
             }
             catch (Exception ex) when (ex is ConvergenceException or SingularMatrixException)
             {
                 State.Time = target - dt;
                 if (!Settings.EnableStepRejection || ++attempts > 12 || dt <= Settings.MinTimeStep * 2)
                     throw;
+                RetriedSteps++;
                 dt = Math.Max(dt * 0.25, Settings.MinTimeStep);
+                continue;
             }
+
+            if (!Settings.AdaptiveTimeStep) break;
+
+            // Solved, but not yet committed — which is what makes rejecting it free. Nothing in the
+            // circuit has taken on the new point as its history, so the only thing to undo is the
+            // clock.
+            if (TooLongAStep(dt, rejections) is not { } shorter) break;
+
+            State.Time = target - dt;
+            RejectedSteps++;
+            rejections++;
+            dt = shorter;
+        }
+
+        if (Settings.AdaptiveTimeStep)
+        {
+            if (governed) Suggest(dt, grow: rejections == 0);
+
+            // A step somebody else shortened still teaches the controller one thing, if it then had
+            // to be shortened again: whatever length it settled on is an upper bound for the next.
+            else if (rejections > 0)
+                _suggestedStep = Math.Max(Math.Min(_suggestedStep ?? dt, dt), Settings.MinTimeStep);
         }
 
         CommitAll();
@@ -266,6 +357,84 @@ public sealed class CircuitSimulator
         return best;
     }
 
+    /// <summary>
+    /// Whether the step just solved has to be thrown away, and what to retake it as.
+    /// <para>
+    /// Two separate questions, asked in the order that matters. A part that switched partway through
+    /// the step is asked about first, because its answer is exact — a ramp between two thresholds is
+    /// a straight line, so the instant it crossed is arithmetic — and because a discontinuity landed
+    /// on is worth more than a truncation error trimmed. The error estimate is the second question,
+    /// and it is only asked of the parts that integrate.
+    /// </para>
+    /// </summary>
+    private double? TooLongAStep(double dt, int rejections)
+    {
+        LastStepError = 0;
+        _errorMeasured = false;
+
+        // A shortened step has to stay worth taking: below this, the step is as short as the run
+        // will allow and the point is accepted as the best available rather than chased.
+        var floor = Settings.MinTimeStep * 2;
+
+        if (rejections >= 8 || dt <= floor) return null;
+
+        var earliest = 1.0;
+        foreach (var crossing in _crossings)
+        {
+            if (crossing.CrossingFraction(System, State) is not { } fraction) continue;
+            if (fraction > 0 && fraction < earliest) earliest = fraction;
+        }
+
+        if (earliest < 1.0)
+        {
+            var landing = dt * earliest;
+            if (landing >= floor) return landing;
+        }
+
+        var error = 0.0;
+        foreach (var part in _integrating)
+        {
+            if (part.IntegrationError(System, State) is not { } e) continue;
+            _errorMeasured = true;
+            if (e > error) error = e;
+        }
+
+        LastStepError = error;
+
+        if (error <= 1.0) return null;
+
+        // The trapezoidal error goes as the cube of the step, so the cube root of how far over it is
+        // says how much shorter to make it. The 0.9 keeps the retake from landing exactly on the
+        // tolerance and being rejected again by a rounding error.
+        var scaled = dt * Math.Max(0.9 / Math.Cbrt(error), 0.25);
+
+        return scaled >= floor ? scaled : null;
+    }
+
+    /// <summary>
+    /// What to ask for next time, from how much error the accepted step carried. A step well inside
+    /// tolerance earns a longer one, up to the configured growth; anything else keeps what it had.
+    /// </summary>
+    private void Suggest(double dt, bool grow)
+    {
+        // Nothing measured is not the same as nothing wrong. A circuit with nothing in it that
+        // integrates — logic and resistors — gives no estimate at all, and the honest response to no
+        // information is to keep the step that worked rather than to help oneself to a longer one.
+        // The same goes for the step after a rejection: the reason it was rejected has not gone
+        // anywhere, and growing straight back into it is how a controller ends up spending two
+        // solves on every point.
+        var growth = !_errorMeasured || !grow
+            ? 1.0
+            : LastStepError <= 0
+                ? Settings.MaxStepGrowth
+                // Aim for four fifths of the tolerance rather than all of it: the error goes as the
+                // cube of the step, so a suggestion that lands exactly on the limit is a suggestion
+                // that is rejected half the time.
+                : Math.Clamp(0.8 / Math.Cbrt(LastStepError), 0.5, Settings.MaxStepGrowth);
+
+        _suggestedStep = Math.Clamp(dt * growth, Settings.MinTimeStep, Settings.MaxTimeStep);
+    }
+
     /// <summary>Runs the transient analysis forward by <paramref name="duration"/> seconds.</summary>
     public void Run(double duration, CancellationToken cancellationToken = default)
     {
@@ -274,7 +443,7 @@ public sealed class CircuitSimulator
         {
             cancellationToken.ThrowIfCancellationRequested();
             var remaining = end - State.Time;
-            Step(Math.Min(Settings.TimeStep, remaining));
+            Step(Math.Min(Ceiling(), remaining));
         }
     }
 

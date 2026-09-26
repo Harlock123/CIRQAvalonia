@@ -8,6 +8,37 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**The solver can choose its own time step.** *Simulate > Conditions* has a box for it, and it is
+saved with the circuit. Off by default: a fixed step is repeatable, and that is worth a great deal in
+something whose answers people check by eye.
+
+The step length follows how much the waveform is bending — but only as reported by the parts that
+*integrate*, a capacitor about its charge and an inductor about its flux. Each compares where the
+step landed against where a straight line through the last two accepted points said it would, and the
+gap between them is the local truncation error. Nothing else in the matrix is consulted, and that is
+the whole design: a logic node goes from zero to five volts between two time points because that is
+what logic does, and a controller watching every unknown reads that as a catastrophic error and
+grinds the step down to the floor. That is not a hypothetical — it is what the first attempt at this
+feature did, which is why it was backed out of 0.36.0 rather than shipped.
+
+The second half is the discontinuity an error estimate cannot see, and it is the reason the feature
+is here at all rather than a year from now. A switching regulator's oscillator is a ramp between two
+thresholds: a straight line, no curvature, nothing for an estimator to notice. A long step sails past
+the threshold and the oscillator turns round late, the overshoot is time it never spent charging, and
+the frequency comes out low — 27 % low at a step worth taking. So a part can now say, after a step
+has been solved and before anything is committed, that it crossed a threshold and how far into the
+step: the step is thrown away and retaken to land exactly on the crossing. Nothing having been
+committed is what makes throwing it away free. Two tests hold the two behaviours against each other
+on the same converter at the same ceiling — wrong with a fixed step, right with a chosen one.
+
+An RC charging curve takes about a thirtieth of the steps for the same accuracy. A circuit with
+nothing in it that integrates — logic and resistors — is left alone entirely, because there is no
+truncation error to control and the step is already decided by when the logic changes.
+
+**Opening a circuit was dropping its temperature too.** The same bug as the parameters and the
+baseline in 0.36.0, in the same place and found the same way: the conditions are saved, and the open
+path did not carry them across. A circuit saved at 85 °C opened at whatever the last one was at.
+
 ## [0.36.0] - 2026-09-25
 
 A drawing can be more than one page. Large circuits solve eight to twelve times faster. Everything a

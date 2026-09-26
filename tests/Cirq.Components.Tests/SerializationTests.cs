@@ -548,4 +548,34 @@ public class SerializationTests
     public void LoadingAMissingFileSaysSo() =>
         Assert.Throws<FileNotFoundException>(() =>
             CircuitSerializer.Load(Path.Combine(Path.GetTempPath(), $"absent-{Guid.NewGuid():N}.cirq")));
+
+    /// <summary>
+    /// The conditions travel with the circuit: the temperature it is run at, and whether the solver
+    /// chooses its own step. A converter saved with one and opened without it is a converter giving
+    /// a different answer than the one that was saved.
+    /// </summary>
+    [Fact]
+    public void TheConditionsSurviveARoundTrip()
+    {
+        var circuit = new Circuit { AmbientTemperatureCelsius = 85, AdaptiveTimeStep = true };
+        circuit.Add(new Resistor(1e3));
+
+        var back = CircuitSerializer.FromJson(CircuitSerializer.ToJson(circuit)).Circuit;
+
+        Assert.Equal(85, back.AmbientTemperatureCelsius);
+        Assert.True(back.AdaptiveTimeStep);
+    }
+
+    /// <summary>
+    /// And a circuit that steps the ordinary way says nothing about it on disk, so a file written by
+    /// this build still opens in the one before it.
+    /// </summary>
+    [Fact]
+    public void TheOrdinaryStepIsNotWrittenDown()
+    {
+        var circuit = new Circuit();
+        circuit.Add(new Resistor(1e3));
+
+        Assert.DoesNotContain("AdaptiveTimeStep", CircuitSerializer.ToJson(circuit));
+    }
 }

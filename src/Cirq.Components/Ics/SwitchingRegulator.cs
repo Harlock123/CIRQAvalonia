@@ -44,9 +44,10 @@ namespace Cirq.Components.Ics;
 /// Pinout: 1=SWC, 2=SWE, 3=CT, 4=GND, 5=FB, 6=VCC, 7=IPK, 8=DRC.
 /// </para>
 /// </summary>
-public partial class SwitchingRegulator : CircuitComponent
+public partial class SwitchingRegulator : CircuitComponent, IStepCrossing
 {
     private bool _charging = true;
+    private double _ramp;
     private bool _latched;
 
     /// <summary>Leaky accumulators for the duty readout: time on, against time altogether.</summary>
@@ -218,6 +219,7 @@ public partial class SwitchingRegulator : CircuitComponent
         var reference = system.NodeVoltage(Ground);
 
         var ramp = system.NodeVoltage(Timing) - reference;
+        _ramp = ramp;
         FeedbackVoltage = system.NodeVoltage(Feedback) - reference;
 
         var sense = system.NodeVoltage(Supply) - system.NodeVoltage(CurrentSense);
@@ -263,9 +265,42 @@ public partial class SwitchingRegulator : CircuitComponent
         NotifyValueChanged();
     }
 
+    /// <summary>
+    /// Where in the step the timing ramp went through its threshold.
+    /// <para>
+    /// The ramp is charged and discharged with fixed currents, so inside one step it is a straight
+    /// line and the crossing is exact arithmetic rather than a guess. Without this the oscillator
+    /// turns round wherever the step happened to land, the overshoot is time it did not spend
+    /// charging, and the frequency comes out low by whatever fraction of a ramp a step is — which
+    /// is a 27 % error at a step long enough to be worth taking.
+    /// </para>
+    /// </summary>
+    public double? CrossingFraction(MnaSystem system, SimulationState state)
+    {
+        ArgumentNullException.ThrowIfNull(system);
+        ArgumentNullException.ThrowIfNull(state);
+
+        var now = system.NodeVoltage(Timing) - system.NodeVoltage(Ground);
+        var threshold = _charging ? RampUpper : RampLower;
+        var crossed = _charging ? now >= threshold : now <= threshold;
+
+        if (!crossed) return null;
+
+        var travelled = now - _ramp;
+
+        // It was already past the threshold when the step began: nothing to land on, and shortening
+        // the step would only find the same thing again.
+        if (Math.Abs(travelled) < 1e-15) return null;
+
+        var fraction = (threshold - _ramp) / travelled;
+
+        return fraction is > 0.0 and < 0.999 ? fraction : null;
+    }
+
     public override void ResetState()
     {
         _charging = true;
+        _ramp = 0;
         _latched = false;
         _onTime = 0;
         _totalTime = 0;

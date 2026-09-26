@@ -87,4 +87,46 @@ public class ConditionsTests
         // About two millivolts a degree lower, which is ~200 mV over that span.
         Assert.InRange(room - hot, 0.15, 0.25);
     }
+
+    // ---- the time step -----------------------------------------------------
+
+    [Fact]
+    public void TheStepSettingStartsFromTheCircuitAndWritesBackToIt()
+    {
+        var circuit = new Circuit { AdaptiveTimeStep = true };
+        var vm = new ConditionsViewModel(circuit);
+
+        Assert.True(vm.AdaptiveTimeStep);
+
+        var announced = 0;
+        vm.Changed += (_, _) => announced++;
+
+        vm.AdaptiveTimeStep = false;
+
+        Assert.False(circuit.AdaptiveTimeStep);
+        Assert.Equal(1, announced);
+
+        // And the sentence under the box follows it, because the two behaviours are not obvious
+        // from a tick.
+        Assert.Contains("the one the timebase asks for", vm.StepNote);
+
+        vm.AdaptiveTimeStep = true;
+        Assert.Contains("shortens the step where the waveform bends", vm.StepNote);
+    }
+
+    [Fact]
+    public void ARebuildCarriesTheStepSettingIntoTheEngine()
+    {
+        using var vm = new MainWindowViewModel();
+
+        vm.Circuit.AdaptiveTimeStep = true;
+        Assert.True(vm.Simulation.Rebuild(), vm.Simulation.Status);
+
+        Assert.True(vm.Simulation.Simulator!.Settings.AdaptiveTimeStep);
+
+        vm.Circuit.AdaptiveTimeStep = false;
+        Assert.True(vm.Simulation.Rebuild(), vm.Simulation.Status);
+
+        Assert.False(vm.Simulation.Simulator!.Settings.AdaptiveTimeStep);
+    }
 }

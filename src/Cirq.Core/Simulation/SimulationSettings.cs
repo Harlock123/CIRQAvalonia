@@ -35,6 +35,38 @@ public sealed class SimulationSettings
     /// <summary>Skip the bias-point solve and start the transient from zero initial conditions.</summary>
     public bool UseInitialConditions { get; set; }
 
+    /// <summary>
+    /// Let the solver choose its own step: shorter where the waveform bends, longer where it does
+    /// not, and landing on the instant a part switches rather than somewhere past it.
+    /// <para>
+    /// Off by default, and deliberately. A fixed step is predictable, and predictability is worth a
+    /// great deal in something whose answers people check by eye: every run of the same circuit
+    /// takes the same steps and gives the same numbers. Turning this on trades that for accuracy
+    /// where it is needed and speed where it is not — <see cref="TimeStep"/> becomes where the
+    /// controller starts rather than what it uses, and <see cref="MaxTimeStep"/> the ceiling it may
+    /// grow to.
+    /// </para>
+    /// </summary>
+    public bool AdaptiveTimeStep { get; set; }
+
+    /// <summary>
+    /// How much local truncation error the adaptive controller will accept, relative to the size of
+    /// the quantity being integrated. A thousandth is about a hundred and forty points across a
+    /// sine; a hundredth is about forty-five.
+    /// </summary>
+    public double StepErrorTolerance { get; set; } = 1e-3;
+
+    /// <summary>
+    /// The most the adaptive controller will lengthen one step by, as a multiple of the last.
+    /// <para>
+    /// Kept modest on purpose. A controller that may double at will walks straight past a
+    /// discontinuity it had no way to predict, discovers the trouble on the far side of it, and
+    /// spends the steps it saved getting back — and a run whose step size oscillates is a run whose
+    /// answers depend on where the oscillation happened to be.
+    /// </para>
+    /// </summary>
+    public double MaxStepGrowth { get; set; } = 1.6;
+
     /// <summary>Halve the step and retry when Newton fails, instead of throwing immediately.</summary>
     public bool EnableStepRejection { get; set; } = true;
 

@@ -170,6 +170,25 @@ latch and discharge transistor all interact with the RC network around them in o
 
 ![The digit counter example: a 7490 decade counter driving a 7447 decoder into a seven-segment display, with the QA and QD outputs plotted on a stacked scope](docs/images/05-digital.png)
 
+**The time step** is fixed by default and can be handed to the solver instead — *Simulate >
+Conditions*, saved with the circuit. Two mechanisms, for two kinds of trouble. The step length is
+controlled by the predictor-corrector difference on the **integrated** quantities only, a capacitor's
+charge and an inductor's flux: extrapolate a straight line through the last two accepted points,
+compare it with what the step solved to, and the gap is proportional to the truncation error. Nothing
+else is asked, because a logic node steps discontinuously by design and a controller watching every
+unknown would read that as catastrophe and collapse to the floor — which is exactly what the first
+attempt at this did. On an RC charging curve it is about a thirtieth of the steps for the same
+accuracy.
+
+The second mechanism is for the discontinuity no error estimate can see. A switching regulator's
+oscillator ramps linearly between two thresholds, so the truncation error across a long step is nil
+and there is no reason to shorten it — and then the ramp is found well past the threshold, the
+overshoot is time it never spent charging, and the rate comes out 27 % low. So a part may implement
+`IStepCrossing` and be asked, after the step is solved and before anything is committed, whether it
+crossed something and where. If it did, the step is thrown away and retaken to land on the crossing.
+Uncommitted state is what makes that cheap, and a test holds the two against each other: the same
+circuit at the same ceiling, wrong with a fixed step and right with a chosen one.
+
 **Analyses.** A good many, and they answer genuinely different questions — the guide's
 [index of them](docs/USER_GUIDE.md#which-analysis-answers-which-question) is the map. The four the
 rest are built on: the **operating point** settles

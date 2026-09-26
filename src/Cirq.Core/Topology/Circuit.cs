@@ -195,6 +195,20 @@ public partial class Circuit : ObservableObject
     [ObservableProperty]
     public partial double AmbientTemperatureCelsius { get; set; } = 27.0;
 
+    /// <summary>
+    /// Whether the solver may choose its own time step for this circuit: shorter where the waveform
+    /// bends, longer where it does not, and landing on the instant a part switches.
+    /// <para>
+    /// Part of the document for the same reason the temperature is. It is not a preference about the
+    /// application, it is a statement about this circuit — a converter whose oscillator has to be
+    /// caught at the right instant needs it, and a circuit somebody is reading step by step does not
+    /// want it. Off by default, because a fixed step gives the same answer every run and that is
+    /// worth a great deal in something whose results people check by eye.
+    /// </para>
+    /// </summary>
+    [ObservableProperty]
+    public partial bool AdaptiveTimeStep { get; set; }
+
     /// <summary>Adds a component, auto-naming it with the next free reference designator.</summary>
     public T Add<T>(T component) where T : CircuitComponent
     {
@@ -254,6 +268,11 @@ public partial class Circuit : ObservableObject
         Parameters.Clear();
         Sheets.Clear();
         Baseline = Cirq.Core.Probing.TraceBaseline.Empty;
+
+        // The conditions go back to the defaults as well. A new drawing inheriting the last one's
+        // 85 °C would be a new drawing quietly running somewhere nobody asked for.
+        AmbientTemperatureCelsius = 27.0;
+        AdaptiveTimeStep = false;
     }
 
     /// <summary>Resolves the current topology into a netlist.</summary>

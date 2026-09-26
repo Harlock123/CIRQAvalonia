@@ -186,6 +186,7 @@ public sealed partial class SimulationController : ObservableObject, IDisposable
                 // is where the two are joined, on every rebuild, so changing the ambient and
                 // pressing Reset is all it takes.
                 Settings.TemperatureKelvin = Circuit.AmbientTemperatureCelsius + 273.15;
+                Settings.AdaptiveTimeStep = Circuit.AdaptiveTimeStep;
 
                 Simulator = new CircuitSimulator(Circuit, Settings);
                 Simulator.Reset();

@@ -10,10 +10,15 @@ namespace Cirq.Components.Passive;
 /// Capacitor discretised with a Norton companion model: <c>i = Geq·v + Ieq</c>, where the
 /// coefficients come from Trapezoidal or Backward-Euler integration of <c>i = C·dv/dt</c>.
 /// </summary>
-public partial class Capacitor : TwoTerminalComponent, ICurrentReporting, IToleranced, IVoltageRated
+public partial class Capacitor : TwoTerminalComponent, ICurrentReporting, IToleranced, IVoltageRated,
+    IIntegrating
 {
     private double _previousVoltage;
     private double _previousCurrent;
+
+    // The point before the previous one, which is what makes a straight line to extrapolate along.
+    // Null until two points have been accepted, because one point predicts nothing.
+    private double? _priorVoltage;
     private double _conductance;
     private double _equivalentCurrent;
 
@@ -147,17 +152,46 @@ public partial class Capacitor : TwoTerminalComponent, ICurrentReporting, IToler
         {
             _previousVoltage = InitialVoltage ?? v;
             _previousCurrent = 0;
+            _priorVoltage = null;
             return;
         }
 
         _previousCurrent = _conductance * v + _equivalentCurrent;
+        _priorVoltage = _previousVoltage;
         _previousVoltage = v;
+    }
+
+    /// <summary>
+    /// How far the step just solved put the voltage from where a straight line through the last two
+    /// accepted points said it would be — the charge is <c>C·v</c>, so the error in the one is the
+    /// error in the other, and volts are the quantity with a meaningful floor.
+    /// </summary>
+    public double? IntegrationError(MnaSystem system, SimulationState state)
+    {
+        ArgumentNullException.ThrowIfNull(system);
+        ArgumentNullException.ThrowIfNull(state);
+
+        if (_priorVoltage is not { } prior) return null;
+        if (state.PreviousTimeStep <= 0) return null;
+
+        var (na, nb) = CapacitanceNodes(system);
+        var solved = system.NodeVoltage(na) - system.NodeVoltage(nb);
+
+        var predicted = _previousVoltage +
+                        (state.TimeStep / state.PreviousTimeStep) * (_previousVoltage - prior);
+
+        // A millivolt of floor, so a capacitor sitting at nothing is not asked to resolve nothing to
+        // a thousandth of itself.
+        var scale = state.Settings.StepErrorTolerance * (Math.Abs(solved) + 1e-3);
+
+        return scale <= 0 ? null : Math.Abs(solved - predicted) / scale;
     }
 
     public override void ResetState()
     {
         _previousVoltage = InitialVoltage ?? 0;
         _previousCurrent = 0;
+        _priorVoltage = null;
         _conductance = 0;
         _equivalentCurrent = 0;
     }

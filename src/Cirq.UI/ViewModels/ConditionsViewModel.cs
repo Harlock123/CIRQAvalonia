@@ -6,10 +6,10 @@ namespace Cirq.UI.ViewModels;
 /// <summary>
 /// The conditions the circuit is run under, as opposed to what is in it.
 /// <para>
-/// At the moment that means one thing — the ambient temperature — and it is worth a dialog of its
-/// own because it is not a property of any single part. Every semiconductor junction in the
-/// circuit reads it at once, so changing it moves diode drops, transistor gains and leakage
-/// currents together.
+/// Two things, neither a property of any single part: the temperature everything is at, and how the
+/// solver is allowed to step through time. Every semiconductor junction reads the first at once, so
+/// changing it moves diode drops, transistor gains and leakage currents together; the second decides
+/// whether a run takes the step it was given or one it chose.
 /// </para>
 /// </summary>
 public sealed partial class ConditionsViewModel : ObservableObject
@@ -20,6 +20,7 @@ public sealed partial class ConditionsViewModel : ObservableObject
     {
         _circuit = circuit;
         AmbientCelsius = circuit.AmbientTemperatureCelsius;
+        AdaptiveTimeStep = circuit.AdaptiveTimeStep;
     }
 
     /// <summary>
@@ -28,6 +29,29 @@ public sealed partial class ConditionsViewModel : ObservableObject
     /// </summary>
     [ObservableProperty]
     public partial double AmbientCelsius { get; set; }
+
+    /// <summary>
+    /// Whether the solver chooses its own step.
+    /// <para>
+    /// Worth a checkbox rather than being simply switched on, because the two behaviours are useful
+    /// for different things. A fixed step is repeatable: the same circuit takes the same steps and
+    /// gives the same numbers every run, and somebody stepping through an edge by hand gets a step
+    /// they can predict. A chosen step is accurate where it matters and quick where it does not —
+    /// which on a converter is the difference between a right answer and a plausible one.
+    /// </para>
+    /// </summary>
+    [ObservableProperty]
+    public partial bool AdaptiveTimeStep { get; set; }
+
+    /// <summary>What the step setting means, in a sentence, so nobody has to try it to find out.</summary>
+    public string StepNote => AdaptiveTimeStep
+        ? "The solver shortens the step where the waveform bends and lengthens it where it does " +
+          "not, and retakes a step that stepped over the instant a part switched. An RC charging " +
+          "curve costs a thirtieth of the steps for the same accuracy; a converter's oscillator " +
+          "comes out at the rate its timing capacitor sets rather than low."
+        : "Every step is the one the timebase asks for. Predictable, and the same every run — but " +
+          "a fast edge is only as well placed as the step is short, and a long step spent on a " +
+          "flat waveform is a long step wasted.";
 
     /// <summary>Raised when the value changes, so the engine can be rebuilt with it.</summary>
     public event EventHandler? Changed;
@@ -50,6 +74,14 @@ public sealed partial class ConditionsViewModel : ObservableObject
     /// <summary>Back to the figure the models are characterised at.</summary>
     [CommunityToolkit.Mvvm.Input.RelayCommand]
     public void Reset() => AmbientCelsius = 27.0;
+
+    partial void OnAdaptiveTimeStepChanged(bool value)
+    {
+        _circuit.AdaptiveTimeStep = value;
+
+        OnPropertyChanged(nameof(StepNote));
+        Changed?.Invoke(this, EventArgs.Empty);
+    }
 
     partial void OnAmbientCelsiusChanged(double value)
     {

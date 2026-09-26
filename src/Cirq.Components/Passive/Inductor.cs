@@ -9,10 +9,13 @@ namespace Cirq.Components.Passive;
 /// Inductor solved in branch-current form, so its current is a first-class unknown. That makes the
 /// bias point a plain short circuit and lets <see cref="Transformer"/> couple two of them.
 /// </summary>
-public partial class Inductor : TwoTerminalComponent, IToleranced
+public partial class Inductor : TwoTerminalComponent, IToleranced, IIntegrating
 {
     private double _previousCurrent;
     private double _previousVoltage;
+
+    // Two points back, for the straight line an error estimate extrapolates along.
+    private double? _priorCurrent;
 
     public Inductor(double inductance = 1e-3)
     {
@@ -171,6 +174,7 @@ public partial class Inductor : TwoTerminalComponent, IToleranced
 
     public override void CommitTimeStep(MnaSystem system, SimulationState state)
     {
+        _priorCurrent = _previousCurrent;
         _previousCurrent = system.BranchCurrent(this);
         // The stored voltage is the inductive part only: the resistive drop is not integrated.
         _previousVoltage = VoltageAcross(system, A, B) - SeriesResistance * _previousCurrent;
@@ -180,6 +184,31 @@ public partial class Inductor : TwoTerminalComponent, IToleranced
     {
         _previousCurrent = 0;
         _previousVoltage = 0;
+        _priorCurrent = null;
+    }
+
+    /// <summary>
+    /// How far the step just solved put the current from where a straight line through the last two
+    /// accepted points said it would be. The flux is <c>L·i</c>, so this is the error in the flux
+    /// with the henries divided out — which also keeps the floor in amps, where it means something.
+    /// </summary>
+    public double? IntegrationError(MnaSystem system, SimulationState state)
+    {
+        ArgumentNullException.ThrowIfNull(system);
+        ArgumentNullException.ThrowIfNull(state);
+
+        if (_priorCurrent is not { } prior) return null;
+        if (state.PreviousTimeStep <= 0) return null;
+
+        var solved = system.BranchCurrent(this);
+
+        var predicted = _previousCurrent +
+                        (state.TimeStep / state.PreviousTimeStep) * (_previousCurrent - prior);
+
+        // A microamp of floor: a winding carrying nothing is not held to a thousandth of nothing.
+        var scale = state.Settings.StepErrorTolerance * (Math.Abs(solved) + 1e-6);
+
+        return scale <= 0 ? null : Math.Abs(solved - predicted) / scale;
     }
 
     partial void OnInductanceChanged(double value) => NotifyValueChanged();

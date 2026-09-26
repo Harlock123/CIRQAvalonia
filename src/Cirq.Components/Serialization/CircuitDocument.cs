@@ -29,6 +29,13 @@ public sealed class CircuitDocument
     public double? AmbientTemperatureCelsius { get; set; }
 
     /// <summary>
+    /// Whether the solver chooses its own step. Absent for the great majority of circuits, which do
+    /// not, so an older build reading this file loses nothing it would have understood.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? AdaptiveTimeStep { get; set; }
+
+    /// <summary>
     /// The SPICE cards for any imported models the circuit uses, carried in the file so it opens
     /// complete somewhere else.
     /// <para>

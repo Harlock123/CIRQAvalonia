@@ -1,3 +1,4 @@
+using Cirq.Core.Simulation;
 using ScottPlot;
 using Sample = Cirq.Core.Primitives.DataPoint;
 using System.Numerics;
@@ -618,5 +619,93 @@ public class GuidePlotTests
             "A TL431's reference is bowed, not sloped — both ends of the range sit below the middle");
 
         DocPlot.Save(plot, "24-bandgap.png");
+    }
+
+    // ---- the adaptive step -------------------------------------------------
+
+    /// <summary>
+    /// What a chosen step looks like: the waveform above, the step size that produced it below.
+    /// Every dot is a time point the solver actually took.
+    /// </summary>
+    [Fact]
+    public void AdaptiveStep()
+    {
+        var circuit = new Circuit();
+
+        // A square wave into an RC, so the run has both kinds of moment in it: an edge that has to
+        // be resolved, and a flat top where there is nothing to resolve.
+        var source = circuit.Add(new FunctionGenerator(Waveform.Square, 500, 10.0) { Name = "V1" });
+        var resistor = circuit.Add(new Resistor(1e3));
+        var capacitor = circuit.Add(new Capacitor(100e-9) { InitialVoltage = -5 });
+        var ground = Gnd(circuit);
+
+        circuit.Connect(source.B, ground.Pin);
+        circuit.Connect(source.A, resistor.A);
+        circuit.Connect(resistor.B, capacitor.A);
+        circuit.Connect(capacitor.B, ground.Pin);
+
+        var sim = new CircuitSimulator(circuit, new SimulationSettings
+        {
+            AdaptiveTimeStep = true,
+            TimeStep = 1e-7,
+            MaxTimeStep = 5e-5,
+            MinTimeStep = 1e-12,
+            StepErrorTolerance = 1e-3,
+            UseInitialConditions = true,
+        });
+
+        sim.Reset();
+        sim.SolveOperatingPoint();
+
+        List<double> times = [];
+        List<double> output = [];
+        List<double> steps = [];
+
+        var end = 4e-3;
+
+        while (sim.Time < end - sim.Settings.MinTimeStep)
+        {
+            var dt = sim.Step(end - sim.Time);
+
+            times.Add(sim.Time);
+            output.Add(sim.NodeVoltage(capacitor.A));
+            steps.Add(dt);
+        }
+
+        // The point of the picture, as an assertion: the shortest step is a hundredth of the longest,
+        // and the short ones are at the edges. Half a millisecond either side of the first edge at
+        // 1 ms is where to look.
+        var atEdge = times.Zip(steps).Where(p => Math.Abs(p.First - 1e-3) < 2e-5).Select(p => p.Second);
+        var onFlat = times.Zip(steps).Where(p => p.First is > 1.5e-3 and < 1.9e-3).Select(p => p.Second);
+
+        Assert.True(atEdge.Min() < onFlat.Max() / 100,
+            $"the step should collapse at an edge: {atEdge.Min():g3} s against {onFlat.Max():g3} s");
+
+        // And the capacitor still charges to the supply between edges, which is the answer the steps
+        // were saving time on.
+        Assert.True(output.Max() > 4.9 && output.Min() < -4.9, "the RC did not follow the square wave");
+
+        DocPlot.Stack("29-adaptive-step.png", (waveform, step) =>
+        {
+            DocPlot.Style(waveform, "Time (s)", "Capacitor (V)");
+            DocPlot.SiBottom(waveform);
+
+            var line = DocPlot.Line(waveform, times, output, 0);
+            line.MarkerSize = 4;
+            line.MarkerShape = MarkerShape.FilledCircle;
+
+            DocPlot.Title(waveform,
+                $"{times.Count} time points across four milliseconds — every dot is one of them");
+
+            DocPlot.Style(step, "Time (s)", "Step (s)");
+            DocPlot.SiBottom(step);
+            DocPlot.SiLeft(step);
+
+            DocPlot.Line(step, times, steps.Select(Math.Log10), 1);
+            DocPlot.DecadeLeft(step);
+
+            DocPlot.Title(step,
+                "The step it chose: a hundred times shorter at each edge, growing back across each flat");
+        });
     }
 }

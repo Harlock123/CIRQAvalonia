@@ -755,6 +755,47 @@ The simulation starts from initial conditions: capacitors begin at their stated 
 inductors at their initial current, both zero unless you say otherwise. A source applied at t = 0 is
 therefore a genuine step, not a circuit that has already settled.
 
+### Letting the solver choose the step
+
+By default every step is the same length, taken from the scope's timebase. That is predictable —
+the same circuit takes the same steps and gives the same numbers every run — and it is wasteful:
+the step has to be short enough for the fastest edge in the circuit, and then that same short step
+is spent on the long flat stretches where nothing is happening.
+
+**Simulate > Conditions...** has a box for the other way: *Let the solver choose the time step*.
+
+![Two stacked plots of a square wave charging an RC. Above, the capacitor voltage with a dot at
+every time point the solver took: the dots crowd together at each edge and spread out across each
+flat top. Below, the step size on a logarithmic axis, falling from fifty microseconds to about a
+nanosecond at every edge and climbing back between them](images/29-adaptive-step.png)
+
+Nine hundred time points across four milliseconds, placed where they were needed. The step collapses
+by a factor of a hundred at each edge and grows back across each flat — an RC charging curve costs
+about a thirtieth of the steps a fixed run would take for the same accuracy.
+
+Two different things decide the step, and they catch two different kinds of trouble:
+
+**How much the waveform is bending.** Only the parts that *integrate* are asked — a capacitor about
+its charge, an inductor about its flux — and each compares where the step landed against where a
+straight line through the last two points said it would. The gap between the two is the error the
+step size is costing. Nothing else is asked, and that is deliberate: a logic node goes from zero to
+five volts between two time points because that is what logic does, and a solver that read that as
+an error would grind its step down to nothing and never recover.
+
+**Whether a part switched partway through the step.** This is the one an error estimate cannot see.
+A switching regulator's oscillator is a ramp between two thresholds — a straight line, no curvature,
+nothing for an estimator to notice — and a long step sails past the threshold and turns round late.
+The overshoot is time the oscillator never really spent charging, and the frequency comes out low: at
+a step a fifth of the ramp long, **27 % low**. So the part is asked afterwards whether it crossed
+something, and if it did, the step is thrown away and retaken to land exactly on the crossing.
+Nothing has been committed at that point, which is what makes throwing it away cheap.
+
+It is off by default on purpose. A fixed step is repeatable, and repeatability is worth a lot in
+something whose answers people check by eye. Turn it on for converters, oscillators and anything with
+both a fast edge and a slow envelope; leave it off when stepping through an edge by hand with `F6`,
+where a step you can predict is the point. The setting is saved with the circuit, so a design that
+needs it keeps it.
+
 ---
 
 ## Worked example: an RC low-pass

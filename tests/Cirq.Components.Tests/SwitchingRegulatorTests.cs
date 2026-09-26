@@ -27,7 +27,8 @@ public class SwitchingRegulatorTests
         // oscillator rate a smaller inductor lets the current ramp most of an amp inside one
         // on-time and the converter ends up regulating on its current limit instead of its
         // comparator. That is real behaviour, and it is the subject of its own test below.
-        double inductance = 1e-3, double timing = 1e-9, double senseOhms = 1.0)
+        double inductance = 1e-3, double timing = 1e-9, double senseOhms = 1.0,
+        SimulationSettings? settings = null)
     {
         var circuit = new Circuit();
         var vin = circuit.Add(new DcVoltageSource(input));
@@ -68,7 +69,7 @@ public class SwitchingRegulatorTests
         circuit.Connect(reg.Timing, ct.A);
         circuit.Connect(ct.B, gnd.Pin);
 
-        var sim = new CircuitSimulator(circuit, Fine);
+        var sim = new CircuitSimulator(circuit, settings ?? Fine);
         sim.Reset();
         sim.SolveOperatingPoint();
         return new Buck(sim, reg, coil, load, ct);
@@ -261,5 +262,98 @@ public class SwitchingRegulatorTests
         }
 
         Assert.True(sawOn && sawOff, "a switching regulator has to be doing both");
+    }
+
+    // ---- landing on the ramp ------------------------------------------------
+
+    /// <summary>
+    /// The oscillator's rate, measured off the ramp rather than asked of the part: count the times
+    /// it crosses its upper threshold, and divide by how long that took.
+    /// </summary>
+    private static double MeasuredFrequency(Buck buck, double duration)
+    {
+        var reg = buck.Regulator;
+        var above = false;
+        var crossings = 0;
+        double first = 0, last = 0;
+
+        var end = buck.Sim.Time + duration;
+
+        while (buck.Sim.Time < end)
+        {
+            buck.Sim.Step();
+
+            var nowAbove = buck.Sim.NodeVoltage(buck.Timing.A) >= reg.RampUpper;
+
+            if (nowAbove && !above)
+            {
+                if (crossings == 0) first = buck.Sim.Time; else last = buck.Sim.Time;
+                crossings++;
+            }
+
+            above = nowAbove;
+        }
+
+        return crossings < 2 ? 0 : (crossings - 1) / (last - first);
+    }
+
+    /// <summary>What the oscillator's own arithmetic says its rate is.</summary>
+    private static double ExpectedFrequency(SwitchingRegulator reg, double timing) =>
+        1.0 / (timing * (reg.RampUpper - reg.RampLower) *
+               ((1.0 / reg.ChargeCurrent) + (1.0 / reg.DischargeCurrent)));
+
+    /// <summary>
+    /// The discontinuity an error estimate cannot see, stated as a failure.
+    /// <para>
+    /// The timing ramp is a straight line between two thresholds, so there is no curvature for a
+    /// step controller to notice and no reason for it to shorten anything. Take steps a fifth of the
+    /// ramp long and the oscillator turns round wherever the step happened to land — past the
+    /// threshold, every time, by an amount that is pure fiction — and the rate comes out well low.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void ACoarseFixedStepGetsTheRateWrong()
+    {
+        const double timing = 1e-9;
+
+        var coarse = new SimulationSettings { TimeStep = 2e-6, MaxTimeStep = 2e-6 };
+        var buck = StepDown(timing: timing, settings: coarse);
+
+        var measured = MeasuredFrequency(buck, 2e-3);
+        var expected = ExpectedFrequency(buck.Regulator, timing);
+
+        // Not a little wrong: a fifth of a ramp of overshoot on every half cycle.
+        Assert.True(measured < expected * 0.85,
+            $"a coarse fixed step should have cost the rate: {measured / 1e3:0.0} kHz against " +
+            $"{expected / 1e3:0.0} kHz expected");
+    }
+
+    /// <summary>
+    /// And the same coarse ceiling, with the solver allowed to land on the crossing: the step is
+    /// retaken to end exactly where the ramp met its threshold, the overshoot never happens, and the
+    /// rate is the one the arithmetic says.
+    /// </summary>
+    [Fact]
+    public void LandingOnTheThresholdGetsItRight()
+    {
+        const double timing = 1e-9;
+
+        var adaptive = new SimulationSettings
+        {
+            AdaptiveTimeStep = true,
+            TimeStep = 2e-6,
+            MaxTimeStep = 2e-6,
+            MinTimeStep = 1e-12,
+        };
+
+        var buck = StepDown(timing: timing, settings: adaptive);
+
+        var measured = MeasuredFrequency(buck, 2e-3);
+        var expected = ExpectedFrequency(buck.Regulator, timing);
+
+        Assert.Equal(expected, measured, expected * 0.05);
+
+        // Steps were thrown away to get there, which is what the accuracy cost.
+        Assert.True(buck.Sim.RejectedSteps > 0, "no step was ever retaken");
     }
 }
