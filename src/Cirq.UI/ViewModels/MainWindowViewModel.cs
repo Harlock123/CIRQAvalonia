@@ -975,6 +975,12 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         StatusMessage = $"Went to {component.Name}";
     }
 
+    /// <summary>Raised when the requirements-over-a-range window should be opened.</summary>
+    public event EventHandler? RequestSpecSweep;
+
+    [RelayCommand]
+    private void ShowSpecSweep() => RequestSpecSweep?.Invoke(this, EventArgs.Empty);
+
     /// <summary>Raised when the impedance window should be opened.</summary>
     public event EventHandler? RequestImpedance;
 
@@ -1525,6 +1531,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
           Ctrl+Shift+F Find a part on the sheet — designator, value, kind or net
           Ctrl+F1      What is this circuit? — the drawing read back in words
           Ctrl+PgDn/PgUp The next / previous sheet, on a drawing split into pages
+          Ctrl+Shift+F4 Requirements over a range — does it still meet them from -40 to +85 C
           Arrows       Move the selection — Shift for one unit rather than one square
           Tab          Step to the next part on the sheet; Shift+Tab the previous
           Enter        Drop the armed part in the middle of the view

@@ -180,6 +180,9 @@
         <MenuItem Header="_Requirements..." InputGesture="Ctrl+F4"
                   Command="{Binding ShowSpecsCommand}"
                   ToolTip.Tip="What this circuit is supposed to do, checked against what it did" />
+        <MenuItem Header="Requirements _Over a Range..." InputGesture="Ctrl+Shift+F4"
+                  Command="{Binding ShowSpecSweepCommand}"
+                  ToolTip.Tip="Does it still meet them from −40 °C to +85 °C — or with a part anywhere in its tolerance band" />
         <MenuItem Header="Play Speaker _Recording" Command="{Binding PlayRecordingCommand}" />
         <Separator />
         <MenuItem Header="Spee_d" ItemsSource="{Binding SpeedOptions}">

@@ -3727,6 +3727,38 @@ is not a requirement. They are measured across everything the probes have record
 on the scope: a ripple limit that passes because the interesting half is off the left of the screen
 is not a check.
 
+### Over a range
+
+Checking the requirements tells you the circuit works. It does not tell you the circuit works *in
+January*. **Simulate > Requirements Over a Range** (`Ctrl` `Shift` `F4`) runs every enabled
+requirement at each of a series of temperatures — or with any part stepped across its range — and
+says where each one holds.
+
+![A plot of margin against temperature from −40 to +85 °C, with two lines falling steadily from left
+to right and a dashed line across at zero marked "limit". The upper line, a 400 mV requirement,
+stays above zero all the way across. The lower line, a 600 mV requirement, crosses zero just below
+0 °C and is below it for the rest of the range](images/31-over-temperature.png)
+
+What is plotted is the **margin** rather than the measurement, and that is what lets several
+requirements share one pair of axes: a ripple limit in millivolts and a rise time in microseconds
+have nothing in common as measurements, but both are a fraction of their own limit, and zero is the
+line neither may cross.
+
+The list underneath gives each requirement a verdict — **Holds**, **Fails**, or **No verdict** — and
+the sentence that goes with it: the range it is met over, the worst point, and what it read there.
+Failures are listed first, because they are what somebody swept to find. A requirement that could
+not be measured at all is *No verdict* rather than a failure, for the same reason it is in the
+requirements window: a circuit that has not been shown to break a requirement has not broken it.
+
+Two things to know about the run. Each point is a **fresh run** — reset, bias point, transient — so
+one point cannot contaminate the next; and the circuit is put back exactly as it was afterwards, at
+the temperature and the part values it had, so the canvas and the scope are not left showing the
+last point of the sweep as though it were the state of things.
+
+The default range is −40 °C to +85 °C, which is the commercial and industrial band most parts are
+specified over. Choosing a part instead of the temperature ranges from half to double whatever it is
+set to, which is a wider band than any real tolerance and therefore tells you where the edge is.
+
 ---
 
 ## A baseline
@@ -5357,6 +5389,7 @@ Also available in the app at **Help > Keyboard Shortcuts**.
 | Click a wire or a pin | Light up the whole net it is on, and say what is joined to it |
 | `F9` / `F10` | Collapse the palette / the properties panel |
 | `Ctrl` `PgDn` / `Ctrl` `PgUp` | The next / previous sheet, on a drawing split into pages |
+| `Ctrl` `Shift` `F4` | Requirements over a range — does it still meet them from −40 to +85 °C |
 | Arrow keys | Move the selection by one grid square — **Shift** for one unit, which is how to place something off the grid |
 | `Tab` / `Shift` `Tab` | Step to the next part on the sheet, and the previous. Brings it into view if it is not |
 | `Enter` | Drop the armed part in the middle of the view, for placing one without a pointer |

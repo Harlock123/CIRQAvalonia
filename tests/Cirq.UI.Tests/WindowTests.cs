@@ -40,7 +40,7 @@ public class WindowTests(WindowSession session)
         "About", "Baseline", "Compare", "Conditions", "DcSweep", "ExampleBrowser", "Explain",
         "Find", "FrequencyResponse", "Impedance", "MonteCarlo", "Noise", "Parameters",
         "PoleZero", "Ratings",
-        "RuleCheck", "Specs", "SpectrumAnalyser", "Stability", "TransientStep");
+        "RuleCheck", "Specs", "SpecSweep", "SpectrumAnalyser", "Stability", "TransientStep");
 
     internal static Window BuildForTest(string name) => Build(name);
 
@@ -73,6 +73,7 @@ public class WindowTests(WindowSession session)
             },
             "RuleCheck" => new RuleCheckWindow { DataContext = new RuleCheckViewModel(circuit) },
             "Specs" => new SpecsWindow { DataContext = new SpecsViewModel(circuit) },
+            "SpecSweep" => new SpecSweepWindow { DataContext = new SpecSweepViewModel(circuit) },
             "SpectrumAnalyser" => new SpectrumAnalyserWindow
             {
                 DataContext = new SpectrumViewModel(circuit),

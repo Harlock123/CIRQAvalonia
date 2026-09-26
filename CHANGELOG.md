@@ -8,6 +8,28 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**Does it still meet its requirements at 85 °C?** *Simulate > Requirements Over a Range*
+(`Ctrl+Shift+F4`) runs every enabled requirement at each of a series of temperatures — or with any
+part stepped across its range — and says where each one holds.
+
+The requirements window holds the circuit to what it is supposed to do at one temperature with every
+part at the value written on it. That is not the question a design is signed off against. A design
+is signed off over a *range*, and a circuit checked at 27 °C and shipped is a circuit nobody has
+checked at the temperature it will be used at.
+
+What is plotted is the **margin** rather than the measurement, which is what lets several
+requirements share one pair of axes: a ripple limit in millivolts and a rise time in microseconds
+have nothing in common as measurements, but each is a fraction of its own limit and zero is the line
+neither may cross. The list underneath says Holds, Fails or No verdict, with the range it is met
+over and what it read at its worst point — failures first, since they are what somebody swept to
+find.
+
+It is built on the stepped transient, which already knew how to run the same circuit many times with
+one thing changed and put everything back afterwards, and it judges each pass with exactly the code
+the requirements window uses. Neither of those is an implementation detail: the first is why the
+circuit is left where it was found, and the second is why this window and that one cannot come to
+different conclusions about whether the circuit passes.
+
 **The scope triggers.** Off, Auto, Normal and Single, the four modes a bench scope has, with the
 trace, the slope and the level beside them.
 

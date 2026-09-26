@@ -173,6 +173,7 @@ public partial class MainWindow : Window
         viewModel.RequestImpedance += async (_, _) => await ShowImpedanceAsync();
         viewModel.RequestPoleZero += async (_, _) => await ShowPoleZeroAsync();
         viewModel.RequestSpecs += async (_, _) => await ShowSpecsAsync();
+        viewModel.RequestSpecSweep += async (_, _) => await ShowSpecSweepAsync();
         viewModel.RequestRuleCheck += async (_, _) => await ShowRuleCheckAsync();
         viewModel.RequestRatings += async (_, _) => await ShowRatingsAsync();
         viewModel.RequestBaseline += async (_, _) => await ShowBaselineAsync();
@@ -436,6 +437,19 @@ public partial class MainWindow : Window
         {
             DataContext = new PoleZeroViewModel(_viewModel.Circuit),
         };
+
+        await dialog.ShowModal(this);
+    }
+
+    /// <summary>
+    /// The requirements across a range rather than at one point — which is what a design is signed
+    /// off against.
+    /// </summary>
+    private async Task ShowSpecSweepAsync()
+    {
+        if (_viewModel is null) return;
+
+        var dialog = new SpecSweepWindow { DataContext = new SpecSweepViewModel(_viewModel.Circuit) };
 
         await dialog.ShowModal(this);
     }

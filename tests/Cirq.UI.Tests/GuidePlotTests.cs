@@ -1,3 +1,4 @@
+using Cirq.Core.Verification;
 using Cirq.Core.Simulation;
 using ScottPlot;
 using Sample = Cirq.Core.Primitives.DataPoint;
@@ -787,5 +788,92 @@ public class GuidePlotTests
             DocPlot.Title(locked,
                 "Trigger on a rising edge through zero: the same four repaints, lying on top of each other");
         });
+    }
+
+    // ---- requirements over a range -----------------------------------------
+
+    /// <summary>
+    /// Two requirements on one circuit across the commercial temperature range, drawn as margin
+    /// against temperature: one holds all the way across, the other crosses the line.
+    /// </summary>
+    [Fact]
+    public void RequirementsOverTemperature()
+    {
+        var circuit = new Circuit();
+
+        var supply = circuit.Add(new DcVoltageSource(5.0) { Name = "V1" });
+        var series = circuit.Add(new Resistor(10e3));
+        var diode = circuit.Add(new Cirq.Components.Nonlinear.Diode());
+        var ground = Gnd(circuit);
+
+        circuit.Connect(supply.Negative, ground.Pin);
+        circuit.Connect(supply.Positive, series.A);
+        circuit.Connect(series.B, diode.Anode);
+        circuit.Connect(diode.Cathode, ground.Pin);
+
+        circuit.Probes.Add(new SignalProbe("Vf", diode.Anode, default));
+
+        // A silicon diode's drop falls about two millivolts a degree. Six hundred millivolts is
+        // there in the cold and gone in the heat; four hundred is there throughout.
+        circuit.Specs.Add(new DesignSpec
+        {
+            Name = "Vref ≥ 600 mV",
+            Trace = "Vf",
+            Quantity = SpecQuantity.Mean,
+            Comparison = SpecComparison.AtLeast,
+            Limit = 0.6,
+        });
+
+        circuit.Specs.Add(new DesignSpec
+        {
+            Name = "Vref ≥ 400 mV",
+            Trace = "Vf",
+            Quantity = SpecQuantity.Mean,
+            Comparison = SpecComparison.AtLeast,
+            Limit = 0.4,
+        });
+
+        var sim = new CircuitSimulator(circuit);
+        sim.Reset();
+        sim.SolveOperatingPoint();
+        sim.ResolveProbes();
+
+        var result = new SpecSweep(sim).Run(
+            new SpecSweepRequest(SweepTarget.OverTemperature(-40, 85, 14), 2e-4));
+
+        var tight = result.Margins[0];
+        var loose = result.Margins[1];
+
+        // What the picture claims: one crosses the line inside the range and the other does not.
+        Assert.True(tight.Fails);
+        Assert.True(loose.Holds);
+
+        var plot = DocPlot.New("Temperature (°C)", "Margin (fraction of the limit)");
+
+        var index = 0;
+
+        foreach (var margin in result.Margins)
+        {
+            var judged = margin.Judged.Where(p => p.Result.Margin is not null).ToList();
+
+            var line = DocPlot.Line(
+                plot,
+                judged.Select(p => p.Value),
+                judged.Select(p => p.Result.Margin!.Value),
+                index++,
+                margin.Spec.Name);
+
+            line.MarkerSize = 5;
+            line.MarkerShape = MarkerShape.FilledCircle;
+        }
+
+        DocPlot.Reference(plot, 0, "limit");
+        DocPlot.Legend(plot);
+
+        DocPlot.Title(plot,
+            "A diode reference across the commercial range: the 600 mV requirement gives out near " +
+            $"{tight.Window!.Value.To:0} °C, the 400 mV one holds throughout");
+
+        DocPlot.Save(plot, "31-over-temperature.png");
     }
 }
