@@ -46,6 +46,8 @@ public static class CommandLine
             return verb switch
             {
                 "check" => Commands.Check(new Options(rest), output, error),
+                "baseline" => Commands.Baseline(new Options(rest), output, error),
+                "compare" => Commands.Compare(new Options(rest), output, error),
                 "run" => Commands.RunTransient(new Options(rest), output, error),
                 "netlist" => Commands.Netlist(new Options(rest), output, error),
                 "info" => Commands.Info(new Options(rest), output, error),
@@ -120,6 +122,24 @@ public static class CommandLine
             return;
         }
 
+        if (verb is "baseline" or "compare")
+        {
+            output.WriteLine("""
+                cirq baseline <circuit.cirq> [--for <seconds>] [--note <text>]
+                cirq compare <circuit.cirq> [--for <seconds>] [--quiet]
+
+                  baseline runs the circuit and records what it did, into the circuit file itself —
+                  the same baseline the application takes under Simulate > Baseline.
+
+                  compare runs it again and says what moved since. It exits 1 when anything did, so
+                  a change nobody meant to make fails a build the way a broken test does.
+
+                  A measurement has to move by more than one percent of what it was to count, which
+                  is comfortably above what re-running the same circuit produces.
+                """);
+            return;
+        }
+
         if (verb == "run")
         {
             output.WriteLine("""
@@ -138,6 +158,8 @@ public static class CommandLine
             cirq — the circuit editor's engine, without the editor.
 
               cirq check <circuit.cirq>     Hold it to the requirements saved in it
+              cirq baseline <circuit.cirq>  Record what it does now, into the circuit
+              cirq compare <circuit.cirq>   Run it again and say what moved since
               cirq run <circuit.cirq>       Run it and write the traces as CSV
               cirq netlist <circuit.cirq>   Write it out as a SPICE netlist
               cirq info <circuit.cirq>      What is in it: parts, nets, probes, requirements

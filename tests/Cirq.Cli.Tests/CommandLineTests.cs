@@ -318,4 +318,138 @@ public class CommandLineTests : IDisposable
         Assert.Equal(CommandLine.Ok, Run("version"));
         Assert.NotEmpty(Output.Trim());
     }
+
+    // ---- baselines -----------------------------------------------------------
+
+    /// <summary>
+    /// A resistive divider, whose output is exactly what the arithmetic says — so a change to a
+    /// resistor is a change of a known size rather than a wobble.
+    /// </summary>
+    private string Divider(double top = 10e3)
+    {
+        var circuit = new Circuit { Title = "Divider" };
+
+        var supply = circuit.Add(new DcVoltageSource(10.0));
+        var upper = circuit.Add(new Resistor(top) { Name = "R1" });
+        var lower = circuit.Add(new Resistor(10e3) { Name = "R2" });
+        var ground = circuit.Add(new Ground());
+
+        circuit.Connect(supply.Negative, ground.Pin);
+        circuit.Connect(supply.Positive, upper.A);
+        circuit.Connect(upper.B, lower.A);
+        circuit.Connect(lower.B, ground.Pin);
+
+        circuit.Probes.Add(new SignalProbe("Mid", lower.A, default));
+
+        return Save(circuit);
+    }
+
+    [Fact]
+    public void ABaselineIsRecordedIntoTheCircuit()
+    {
+        var path = Divider();
+
+        Assert.Equal(CommandLine.Ok, Run("baseline", path, "--for", "1e-4"));
+        Assert.Contains("Recorded 1 trace(s)", Output);
+
+        // Into the file itself, which is where a baseline lives: it travels with the design.
+        var back = CircuitSerializer.FromJson(File.ReadAllText(path)).Circuit;
+
+        Assert.False(back.Baseline.IsEmpty);
+        Assert.Single(back.Baseline.Traces);
+    }
+
+    [Fact]
+    public void AnUnchangedCircuitComparesClean()
+    {
+        var path = Divider();
+
+        Run("baseline", path, "--for", "1e-4");
+
+        Assert.Equal(CommandLine.Ok, Run("compare", path, "--for", "1e-4"));
+        Assert.Contains("Nothing moved", Output);
+        Assert.Contains("same", Output);
+    }
+
+    /// <summary>
+    /// The point of the command: a change nobody meant to make fails a build the way a broken test
+    /// does. The divider's midpoint goes from 5 V to 3.33 V, which is a third — far past the one
+    /// percent that counts as a move.
+    /// </summary>
+    [Fact]
+    public void ACircuitThatHasMovedExitsOne()
+    {
+        var path = Divider();
+
+        Run("baseline", path, "--for", "1e-4");
+
+        // Reopen it, change a resistor, and write it back — which is what an edit is.
+        var circuit = CircuitSerializer.FromJson(File.ReadAllText(path)).Circuit;
+
+        circuit.Components.OfType<Resistor>().First(r => r.Name == "R1").Resistance = 20e3;
+
+        File.WriteAllText(path, CircuitSerializer.ToJson(circuit));
+
+        Assert.Equal(CommandLine.Failed, Run("compare", path, "--for", "1e-4"));
+
+        Assert.Contains("MOVED", Output);
+        Assert.Contains("Mid", Output);
+        Assert.Contains("changed since the baseline", Output);
+    }
+
+    [Fact]
+    public void ComparingWithoutABaselineIsAMisuseRatherThanAPass()
+    {
+        // Exiting zero here would be the dangerous answer: a build would go green because nobody
+        // had ever recorded what the circuit does.
+        Assert.Equal(CommandLine.Misused, Run("compare", Divider(), "--for", "1e-4"));
+        Assert.Contains("no baseline", Error);
+    }
+
+    [Fact]
+    public void ANewProbeCountsAsAChange()
+    {
+        var path = Divider();
+
+        Run("baseline", path, "--for", "1e-4");
+
+        var circuit = CircuitSerializer.FromJson(File.ReadAllText(path)).Circuit;
+        var supply = circuit.Components.OfType<DcVoltageSource>().Single();
+
+        circuit.Probes.Add(new SignalProbe("Rail", supply.Positive, default));
+
+        File.WriteAllText(path, CircuitSerializer.ToJson(circuit));
+
+        Assert.Equal(CommandLine.Failed, Run("compare", path, "--for", "1e-4"));
+        Assert.Contains("new since the baseline", Output);
+    }
+
+    [Fact]
+    public void QuietComparingSaysOnlyTheVerdict()
+    {
+        var path = Divider();
+
+        Run("baseline", path, "--for", "1e-4");
+
+        Assert.Equal(CommandLine.Ok, Run("compare", path, "--for", "1e-4", "--quiet"));
+
+        Assert.DoesNotContain("same", Output);
+        Assert.Contains("Nothing moved", Output);
+    }
+
+    [Fact]
+    public void RecordingWithoutProbesHasNothingToRecord()
+    {
+        Assert.Equal(CommandLine.Misused, Run("baseline", Reference(probed: false)));
+        Assert.Contains("no probes", Error);
+    }
+
+    [Fact]
+    public void BaselineHelpDescribesBothHalves()
+    {
+        Assert.Equal(CommandLine.Ok, Run("baseline", "--help"));
+
+        Assert.Contains("cirq compare", Output);
+        Assert.Contains("one percent", Output);
+    }
 }

@@ -5397,6 +5397,8 @@ application.
 
 ```
 cirq check <circuit.cirq>     Hold it to the requirements saved in it
+cirq baseline <circuit.cirq>  Record what it does now, into the circuit
+cirq compare <circuit.cirq>   Run it again and say what moved since
 cirq run <circuit.cirq>       Run it and write the traces as CSV
 cirq netlist <circuit.cirq>   Write it out as a SPICE netlist
 cirq info <circuit.cirq>      What is in it: parts, nets, probes, requirements
@@ -5435,6 +5437,37 @@ Vf mean at least 600mV — it holds from -40 °C to -4.3 °C.
 temperature. `--quiet` prints the verdict line and nothing else.
 
 ### The others
+
+### Catching a change nobody meant to make
+
+Requirements say whether the circuit still does what it is supposed to. They cannot say whether
+anything *else* moved — and during a refactor, that is the failure that actually happens.
+
+```
+$ cirq baseline supply.cirq --for 5e-3
+Recorded 3 trace(s) over 5ms into supply.cirq
+
+  ... change something ...
+
+$ cirq compare supply.cirq --for 5e-3
+  same   Rail
+  MOVED  Ripple — peak to peak +42.7%
+  same   Load
+
+Ripple changed since the baseline taken 2 minutes ago — worst is Ripple, off by 31mV (4.1% of its swing).
+$ echo $?
+1
+```
+
+`cirq baseline` records what the circuit does now — into the circuit file itself, the same baseline
+the application takes under **Simulate > Baseline**, so it travels with the design rather than
+sitting in a file beside it that can get out of step. `cirq compare` runs it again and exits 1 if
+anything moved.
+
+A measurement has to move by more than **one percent** of what it was to count. That is comfortably
+above what re-running the same circuit produces — the solver picks its own step sizes, and a step
+landing a nanosecond elsewhere moves a measured rise time in the last few digits — and comfortably
+below anything a person would call the same answer.
 
 `cirq run` runs the circuit and writes what every probe recorded as a CSV — one column per probe,
 `--for` seconds long, `--every` seconds apart — for feeding into whatever else you use to look at

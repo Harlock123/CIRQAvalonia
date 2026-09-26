@@ -8,6 +8,21 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**`cirq baseline` and `cirq compare`: regression testing for waveforms.** Record what the circuit
+does now — into the circuit file, the same baseline the application takes under *Simulate >
+Baseline* — and later run it again and find out what moved. `compare` exits 1 when anything did.
+
+Requirements answer "does it still meet spec". This answers the other question, which is the one
+that actually catches you during a refactor: *did anything else change?* A measurement has to move by
+more than one percent of what it was to count, which is above what re-running the same circuit
+produces and below anything a person would call the same answer.
+
+**A flat trace was compared against a swing it does not have.** Found while writing the above, and
+it is the more important half. Every level in a baseline was judged as a fraction of the trace's own
+peak-to-peak, so a trace that does not move — which is what a supply rail *is*, and the commonest
+thing anybody baselines — had every change divided by nothing and discarded. A rail that fell from
+5 V to 3.3 V was reported as unchanged. A flat trace is now judged against its own level.
+
 **An export or a print can have every sheet in it.** 0.36.0 made both respect the page you were
 looking at, which was necessary — every page starts its coordinates in the same corner, so one image
 of a split drawing is every page drawn on top of the first — and left the other half undone. A

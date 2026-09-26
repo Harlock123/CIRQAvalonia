@@ -230,4 +230,32 @@ public class BaselineTests
 
         Assert.Contains("worst is big", comparison.Summary(), StringComparison.Ordinal);
     }
+
+    /// <summary>
+    /// A trace that does not move is judged against its own level rather than against its swing.
+    /// <para>
+    /// The commonest thing anybody baselines is a supply, and a supply is flat: it has no
+    /// peak-to-peak to measure a change against. Dividing by it left a rail that fell from five
+    /// volts to three reported as unchanged, which is the one answer a regression check must never
+    /// give.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void AFlatTraceIsJudgedAgainstItsOwnLevel()
+    {
+        static IReadOnlyList<DataPoint> Flat(double volts) =>
+            [.. Enumerable.Range(0, 50).Select(i => new DataPoint(i * 1e-5, volts))];
+
+        var was = TraceBaseline.From([("Rail", "V", Flat(5.0))]);
+
+        var moved = BaselineCheck.Against(was, [("Rail", "V", Flat(3.3))]);
+
+        Assert.False(moved.IsUnchanged);
+        Assert.Contains("Rail", moved.Summary());
+
+        // A third is well past the one percent that counts; a thousandth is not.
+        var still = BaselineCheck.Against(was, [("Rail", "V", Flat(5.002))]);
+
+        Assert.True(still.IsUnchanged, still.Summary());
+    }
 }

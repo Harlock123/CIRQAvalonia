@@ -1,6 +1,7 @@
 using System.Globalization;
 using Cirq.Components.Serialization;
 using Cirq.Components.Spice;
+using Cirq.Core.Primitives;
 using Cirq.Core.Probing;
 using Cirq.Core.Simulation;
 using Cirq.Core.Topology;
@@ -130,6 +131,109 @@ public static class Commands
         output.WriteLine(result.Summary());
 
         return result.Margins.Any(m => m.Fails) ? CommandLine.Failed : CommandLine.Ok;
+    }
+
+    /// <summary>
+    /// Records what the circuit does now, into the circuit, so a later run can be held against it.
+    /// </summary>
+    public static int Baseline(Options options, TextWriter output, TextWriter error)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
+        var path = options.RequirePath();
+        var (circuit, exit) = Load(options, output, error);
+
+        if (circuit is null) return exit;
+
+        if (circuit.Probes.Count == 0)
+        {
+            error.WriteLine("cirq: this circuit has no probes, so there would be nothing to record.");
+            return CommandLine.Misused;
+        }
+
+        var seconds = options.Number("for", 10e-3);
+
+        var traces = RunAndCollect(circuit, seconds);
+
+        circuit.Baseline = TraceBaseline.From(traces, options.Text("note") ?? "Recorded by cirq");
+
+        // Written back into the circuit, because that is where a baseline lives: it travels with
+        // the design, the way the requirements do, rather than in a file beside it that can be lost
+        // or get out of step.
+        File.WriteAllText(path, CircuitSerializer.ToJson(circuit));
+
+        output.WriteLine(
+            $"Recorded {circuit.Baseline.Traces.Count} trace(s) over {Seconds(seconds)} into " +
+            $"{Path.GetFileName(path)}");
+
+        return CommandLine.Ok;
+    }
+
+    /// <summary>Runs the circuit and says what moved since the baseline was recorded.</summary>
+    public static int Compare(Options options, TextWriter output, TextWriter error)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
+        var (circuit, exit) = Load(options, output, error);
+
+        if (circuit is null) return exit;
+
+        if (circuit.Baseline.IsEmpty)
+        {
+            error.WriteLine(
+                "cirq: this circuit has no baseline. Record one with cirq baseline, or take one in " +
+                "the application under Simulate > Baseline.");
+
+            return CommandLine.Misused;
+        }
+
+        var seconds = options.Number("for", 10e-3);
+        var quiet = options.Has("quiet");
+
+        var comparison = BaselineCheck.Against(circuit.Baseline, RunAndCollect(circuit, seconds));
+
+        if (!quiet)
+        {
+            foreach (var trace in comparison.Traces)
+            {
+                var mark = trace.IsUnchanged ? "same" : "MOVED";
+                var what = trace.Missing ? " — gone since the baseline"
+                    : trace.Added ? " — new since the baseline"
+                    : trace.Changes.Count == 0 ? string.Empty
+                    : " — " + string.Join(", ", trace.Changes.Select(Describe));
+
+                output.WriteLine($"  {mark}  {trace.Label}{what}");
+            }
+
+            output.WriteLine();
+        }
+
+        output.WriteLine(comparison.Summary());
+
+        return comparison.IsUnchanged ? CommandLine.Ok : CommandLine.Failed;
+    }
+
+    /// <summary>One measurement's move, in the words a person would use for it.</summary>
+    private static string Describe(MeasurementChange change) =>
+        change.Appeared ? $"{change.Quantity} appeared"
+        : change.Disappeared ? $"{change.Quantity} went away"
+        : double.IsNaN(change.Fraction)
+            ? $"{change.Quantity} {change.Was:g4} to {change.Now:g4}"
+            : $"{change.Quantity} {change.Fraction * 100:+0.#;-0.#}%";
+
+    /// <summary>Runs the circuit once and hands back what every probe recorded.</summary>
+    private static List<(string Label, string Unit, IReadOnlyList<DataPoint> Samples)> RunAndCollect(
+        Circuit circuit, double seconds)
+    {
+        var simulator = new CircuitSimulator(circuit);
+
+        simulator.Settings.ProbeSampleInterval = seconds / 4000.0;
+        simulator.Reset();
+        simulator.ResolveProbes();
+        simulator.RunTransient(seconds);
+
+        return [.. circuit.Probes.Select(p =>
+            (p.Label, p.Unit, (IReadOnlyList<DataPoint>)p.HistoryBuffer.ToArray()))];
     }
 
     /// <summary>Runs the circuit and writes what the probes recorded.</summary>

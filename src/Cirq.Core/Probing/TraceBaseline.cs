@@ -266,7 +266,15 @@ public static class BaselineCheck
 
             var scale = scaling switch
             {
-                Scaling.Swing => swing,
+                // Against the trace's own swing, which is what makes a millivolt of extra ripple on
+                // a five volt swing read as a small change. A trace that does not move has no swing
+                // to measure against, and dividing by it would leave a rail that fell from 5 V to
+                // 3.3 V reported as unchanged — so a flat trace is judged against its own level
+                // instead. That is the commonest thing anybody baselines: a supply.
+                Scaling.Swing => swing > 1e-30
+                    ? swing
+                    : Math.Max(Math.Abs(before.Value), Math.Abs(after.Value)),
+
                 Scaling.Fraction => 1.0,
 
                 // The larger of the two, so a figure that fell to nearly nothing counts as having
@@ -313,6 +321,12 @@ public static class BaselineCheck
         }
 
         var swing = Math.Max(was.Measurements.PeakToPeak, now.Measurements.PeakToPeak);
+
+        // The same fallback as above, and for the same reason: "half a volt out" means something
+        // different on a five volt swing and on a rail that is supposed to sit still, but it means
+        // nothing at all as a fraction of zero.
+        if (swing <= 1e-30)
+            swing = Math.Max(Math.Abs(was.Measurements.Mean), Math.Abs(now.Measurements.Mean));
 
         return (worst, swing > 1e-30 ? worst / swing : double.NaN);
     }
