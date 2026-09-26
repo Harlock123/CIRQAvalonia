@@ -184,6 +184,15 @@ falling back to Backward Euler on the first step after a discontinuity to damp t
 Inductors and transformers are solved in branch-current form, so mutual inductance is just an
 off-diagonal coefficient and a DC inductor is simply a short.
 
+**Behaviour as a formula.** A **behavioural source** — SPICE's `B` element — takes an expression
+rather than a gain: `= 2.5 * tanh(a)`, where `a`, `b` and `c` are its input pins and `t` is the
+time. It is solved as a non-linear device by linearising numerically: the formula is worked out at
+the iterate, its slope in each input measured by nudging that input a millivolt either way, and the
+source stamped as that value plus those slopes. A formula mentioning no pin is not iterated at all —
+a waveform written in `t` leaves the circuit linear. The notation is the one the scope and the
+parameters already use, deliberately: a second dialect of the same arithmetic is how an application
+ends up with two parsers that disagree about what `-2^2` means.
+
 **Non-linear.** Diodes, transistors, op-amps and regulators are iterated with damped Newton-Raphson.
 Bipolars use the Ebers-Moll transport model with an Early-effect output conductance; MOSFETs use the
 level-1 square law with drain/source reversal and an intrinsic body diode. The diode
@@ -286,7 +295,7 @@ and placed again, here or in another circuit — as a copy
 rather than a reference, which the docs say plainly rather than implying a link that is not there.
 **Notes, headings and boxes** can be put on the drawing too, and exports carry them.
 
-The palette has a **Find a part** box (`Ctrl+F`): 188 components in 16 groups is more than anybody
+The palette has a **Find a part** box (`Ctrl+F`): 189 components in 16 groups is more than anybody
 browses, and it matches on the name, on what the part does — `shift register` finds the 74164 — and
 on the group. Enter arms the first match, so a part can be found and placed without the mouse.
 
@@ -598,6 +607,7 @@ one passes against a button that would never have fired.
 | Spectrum | The transform of a constant landing entirely in the first bin, a length that is not a power of two refused rather than quietly wrong, a sine reading its own amplitude under all three windows, the DC term in bin zero at its own value, the peak found past the DC lobe rather than in its skirt, a square wave's odd harmonics at a third, a fifth and a seventh with no even ones at all, a modulated carrier's sidebands at half the modulation depth and nothing at twice the spacing, windowing keeping an awkward tone from smearing across everything, unevenly spaced samples still giving the right frequency and amplitude, and a transform no larger than the samples support |
 | Power and interface | A PPTC carrying its hold current for ever and tripping on a fault to a trickle rather than to nothing, and cooling back far slower than it tripped; a solid-state relay commanded at a mains peak refusing to fire until the next zero crossing and then conducting properly; an LM324 running four independent followers off one supply pair with the fourth saturating exactly where its family's headroom says; an A4988 holding 0.8 A out of a supply that would otherwise force 4.3 A, reversing the winding rather than switching it off, and commanding intermediate currents when microstepping is selected; and a MAX232 making ±8.5 V from a single 5 V rail, inverting TTL onto the line and back, deciding with half a volt of hysteresis, and sagging its pump when the line load is heavier than the standard allows |
 | New devices | Tri-state outputs genuinely releasing a bus where a pull-down alone then decides it, a CAN bus going dominant whenever any node sends a zero and the recessive node knowing it lost, an IGBT conducting with a voltage offset where a MOSFET holds a resistance and still passing current after its gate has gone, a photodiode linear across decades with a thousandth of a phototransistor's current and saturating when its load resistor is too big, and a synchronous counter whose carry is gated by the enable that chains it |
+| Behavioural sources | A linear formula agreeing exactly with the VCVS it imitates, six formulas giving back what the arithmetic says, a soft limiter matching 2.5·tanh to five figures across its knee, a current output driving its load the right way round, a formula in time alone being a waveform and not making the circuit non-linear, two sines multiplied producing the sum and difference frequencies and neither input, a formula that will not parse producing nothing rather than an arbitrary number, an unknown name refused, a division by zero costing an instant rather than the matrix, and an unwired input being zero rather than a singular matrix |
 | The command line | Every command against a real circuit file: a met requirement exiting 0 and an unmet one exiting 1, a circuit with no requirements or no probes being a misuse rather than a quiet pass, a file that is not there and a file that is not a circuit both reported rather than thrown, a number that is not a number refused before anything runs, the range check finding where a requirement gives out and passing over a range it survives, sweeping a part instead of the temperature, sweeping something that is not there, run writing a CSV with a real reading in it, netlist going to the screen and to a file, info naming the sheets — and help for a command describing that command rather than all of them |
 | Off-page nets | A net found on every page that names it and matched the way the netlist matches names, a label reporting the other pages its net is on and nothing when it stays put, an unsplit drawing having no crossings at all, following one walking the pages in order and coming back round, a net on one page having nowhere to go, and a part that is not a label not being a crossing |
 | Sheets | Each page showing its own parts and an unsplit drawing being all one page, a part naming a page that has been removed landing on the first rather than nowhere, the netlist being the same netlist however the pages are cut, the first added sheet making two without relabelling anything, a name already taken made unique, a rename bringing its parts and its tab, a blank or colliding one refused, removing a page moving what was on it rather than deleting it, the last page staying, a wire belonging to the page its ends are on, a band selection and a pasted part both respecting the page on screen, leaving a page dropping the selection on it while keeping a part on the page being gone to, and a saved circuit coming back with its pages, its tabs and the numbers it gives names to — plus the strip itself built in a real window, its tabs clicked through hit testing with the canvas following the one that was clicked, and a one-page circuit whose file is byte-for-byte what it always was |
@@ -732,7 +742,7 @@ When the solver cannot find an answer it now says **where**: the net that was st
 attached to it, and any part that said it had not settled — all of which name somewhere on the
 drawing to go and look, which "try a smaller time step" does not.
 
-The palette holds 188 components in 16 collapsible categories, with a **Find a part** box
+The palette holds 189 components in 16 collapsible categories, with a **Find a part** box
 (`Ctrl+F`) over them:
 
 ![The component palette: a Find a part box at the top, "186 parts in 16 groups" under it, and the sixteen categories with their counts — passive 11, switches 4, sources 14, semiconductors 13, transistors 11, LEDs and displays 9, power 10, analog ICs 13, logic gates 7, 74xx series 21, 40xx series 15, buses 17, digital I/O 8, sensors and actuators 18, switching and isolation 11, dev boards 4 — every group closed, so all sixteen headings fit on screen at once](docs/images/02-palette.png)

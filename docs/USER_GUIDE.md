@@ -37,27 +37,28 @@ the [README](../README.md), and what changed between releases is in the
 25. [Temperature](#temperature)
 26. [Feeding it a real waveform](#feeding-it-a-real-waveform)
 27. [Parameters](#parameters)
-28. [Ratings](#ratings)
-29. [Writing on the schematic](#writing-on-the-schematic)
-30. [Drawing part of a circuit as one block](#drawing-part-of-a-circuit-as-one-block)
-31. [Reusing a block](#reusing-a-block)
-32. [Plotting one trace against another](#plotting-one-trace-against-another)
-33. [Importing a SPICE model](#importing-a-spice-model)
-34. [Comparing and computing traces](#comparing-and-computing-traces)
-35. [Naming a net instead of drawing it](#naming-a-net-instead-of-drawing-it)
-36. [Sheets](#sheets)
-37. [What is this circuit?](#what-is-this-circuit)
-38. [Checking the circuit](#checking-the-circuit)
-39. [Development boards](#development-boards)
-40. [Saving and loading](#saving-and-loading)
-41. [Printing](#printing)
-42. [Exporting](#exporting)
-43. [The command line](#the-command-line)
-44. [Appearance](#appearance)
-45. [What version is this](#what-version-is-this)
-46. [Closing a dialog](#closing-a-dialog)
-47. [Keyboard reference](#keyboard-reference)
-48. [When a circuit will not simulate](#when-a-circuit-will-not-simulate)
+28. [A source that is a formula](#a-source-that-is-a-formula)
+29. [Ratings](#ratings)
+30. [Writing on the schematic](#writing-on-the-schematic)
+31. [Drawing part of a circuit as one block](#drawing-part-of-a-circuit-as-one-block)
+32. [Reusing a block](#reusing-a-block)
+33. [Plotting one trace against another](#plotting-one-trace-against-another)
+34. [Importing a SPICE model](#importing-a-spice-model)
+35. [Comparing and computing traces](#comparing-and-computing-traces)
+36. [Naming a net instead of drawing it](#naming-a-net-instead-of-drawing-it)
+37. [Sheets](#sheets)
+38. [What is this circuit?](#what-is-this-circuit)
+39. [Checking the circuit](#checking-the-circuit)
+40. [Development boards](#development-boards)
+41. [Saving and loading](#saving-and-loading)
+42. [Printing](#printing)
+43. [Exporting](#exporting)
+44. [The command line](#the-command-line)
+45. [Appearance](#appearance)
+46. [What version is this](#what-version-is-this)
+47. [Closing a dialog](#closing-a-dialog)
+48. [Keyboard reference](#keyboard-reference)
+49. [When a circuit will not simulate](#when-a-circuit-will-not-simulate)
 
 This guide is also attached to every [release](../../releases) as a PDF, with a contents page and
 the screenshots in place — the same document, laid out for reading away from the machine. Build it
@@ -164,13 +165,13 @@ Three of those are worth separating, because they are easy to confuse:
 
 Click a palette entry, then click the canvas. The part lands where you click, snapped to the grid.
 
-The palette holds **188 components in 16 categories**:
+The palette holds **189 components in 16 categories**:
 
 | Category | Count | Contents |
 | --- | --- | --- |
 | Passive | 11 | Resistor, capacitor, electrolytic capacitor, inductor, transformer, centre-tapped transformer, potentiometer, crystal, ferrite bead, **common-mode choke** and transmission line — see [below](#common-mode-chokes) |
 | Switches | 4 | SPST, SPDT, push button, **8-way DIP switch** |
-| Sources | 15 | Ground, **net label**, **loop probe**, DC voltage, DC current, **voltage- and current-controlled sources**, function generator, **waveform source**, battery, solar cell, **noise source**, and the three **annotations** — note, heading and area — see [below](#feeding-it-a-real-waveform) |
+| Sources | 16 | Ground, **net label**, **loop probe**, DC voltage, DC current, **voltage- and current-controlled sources**, the **behavioural source** whose output is a formula, function generator, **waveform source**, battery, solar cell, **noise source**, and the three **annotations** — note, heading and area — see [below](#feeding-it-a-real-waveform) |
 | Semiconductors | 13 | 1N4148, 1N4001, Schottky, zeners, **varactor**, **photodiode**, bridge rectifier, SCR, triac, diac, TVS and varistor — see [below](#three-ways-to-measure-light) |
 | Transistors | 11 | NPN and PNP bipolars, N- and P-channel MOSFETs, three JFETs and an **IGBT** — see [below](#the-igbt) |
 | LEDs & Displays | 9 | Six LED colours, seven-segment displays, **HD44780 character LCD** — see [below](#the-character-lcd) |
@@ -4411,6 +4412,67 @@ it, so an ordinary file is byte for byte what it was.
 Underneath, a bound setting is still a plain number on the part. An expression is a way of
 *setting* a value, not a second kind of value — which is why the solver, the parts list, the
 exporter and a hundred and eighty-eight component types know nothing about any of it.
+
+---
+
+## A source that is a formula
+
+Every other source in the palette is linear. A VCVS is `gain × v` and nothing else, so anything with
+a curve to it — a sensor's characteristic, a thermistor's law, a multiplier, an automatic gain
+control, a stage that runs out of headroom — could only be had by someone writing a new part in C#.
+
+The **Behavioural** source, under *Sources*, is written in a box instead:
+
+```
+= 2.5 * tanh(a)
+```
+
+![Two stacked plots. Above, the transfer curve of that formula: a straight line of slope 2.5 through
+the origin that bends over and flattens at plus and minus 2.5 volts, with the straight line it
+starts as drawn beside it for comparison. Below, an 8 V peak-to-peak sine going in and coming out
+with its peaks squashed flat at the limits](images/33-behavioural.png)
+
+The variables are the three input pins — **a**, **b** and **c**, each the voltage on that pin with
+respect to ground — and **t**, the time in seconds. `pi` is there as always. The notation is the one
+the scope's expression box and the [parameters](#parameters) already use: `+ - * / ^`, brackets, and
+`abs sqrt log log10 db exp sin cos tan sinh cosh tanh sign`.
+
+**Volts or amps**, from the *Output* setting. A voltage source holds its formula whatever the load
+does; a current source pushes its formula out of the positive pin whatever the voltage does.
+
+Some things it is good for:
+
+| Formula | What it is |
+| --- | --- |
+| `= 2.5 * tanh(a)` | A stage that saturates softly, the way a real amplifier runs out of headroom |
+| `= a * b` | A multiplier: a mixer, an AM modulator, a phase detector, a squarer |
+| `= a * a * 1e-3` | A square-law transconductance — a FET, near enough, without the model |
+| `= 5 * sin(2 * pi * 1000 * t) * exp(-t / 0.01)` | A decaying tone no stock source can make |
+| `= sqrt(abs(a))` | The curve a sensor gives you rather than the one you wanted |
+| `= 0.02 * (a - 25) + 1.0` | A calibration: something measured, turned into what it means |
+
+The **`t` variable is the one to notice**. A formula that mentions no input pin is a *waveform
+generator*, and the solver knows it: nothing in the circuit depends on the solution, so the circuit
+stays linear and costs nothing extra to run.
+
+### How it is solved, and what that costs
+
+It is solved the way a diode is. At each Newton iteration the formula is worked out at wherever the
+solver currently thinks the inputs are, its slope in each input is measured by nudging that input a
+millivolt either way, and the source is stamped as that value plus those slopes. The iteration
+repeats until the value stops moving.
+
+Two consequences worth knowing. **A formula with a corner in it is harder to solve than one without**
+— `sign(a)` steps, and a solver hunting across a step can take many iterations or fail to converge,
+where `tanh(a * 10)` is the same shape with a knee and converges immediately. And the slope is
+measured rather than differentiated, so a formula that changes very fast over less than a millivolt
+will have its slope under-reported; *Slope Step* in the properties panel is there for that, and
+almost never needs touching.
+
+A formula that does not parse leaves the source putting out **nothing** — zero volts, or an open
+circuit — rather than an arbitrary number, and says why on the part, where the rule check and the
+hover card both show it. A formula that produces something that is not a number, such as a division
+by zero, costs that one instant's output rather than the whole solve.
 
 ---
 

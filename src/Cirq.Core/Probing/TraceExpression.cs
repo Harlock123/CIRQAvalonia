@@ -91,6 +91,29 @@ public static class TraceExpression
     }
 
     /// <summary>
+    /// Parses an expression once, for a caller that will work it out many times over.
+    /// <para>
+    /// <see cref="Number"/> parses on every call, which is right for a parameter worked out when
+    /// somebody presses a button and wrong inside a solver: a part whose value is an expression is
+    /// asked for it several times per Newton iteration, several iterations per time point, for as
+    /// many time points as the run is long. Parsing the same eleven characters a few million times
+    /// is not a cost anybody should pay to write down a formula.
+    /// </para>
+    /// </summary>
+    public static Compiled Compile(
+        string expression, IEnumerable<string> names, string noun = DefaultNoun)
+    {
+        ArgumentNullException.ThrowIfNull(names);
+
+        var known = names.ToList();
+        List<string> used = [];
+
+        var tree = Parse(expression, known, used, noun);
+
+        return new Compiled(tree, used);
+    }
+
+    /// <summary>
     /// Checks an expression against a set of names without needing any samples, so a box can go
     /// red as it is typed rather than when it is run. Null when it is fine.
     /// </summary>
@@ -135,31 +158,56 @@ public static class TraceExpression
         return a.Value + ((time - a.Time) / span * (b.Value - a.Value));
     }
 
+    /// <summary>
+    /// An expression that has already been parsed, and the names it turned out to use.
+    /// </summary>
+    public sealed class Compiled
+    {
+        private readonly INode _tree;
+
+        internal Compiled(INode tree, IReadOnlyList<string> names)
+        {
+            _tree = tree;
+            Names = names;
+        }
+
+        /// <summary>The names it refers to, which is a subset of the ones it was compiled against.</summary>
+        public IReadOnlyList<string> Names { get; }
+
+        /// <summary>Works it out. The dictionary has to hold every name in <see cref="Names"/>.</summary>
+        public double Evaluate(IReadOnlyDictionary<string, double> values)
+        {
+            ArgumentNullException.ThrowIfNull(values);
+
+            return _tree.Evaluate(values);
+        }
+    }
+
     // ---- the grammar -------------------------------------------------------
 
-    private interface INode
+    internal interface INode
     {
         double Evaluate(IReadOnlyDictionary<string, double> values);
     }
 
-    private sealed record Constant(double Value) : INode
+    internal sealed record Constant(double Value) : INode
     {
         public double Evaluate(IReadOnlyDictionary<string, double> values) => Value;
     }
 
-    private sealed record Reference(string Name) : INode
+    internal sealed record Reference(string Name) : INode
     {
         public double Evaluate(IReadOnlyDictionary<string, double> values) =>
             values.TryGetValue(Name, out var value) ? value : 0.0;
     }
 
-    private sealed record Unary(INode Operand, Func<double, double> Apply) : INode
+    internal sealed record Unary(INode Operand, Func<double, double> Apply) : INode
     {
         public double Evaluate(IReadOnlyDictionary<string, double> values) =>
             Apply(Operand.Evaluate(values));
     }
 
-    private sealed record Binary(INode Left, INode Right, Func<double, double, double> Apply) : INode
+    internal sealed record Binary(INode Left, INode Right, Func<double, double, double> Apply) : INode
     {
         public double Evaluate(IReadOnlyDictionary<string, double> values) =>
             Apply(Left.Evaluate(values), Right.Evaluate(values));
@@ -187,7 +235,16 @@ public static class TraceExpression
 
             ["sin"] = Math.Sin,
             ["cos"] = Math.Cos,
+            ["tan"] = Math.Tan,
             ["sign"] = x => Math.Sign(x),
+
+            // The soft limit. Everything that saturates gently — an amplifier running out of
+            // headroom, a magnetic core, a compressor — is some scaling of this, and writing one
+            // without it means faking the knee with arithmetic that has a corner in it, which is
+            // exactly the shape a solver has most trouble with.
+            ["tanh"] = Math.Tanh,
+            ["sinh"] = Math.Sinh,
+            ["cosh"] = Math.Cosh,
         };
 
     /// <summary>

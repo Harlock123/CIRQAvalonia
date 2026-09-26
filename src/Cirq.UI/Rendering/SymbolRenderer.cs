@@ -93,6 +93,7 @@ public static class SymbolRenderer
             case DcCurrentSource: DrawCurrentSource(context, pen); break;
             case VoltageControlledVoltageSource: DrawControlledSource(context, pen, zoom, true); break;
             case VoltageControlledCurrentSource: DrawControlledSource(context, pen, zoom, false); break;
+            case BehaviouralSource behavioural: DrawBehaviouralSource(context, pen, zoom, behavioural); break;
             case FunctionGenerator fg: DrawFunctionGenerator(context, pen, fg); break;
             case WaveformSource: DrawWaveformSource(context, pen); break;
             case Led led: DrawLed(context, pen, led); break;
@@ -484,6 +485,46 @@ public static class SymbolRenderer
     /// symbol that carries information.
     /// </para>
     /// </summary>
+    /// <summary>
+    /// The behavioural source: the same diamond as a controlled source, marked <c>f(x)</c>, with
+    /// three named inputs rather than a differential pair.
+    /// <para>
+    /// A diamond because that is what a dependent source is drawn as everywhere, and the <c>f(x)</c>
+    /// because the thing that makes this one different is not visible in its shape — the formula is
+    /// written under it as its value, the way a resistance is.
+    /// </para>
+    /// </summary>
+    private static void DrawBehaviouralSource(
+        ISymbolCanvas context, IPen pen, double zoom, BehaviouralSource source)
+    {
+        context.DrawGeometry(CanvasTheme.SymbolFill, pen, SymbolPath.Polyline(
+        [
+            new Point(40, -24), new Point(64, 0), new Point(40, 24), new Point(16, 0),
+        ], true));
+
+        context.DrawLine(pen, new Point(40, -24), new Point(40, -20));
+        context.DrawLine(pen, new Point(40, 24), new Point(40, 20));
+
+        // The three inputs, each stubbed to the body and labelled with the letter the formula uses.
+        foreach (var (y, name) in new[] { (-24.0, "a"), (0.0, "b"), (24.0, "c") })
+        {
+            context.DrawLine(pen, new Point(-40, y), new Point(-18, y));
+
+            if (zoom > 0.6)
+                DrawCenteredText(context, name, new Point(-26, y - 9), 8, zoom, CanvasTheme.LabelBrush);
+        }
+
+        context.DrawLine(pen, new Point(-18, -24), new Point(-18, 24));
+
+        if (zoom > 0.45)
+        {
+            DrawCenteredText(
+                context,
+                source.Output == BehaviouralOutput.Volts ? "f(x) V" : "f(x) A",
+                new Point(40, 0), 9, zoom, CanvasTheme.LabelBrush);
+        }
+    }
+
     private static void DrawControlledSource(ISymbolCanvas context, IPen pen, double zoom, bool voltage)
     {
         // The output diamond, on the right where its pins are.
@@ -2638,6 +2679,9 @@ public static class SymbolRenderer
 
         // The flag is 10 either side of centre and the caption would sit on top of the name.
         NetLabel => 24.0,
+
+        // The diamond reaches 24 down, and the formula written under it needs room to be long.
+        BehaviouralSource => 34.0,
 
         // A block states its own height, and its designator goes below whatever that is.
         Subcircuit block => block.HalfHeight + 14,

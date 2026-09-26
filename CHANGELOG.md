@@ -8,6 +8,27 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**A source whose output is a formula.** SPICE's `B` element, under *Sources* in the palette. Type
+`= 2.5 * tanh(a)` into it and that is what it does.
+
+Everything else in Sources is linear — a VCVS is `gain × v` and nothing else — so until now anything
+with a curve to it had to be written in C# and built into the application: a sensor's
+characteristic, a thermistor's law, a multiplier, an automatic gain control, a stage that runs out
+of headroom. The variables are the three input pins `a`, `b` and `c`, and `t`, the time in seconds,
+which makes it an arbitrary waveform generator as well: `= 5 * sin(2 * pi * 1000 * t) * exp(-t /
+0.01)` is a decaying tone no combination of the stock sources produces.
+
+The notation is the one the scope's expression box and the circuit parameters already use, and it
+gained `tanh`, `sinh`, `cosh` and `tan` on the way — a soft limit is what almost everything that
+saturates actually does, and faking the knee with arithmetic that has a corner in it gives a solver
+the one shape it has most trouble with.
+
+It is solved the way a diode is: the formula is worked out at the current iterate, its slope in each
+input measured by nudging that input a millivolt either way, and the source stamped as that value
+plus those slopes. A formula that mentions no pin is not iterated at all — the circuit stays linear,
+so a waveform costs nothing extra. A formula that will not parse leaves the source putting out
+nothing rather than an arbitrary number, and says why on the part.
+
 ## [0.37.0] - 2026-09-25
 
 The engine without the editor, on a command line that exits non-zero when a circuit stops meeting

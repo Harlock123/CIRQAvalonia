@@ -118,6 +118,8 @@ public static class ComponentCatalog
                 () => new VoltageControlledVoltageSource()),
             new("VCCS", "Voltage-controlled current source — SPICE's G element, which is what an op-amp's input stage actually is",
                 () => new VoltageControlledCurrentSource()),
+            new("Behavioural", "A source whose output is a formula — SPICE's B element. Write = 2.5 * tanh(a) and that is what it does",
+                () => new BehaviouralSource()),
             new("Battery", "A cell that sags under load and runs down — 9 V alkaline by default",
                 () => new Battery()),
             new("Solar Cell", "A photovoltaic panel with its knee — double-click to shade it",

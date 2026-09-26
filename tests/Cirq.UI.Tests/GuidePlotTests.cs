@@ -877,4 +877,100 @@ public class GuidePlotTests
 
         DocPlot.Save(plot, "31-over-temperature.png");
     }
+
+    // ---- a source written as a formula -------------------------------------
+
+    /// <summary>
+    /// A soft limiter written in a box: its transfer curve above, and what it does to a sine below.
+    /// </summary>
+    [Fact]
+    public void BehaviouralSource()
+    {
+        var circuit = new Circuit();
+
+        var input = circuit.Add(new DcVoltageSource(0) { Name = "V1" });
+        var stage = circuit.Add(new BehaviouralSource("= 2.5 * tanh(a)") { Name = "B1" });
+        var load = circuit.Add(new Resistor(1e3));
+        var ground = Gnd(circuit);
+
+        circuit.Connect(input.Negative, ground.Pin);
+        circuit.Connect(input.Positive, stage.A);
+        circuit.Connect(stage.OutputPositive, load.A);
+        circuit.Connect(load.B, ground.Pin);
+        circuit.Connect(stage.OutputNegative, ground.Pin);
+
+        circuit.Probes.Add(new SignalProbe("Out", stage.OutputPositive, default));
+
+        var sim = new CircuitSimulator(circuit);
+        sim.Reset();
+        sim.SolveOperatingPoint();
+        sim.ResolveProbes();
+
+        // The transfer curve, by sweeping the input the way a curve tracer would.
+        var swept = new DcSweep(sim).Run(new DcSweepRequest(
+            new SweepTarget(input, nameof(DcVoltageSource.Voltage), -5, 5, 81)));
+
+        var curve = swept.Curves[0].Traces[0].Values;
+
+        // What the picture claims: a straight line at the origin, flat at the ends.
+        var middle = (curve[41] - curve[39]) / (swept.X[41] - swept.X[39]);
+        var edge = (curve[^1] - curve[^3]) / (swept.X[^1] - swept.X[^3]);
+
+        Assert.True(middle > 2.0, $"the small-signal gain should be about 2.5: {middle:g3}");
+        Assert.True(edge < 0.02, $"it should be flat at the ends: {edge:g3}");
+
+        // And a sine through it, which is where the flattening is visible as a shape.
+        var wave = new Circuit();
+
+        var tone = wave.Add(new FunctionGenerator(Waveform.Sine, 1e3, 8.0) { Name = "V1" });
+        var limiter = wave.Add(new BehaviouralSource("= 2.5 * tanh(a)") { Name = "B1" });
+        var burden = wave.Add(new Resistor(1e3));
+        var earth = Gnd(wave);
+
+        wave.Connect(tone.B, earth.Pin);
+        wave.Connect(tone.A, limiter.A);
+        wave.Connect(limiter.OutputPositive, burden.A);
+        wave.Connect(burden.B, earth.Pin);
+        wave.Connect(limiter.OutputNegative, earth.Pin);
+
+        var driven = new SignalProbe("In", limiter.A, default);
+        var limited = new SignalProbe("Out", limiter.OutputPositive, default);
+
+        wave.Probes.Add(driven);
+        wave.Probes.Add(limited);
+
+        var run = new CircuitSimulator(wave, new SimulationSettings { TimeStep = 1e-6 });
+
+        run.Reset();
+        run.SolveOperatingPoint();
+        run.ResolveProbes();
+        run.Run(3e-3);
+
+        var inSamples = driven.HistoryBuffer.ToArray();
+        var outSamples = limited.HistoryBuffer.ToArray();
+
+        Assert.True(outSamples.Max(s => s.Value) < 2.5, "the output went past the limit");
+        Assert.True(inSamples.Max(s => s.Value) > 3.5, "the input was not driven hard enough");
+
+        DocPlot.Stack("33-behavioural.png", (transfer, shape) =>
+        {
+            DocPlot.Style(transfer, "In (V)", "Out (V)");
+            DocPlot.Line(transfer, swept.X, curve, 0, "= 2.5 * tanh(a)");
+            DocPlot.Line(transfer, swept.X, swept.X.Select(v => Math.Clamp(v * 2.5, -12, 12)), 4,
+                "the straight line it starts as");
+
+            DocPlot.Reference(transfer, 2.5, "+2.5 V");
+            DocPlot.Reference(transfer, -2.5, "−2.5 V");
+            transfer.Axes.SetLimitsY(-4, 4);
+            DocPlot.Legend(transfer);
+            DocPlot.Title(transfer, "The transfer curve of a formula: straight through the middle, flat at the ends");
+
+            DocPlot.Style(shape, "Time (s)", "Volts");
+            DocPlot.SiBottom(shape);
+            DocPlot.Line(shape, inSamples.Select(s => s.Time), inSamples.Select(s => s.Value), 1, "in");
+            DocPlot.Line(shape, outSamples.Select(s => s.Time), outSamples.Select(s => s.Value), 0, "out");
+            DocPlot.Legend(shape);
+            DocPlot.Title(shape, "An 8 V peak-to-peak sine through it, squashed rather than clipped");
+        });
+    }
 }
