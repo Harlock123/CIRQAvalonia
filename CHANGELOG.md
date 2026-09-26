@@ -8,6 +8,14 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+## [0.39.0] - 2026-09-26
+
+A block can be given a symbol, and opened to measure inside it. Eight signals can be drawn as one
+bus. The tolerance analysis runs on every core. And a printed sheet has a title block on it. 191
+components in 16 categories, 87 worked examples, 3752 tests.
+
+### Added
+
 **A block can be given a symbol.** *Edit > Draw the Block's Symbol* opens an editor: the size of the
 body, a pin on whichever edge you want it at whatever height, and the pins named the way a datasheet
 would name them — `IN+`, `OUT`, `GND` — instead of `R1.A`. The block itself is drawn beside the
@@ -17,11 +25,6 @@ Apply to find out what you drew is one nobody can draw with.
 Every block was the same grey box with its pins alternating down the sides. That is fine for hiding
 a section and useless for making a part: what tells somebody at a glance that this is an amplifier
 and that one a regulator is its shape and where its pins are.
-
-Drawing the figure for the guide turned up a bug that had been there since blocks existed: a pin's
-position was worked out from how tall the block was *when that pin was added*, and the block grows
-as pins are added — so a block with five pins drew two of them on top of each other. Every pin is
-now placed again each time one is brought out.
 
 It is drawing and only drawing. A pin that moves or is renamed is **the same pin** — identity is the
 terminal, not its position or its label — so every wire on it stays on it, every probe watching it
@@ -90,6 +93,13 @@ no revision on it is worse, because somebody will build from it.
 KiCad netlist, and the BOM — which is what somebody actually orders from — did not have it. It is
 now a column, and two parts alike on the drawing but to be built as different packages are two
 lines, because they are two things to order.
+
+### Fixed
+
+**A block with five pins drew two of them on top of each other.** As old as blocks, and found while
+drawing the guide's picture of the symbol editor: a pin's position was worked out from how tall the
+block was *at the moment that pin was added*, and a block grows as pins are brought out. Every pin
+is now placed again each time one is added.
 
 ## [0.38.0] - 2026-09-26
 
@@ -2316,7 +2326,8 @@ First public build of CirqAvalonia — an electronic circuit analyzer and mixed-
 
 **501 tests** measure the solver against closed-form answers rather than recorded output.
 
-[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.38.0...HEAD
+[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.39.0...HEAD
+[0.39.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.38.0...v0.39.0
 [0.38.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.37.0...v0.38.0
 [0.37.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.36.0...v0.37.0
 [0.36.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.35.0...v0.36.0

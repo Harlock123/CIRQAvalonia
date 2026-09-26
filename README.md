@@ -33,7 +33,7 @@ Core ← Engine ← Components ← UI, which keeps the whole engine headless-tes
 ```bash
 dotnet run --project src/Cirq.UI     # the editor
 dotnet run --project src/Cirq.Cli    # the same engine, no window
-dotnet test                          # 3674 tests
+dotnet test                          # 3752 tests
 ./scripts/build-guide.sh             # the user guide as a PDF
 ```
 
