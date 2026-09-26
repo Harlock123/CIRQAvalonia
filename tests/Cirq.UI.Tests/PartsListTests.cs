@@ -5,12 +5,21 @@ using Cirq.Components.Sources;
 using Cirq.Core.Topology;
 using Cirq.UI.Services;
 
+using Cirq.UI.Tests.Support;
+
 namespace Cirq.UI.Tests;
+
+// Rendering tests share the window session's collection so they cannot run while another test is
+// changing the application's theme. The canvas colours are resolved through a static cache that a
+// theme change invalidates, so a render in one collection and an Apply in another is a race — and
+// it was one: four different colour-sensitive tests failed once each under load, each passing on
+// its own. See WindowSession.
 
 /// <summary>
 /// A parts list is a bill of materials, so the grouping is the whole job: three 10k resistors are
 /// one line and a 4k7 among them is another.
 /// </summary>
+[Collection(WindowCollection.Name)]
 public class PartsListTests
 {
     private static Circuit Circuit(params CircuitComponent[] components)

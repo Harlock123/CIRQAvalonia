@@ -8,6 +8,20 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**The worst case can include the temperature.** Tick *and over* beside the worst-case button in
+*Simulate > Tolerance* and the temperature becomes one more axis to push, with two boxes for the
+range.
+
+Corner analysis varied the parts and nothing else, so the number it gave was the worst case *at room
+temperature* — which is not the number anybody signs a design off against. Temperature is the one
+variable that moves everything at once, so a circuit whose parts happen to cancel at 27 °C may have
+nothing cancelling at 85, and no amount of pushing resistors around their bands finds that.
+
+It is one more axis rather than a second analysis: the same n-solves-not-2ⁿ search, the same recipe
+at the end, now reading "highest with R1 low, temperature low". Off by default, because it needs a
+range somebody has decided on. While in there: the corner analysis was finding its corners at the
+default 27 °C even for a circuit saved to run at 85. It now starts from the document's own ambient.
+
 **A source whose output is a formula.** SPICE's `B` element, under *Sources* in the palette. Type
 `= 2.5 * tanh(a)` into it and that is what it does.
 

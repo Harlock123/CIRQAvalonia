@@ -5,7 +5,15 @@ using Cirq.Core.Topology;
 using Cirq.Engine.Simulation;
 using Cirq.UI.Services;
 
+using Cirq.UI.Tests.Support;
+
 namespace Cirq.UI.Tests;
+
+// Rendering tests share the window session's collection so they cannot run while another test is
+// changing the application's theme. The canvas colours are resolved through a static cache that a
+// theme change invalidates, so a render in one collection and an Apply in another is a race — and
+// it was one: four different colour-sensitive tests failed once each under load, each passing on
+// its own. See WindowSession.
 
 /// <summary>
 /// What every net is sitting at and what every part is doing.
@@ -15,6 +23,7 @@ namespace Cirq.UI.Tests;
 /// ever says something else then one of the two is wrong and it is not the arithmetic.
 /// </para>
 /// </summary>
+[Collection(WindowCollection.Name)]
 public class LiveValuesTests
 {
     /// <summary>

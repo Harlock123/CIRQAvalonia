@@ -7,12 +7,21 @@ using Cirq.UI.Rendering;
 using Cirq.UI.Services;
 using SkiaSharp;
 
+using Cirq.UI.Tests.Support;
+
 namespace Cirq.UI.Tests;
+
+// Rendering tests share the window session's collection so they cannot run while another test is
+// changing the application's theme. The canvas colours are resolved through a static cache that a
+// theme change invalidates, so a render in one collection and an Apply in another is a race — and
+// it was one: four different colour-sensitive tests failed once each under load, each passing on
+// its own. See WindowSession.
 
 /// <summary>
 /// The exporter writes real files, so these check the bytes rather than that a method ran: the
 /// magic numbers, the dimensions in the headers, and that the drawing actually reached the page.
 /// </summary>
+[Collection(WindowCollection.Name)]
 public class ExportTests : IDisposable
 {
     private readonly string _directory =
@@ -381,6 +390,7 @@ public class ExportTests : IDisposable
 }
 
 /// <summary>The menu command around the exporter: what it asks, and what it does with the answer.</summary>
+[Collection(WindowCollection.Name)]
 public class ExportCommandTests : IDisposable
 {
     private readonly List<string> _files = [];
@@ -501,6 +511,7 @@ public class ExportCommandTests : IDisposable
 /// it draws, which on a bitmap wiped the schematic above it — so the exporter has to confine a
 /// scope to the area it was given rather than trusting it.
 /// </summary>
+[Collection(WindowCollection.Name)]
 public class ScopeContainmentTests
 {
     private sealed class ClearingScope : IScopeSource

@@ -3,12 +3,21 @@ using Cirq.Components.Sources;
 using Cirq.Core.Topology;
 using Cirq.UI.Services;
 
+using Cirq.UI.Tests.Support;
+
 namespace Cirq.UI.Tests;
+
+// Rendering tests share the window session's collection so they cannot run while another test is
+// changing the application's theme. The canvas colours are resolved through a static cache that a
+// theme change invalidates, so a render in one collection and an Apply in another is a race — and
+// it was one: four different colour-sensitive tests failed once each under load, each passing on
+// its own. See WindowSession.
 
 /// <summary>
 /// The parts list as a file rather than a page. The circuit already knows every part in it and
 /// what each is set to; this is that list in the form somebody ordering the parts actually wants.
 /// </summary>
+[Collection(WindowCollection.Name)]
 public class BomExportTests : IDisposable
 {
     private readonly string _path =

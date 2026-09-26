@@ -46,6 +46,20 @@
 
         <Button Content="Worst case" Command="{Binding FindCornersCommand}" Padding="14,5"
                 ToolTip.Tip="The worst this circuit can ever be, rather than the worst these trials happened to be. Random sampling essentially never lands on the corner where every part is at its extreme the same way — that is one combination out of two to the number of parts." />
+
+        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+          <CheckBox AutomationProperties.Name="Include the temperature in the worst case"
+                    Content="and over" IsChecked="{Binding IncludeTemperature, Mode=TwoWay}"
+                    ToolTip.Tip="Vary the temperature as well as the parts. The worst case off the parts bin is not the worst case in the field, because every junction in the circuit moves together with the temperature." />
+          <TextBox AutomationProperties.Name="The cold end of the range, in Celsius" Width="52"
+                   IsEnabled="{Binding IncludeTemperature}"
+                   Text="{Binding ColdCelsius, Mode=TwoWay}" />
+          <TextBlock Text="to" VerticalAlignment="Center" Opacity="0.7" />
+          <TextBox AutomationProperties.Name="The hot end of the range, in Celsius" Width="52"
+                   IsEnabled="{Binding IncludeTemperature}"
+                   Text="{Binding HotCelsius, Mode=TwoWay}" />
+          <TextBlock Text="°C" VerticalAlignment="Center" Opacity="0.7" />
+        </StackPanel>
       </StackPanel>
     </Border>
 

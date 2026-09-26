@@ -5,12 +5,21 @@ using Cirq.Core.Probing;
 using Cirq.Core.Topology;
 using Cirq.UI.Services;
 
+using Cirq.UI.Tests.Support;
+
 namespace Cirq.UI.Tests;
+
+// Rendering tests share the window session's collection so they cannot run while another test is
+// changing the application's theme. The canvas colours are resolved through a static cache that a
+// theme change invalidates, so a render in one collection and an Apply in another is a race — and
+// it was one: four different colour-sensitive tests failed once each under load, each passing on
+// its own. See WindowSession.
 
 /// <summary>
 /// The two text exports, through the same entry point the picture formats use — so they are found
 /// where somebody already looks rather than on a menu of their own.
 /// </summary>
+[Collection(WindowCollection.Name)]
 public class TextExportTests : IDisposable
 {
     private readonly string _directory =

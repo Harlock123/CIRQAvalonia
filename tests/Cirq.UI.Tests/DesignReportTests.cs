@@ -5,7 +5,15 @@ using Cirq.Core.Topology;
 using Cirq.Core.Verification;
 using Cirq.UI.Services;
 
+using Cirq.UI.Tests.Support;
+
 namespace Cirq.UI.Tests;
+
+// Rendering tests share the window session's collection so they cannot run while another test is
+// changing the application's theme. The canvas colours are resolved through a static cache that a
+// theme change invalidates, so a render in one collection and an Apply in another is a race — and
+// it was one: four different colour-sensitive tests failed once each under load, each passing on
+// its own. See WindowSession.
 
 /// <summary>
 /// One page with the drawing, what it is, the requirements and the parts.
@@ -15,6 +23,7 @@ namespace Cirq.UI.Tests;
 /// and is read somewhere else, so a designator with an ampersand in it must not break the page.
 /// </para>
 /// </summary>
+[Collection(WindowCollection.Name)]
 public class DesignReportTests
 {
     private static Circuit Divider()

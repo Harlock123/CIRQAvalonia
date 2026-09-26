@@ -7,7 +7,25 @@ namespace Cirq.Engine.Simulation;
 
 /// <summary>What a corner analysis was asked for.</summary>
 /// <param name="Probe">The probe whose extremes are being hunted. Null takes the first.</param>
-public sealed record CornerRequest(SignalProbe? Probe = null);
+/// <param name="Over">
+/// A temperature range to include as one more axis, or null to hold the circuit at the temperature
+/// it is set to.
+/// <para>
+/// Worth asking for separately rather than always doing, because it is a different question. "The
+/// worst this can be off the parts bin" and "the worst this can be off the parts bin anywhere in
+/// the car" are both real, and the second needs a range somebody has decided on.
+/// </para>
+/// </param>
+public sealed record CornerRequest(SignalProbe? Probe = null, TemperatureRange? Over = null);
+
+/// <summary>The two ends of a temperature range, in degrees Celsius.</summary>
+public sealed record TemperatureRange(double ColdCelsius, double HotCelsius)
+{
+    /// <summary>The commercial and industrial band most parts are specified over.</summary>
+    public static TemperatureRange Industrial { get; } = new(-40, 85);
+
+    public bool IsEmpty => Math.Abs(HotCelsius - ColdCelsius) < 1e-9;
+}
 
 /// <summary>Which way a part was pushed at a corner.</summary>
 public enum CornerDirection
@@ -113,12 +131,14 @@ public sealed class CornerAnalysis
         request ??= new CornerRequest();
 
         var targets = MonteCarlo.Targets(_circuit).ToList();
+        var varying = request.Over is { IsEmpty: false };
 
-        if (targets.Count == 0)
+        if (targets.Count == 0 && !varying)
         {
             return CornerResult.Unusable(
-                "No part in this circuit has a tolerance. Set one on a resistor, capacitor or " +
-                "inductor in the properties panel — they default to exact.");
+                "No part in this circuit has a tolerance, and no temperature range was given. Set " +
+                "a tolerance on a resistor, capacitor or inductor in the properties panel — they " +
+                "default to exact — or ask for a range.");
         }
 
         var probe = request.Probe ?? _circuit.Probes.FirstOrDefault();
@@ -126,7 +146,15 @@ public sealed class CornerAnalysis
         if (probe is null)
             return CornerResult.Unusable("Nothing to measure — put a probe on the node you care about.");
 
-        var simulator = new CircuitSimulator(_circuit);
+        // Started from the circuit's own ambient rather than from the default: a circuit saved to
+        // run at 85 °C has its corners at 85 °C, and finding them at 27 would be answering about a
+        // different circuit.
+        var settings = new SimulationSettings
+        {
+            TemperatureKelvin = _circuit.AmbientTemperatureCelsius + 273.15,
+        };
+
+        var simulator = new CircuitSimulator(_circuit, settings);
 
         simulator.Reset();
         simulator.SolveOperatingPoint();
@@ -156,27 +184,44 @@ public sealed class CornerAnalysis
         if (nominal is null)
             return CornerResult.Unusable("The circuit does not solve at its marked values.");
 
+        // Every part with a tolerance, and the temperature if a range was asked for, as the same
+        // kind of thing: something with a low end, a high end and a value in the middle. The rest
+        // of the analysis then has one case to think about instead of two.
+        List<Axis> axes = [.. targets.Select(Axis.For)];
+
+        if (request.Over is { IsEmpty: false } range)
+        {
+            var was = settings.TemperatureKelvin - 273.15;
+
+            axes.Add(new Axis(
+                "temperature",
+                Math.Min(range.ColdCelsius, range.HotCelsius),
+                Math.Max(range.ColdCelsius, range.HotCelsius),
+                was,
+                celsius => settings.TemperatureKelvin = celsius + 273.15));
+        }
+
         try
         {
-            // Which way each part pushes, one at a time. n solves rather than 2ⁿ, and the only
+            // Which way each axis pushes, one at a time. n solves rather than 2ⁿ, and the only
             // thing that makes a corner analysis affordable on a circuit with twenty parts in it.
-            List<(MonteCarlo.ToleranceTarget Target, int Sign)> pushes = [];
+            List<(Axis Axis, int Sign)> pushes = [];
 
-            foreach (var target in targets)
+            foreach (var axis in axes)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                target.Property.SetValue(target.Component, target.Nominal * (1 + target.Tolerance));
+                axis.Set(axis.High);
 
                 var raised = Read();
 
-                target.Property.SetValue(target.Component, target.Nominal);
+                axis.Set(axis.Nominal);
 
-                // A part the answer does not depend on is left at nominal: putting it at an
+                // Something the answer does not depend on is left where it was: putting it at an
                 // extreme would be noise in the recipe rather than part of it.
                 var sign = raised is null ? 0 : Math.Sign(raised.Value - nominal.Value);
 
-                pushes.Add((target, sign));
+                pushes.Add((axis, sign));
             }
 
             var highest = Extreme(pushes, +1, Read);
@@ -186,12 +231,11 @@ public sealed class CornerAnalysis
                 return CornerResult.Unusable("A corner of this circuit could not be solved.");
 
             return new CornerResult(
-                probe.Label, nominal.Value, lowest, highest, targets.Count, solves);
+                probe.Label, nominal.Value, lowest, highest, axes.Count, solves);
         }
         finally
         {
-            foreach (var target in targets)
-                target.Property.SetValue(target.Component, target.Nominal);
+            foreach (var axis in axes) axis.Set(axis.Nominal);
 
             simulator.System.ResetSolution();
 
@@ -208,34 +252,45 @@ public sealed class CornerAnalysis
     }
 
     /// <summary>
-    /// Every part pushed the way that moves the answer in one direction, solved once.
+    /// Every axis pushed the way that moves the answer in one direction, solved once.
     /// </summary>
-    private static Corner? Extreme(
-        List<(MonteCarlo.ToleranceTarget Target, int Sign)> pushes, int direction, Func<double?> read)
+    private static Corner? Extreme(List<(Axis Axis, int Sign)> pushes, int direction, Func<double?> read)
     {
         List<CornerSetting> settings = [];
 
-        foreach (var (target, sign) in pushes)
+        foreach (var (axis, sign) in pushes)
         {
             if (sign == 0)
             {
-                target.Property.SetValue(target.Component, target.Nominal);
+                axis.Set(axis.Nominal);
                 continue;
             }
 
             var high = sign == direction;
-            var value = target.Nominal * (1 + (high ? target.Tolerance : -target.Tolerance));
+            var value = high ? axis.High : axis.Low;
 
-            target.Property.SetValue(target.Component, value);
+            axis.Set(value);
 
             settings.Add(new CornerSetting(
-                target.Component.Name,
-                high ? CornerDirection.High : CornerDirection.Low,
-                value));
+                axis.Name, high ? CornerDirection.High : CornerDirection.Low, value));
         }
 
         var reading = read();
 
         return reading is null ? null : new Corner(reading.Value, settings);
+    }
+
+    /// <summary>
+    /// Something a corner can be pushed along: a part's value inside its tolerance band, or the
+    /// temperature between two limits.
+    /// </summary>
+    private sealed record Axis(string Name, double Low, double High, double Nominal, Action<double> Set)
+    {
+        public static Axis For(MonteCarlo.ToleranceTarget target) => new(
+            target.Component.Name,
+            target.Nominal * (1 - target.Tolerance),
+            target.Nominal * (1 + target.Tolerance),
+            target.Nominal,
+            value => target.Property.SetValue(target.Component, value));
     }
 }

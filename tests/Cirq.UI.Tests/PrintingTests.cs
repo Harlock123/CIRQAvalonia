@@ -5,13 +5,22 @@ using Cirq.Core.Topology;
 using Cirq.UI.Services;
 using Cirq.UI.ViewModels;
 
+using Cirq.UI.Tests.Support;
+
 namespace Cirq.UI.Tests;
+
+// Rendering tests share the window session's collection so they cannot run while another test is
+// changing the application's theme. The canvas colours are resolved through a static cache that a
+// theme change invalidates, so a render in one collection and an Apply in another is a race — and
+// it was one: four different colour-sensitive tests failed once each under load, each passing on
+// its own. See WindowSession.
 
 /// <summary>
 /// The printable document: a real sheet size, the drawing fitted on it, and a header saying what
 /// it is. Avalonia has no print API, so what "printing" means here is producing that document and
 /// handing it to the system — and the document is the part worth checking.
 /// </summary>
+[Collection(WindowCollection.Name)]
 public class PrintingTests : IDisposable
 {
     private readonly string _directory =

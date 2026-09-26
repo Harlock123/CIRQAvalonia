@@ -4086,6 +4086,18 @@ the worst one, and the sampled spread is the better tool.
 A part the answer does not depend on is left at its marked value rather than pushed anywhere,
 because putting it somewhere would be noise in the recipe rather than part of it.
 
+**And over −40 to 85 °C.** Tick *and over* beside the button and the temperature becomes one more
+thing to push, with the two boxes setting the range. It is off by default because it is a different
+question: "the worst this can be off the parts bin" and "the worst it can be off the parts bin
+anywhere in the car" are both real, and the second needs a range somebody has decided on.
+
+It matters more than another 5 % part would. Temperature is the one variable that moves *everything
+at once* — every junction drop, every transistor's gain, every leakage current — so a circuit whose
+parts happen to cancel at 27 °C may have nothing cancelling at 85. The recipe names it like any
+other axis: **highest with R1 low, temperature low**. The corner is found at the circuit's own
+ambient when the box is unticked, so a design saved to run at 85 °C has its corners at 85 °C rather
+than at room temperature.
+
 
 ![A histogram of four hundred builds of a divider made from two five percent resistors: a rough bell centred on the nominal five volts, with the extremes reaching about four and a half percent either side](images/23-tolerance.png)
 

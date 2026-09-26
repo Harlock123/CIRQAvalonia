@@ -240,4 +240,88 @@ public class MonteCarloViewModelTests
         Assert.Equal(2, model.Varied.Count);
         Assert.Contains(model.Varied, v => v.Contains("20"));
     }
+
+    // ---- the worst case, with the temperature in it -------------------------
+
+    /// <summary>
+    /// A diode reference with an exact feed resistor: nothing about the parts can move the answer,
+    /// so anything the worst case finds is the temperature moving it.
+    /// </summary>
+    private static Circuit Reference()
+    {
+        var circuit = new Circuit();
+
+        var supply = circuit.Add(new DcVoltageSource(5.0));
+        var series = circuit.Add(new Resistor(10e3) { Name = "R1", Tolerance = 0 });
+        var diode = circuit.Add(new Cirq.Components.Nonlinear.Diode());
+        var ground = circuit.Add(new Ground());
+
+        circuit.Connect(supply.Negative, ground.Pin);
+        circuit.Connect(supply.Positive, series.A);
+        circuit.Connect(series.B, diode.Anode);
+        circuit.Connect(diode.Cathode, ground.Pin);
+
+        circuit.Probes.Add(new SignalProbe("Vf", diode.Anode, Color.ProbePalette[0]));
+
+        return circuit;
+    }
+
+    [Fact]
+    public void TheWorstCaseLeavesTheTemperatureAloneUnlessAsked()
+    {
+        var vm = new MonteCarloViewModel(Reference());
+
+        Assert.False(vm.IncludeTemperature);
+        Assert.Equal(-40, vm.ColdCelsius);
+        Assert.Equal(85, vm.HotCelsius);
+
+        vm.FindCornersCommand.Execute(null);
+
+        // Nothing has a tolerance and no range was asked for, so there is nothing to vary.
+        Assert.False(vm.HasCorners);
+        Assert.Contains("no temperature range", vm.CornerSummary);
+    }
+
+    [Fact]
+    public void AskingForTheRangeMakesTheTemperatureACorner()
+    {
+        var vm = new MonteCarloViewModel(Reference()) { IncludeTemperature = true };
+
+        vm.FindCornersCommand.Execute(null);
+
+        Assert.True(vm.HasCorners, vm.CornerSummary);
+        Assert.Contains("across -40 to 85 °C", vm.CornerSummary);
+
+        // A diode drops more when it is cold, so the high corner is the cold end.
+        Assert.Contains("temperature low", vm.Corners[0]);
+        Assert.Contains("temperature high", vm.Corners[1]);
+    }
+
+    [Fact]
+    public void TheRangeIsTheOneTyped()
+    {
+        var vm = new MonteCarloViewModel(Reference())
+        {
+            IncludeTemperature = true,
+            ColdCelsius = 0,
+            HotCelsius = 50,
+        };
+
+        vm.FindCornersCommand.Execute(null);
+
+        Assert.Contains("across 0 to 50 °C", vm.CornerSummary);
+
+        // Half the span of the industrial range moves a diode drop about half as far.
+        var narrow = Spread(vm);
+
+        var wide = new MonteCarloViewModel(Reference()) { IncludeTemperature = true };
+        wide.FindCornersCommand.Execute(null);
+
+        Assert.True(Spread(wide) > narrow, "the wider range should have found the wider spread");
+    }
+
+    private static double Spread(MonteCarloViewModel vm) =>
+        double.Parse(
+            System.Text.RegularExpressions.Regex.Match(vm.CornerSummary, @"spread ([0-9.]+)").Groups[1].Value,
+            System.Globalization.CultureInfo.InvariantCulture);
 }

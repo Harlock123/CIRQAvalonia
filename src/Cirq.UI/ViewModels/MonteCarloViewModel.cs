@@ -158,6 +158,24 @@ public sealed partial class MonteCarloViewModel : ObservableObject
     /// run, because it is a different question and costs a different amount: a solve per part and
     /// a couple more, against several hundred for the trials.
     /// </summary>
+    /// <summary>
+    /// Whether the worst case includes the temperature as well as the parts.
+    /// <para>
+    /// Off by default, because it is a different question and needs a range somebody has decided
+    /// on. "The worst this can be off the parts bin" and "the worst it can be off the parts bin
+    /// anywhere in the car" are both real questions, and answering the second when the first was
+    /// asked would quietly widen every number.
+    /// </para>
+    /// </summary>
+    [ObservableProperty]
+    public partial bool IncludeTemperature { get; set; }
+
+    [ObservableProperty]
+    public partial double ColdCelsius { get; set; } = -40;
+
+    [ObservableProperty]
+    public partial double HotCelsius { get; set; } = 85;
+
     [RelayCommand]
     public void FindCorners()
     {
@@ -172,7 +190,9 @@ public sealed partial class MonteCarloViewModel : ObservableObject
 
         try
         {
-            result = new CornerAnalysis(_circuit).Run(new CornerRequest(probe));
+            var over = IncludeTemperature ? new TemperatureRange(ColdCelsius, HotCelsius) : null;
+
+            result = new CornerAnalysis(_circuit).Run(new CornerRequest(probe, over));
         }
         catch (Exception ex) when (ex is CircuitTopologyException or ConvergenceException)
         {
@@ -196,9 +216,13 @@ public sealed partial class MonteCarloViewModel : ObservableObject
         Corners.Add($"Lowest   {SiPrefix.Format(result.Lowest!.Value, unit)}   " +
                     $"with {result.Lowest.Describe()}");
 
+        var span = IncludeTemperature
+            ? $" across {ColdCelsius:0.#} to {HotCelsius:0.#} °C"
+            : string.Empty;
+
         CornerSummary =
             $"{result.Label}: nominal {SiPrefix.Format(result.Nominal, unit)}, " +
-            $"worst {result.WorstFractionalError:P2} out, spread {result.Spread:P2} — " +
+            $"worst {result.WorstFractionalError:P2} out, spread {result.Spread:P2}{span} — " +
             $"found in {result.Solves} solves rather than {Math.Pow(2, result.Varied):N0} corners";
 
         OnPropertyChanged(nameof(HasCorners));

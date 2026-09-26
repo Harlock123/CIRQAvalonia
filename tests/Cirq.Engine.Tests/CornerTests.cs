@@ -237,4 +237,119 @@ public class CornerTests
         Assert.Equal(10.0, result.Nominal, 1e-6);
         Assert.Equal(0.0, result.Spread, 1e-9);
     }
+
+    // ---- the temperature axis -----------------------------------------------
+
+    /// <summary>
+    /// A diode reference: a resistor feeding a diode, whose drop falls about two millivolts a
+    /// degree. Nothing here has a tolerance, so the only thing that can move the answer is the
+    /// temperature — which makes it the test that proves the axis is being varied at all.
+    /// </summary>
+    private static Circuit Reference()
+    {
+        var circuit = new Circuit();
+
+        var supply = circuit.Add(new DcVoltageSource(5.0));
+        var series = circuit.Add(new Resistor(10e3) { Name = "R1", Tolerance = 0 });
+        var diode = circuit.Add(new Cirq.Components.Nonlinear.Diode());
+        var ground = circuit.Add(new Ground());
+
+        circuit.Connect(supply.Negative, ground.Pin);
+        circuit.Connect(supply.Positive, series.A);
+        circuit.Connect(series.B, diode.Anode);
+        circuit.Connect(diode.Cathode, ground.Pin);
+
+        circuit.Probes.Add(new SignalProbe("Vf", diode.Anode, default));
+
+        return circuit;
+    }
+
+    [Fact]
+    public void WithoutARangeTheTemperatureIsNotVaried()
+    {
+        var result = new CornerAnalysis(Reference()).Run();
+
+        // Nothing has a tolerance and no range was asked for, so there is nothing to vary and the
+        // analysis says so rather than reporting a spread of zero as though it had looked.
+        Assert.False(result.IsUsable);
+        Assert.Contains("no temperature range", result.Problem);
+    }
+
+    [Fact]
+    public void ATemperatureRangeIsACornerAxisOfItsOwn()
+    {
+        var result = new CornerAnalysis(Reference())
+            .Run(new CornerRequest(Over: TemperatureRange.Industrial));
+
+        Assert.True(result.IsUsable, result.Problem);
+
+        // A silicon diode drops more when it is cold, so the high corner is the cold end.
+        Assert.Contains("temperature low", result.Highest!.Describe());
+        Assert.Contains("temperature high", result.Lowest!.Describe());
+
+        // About two millivolts a degree across 125 degrees is a quarter of a volt or so.
+        Assert.InRange(result.Highest.Value - result.Lowest.Value, 0.15, 0.35);
+
+        // And the settings name the ends of the range that were used.
+        Assert.Equal(-40, result.Highest.Settings.Single().Value);
+        Assert.Equal(85, result.Lowest.Settings.Single().Value);
+    }
+
+    /// <summary>
+    /// The two kinds of variation together, which is the question a datasheet answers: the parts
+    /// at their extremes <i>and</i> the temperature at the end of the range that makes it worse.
+    /// </summary>
+    [Fact]
+    public void PartsAndTemperatureAreVariedTogether()
+    {
+        var circuit = Reference();
+
+        // Give the feed resistor a tolerance, so there are two axes rather than one.
+        circuit.Components.OfType<Resistor>().Single().Tolerance = 0.1;
+
+        var both = new CornerAnalysis(circuit).Run(new CornerRequest(Over: TemperatureRange.Industrial));
+        var partsOnly = new CornerAnalysis(circuit).Run();
+
+        Assert.True(both.IsUsable, both.Problem);
+        Assert.True(partsOnly.IsUsable, partsOnly.Problem);
+
+        Assert.Equal(2, both.Varied);
+        Assert.Equal(1, partsOnly.Varied);
+
+        // Both axes appear in the recipe, and the answer is worse than either alone.
+        Assert.Equal(2, both.Highest!.Settings.Count);
+        Assert.True(both.Spread > partsOnly.Spread,
+            $"{both.Spread:P2} should be wider than {partsOnly.Spread:P2}");
+    }
+
+    [Fact]
+    public void TheTemperatureIsPutBackAfterwards()
+    {
+        var circuit = Reference();
+        circuit.AmbientTemperatureCelsius = 50;
+
+        var result = new CornerAnalysis(circuit).Run(new CornerRequest(Over: TemperatureRange.Industrial));
+
+        Assert.True(result.IsUsable, result.Problem);
+
+        // The analysis has its own settings, so the document's ambient is untouched — and it was
+        // read rather than ignored, which is what the nominal being between the corners shows.
+        Assert.Equal(50, circuit.AmbientTemperatureCelsius);
+        Assert.InRange(result.Nominal, result.Lowest!.Value, result.Highest!.Value);
+    }
+
+    /// <summary>
+    /// A range of no width is not a range. Asking for one should leave the analysis exactly as it
+    /// was rather than adding an axis that cannot move.
+    /// </summary>
+    [Fact]
+    public void ARangeOfNoWidthIsNotAnAxis()
+    {
+        var (circuit, _, _) = Divider(10e3, 10e3);
+
+        var result = new CornerAnalysis(circuit).Run(new CornerRequest(Over: new TemperatureRange(27, 27)));
+
+        Assert.True(result.IsUsable, result.Problem);
+        Assert.Equal(2, result.Varied);
+    }
 }
