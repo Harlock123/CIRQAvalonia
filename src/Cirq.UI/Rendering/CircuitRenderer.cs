@@ -184,6 +184,8 @@ public static class CircuitRenderer
             // repeating its own text back at it under a name nobody chose.
             if (component is not IAnnotation) DrawComponentLabels(canvas, component, options);
 
+            if (component is INetNaming) DrawCrossing(canvas, circuit, component, options);
+
             if (options.ShowInteractiveMarkers && component is IInteractiveComponent)
                 DrawInteractiveMarker(canvas, component, options);
         }
@@ -207,6 +209,35 @@ public static class CircuitRenderer
 
         canvas.DrawEllipse(null, pen, centre, 5, 5);
         canvas.DrawEllipse(CanvasTheme.ValueBrush, null, centre, 1.8, 1.8);
+    }
+
+    /// <summary>
+    /// What a net label says about where else its net goes — "also on Logic, I/O" — written under it
+    /// in the muted colour a caption uses.
+    /// <para>
+    /// Worked out from the drawing rather than typed, which is the whole point. A conventional
+    /// off-page connector is a second symbol somebody has to remember to place and keep in step with
+    /// the first, and a drawing where that has gone stale is worse than one with no connectors at
+    /// all. This cannot go stale: it is a statement about the labels that are there.
+    /// </para>
+    /// </summary>
+    private static void DrawCrossing(
+        ISymbolCanvas canvas, Circuit circuit, CircuitComponent label, CircuitRenderOptions options)
+    {
+        if (options.Zoom < 0.5) return;
+
+        var elsewhere = SheetCrossings.Elsewhere(circuit, label);
+
+        if (elsewhere.Count == 0) return;
+
+        // Under the value caption rather than in place of it: the name of the net is the thing to
+        // read first, and where it goes is the footnote.
+        var offset = SymbolRenderer.LabelOffset(label);
+        var under = new Point(label.X, label.Y + offset + CaptionSize);
+
+        SymbolRenderer.DrawCenteredText(
+            canvas, $"\u2192 {string.Join(", ", elsewhere)}", under, 9, options.Zoom,
+            CanvasTheme.ValueBrush);
     }
 
     private static void DrawComponentLabels(

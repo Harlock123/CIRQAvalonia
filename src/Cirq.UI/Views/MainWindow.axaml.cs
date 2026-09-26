@@ -145,6 +145,14 @@ public partial class MainWindow : Window
         _canvas.ProbeRequested += (_, terminal) => viewModel.AttachProbe(terminal);
         _canvas.ProbeReferenceRequested += (_, terminal) => viewModel.SetProbeReference(terminal);
         _canvas.StatusChanged += (_, message) => viewModel.StatusMessage = message;
+
+        // Following a net label to the page its net continues on: change page first, then go to the
+        // label there, which selects it and brings it into view.
+        _canvas.RequestSheet += (_, jump) =>
+        {
+            viewModel.ShowSheetCommand.Execute(jump.Sheet);
+            viewModel.GoTo(jump.Target);
+        };
     }
 
     /// <summary>

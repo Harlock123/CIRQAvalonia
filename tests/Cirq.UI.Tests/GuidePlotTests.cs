@@ -1,3 +1,4 @@
+using Cirq.UI.Services;
 using Cirq.Core.Verification;
 using Cirq.Core.Simulation;
 using ScottPlot;

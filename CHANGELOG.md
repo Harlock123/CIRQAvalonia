@@ -8,6 +8,18 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**A net label says where else its net goes.** Sheets are joined by naming a net, which is the one
+thing about them that fails silently: a `VCC` label that reaches the logic page looks exactly like a
+`VCC` label that goes nowhere, and `VCC1` here against `VCC` there is two nets that look like one.
+Now a label whose net is on other pages writes them underneath itself — `→ Logic, I/O` — and
+double-clicking it follows the net there, selecting the label at the far end.
+
+It is worked out from the drawing rather than declared. A conventional off-page connector is a
+second symbol somebody has to place and then keep in step with the first, and a drawing where that
+has gone stale is worse than one with no connectors at all. This is a statement about the labels
+that are actually there, so it cannot go stale — and a rail you expected to see `→ Logic` under and
+do not is a typo you have just found.
+
 **Does it still meet its requirements at 85 °C?** *Simulate > Requirements Over a Range*
 (`Ctrl+Shift+F4`) runs every enabled requirement at each of a series of temperatures — or with any
 part stepped across its range — and says where each one holds.

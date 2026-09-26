@@ -187,6 +187,12 @@ public class CircuitCanvas : Control
         _hoverComponent = null;
     }
 
+    /// <summary>
+    /// Raised when the view should go to another page and land on a part there — following a net
+    /// label to where its net continues.
+    /// </summary>
+    public event EventHandler<(string Sheet, CircuitComponent Target)>? RequestSheet;
+
     /// <summary>What is on the page being shown. Everything, for a document with one page.</summary>
     private IReadOnlyList<CircuitComponent> Visible =>
         Circuit is not { } circuit ? [] : [.. circuit.OnSheet(Sheet)];
@@ -1037,6 +1043,22 @@ public class CircuitCanvas : Control
         }
 
         var component = ComponentAt(world);
+
+        // Double-clicking a net label that goes to another page follows it there — the other half
+        // of what the "also on Logic" note under it is saying. A label is not operable, so the
+        // gesture was free.
+        if (component is INetNaming && e.ClickCount >= 2 && Circuit is { } document
+            && SheetCrossings.Continuation(document, component) is { } continued)
+        {
+            var sheet = document.Sheets.FirstOrDefault(s => document.Belongs(continued, s));
+
+            if (sheet is not null)
+            {
+                RequestSheet?.Invoke(this, (sheet, continued));
+                StatusChanged?.Invoke(this, $"{((INetNaming)component).NetName} continues on {sheet}");
+                return;
+            }
+        }
 
         // Double-clicking an operable device flips it, so a switch behaves like a switch instead
         // of something you have to go to the inspector to change.

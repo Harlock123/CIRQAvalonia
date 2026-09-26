@@ -4878,6 +4878,29 @@ Everything that is about the circuit rather than the drawing ignores pages entir
 every analysis, the check, the ratings, the parts list, the netlist and BOM exports, and what the
 scope shows. A probe on the logic page keeps recording while you work on the supply page.
 
+### Where a net goes when it leaves the page
+
+Two pages are joined by naming a net, and that is the one thing about sheets that can fail
+silently: a `VCC` label on the supply page looks exactly like a `VCC` label that goes nowhere, and
+a name typed `VCC1` here and `VCC` there is two nets that look like one.
+
+So a label says where else its net is. Under the name, in small type: **→ Logic, I/O**.
+
+![A power supply page drawn on the canvas: a 5 V source, a 100 Ω series resistor, a 100 µF
+capacitor to ground, and a 10k/10k divider. At the right, two net labels — VCC, with "→ Logic"
+written underneath it, and SENSE with nothing underneath](images/32-off-page.png)
+
+It is worked out from the drawing rather than typed, which is the point. A conventional off-page
+connector is a second symbol you have to remember to place and keep in step with the first, and a
+drawing where that has gone stale is worse than one with no connectors at all. This cannot go stale
+— it is a statement about the labels that are actually there. A label with nothing under it is a
+label whose net does not leave the page, and a rail you *expected* to see `→ Logic` on and do not
+is a typo you have just found.
+
+**Double-click a label that continues elsewhere** to follow it: the view changes to that page and
+selects the label at the other end. On a net that crosses three pages, double-clicking again walks
+to the next one and eventually back round, rather than bouncing between two.
+
 ### Taking a page out
 
 **View > Remove Sheet**, or the `✕` at the right of the strip, takes the current page out. What was
