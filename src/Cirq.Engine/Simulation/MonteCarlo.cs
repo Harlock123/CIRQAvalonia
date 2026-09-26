@@ -8,7 +8,12 @@ namespace Cirq.Engine.Simulation;
 /// <summary>What a Monte Carlo run was asked for.</summary>
 /// <param name="Trials">How many circuits to build and solve.</param>
 /// <param name="Seed">Where the sequence starts, so a run can be repeated exactly.</param>
-public sealed record MonteCarloRequest(int Trials = 200, int Seed = 1);
+/// <param name="FirstTrial">
+/// Which trial to start at. Trials are numbered from zero and each one's part values come from its
+/// own number, so a run of a thousand can be cut into chunks and solved on several threads without
+/// changing a single answer — see <see cref="MonteCarlo"/>.
+/// </param>
+public sealed record MonteCarloRequest(int Trials = 200, int Seed = 1, int FirstTrial = 0);
 
 /// <summary>
 /// What one probe read across every trial, and what that spread amounts to.
@@ -114,6 +119,13 @@ public sealed record MonteCarloResult(
 /// The sequence comes from a seed, so a run repeats exactly. An analysis whose answer changes every
 /// time you look at it is not much use for deciding anything.
 /// </para>
+/// <para>
+/// Each trial is seeded from <i>its own number</i> rather than drawn from one long stream, which is
+/// what makes the whole thing splittable: trial 700 gets the same parts whether it was solved
+/// seventh or seven-hundredth, on one thread or on twelve. A stream would have tied the answer to
+/// the order the work happened to be done in, and a parallel analysis whose result depends on how
+/// many cores the machine has is not a result.
+/// </para>
 /// </summary>
 public sealed class MonteCarlo
 {
@@ -150,15 +162,19 @@ public sealed class MonteCarlo
 
         List<double>[] readings = [.. probes.Select(_ => new List<double>())];
 
-        var random = new Xorshift(request.Seed);
         var failed = 0;
         var trials = Math.Max(request.Trials, 1);
+        var first = Math.Max(request.FirstTrial, 0);
 
         try
         {
-            for (var trial = 0; trial < trials; trial++)
+            for (var trial = first; trial < first + trials; trial++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+
+                // This trial's own generator, from its own number. See the note above about why
+                // that is not the same as taking the next values from one stream.
+                var random = new Xorshift(Seed(request.Seed, trial));
 
                 foreach (var target in targets)
                 {
@@ -230,6 +246,27 @@ public sealed class MonteCarlo
     /// A small deterministic generator rather than <c>System.Random</c>, so a seed gives the same
     /// sequence on every platform and every run — the same reasoning the noise source uses.
     /// </summary>
+    /// <summary>
+    /// A trial's seed, mixed from the run's seed and the trial's number so that neighbouring trials
+    /// do not start from neighbouring states — a shift-register generator started at 1 and at 2
+    /// produces streams that look alike for their first few values, which would show up as
+    /// structure in the histogram.
+    /// </summary>
+    private static int Seed(int seed, int trial)
+    {
+        unchecked
+        {
+            var mixed = (uint)seed * 2654435761u;
+
+            mixed ^= (uint)trial * 2246822519u;
+            mixed ^= mixed >> 15;
+            mixed *= 2654435761u;
+            mixed ^= mixed >> 13;
+
+            return (int)(mixed | 1u);
+        }
+    }
+
     private sealed class Xorshift(int seed)
     {
         private uint _state = seed == 0 ? 1u : (uint)seed;

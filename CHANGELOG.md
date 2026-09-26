@@ -8,6 +8,22 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**Tolerance analysis runs on every core.** A Monte Carlo run is a few hundred to a few thousand
+independent circuits, each solved from scratch, none of them looking at any of the others — the one
+embarrassingly parallel thing in the application, and a serial loop. On a twenty-part circuit at two
+thousand trials: **262 ms to 71 ms** on eight cores.
+
+What made it serial was the circuit rather than the arithmetic. A trial works by writing values into
+the parts and solving, so two threads sharing one drawing would write over each other; each worker
+now gets its own copy, made through the serializer, because a copy that is not the saved form is a
+second definition of what a circuit is.
+
+The answers do not depend on how it was split, and that took a change: each trial's parts now come
+from **that trial's own number** rather than from one long stream, so trial 700 is the same circuit
+whether it was solved seventh or seven-hundredth, on one thread or on twelve. A tolerance analysis
+whose result depends on how many cores the machine has would not be a result. Tested reading for
+reading against the serial run, across four different worker counts and four awkward trial counts.
+
 **A printed sheet has a title block.** Six labelled cells across the top — what the drawing is,
 which sheet this is, the revision, who drew it, the date, and the page number — where there used to
 be one line of text. **Rev** and **Drawn by** are boxes in the print dialog, and what you type goes

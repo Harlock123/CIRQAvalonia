@@ -4068,7 +4068,11 @@ this is how you find out which kind you have.
 ### The worst it can ever be
 
 **Run** samples: it builds the circuit a few hundred times from parts drawn at random and reports
-the spread. That answers "what will most of them do".
+the spread. That answers "what will most of them do". The trials are spread **across every core the
+machine has** — two thousand trials of a twenty-part circuit takes 71 ms here against 262 ms on one
+thread — and the answer does not depend on how many cores that is: each trial's parts come from that
+trial's own number, so trial 700 is the same circuit whether it was solved seventh or
+seven-hundredth, on one thread or on twelve.
 
 **Worst case** answers the other question, and it is the one a specification is written from: what
 is the worst this can *ever* be. Random trials essentially never land on the corner where every

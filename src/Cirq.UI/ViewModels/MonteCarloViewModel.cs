@@ -306,7 +306,11 @@ public sealed partial class MonteCarloViewModel : ObservableObject
 
         var band = Math.Max(AcceptableBandPercent, 0) / 100.0;
 
-        var result = new MonteCarlo(_circuit).Run(new MonteCarloRequest(Math.Max(Trials, 2), Seed));
+        // Across every core the machine has. The trials are independent and each one's parts come
+        // from its own number, so the answer is the same as it would be on one thread — it simply
+        // arrives while somebody is still looking at the window.
+        var result = Cirq.Components.Analysis.ParallelMonteCarlo.Run(
+            _circuit, new MonteCarloRequest(Math.Max(Trials, 2), Seed));
 
         // Exact rather than sampled: each part is taken to each end of its own band with
         // everything else at nominal, which is two solves and no randomness at all.
