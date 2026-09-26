@@ -8,6 +8,15 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+## [0.38.0] - 2026-09-26
+
+A source you write the behaviour of as a formula. A worst case that includes the temperature. Every
+sheet in an export or a print. A command line that fails a build when a waveform moves. And a KiCad
+netlist, for when the simulation is right and you want a board. 189 components in 16 categories, 87
+worked examples, 3674 tests.
+
+### Added
+
 **A KiCad netlist, for when the simulation is right and you want a board.** *File > Export* has it
 as a format, and `cirq netlist --kicad` writes it from the command line. Every part with its
 designator, value and footprint; every net with the pins on it.
@@ -31,12 +40,6 @@ Requirements answer "does it still meet spec". This answers the other question, 
 that actually catches you during a refactor: *did anything else change?* A measurement has to move by
 more than one percent of what it was to count, which is above what re-running the same circuit
 produces and below anything a person would call the same answer.
-
-**A flat trace was compared against a swing it does not have.** Found while writing the above, and
-it is the more important half. Every level in a baseline was judged as a fraction of the trace's own
-peak-to-peak, so a trace that does not move — which is what a supply rail *is*, and the commonest
-thing anybody baselines — had every change divided by nothing and discarded. A rail that fell from
-5 V to 3.3 V was reported as unchanged. A flat trace is now judged against its own level.
 
 **An export or a print can have every sheet in it.** 0.36.0 made both respect the page you were
 looking at, which was necessary — every page starts its coordinates in the same corner, so one image
@@ -81,6 +84,19 @@ input measured by nudging that input a millivolt either way, and the source stam
 plus those slopes. A formula that mentions no pin is not iterated at all — the circuit stays linear,
 so a waveform costs nothing extra. A formula that will not parse leaves the source putting out
 nothing rather than an arbitrary number, and says why on the part.
+
+### Fixed
+
+**A flat trace was compared against a swing it does not have.** Found while writing the baseline
+commands, and it is the more important half. Every level in a baseline was judged as a fraction of
+the trace's own peak-to-peak, so a trace that does not move — which is what a supply rail *is*, and the commonest
+thing anybody baselines — had every change divided by nothing and discarded. A rail that fell from
+5 V to 3.3 V was reported as unchanged. A flat trace is now judged against its own level.
+
+**The suite's own colour-sensitive tests raced the theme.** The canvas palette is a static cache
+that a theme change invalidates, so a test rendering in one collection while another applied a theme
+was a data race — and it was one: four different tests had each failed once under load and passed on
+their own. The rendering tests now share the window session's collection.
 
 ## [0.37.0] - 2026-09-25
 
@@ -2217,7 +2233,8 @@ First public build of CirqAvalonia — an electronic circuit analyzer and mixed-
 
 **501 tests** measure the solver against closed-form answers rather than recorded output.
 
-[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.37.0...HEAD
+[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.38.0...HEAD
+[0.38.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.37.0...v0.38.0
 [0.37.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.36.0...v0.37.0
 [0.36.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.35.0...v0.36.0
 [0.35.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.34.0...v0.35.0

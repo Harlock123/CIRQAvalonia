@@ -316,6 +316,10 @@ on the group. Enter arms the first match, so a part can be found and placed with
 few hundred random builds did, but what the circuit can *ever* do. The corner where every part is
 at its extreme the same way is one combination out of 2ⁿ, which random sampling never finds — so
 this finds it directly, in a solve per part rather than 2ⁿ, and gives the recipe for each extreme.
+**Temperature can be one of the axes**, which is the difference between the worst case off the parts
+bin and the worst case in the field: it is the one variable that moves every junction at once, so a
+circuit whose parts happen to cancel at 27 °C may have nothing cancelling at 85. The recipe names it
+like any other — *highest with R1 low, temperature low*.
 The DC sweep also runs **backwards**: say what reading you want and it finds the value that gives
 it, along with the nearest E24 part you can actually buy and what that one achieves.
 
@@ -830,7 +834,9 @@ against a second backend; captions come out as real text, not outlines:
 
 The frame follows the circuit rather than the window, so whatever the view is scrolled to you get
 the whole thing at its natural size. The editing aids — dot grid, terminal dots, hover highlighting
-— stay behind. `docs/USER_GUIDE.md` has [the rest](docs/USER_GUIDE.md#exporting).
+— stay behind. The text formats are the circuit rather than a picture of it: a **SPICE deck**, a
+**KiCad netlist** for a board, the traces as **CSV**, and the parts list as a **BOM**.
+`docs/USER_GUIDE.md` has [the rest](docs/USER_GUIDE.md#exporting).
 
 | | |
 | --- | --- |
@@ -842,7 +848,7 @@ the whole thing at its natural size. The editing aids — dot grid, terminal dot
 | View | `Ctrl`+`+` / `Ctrl`+`-` zoom in and out, wheel zooms at the cursor, middle-drag or space-drag pans, `F` fits the whole circuit — captions and all |
 | Scope | The vertical range follows the traces by default, so changing a source amplitude keeps the waveform on screen. The `Auto` checkbox turns that off, and using the vertical `+`/`-` buttons turns it off for you |
 | File | `Ctrl+N` new, `Ctrl+O` open, `Ctrl+S` save, `Ctrl+Shift+S` save as, and `File > Settings` for the theme. The title bar shows the document and an asterisk while there are unsaved edits |
-| Export | `Ctrl+E` writes the schematic and the traces out as PNG, JPEG, BMP, SVG or PDF, optionally with a grouped parts list. SVG and PDF are true vector, drawn by the same code that draws the screen. The frame follows the circuit rather than the view |
+| Export | `Ctrl+E` writes the schematic and the traces out as PNG, JPEG, BMP, SVG or PDF, optionally with a grouped parts list, and as text: a SPICE deck, a KiCad netlist, the traces as CSV, the parts as a BOM. SVG and PDF are true vector, drawn by the same code that draws the screen. The frame follows the circuit rather than the view, and a drawing on sheets exports every page or the one you are on |
 | About | `Help > About` reports the version and the libraries it is built on, read from the loaded assemblies rather than a hand-kept list, with a button that copies the lot for a bug report |
 | Transport | `F5` run/pause, `F6` single step, `F8` reset |
 | Controls | Every switch, potentiometer, light level, temperature and magnet — and every supply voltage, generator frequency and amplitude — is gathered into a **CONTROLS** panel under the properties panel, and can be worked while the simulation runs. Sweep a frequency with the scope running and watch a filter turn over. A part declares a control by marking the property `[Operable]`, so a new component gets one without the UI being edited |

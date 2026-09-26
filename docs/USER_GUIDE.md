@@ -139,7 +139,11 @@ each row links to the section that explains it.
 | Where is the **current actually going** | [Current flow](#watching-the-current-move) — dots on the wires, in the View menu | — |
 | What is **this node sitting at** | [Live values](#what-the-circuit-is-doing) — volts on every net and amps through every part | `Ctrl` `L` |
 | Is this **better than what I had** | [Keep a reference](#comparing-and-computing-traces), change the circuit, compare | — |
-| What is the **worst it can ever be** | [Worst case](#the-worst-it-can-ever-be), in the tolerance window — the corner, not a sample of it | `Shift` `F4` |
+| What is the **worst it can ever be** | [Worst case](#the-worst-it-can-ever-be), in the tolerance window — the corner, not a sample of it, and over a temperature range if you ask | `Shift` `F4` |
+| Does it still meet spec **at 85 °C** | [Requirements over a range](#requirements) — every requirement at every temperature | `Ctrl` `Shift` `F4` |
+| Can I write the behaviour as a **formula** | [A source that is a formula](#a-source-that-is-a-formula) — `= 2.5 * tanh(a)`, solved like any other device | — |
+| Can I check a circuit **without opening it** | [The command line](#the-command-line) — `cirq check` exits non-zero when a requirement is not met | — |
+| How do I get this onto a **board** | [Taking it to a board](#taking-it-to-a-board) — a KiCad netlist, from the netlist that was simulated | `Ctrl` `E` |
 | **What value** gives me this answer | [Solve](#working-it-backwards), in the DC sweep window | `Shift` `F7` |
 
 Three of those are worth separating, because they are easy to confuse:
@@ -5299,6 +5303,10 @@ the one to pick when you want the pieces separately and something to hand someon
 | **PNG** | The general-purpose image. Pick a resolution — 1× is screen size, 2× is crisp, 3× is large |
 | **JPEG** | Smaller and lossy. Poor at line art, which a schematic is entirely made of, so prefer PNG unless something insists on JPEG |
 | **BMP** | Uncompressed, for the tools that still want it |
+| **SPICE netlist** | The circuit as a deck, for ngspice or LTspice — see [below](#some-of-the-formats-are-text-not-pictures) |
+| **KiCad netlist** | The parts and the nets, for laying out a board — see [below](#taking-it-to-a-board) |
+| **CSV** | The recorded traces as numbers |
+| **Parts list** | A bill of materials, as CSV |
 
 Both on one sheet puts the schematic above the traces, at whatever size each of them needs:
 
@@ -5334,10 +5342,11 @@ light theme first (`File > Settings`) if it is going into a document.
 
 ---
 
-### Two of the formats are text, not pictures
+### Some of the formats are text, not pictures
 
-The five image formats are a picture of the circuit. These two are the circuit, in a form something
-else can act on.
+The five image formats are a picture of the circuit. These are the circuit itself, in a form
+something else can act on: a SPICE deck, a KiCad netlist, the traces as numbers, and the parts list
+as a bill of materials.
 
 **SPICE netlist** (`.cir`) writes the circuit as a deck. There are analyses this engine does not
 do — noise, distortion, pole-zero — and a deck ngspice or LTspice can read means a circuit drawn
@@ -5621,7 +5630,7 @@ Also available in the app at **Help > Keyboard Shortcuts**.
 | View menu | **Mark Interactive Parts** rings everything you can double-click; **Describe Parts on Hover** turns the hover card off; **Show Current Flow** puts moving dots on the wires; **Show Live Values** annotates the drawing with what it is doing |
 | `Ctrl+N` / `Ctrl+O` / `Ctrl+S` / `Ctrl+Shift+S` | New / open / save / save as |
 | `Ctrl+P` | Print — a sheet each for the schematic, the traces and the parts list |
-| `Ctrl+E` | Export — PNG, JPEG, BMP, SVG, PDF, a SPICE netlist, the traces as CSV, or the parts list as a BOM |
+| `Ctrl+E` | Export — PNG, JPEG, BMP, SVG, PDF, a SPICE netlist, a KiCad netlist for a board, the traces as CSV, or the parts list as a BOM |
 | `Ctrl+Shift+E` | Browse the example circuits |
 | `Help > About` | Version, and the libraries this is built on — with a button that copies the lot |
 
