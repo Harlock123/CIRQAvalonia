@@ -181,6 +181,7 @@ public partial class MainWindow : Window
         viewModel.RequestImpedance += async (_, _) => await ShowImpedanceAsync();
         viewModel.RequestPoleZero += async (_, _) => await ShowPoleZeroAsync();
         viewModel.RequestSpecs += async (_, _) => await ShowSpecsAsync();
+        viewModel.RequestSymbol += async (_, block) => await ShowSymbolAsync(block);
         viewModel.RequestBus += async (_, _) => await ShowBusAsync();
         viewModel.RequestBlock += async (_, block) => await ShowBlockAsync(block);
         viewModel.RequestSpecSweep += async (_, _) => await ShowSpecSweepAsync();
@@ -449,6 +450,27 @@ public partial class MainWindow : Window
         };
 
         await dialog.ShowModal(this);
+    }
+
+    /// <summary>
+    /// Draws a block's symbol: its shape, and where its pins go. Nothing here changes what the
+    /// block does — a pin that moves keeps its identity and everything wired to it stays wired.
+    /// </summary>
+    private async Task ShowSymbolAsync(Cirq.Components.Hierarchy.Subcircuit block)
+    {
+        if (_viewModel is null) return;
+
+        var model = new SymbolViewModel(block);
+
+        model.Changed += (_, _) =>
+        {
+            _viewModel.MarkModified();
+            _canvas?.InvalidateVisual();
+        };
+
+        await new SymbolWindow { DataContext = model }.ShowModal(this);
+
+        _canvas?.InvalidateVisual();
     }
 
     /// <summary>

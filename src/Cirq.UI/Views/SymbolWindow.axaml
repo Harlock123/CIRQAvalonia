@@ -1,0 +1,83 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:Cirq.UI.Controls"
+        xmlns:vm="clr-namespace:Cirq.UI.ViewModels"
+        x:Class="Cirq.UI.Views.SymbolWindow"
+        x:DataType="vm:SymbolViewModel"
+        Title="Draw the Symbol"
+        Width="900" Height="620"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource PanelBackground}">
+
+  <DockPanel>
+
+    <!-- A way out that does not depend on a title bar, because a tiling window manager draws
+         none. Escape closes it too; this is the half somebody can see. -->
+    <Border DockPanel.Dock="Bottom" Padding="14,9"
+            BorderBrush="{DynamicResource PanelBorder}" BorderThickness="0,1,0,0">
+      <DockPanel>
+        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8">
+          <Button Content="Arrange for me" Command="{Binding ArrangeCommand}" Padding="14,5"
+                  ToolTip.Tip="Put every pin back down the sides, the way a block arranges itself before anybody draws it" />
+          <Button Name="CloseButton" Content="Close" MinWidth="88" Padding="14,5" />
+        </StackPanel>
+        <TextBlock Text="{Binding Summary}" VerticalAlignment="Center" Opacity="0.85"
+                   TextWrapping="Wrap" />
+      </DockPanel>
+    </Border>
+
+    <!-- The pins, one row each: what it is called, which edge it is on, and how far along. -->
+    <Border DockPanel.Dock="Right" Width="360" Classes="panel" BorderThickness="1,0,0,0">
+      <DockPanel Margin="10">
+
+        <StackPanel DockPanel.Dock="Top" Spacing="8" Margin="0,0,0,10">
+          <TextBlock Text="The symbol" FontWeight="SemiBold" />
+
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <TextBlock Text="Called" VerticalAlignment="Center" Width="46" Opacity="0.7" />
+            <TextBox Width="180" AutomationProperties.Name="What the symbol is called"
+                     Text="{Binding Label, Mode=TwoWay}" />
+          </StackPanel>
+
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <TextBlock Text="Size" VerticalAlignment="Center" Width="46" Opacity="0.7" />
+            <TextBox Width="70" AutomationProperties.Name="How wide the symbol is"
+                     Text="{Binding Width, Mode=TwoWay}" />
+            <TextBlock Text="×" VerticalAlignment="Center" Opacity="0.7" />
+            <TextBox Width="70" AutomationProperties.Name="How tall the symbol is"
+                     Text="{Binding Height, Mode=TwoWay}" />
+          </StackPanel>
+
+          <TextBlock Text="Pins" FontWeight="SemiBold" Margin="0,6,0,0" />
+        </StackPanel>
+
+        <ScrollViewer>
+          <ItemsControl ItemsSource="{Binding Pins}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:PinViewModel">
+                <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,3">
+                  <TextBox Width="110" FontSize="12" Padding="6,3" MinHeight="0"
+                           AutomationProperties.Name="What this pin is called"
+                           Text="{Binding Name, Mode=TwoWay}" />
+                  <ComboBox Width="90" FontSize="12" MinHeight="0"
+                            AutomationProperties.Name="Which edge this pin is on"
+                            ItemsSource="{Binding Source={x:Static vm:PinViewModel.Sides}}"
+                            SelectedItem="{Binding Side, Mode=TwoWay}" />
+                  <TextBox Width="70" FontSize="12" Padding="6,3" MinHeight="0"
+                           AutomationProperties.Name="How far along that edge"
+                           Text="{Binding Along, Mode=TwoWay}" />
+                </StackPanel>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </ScrollViewer>
+
+      </DockPanel>
+    </Border>
+
+    <controls:CircuitCanvas Name="Preview"
+                            Circuit="{Binding Preview}"
+                            ShowGrid="True" SnapToGrid="False" GridSize="10" Zoom="1.6" />
+
+  </DockPanel>
+</Window>

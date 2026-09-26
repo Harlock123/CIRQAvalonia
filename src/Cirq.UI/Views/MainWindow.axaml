@@ -82,6 +82,8 @@
                   Command="{Binding GroupSelectionCommand}" />
         <MenuItem Header="Add a B_us..." Command="{Binding ShowBusCommand}"
                   ToolTip.Tip="A row of numbered taps — D0 to D7 — and the line that shows where they go" />
+        <MenuItem Header="Draw the Block's S_ymbol..." Command="{Binding ShowSymbolCommand}"
+                  ToolTip.Tip="Give the selected block a shape and put its pins where you want them — which is what turns a block into a part somebody else can read" />
         <MenuItem Header="_Look Inside Block..." InputGesture="Ctrl+B"
                   Command="{Binding ShowBlockCommand}"
                   ToolTip.Tip="What is inside the selected block: its parts, their values, and the probe tool to measure a node in there" />

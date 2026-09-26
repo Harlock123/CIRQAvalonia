@@ -9,6 +9,29 @@ namespace Cirq.Core.Topology;
 /// </summary>
 public record Terminal(string Id, string Name, TerminalType Type, Point CanvasOffset)
 {
+    /// <summary>
+    /// What the pin is called on the symbol — <c>IN+</c>, <c>OUT</c>, <c>GND</c>.
+    /// <para>
+    /// Settable for the same reason the offset is, and only by the same thing: naming the pins is
+    /// most of what turns a block into a part somebody else can read. It is a label, not an
+    /// identity — that is <see cref="Uid"/> — so renaming a pin leaves every wire, probe and net
+    /// exactly where it was.
+    /// </para>
+    /// </summary>
+    public string Name { get; set; } = Name;
+
+    /// <summary>
+    /// Where the pin sits on the symbol, relative to the part's position.
+    /// <para>
+    /// Settable, and only one thing sets it: the symbol editor, moving a pin of a block somebody is
+    /// drawing. Identity is <see cref="Uid"/> rather than position, so a terminal that has moved is
+    /// still the same terminal — the wires on it, the probes watching it and the nets it belongs to
+    /// are all unaffected, which is what makes moving a pin a drawing operation rather than a
+    /// rewiring one.
+    /// </para>
+    /// </summary>
+    public Point CanvasOffset { get; set; } = CanvasOffset;
+
     /// <summary>Stable per-instance identity, used for equality and for serialization round-trips.</summary>
     public Guid Uid { get; init; } = Guid.NewGuid();
 

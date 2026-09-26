@@ -242,6 +242,16 @@ public sealed class BlockRecord
     /// wires outside the block were saved against those ids.
     /// </summary>
     public List<PortRecord> Ports { get; set; } = [];
+
+    /// <summary>
+    /// How big the symbol is drawn, when somebody has drawn it. Absent for a block that arranges
+    /// itself, which is most of them — so a file written before symbols existed opens unchanged.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public double? Width { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public double? Height { get; set; }
 }
 
 /// <summary>One pin of a block and the terminal inside that it stands for.</summary>
@@ -250,6 +260,13 @@ public sealed class PortRecord
     public string Name { get; set; } = string.Empty;
 
     public TerminalReference Inner { get; set; } = new();
+
+    /// <summary>Where the pin sits on the symbol. Absent when the block arranges its own pins.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public double? X { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public double? Y { get; set; }
 }
 
 /// <summary>

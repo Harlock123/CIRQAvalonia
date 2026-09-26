@@ -8,6 +8,28 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**A block can be given a symbol.** *Edit > Draw the Block's Symbol* opens an editor: the size of the
+body, a pin on whichever edge you want it at whatever height, and the pins named the way a datasheet
+would name them — `IN+`, `OUT`, `GND` — instead of `R1.A`. The block itself is drawn beside the
+boxes by the ordinary canvas, redrawn as each one is typed, because a symbol editor where you press
+Apply to find out what you drew is one nobody can draw with.
+
+Every block was the same grey box with its pins alternating down the sides. That is fine for hiding
+a section and useless for making a part: what tells somebody at a glance that this is an amplifier
+and that one a regulator is its shape and where its pins are.
+
+Drawing the figure for the guide turned up a bug that had been there since blocks existed: a pin's
+position was worked out from how tall the block was *when that pin was added*, and the block grows
+as pins are added — so a block with five pins drew two of them on top of each other. Every pin is
+now placed again each time one is brought out.
+
+It is drawing and only drawing. A pin that moves or is renamed is **the same pin** — identity is the
+terminal, not its position or its label — so every wire on it stays on it, every probe watching it
+goes on watching, and the circuit solves to the same answer. The symbol is saved with the circuit
+and travels with the block into the block library, which is what turns that library from a drawer of
+grey boxes into a parts library. A block nobody has drawn writes nothing about its symbol, so a file
+from before this existed opens unchanged.
+
 **Buses.** *Edit > Add a Bus* puts a column of numbered **taps** on the drawing — `D0` to `D7` —
 with the heavy **bus line** beside them. Both are new parts in the palette as well, for placing one
 at a time.

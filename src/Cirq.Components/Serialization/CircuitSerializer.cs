@@ -151,16 +151,24 @@ public static class CircuitSerializer
 
             if (component is ISubcircuit block)
             {
+                // A symbol somebody drew is saved; one the block arranged for itself is not, so a
+                // file written before symbols existed is byte-for-byte what it was.
+                var drawn = component is Subcircuit { HasOwnSymbol: true } own ? own : null;
+
                 record.Block = new BlockRecord
                 {
                     Components = [.. block.InnerComponents.Select(c => c.Id)],
                     Wires = [.. block.InnerWires.Select(w => w.Id)],
+                    Width = drawn?.SymbolWidth,
+                    Height = drawn?.SymbolHeight,
                     Ports =
                     [
                         .. block.Ports.Select(port => new PortRecord
                         {
                             Name = port.Outer.Name,
                             Inner = Reference(port.Inner),
+                            X = drawn is null ? null : port.Outer.CanvasOffset.X,
+                            Y = drawn is null ? null : port.Outer.CanvasOffset.Y,
                         }),
                     ],
                 };
@@ -499,12 +507,20 @@ public static class CircuitSerializer
             if (!byId.TryGetValue(record.Id, out var placed)) continue;
             if (placed is not Subcircuit block) continue;
 
+            // Before the pins, because where a pin goes by default depends on how big it is.
+            block.SymbolWidth = blockRecord.Width ?? 0;
+            block.SymbolHeight = blockRecord.Height ?? 0;
+
             foreach (var port in blockRecord.Ports)
             {
                 var inner = Resolve(port.Inner, byId, result.Warnings);
                 if (inner is null) continue;
 
-                block.AddPort(port.Name, inner);
+                var pin = block.AddPort(port.Name, inner);
+
+                // A drawn symbol puts its pins back where they were put. One that arranges itself
+                // has nothing saved, and AddPort has already placed it.
+                if (port is { X: { } x, Y: { } y }) pin.CanvasOffset = new Cirq.Core.Primitives.Point(x, y);
             }
         }
 

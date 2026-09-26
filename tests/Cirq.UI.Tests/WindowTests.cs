@@ -40,7 +40,22 @@ public class WindowTests(WindowSession session)
         "About", "Baseline", "Block", "Bus", "Compare", "Conditions", "DcSweep", "ExampleBrowser", "Explain",
         "Find", "FrequencyResponse", "Impedance", "MonteCarlo", "Noise", "Parameters",
         "PoleZero", "Ratings",
-        "RuleCheck", "Specs", "SpecSweep", "SpectrumAnalyser", "Stability", "TransientStep");
+        "RuleCheck", "Specs", "SpecSweep", "SpectrumAnalyser", "Stability", "Symbol",
+        "TransientStep");
+
+    /// <summary>A block, for the window that draws its symbol.</summary>
+    private static SymbolViewModel SymbolModel()
+    {
+        var circuit = Simple();
+
+        var first = circuit.Components[0];
+        var second = circuit.Add(new Resistor(2.2e3) { Name = "R9" });
+
+        circuit.Connect(first.Terminals[0], second.Terminals[0]);
+
+        return new SymbolViewModel(
+            Cirq.Components.Hierarchy.Grouping.Group(circuit, [first, second], "Stage")!);
+    }
 
     /// <summary>A circuit with a block in it, for the window that looks inside one.</summary>
     private static BlockViewModel BlockModel()
@@ -73,6 +88,7 @@ public class WindowTests(WindowSession session)
             "About" => new AboutWindow { DataContext = new AboutViewModel() },
             "Block" => new BlockWindow { DataContext = BlockModel() },
             "Bus" => new BusWindow { DataContext = new BusViewModel(circuit) },
+            "Symbol" => new SymbolWindow { DataContext = SymbolModel() },
             "Baseline" => new BaselineWindow { DataContext = new BaselineViewModel(circuit) },
             "Compare" => new CompareWindow { DataContext = new CompareViewModel("saved.cirq", []) },
             "Conditions" => new ConditionsWindow { DataContext = new ConditionsViewModel(circuit) },

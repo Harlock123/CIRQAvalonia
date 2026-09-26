@@ -384,20 +384,42 @@ public static class SymbolRenderer
 
         context.DrawRectangle(CanvasTheme.SymbolFill, pen, new RoundedRect(body, 4));
 
-        // Pin legs, and the name of each beside it on the inside.
+        // Pin legs, and the name of each beside it on the inside. A pin may be on any edge — the
+        // symbol editor puts them where somebody wants them — so which edge it is on is worked out
+        // from where it sits rather than assumed.
         foreach (var terminal in block.Terminals)
         {
             var offset = terminal.CanvasOffset;
-            var onLeft = offset.X < 0;
-            var inner = onLeft ? body.Left + 10 : body.Right - 10;
 
-            context.DrawLine(pen, new Point(offset.X, offset.Y), new Point(inner, offset.Y));
+            var acrossness = block.HalfWidth > 0 ? Math.Abs(offset.X) / block.HalfWidth : 0;
+            var downness = block.HalfHeight > 0 ? Math.Abs(offset.Y) / block.HalfHeight : 0;
 
-            if (zoom <= 0.55) continue;
+            if (acrossness >= downness)
+            {
+                var onLeft = offset.X < 0;
+                var inner = onLeft ? body.Left + 10 : body.Right - 10;
 
-            DrawCenteredText(
-                context, terminal.Name,
-                new Point(inner + (onLeft ? 26 : -26), offset.Y), 8, zoom, CanvasTheme.LabelBrush);
+                context.DrawLine(pen, new Point(offset.X, offset.Y), new Point(inner, offset.Y));
+
+                if (zoom <= 0.55) continue;
+
+                DrawCenteredText(
+                    context, terminal.Name,
+                    new Point(inner + (onLeft ? 26 : -26), offset.Y), 8, zoom, CanvasTheme.LabelBrush);
+            }
+            else
+            {
+                var onTop = offset.Y < 0;
+                var inner = onTop ? body.Top + 10 : body.Bottom - 10;
+
+                context.DrawLine(pen, new Point(offset.X, offset.Y), new Point(offset.X, inner));
+
+                if (zoom <= 0.55) continue;
+
+                DrawCenteredText(
+                    context, terminal.Name,
+                    new Point(offset.X, inner + (onTop ? 8 : -8)), 8, zoom, CanvasTheme.LabelBrush);
+            }
         }
 
         // The name only. The part count is the block's value label and is already drawn as a

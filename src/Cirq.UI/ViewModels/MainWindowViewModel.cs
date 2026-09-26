@@ -978,6 +978,25 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         StatusMessage = $"Went to {component.Name}";
     }
 
+    /// <summary>Raised when the symbol editor should be opened, for that block.</summary>
+    public event EventHandler<Cirq.Components.Hierarchy.Subcircuit>? RequestSymbol;
+
+    /// <summary>Opens the symbol editor on the selected block.</summary>
+    [RelayCommand]
+    private void ShowSymbol()
+    {
+        var block = Selection().OfType<Cirq.Components.Hierarchy.Subcircuit>().FirstOrDefault()
+                    ?? SelectedComponent as Cirq.Components.Hierarchy.Subcircuit;
+
+        if (block is null)
+        {
+            StatusMessage = "Select a block to draw its symbol.";
+            return;
+        }
+
+        RequestSymbol?.Invoke(this, block);
+    }
+
     /// <summary>Raised when the add-a-bus window should be opened.</summary>
     public event EventHandler? RequestBus;
 

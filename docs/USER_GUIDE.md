@@ -4664,6 +4664,38 @@ hierarchy you cannot measure inside is half a hierarchy.
 Probes inside a block are named after where they are — `X1 · R1.B` — because `R1.B` alone, on a
 sheet with no R1 anywhere on it, is a label nobody can place.
 
+### Drawing its symbol
+
+Every block starts as the same grey box with its pins alternating down the sides. That is fine for
+hiding a section and useless for making a **part**: what tells somebody at a glance that this is an
+amplifier and that a regulator is its shape and where its pins are.
+
+![Two copies of the same gain stage on a canvas. On the left, X1 as a block arrives: a plain box
+with its five pins crowded at the top and labelled with where they came from — R1.A, U1.IN+,
+U1.OUT, U1.V+, U1.V−. On the right, X2 after its symbol has been drawn: a larger body with IN and
+REF down the left, OUT on the right, V+ on top and V− underneath](images/34-symbol.png)
+
+**Edit > Draw the Block's Symbol...** gives it one. The window has the symbol itself on the left —
+the real block, drawn by the real canvas, redrawn as you type — and on the right:
+
+- **Called** — what is written across the middle of it.
+- **Size** — how wide and how tall, in canvas units.
+- **A row per pin** — what it is called, which **edge** it is on, and how far **along** that edge.
+
+So the inputs go down the left, the output on the right, the supply on top and the ground
+underneath, the way a part is drawn; and the pins get the names the datasheet would give them —
+`IN+`, `OUT`, `GND` — rather than `R1.A`, which is what they are called when a block brings them out
+on its own.
+
+**Arrange for me** puts everything back the way an undrawn block arranges itself, and leaves it
+with no symbol of its own again.
+
+Nothing in here changes what the block *does*. A pin that moves or is renamed is the same pin — the
+wires on it stay on it, the probes watching it go on watching, and the circuit solves to exactly the
+same answer. This is drawing, and only drawing. A symbol you have drawn is saved with the circuit,
+and travels with the block into the [block library](#reusing-a-block) — which is what turns that
+library from a drawer of grey boxes into a parts library.
+
 ### Editing the inside
 
 **Adding and removing** parts inside a block is still done by ungrouping it, changing it, and
