@@ -181,6 +181,7 @@ public partial class MainWindow : Window
         viewModel.RequestImpedance += async (_, _) => await ShowImpedanceAsync();
         viewModel.RequestPoleZero += async (_, _) => await ShowPoleZeroAsync();
         viewModel.RequestSpecs += async (_, _) => await ShowSpecsAsync();
+        viewModel.RequestBus += async (_, _) => await ShowBusAsync();
         viewModel.RequestBlock += async (_, block) => await ShowBlockAsync(block);
         viewModel.RequestSpecSweep += async (_, _) => await ShowSpecSweepAsync();
         viewModel.RequestRuleCheck += async (_, _) => await ShowRuleCheckAsync();
@@ -448,6 +449,33 @@ public partial class MainWindow : Window
         };
 
         await dialog.ShowModal(this);
+    }
+
+    /// <summary>
+    /// Puts a bus on the drawing: a column of numbered taps, and the line beside them. They land in
+    /// the middle of the view rather than at the origin, which is where somebody is looking.
+    /// </summary>
+    private async Task ShowBusAsync()
+    {
+        if (_viewModel is null || _canvas is null) return;
+
+        var centre = _canvas.ScreenToWorld(
+            new Avalonia.Point(_canvas.Bounds.Width / 2, _canvas.Bounds.Height / 2));
+
+        var model = new BusViewModel(_viewModel.Circuit)
+        {
+            X = Math.Round(centre.X / 10) * 10,
+            Y = Math.Round(centre.Y / 10) * 10,
+        };
+
+        model.Added += (_, _) =>
+        {
+            _viewModel.Simulation.InvalidateTopology();
+            _viewModel.MarkModified();
+            _canvas.BringIntoView(model.Placed);
+        };
+
+        await new BusWindow { DataContext = model }.ShowModal(this);
     }
 
     /// <summary>

@@ -169,7 +169,7 @@ Three of those are worth separating, because they are easy to confuse:
 
 Click a palette entry, then click the canvas. The part lands where you click, snapped to the grid.
 
-The palette holds **189 components in 16 categories**:
+The palette holds **191 components in 16 categories**:
 
 | Category | Count | Contents |
 | --- | --- | --- |
@@ -184,7 +184,7 @@ The palette holds **189 components in 16 categories**:
 | Logic Gates | 7 | AND, OR, NAND, NOR, XOR, XNOR, NOT |
 | 74xx Series | 21 | Counters (including the synchronous **74161**), decoders, flip-flops, shift registers, the **74245 bus transceiver** and **74373 latch**, multiplexers, Schmitt inverter — see [below](#sharing-a-bus) |
 | 40xx Series | 15 | CMOS gates, counters, flip-flops, analog switches and a **4046 phase-locked loop** — see [below](#phase-locked-loops) |
-| Buses | 17 | I2C master, EEPROM, port expander, DS1307 clock, ADS1115 ADC, MCP4725 DAC and INA219 current sensor, SPI master and **MCP3008 ADC**, 1-Wire master and DS18B20 thermometer, serial terminal and device, **RS-485**, **CAN** and **RS-232 (MAX232)** transceivers, level shifter — see [below](#making-its-own-rails) |
+| Buses | 19 | **Bus tap** and **bus line**, I2C master, EEPROM, port expander, DS1307 clock, ADS1115 ADC, MCP4725 DAC and INA219 current sensor, SPI master and **MCP3008 ADC**, 1-Wire master and DS18B20 thermometer, serial terminal and device, **RS-485**, **CAN** and **RS-232 (MAX232)** transceivers, level shifter — see [below](#making-its-own-rails) |
 | Digital I/O | 9 | Logic toggle, clock, **pattern generator**, rotary encoder, oscillator module, ADC and DAC bridges, and a **2K × 8 SRAM and ROM** — see [below](#something-worth-addressing) |
 | Sensors & Actuators | 18 | DC motor, LDR, thermistors, buzzers, speaker, microphone, servo, stepper in **unipolar and bipolar** wirings, thermocouple, load cell, HC-SR04 ranger, Hall switch, phototransistor, **reed switch** and **PIR motion sensor** — see [below](#sensors-and-actuators) |
 | Switching & Isolation | 11 | Relay, fuses and a **resettable PPTC**, optocouplers, ULN2003, H-bridge, **A4988 microstepping driver**, **solid-state relay**, **MOSFET gate driver** — see [below](#regulating-a-current-instead-of-applying-a-voltage) |
@@ -1623,6 +1623,28 @@ Its two enables are deliberately asymmetric: `CET` gates the carry out as well a
 `CEP` only the counting. That is what lets several be chained — carry into the next stage's CET —
 without the carry itself rippling. Master reset is the one thing on the part that is *not*
 synchronous: it clears the moment it is taken low, without waiting for a clock.
+
+### Drawing one
+
+Eight signals between two parts is eight wires, and it makes a schematic that takes longer to read
+than the circuit takes to understand. **Edit > Add a Bus...** puts one on the drawing instead: give
+it a name, a first number and a width, and you get a column of **taps** — `D0` to `D7` — with the
+heavy **bus line** beside them.
+
+A tap is a [net label](#naming-a-net-instead-of-drawing-it) with the arithmetic done for you. Wire
+the counter's `Q0` to a `D0` tap and the memory's `A0` to another `D0` tap, and they are one net —
+exactly as two labels reading `D0` would be, because that is precisely what they are. A tap and a
+plain net label of the same name are also one net; there is one naming scheme here, not two.
+
+**The line is drawing, not wiring.** It carries no current and appears in no netlist: what joins the
+signals is their names. That is how every schematic tool works underneath and the commonest thing
+people are surprised by, so it is worth saying plainly — the line is there to tell a reader that
+these signals travel together, and you can leave it out of the dialog if you would rather not have
+it.
+
+What the dialog buys is bulk. Eight taps numbered in one gesture rather than eight labels typed by
+hand, because `D3` typed as `D4` on one of sixteen is a mistake that costs an afternoon: the
+schematic looks perfectly right, and the simulation quietly answers a different question.
 
 ---
 

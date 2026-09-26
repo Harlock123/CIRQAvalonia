@@ -978,6 +978,12 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         StatusMessage = $"Went to {component.Name}";
     }
 
+    /// <summary>Raised when the add-a-bus window should be opened.</summary>
+    public event EventHandler? RequestBus;
+
+    [RelayCommand]
+    private void ShowBus() => RequestBus?.Invoke(this, EventArgs.Empty);
+
     /// <summary>Raised when the look-inside-a-block window should be opened, for that block.</summary>
     public event EventHandler<Cirq.Components.Hierarchy.Subcircuit>? RequestBlock;
 

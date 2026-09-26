@@ -305,6 +305,10 @@ public static class ComponentCatalog
 
         new("Buses",
         [
+            new("Bus Tap", "One signal off a bus — D3 of D[0..7]. Two taps with the same name are one net",
+                () => new Cirq.Components.Buses.BusTap()),
+            new("Bus Line", "The heavy line a bus is drawn as. Drawing rather than wiring: the names are what connect",
+                () => new Cirq.Components.Annotations.BusLine()),
             new("I2C Master", "Plays a written list of I2C transactions onto SDA and SCL",
                 () => new I2cMaster()),
             new("I2C EEPROM", "24LC256 — writes and reads back over two wires",

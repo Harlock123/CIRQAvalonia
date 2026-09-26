@@ -85,6 +85,7 @@ public static class SymbolRenderer
             case Potentiometer: DrawPotentiometer(context, pen); break;
             case Subcircuit block: DrawSubcircuit(context, pen, zoom, block); break;
             case SchematicBox box: DrawSchematicBox(context, pen, zoom, box); break;
+            case BusLine bus: DrawBusLine(context, zoom, bus); break;
             case SchematicNote note: DrawSchematicNote(context, zoom, note); break;
             case NetLabel label: DrawNetLabel(context, pen, zoom, label); break;
             case LoopProbe: DrawLoopProbe(context, pen, zoom); break;
@@ -430,6 +431,35 @@ public static class SymbolRenderer
     /// A labelled rectangle round a section. Dashed, because a solid one reads as a shield or a
     /// package outline — something electrical — and this is neither.
     /// </summary>
+    /// <summary>
+    /// A bus: one heavy line with its name along it, and a chamfer at each end so it reads as a
+    /// bundle rather than as a very thick wire.
+    /// </summary>
+    private static void DrawBusLine(ISymbolCanvas context, double zoom, BusLine bus)
+    {
+        var half = bus.HalfLength;
+        var thickness = Math.Max(bus.Thickness, 1.0);
+
+        var pen = CanvasTheme.Pen(CanvasTheme.WireBrush, thickness, zoom);
+
+        context.DrawLine(pen, new Point(-half, 0), new Point(half, 0));
+
+        // The ends, cut back at an angle — the mark that says "bundle" on every schematic that has
+        // ever had a bus on it.
+        var cap = CanvasTheme.Pen(CanvasTheme.WireBrush, Math.Max(thickness * 0.6, 1.0), zoom);
+        var reach = Math.Max(thickness * 1.6, 5.0);
+
+        context.DrawLine(cap, new Point(-half, 0), new Point(-half + reach, -reach));
+        context.DrawLine(cap, new Point(half, 0), new Point(half - reach, -reach));
+
+        var label = bus.Label?.Trim() ?? string.Empty;
+
+        if (zoom < 0.4 || label.Length == 0) return;
+
+        DrawCenteredText(
+            context, label, new Point(0, -thickness - 9), 11, zoom, CanvasTheme.LabelBrush);
+    }
+
     private static void DrawSchematicBox(
         ISymbolCanvas context, IPen pen, double zoom, SchematicBox box)
     {

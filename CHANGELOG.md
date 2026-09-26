@@ -8,6 +8,24 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**Buses.** *Edit > Add a Bus* puts a column of numbered **taps** on the drawing — `D0` to `D7` —
+with the heavy **bus line** beside them. Both are new parts in the palette as well, for placing one
+at a time.
+
+A tap is a net label with the arithmetic done for you: wire a counter's `Q0` to a `D0` tap and a
+memory's `A0` to another, and they are one net, exactly as two labels reading `D0` would be. A tap
+and a plain net label of the same name are one net too — there is one naming scheme here, not two.
+
+**The line is drawing, not wiring**, and that is worth saying plainly because it is the commonest
+thing people are surprised by: what joins the signals is their names, and the line is there to tell
+a reader they travel together. It stamps nothing and appears in no netlist, like the box you draw
+round a section.
+
+What the dialog buys is bulk, which is where the mistakes are. Eight taps numbered in one gesture
+rather than eight labels typed by hand — `D3` typed as `D4` on one of sixteen is a mistake that
+costs an afternoon, because the schematic looks right and the simulation quietly answers a different
+question.
+
 **You can look inside a block — and probe a node in there.** *Edit > Look Inside Block* (`Ctrl+B`)
 opens the selected block on the ordinary canvas, drawing the block's own parts. Change a value and
 it is changed in the block; switch the tool to *Probe*, click a terminal, and the probe goes on the

@@ -286,6 +286,15 @@ the die warms, from the room and from its own dissipation together. The **TL431*
 the part costs more than a zener and why its datasheet quotes a deviation band instead of a
 coefficient.
 
+**Buses.** Eight signals between two parts is eight wires and a schematic that takes longer to read
+than the circuit takes to understand. *Edit > Add a Bus* places a column of numbered **taps** —
+`D0` to `D7` — and the heavy line beside them. A tap is a net label with the arithmetic done: two
+taps of the same signal are one net, and a tap and a plain label of the same name are one net too,
+because there is one naming scheme here rather than two. The line is **drawing, not wiring** — it
+carries no current and appears in no netlist, which is how every schematic tool works and the
+commonest thing people are surprised by. What the dialog buys is bulk, and bulk is where the errors
+are: `D3` typed as `D4` on one of sixteen looks perfectly right.
+
 **Look inside a block** (`Ctrl+B`) opens its contents on the ordinary canvas: the block's own parts,
 so a value changed there is changed in the block, and the **probe tool reaching in**. A probe
 attached inside goes on the circuit outside — the one being simulated — so its trace appears on the
@@ -315,7 +324,7 @@ and placed again, here or in another circuit — as a copy
 rather than a reference, which the docs say plainly rather than implying a link that is not there.
 **Notes, headings and boxes** can be put on the drawing too, and exports carry them.
 
-The palette has a **Find a part** box (`Ctrl+F`): 189 components in 16 groups is more than anybody
+The palette has a **Find a part** box (`Ctrl+F`): 191 components in 16 groups is more than anybody
 browses, and it matches on the name, on what the part does — `shift register` finds the 74164 — and
 on the group. Enter arms the first match, so a part can be found and placed without the mouse.
 
@@ -642,6 +651,7 @@ one passes against a button that would never have fired.
 | Power and interface | A PPTC carrying its hold current for ever and tripping on a fault to a trickle rather than to nothing, and cooling back far slower than it tripped; a solid-state relay commanded at a mains peak refusing to fire until the next zero crossing and then conducting properly; an LM324 running four independent followers off one supply pair with the fourth saturating exactly where its family's headroom says; an A4988 holding 0.8 A out of a supply that would otherwise force 4.3 A, reversing the winding rather than switching it off, and commanding intermediate currents when microstepping is selected; and a MAX232 making ±8.5 V from a single 5 V rail, inverting TTL onto the line and back, deciding with half a volt of hysteresis, and sagging its pump when the line load is heavier than the standard allows |
 | New devices | Tri-state outputs genuinely releasing a bus where a pull-down alone then decides it, a CAN bus going dominant whenever any node sends a zero and the recessive node knowing it lost, an IGBT conducting with a voltage offset where a MOSFET holds a resistance and still passing current after its gate has gone, a photodiode linear across decades with a thousandth of a phototransistor's current and saturating when its load resistor is too big, and a synchronous counter whose carry is gated by the enable that chains it |
 | Behavioural sources | A linear formula agreeing exactly with the VCVS it imitates, six formulas giving back what the arithmetic says, a soft limiter matching 2.5·tanh to five figures across its knee, a current output driving its load the right way round, a formula in time alone being a waveform and not making the circuit non-linear, two sines multiplied producing the sum and difference frequencies and neither input, a formula that will not parse producing nothing rather than an arbitrary number, an unknown name refused, a division by zero costing an instant rather than the matrix, and an unwired input being zero rather than a singular matrix |
+| Buses | A tap naming the bus and the bit run together and trimming what was typed, two taps of one signal solving as a single node — checked as a divider whose midpoint can only be half the supply if they are — two signals one character apart staying apart, a tap and a plain net label of the same name being one net, the line having no pins and contributing nothing to the netlist, and both surviving a save; plus the dialog placing a tap per signal on the pin pitch, labelling the line with the range, leaving the line out when asked, starting somewhere other than zero, and falling back rather than making nets called nothing |
 | Inside a block | The contents being the block's own parts rather than copies, so a value edited in the window is edited in the block; a probe attached inside landing on the circuit outside and named for where it is; the same node probed twice being one probe; the probe resolving through the flattened netlist and reading the six volts the divider makes; the same after a save and reload, still pointing at something inside the block; probes already pointing inside being shown, and probes on the sheet not being |
 | Tolerance analysis in parallel | The same seed giving the same readings in the same order on one thread and on eight, four different worker counts agreeing reading for reading, every trial run exactly once across awkward chunk boundaries — 49 trials over 8 workers — with no trial run twice, a run too small to be worth splitting still agreeing, the circuit on screen left exactly as it was found, and a circuit with nothing to vary saying so the same way |
 | The printed sheet | A title block whose revision and author reach the page, every sheet of a split drawing numbered in it, and the block turning off and giving the drawing its space back |
@@ -786,7 +796,7 @@ When the solver cannot find an answer it now says **where**: the net that was st
 attached to it, and any part that said it had not settled — all of which name somewhere on the
 drawing to go and look, which "try a smaller time step" does not.
 
-The palette holds 189 components in 16 collapsible categories, with a **Find a part** box
+The palette holds 191 components in 16 collapsible categories, with a **Find a part** box
 (`Ctrl+F`) over them:
 
 ![The component palette: a Find a part box at the top, "186 parts in 16 groups" under it, and the sixteen categories with their counts — passive 11, switches 4, sources 14, semiconductors 13, transistors 11, LEDs and displays 9, power 10, analog ICs 13, logic gates 7, 74xx series 21, 40xx series 15, buses 17, digital I/O 8, sensors and actuators 18, switching and isolation 11, dev boards 4 — every group closed, so all sixteen headings fit on screen at once](docs/images/02-palette.png)
