@@ -1,0 +1,80 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:Cirq.UI.Controls"
+        xmlns:vm="clr-namespace:Cirq.UI.ViewModels"
+        x:Class="Cirq.UI.Views.BlockWindow"
+        x:DataType="vm:BlockViewModel"
+        Title="Inside the Block"
+        Width="1000" Height="680"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource PanelBackground}">
+
+  <DockPanel>
+
+    <!-- A way out that does not depend on a title bar, because a tiling window manager draws
+         none. Escape closes it too; this is the half somebody can see. -->
+    <Border DockPanel.Dock="Bottom" Padding="14,9"
+            BorderBrush="{DynamicResource PanelBorder}" BorderThickness="0,1,0,0">
+      <DockPanel>
+        <Button DockPanel.Dock="Right" Name="CloseButton" Content="Close" MinWidth="88" Padding="14,5" />
+        <TextBlock Text="{Binding Summary}" VerticalAlignment="Center" Opacity="0.85"
+                   TextWrapping="Wrap" />
+      </DockPanel>
+    </Border>
+
+    <Border DockPanel.Dock="Top" Padding="14,10"
+            BorderBrush="{DynamicResource PanelBorder}" BorderThickness="0,0,0,1">
+      <StackPanel Orientation="Horizontal" Spacing="10">
+        <TextBlock Text="Tool" VerticalAlignment="Center" Opacity="0.7" />
+        <ComboBox Width="130" AutomationProperties.Name="What clicking does"
+                  SelectedItem="{Binding ActiveTool, Mode=TwoWay}"
+                  ItemsSource="{Binding Source={x:Static vm:BlockViewModel.Tools}}"
+                  ToolTip.Tip="Select to look at a part and edit its value; Probe to put a probe on a node inside, which appears on the main scope" />
+
+        <TextBlock VerticalAlignment="Center" Opacity="0.55" FontSize="11" TextWrapping="Wrap"
+                   Text="These are the block's own parts, not copies: a value changed here is changed in the block. Adding or removing parts is done by ungrouping it." />
+      </StackPanel>
+    </Border>
+
+    <!-- Properties of whatever is selected, beside the drawing. -->
+    <Border DockPanel.Dock="Right" Width="270" Classes="panel" BorderThickness="1,0,0,0">
+      <DockPanel>
+        <StackPanel DockPanel.Dock="Top" Margin="10,10,10,6">
+          <TextBlock Text="{Binding Inspector.Title}" FontSize="15" FontWeight="SemiBold"
+                     Foreground="{DynamicResource TextPrimary}" TextTrimming="CharacterEllipsis" />
+          <TextBlock Text="{Binding Inspector.Subtitle}" FontSize="12"
+                     Foreground="{DynamicResource TextMuted}" TextTrimming="CharacterEllipsis" />
+        </StackPanel>
+
+        <ScrollViewer DataContext="{Binding Inspector}">
+          <StackPanel>
+            <TextBlock Classes="heading" Text="PARAMETERS"
+                       IsVisible="{Binding Component, Converter={x:Static ObjectConverters.IsNotNull}}" />
+            <ItemsControl ItemsSource="{Binding Parameters}" />
+
+            <TextBlock Classes="heading" Text="PINS"
+                       IsVisible="{Binding Component, Converter={x:Static ObjectConverters.IsNotNull}}" />
+            <ItemsControl ItemsSource="{Binding Terminals}" Margin="0,0,0,16">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:TerminalSummary">
+                  <Grid ColumnDefinitions="118,*" Margin="10,2">
+                    <TextBlock Classes="label" Text="{Binding Name}" />
+                    <TextBlock Grid.Column="1" FontSize="11" Foreground="{DynamicResource TextMuted}"
+                               Text="{Binding Role}" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </ScrollViewer>
+      </DockPanel>
+    </Border>
+
+    <controls:CircuitCanvas Name="Canvas"
+                            Circuit="{Binding Contents}"
+                            ActiveTool="{Binding ActiveTool, Mode=TwoWay}"
+                            SelectedComponent="{Binding Selected, Mode=TwoWay}"
+                            ShowGrid="True" SnapToGrid="True" GridSize="10" />
+
+  </DockPanel>
+</Window>

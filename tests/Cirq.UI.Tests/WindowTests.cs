@@ -37,10 +37,30 @@ public class WindowTests(WindowSession session)
 
     /// <summary>Every window the menu can open, with a view model it will accept.</summary>
     public static TheoryData<string> Windows() => new(
-        "About", "Baseline", "Compare", "Conditions", "DcSweep", "ExampleBrowser", "Explain",
+        "About", "Baseline", "Block", "Compare", "Conditions", "DcSweep", "ExampleBrowser", "Explain",
         "Find", "FrequencyResponse", "Impedance", "MonteCarlo", "Noise", "Parameters",
         "PoleZero", "Ratings",
         "RuleCheck", "Specs", "SpecSweep", "SpectrumAnalyser", "Stability", "TransientStep");
+
+    /// <summary>A circuit with a block in it, for the window that looks inside one.</summary>
+    private static BlockViewModel BlockModel()
+    {
+        var circuit = new Circuit();
+
+        var supply = circuit.Add(new DcVoltageSource(12.0));
+        var top = circuit.Add(new Resistor(1e3));
+        var bottom = circuit.Add(new Resistor(1e3));
+        var ground = circuit.Add(new Ground());
+
+        circuit.Connect(supply.Negative, ground.Pin);
+        circuit.Connect(supply.Positive, top.A);
+        circuit.Connect(top.B, bottom.A);
+        circuit.Connect(bottom.B, ground.Pin);
+
+        var block = Cirq.Components.Hierarchy.Grouping.Group(circuit, [top, bottom], "Divider")!;
+
+        return new BlockViewModel(block, circuit);
+    }
 
     internal static Window BuildForTest(string name) => Build(name);
 
@@ -51,6 +71,7 @@ public class WindowTests(WindowSession session)
         return name switch
         {
             "About" => new AboutWindow { DataContext = new AboutViewModel() },
+            "Block" => new BlockWindow { DataContext = BlockModel() },
             "Baseline" => new BaselineWindow { DataContext = new BaselineViewModel(circuit) },
             "Compare" => new CompareWindow { DataContext = new CompareViewModel("saved.cirq", []) },
             "Conditions" => new ConditionsWindow { DataContext = new ConditionsViewModel(circuit) },

@@ -8,6 +8,19 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**You can look inside a block — and probe a node in there.** *Edit > Look Inside Block* (`Ctrl+B`)
+opens the selected block on the ordinary canvas, drawing the block's own parts. Change a value and
+it is changed in the block; switch the tool to *Probe*, click a terminal, and the probe goes on the
+circuit outside, so its trace appears on the main scope and is saved with the file.
+
+The probe is why this exists. A block's contents take part in the solve as ordinary parts, so a node
+inside one always had a real voltage — measurable in every sense except the one that mattered, since
+the canvas only draws what is on the sheet and there was nothing to click. A hierarchy you cannot
+measure inside is half a hierarchy.
+
+Adding and removing parts inside a block is still done by ungrouping it: that changes the block's
+pins, and the honest place to do it is the sheet, where you can see what crosses the boundary.
+
 **Tolerance analysis runs on every core.** A Monte Carlo run is a few hundred to a few thousand
 independent circuits, each solved from scratch, none of them looking at any of the others — the one
 embarrassingly parallel thing in the application, and a serial loop. On a twenty-part circuit at two

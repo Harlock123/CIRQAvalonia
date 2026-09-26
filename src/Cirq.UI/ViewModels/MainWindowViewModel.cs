@@ -978,6 +978,28 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         StatusMessage = $"Went to {component.Name}";
     }
 
+    /// <summary>Raised when the look-inside-a-block window should be opened, for that block.</summary>
+    public event EventHandler<Cirq.Components.Hierarchy.Subcircuit>? RequestBlock;
+
+    /// <summary>
+    /// Opens the selected block. A block hides a section behind one symbol, and until now the only
+    /// thing that could be done with one was to ungroup it and put it back.
+    /// </summary>
+    [RelayCommand]
+    private void ShowBlock()
+    {
+        var block = Selection().OfType<Cirq.Components.Hierarchy.Subcircuit>().FirstOrDefault()
+                    ?? SelectedComponent as Cirq.Components.Hierarchy.Subcircuit;
+
+        if (block is null)
+        {
+            StatusMessage = "Select a block to look inside it.";
+            return;
+        }
+
+        RequestBlock?.Invoke(this, block);
+    }
+
     /// <summary>Raised when the requirements-over-a-range window should be opened.</summary>
     public event EventHandler? RequestSpecSweep;
 
@@ -1515,6 +1537,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
           Ctrl+V       Paste a duplicate of it
           Ctrl+G       Group the selection into a block
           Ctrl+Shift+G Ungroup a block back onto the sheet
+          Ctrl+B       Look inside the selected block — and probe a node in it
 
         Tools
           V            Select

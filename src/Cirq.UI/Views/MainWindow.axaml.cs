@@ -181,6 +181,7 @@ public partial class MainWindow : Window
         viewModel.RequestImpedance += async (_, _) => await ShowImpedanceAsync();
         viewModel.RequestPoleZero += async (_, _) => await ShowPoleZeroAsync();
         viewModel.RequestSpecs += async (_, _) => await ShowSpecsAsync();
+        viewModel.RequestBlock += async (_, block) => await ShowBlockAsync(block);
         viewModel.RequestSpecSweep += async (_, _) => await ShowSpecSweepAsync();
         viewModel.RequestRuleCheck += async (_, _) => await ShowRuleCheckAsync();
         viewModel.RequestRatings += async (_, _) => await ShowRatingsAsync();
@@ -447,6 +448,35 @@ public partial class MainWindow : Window
         };
 
         await dialog.ShowModal(this);
+    }
+
+    /// <summary>
+    /// What is inside a block: its parts drawn by the ordinary canvas, with the probe tool reaching
+    /// in. A probe attached in there goes on this circuit, so it appears on this window's scope.
+    /// </summary>
+    private async Task ShowBlockAsync(Cirq.Components.Hierarchy.Subcircuit block)
+    {
+        if (_viewModel is null) return;
+
+        var model = new BlockViewModel(block, _viewModel.Circuit);
+
+        model.ProbesChanged += (_, _) =>
+        {
+            _viewModel.Simulation.Simulator?.ResolveProbes();
+            _viewModel.MarkModified();
+        };
+
+        model.Changed += (_, _) =>
+        {
+            _viewModel.Simulation.InvalidateTopology();
+            _viewModel.MarkModified();
+        };
+
+        var dialog = new BlockWindow { DataContext = model };
+
+        await dialog.ShowModal(this);
+
+        _canvas?.InvalidateVisual();
     }
 
     /// <summary>

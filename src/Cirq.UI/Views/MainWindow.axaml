@@ -80,6 +80,9 @@
         <Separator />
         <MenuItem Header="_Group into Block" InputGesture="Ctrl+G"
                   Command="{Binding GroupSelectionCommand}" />
+        <MenuItem Header="_Look Inside Block..." InputGesture="Ctrl+B"
+                  Command="{Binding ShowBlockCommand}"
+                  ToolTip.Tip="What is inside the selected block: its parts, their values, and the probe tool to measure a node in there" />
         <MenuItem Header="_Ungroup Block" InputGesture="Ctrl+Shift+G"
                   Command="{Binding UngroupSelectionCommand}" />
         <MenuItem Header="Block _Library..." Command="{Binding ShowBlockLibraryCommand}" />

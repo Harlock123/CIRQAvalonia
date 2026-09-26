@@ -4621,10 +4621,33 @@ inner terminal share one pin, because they are one net.
 Pins are named after where they came from — `R1.A`, `U2.OUT` — which is far more use from outside
 than P1 through P6.
 
+### Looking inside one
+
+**Edit > Look Inside Block...** (`Ctrl` `B`), with a block selected, opens it: the same canvas the
+sheet uses, drawing the block's own parts.
+
+Two things can be done in there, and they are the two worth having:
+
+- **Change a value.** The parts on screen are the block's own, not copies, so a resistor edited here
+  is edited in the block. The circuit rebuilds when the window closes.
+- **Probe a node inside.** Switch the tool to *Probe* and click a terminal. The probe goes on the
+  circuit *outside* — which is the one being simulated — so its trace appears on the main scope like
+  any other, and it is saved with the file.
+
+The probe is the reason this window exists. A block's contents take part in the solve as ordinary
+parts, so a node inside one has a real voltage that could be measured in every sense except the one
+that mattered: the canvas only draws what is on the sheet, so there was nothing to click. A
+hierarchy you cannot measure inside is half a hierarchy.
+
+Probes inside a block are named after where they are — `X1 · R1.B` — because `R1.B` alone, on a
+sheet with no R1 anywhere on it, is a label nobody can place.
+
 ### Editing the inside
 
-Ungroup it, change it, group it again. There is no separate window for the inside of a block, and
-the round trip is lossless. To put a block somewhere you can reach it again, see
+**Adding and removing** parts inside a block is still done by ungrouping it, changing it, and
+grouping it again — the round trip is lossless. That is a change to the block's *shape*, which
+changes its pins, and the honest place to do it is on the sheet where you can see what crosses the
+boundary. To put a block somewhere you can reach it again, see
 [Reusing a block](#reusing-a-block).
 
 Blocks can contain blocks, and the flattening is recursive.
@@ -5651,6 +5674,7 @@ Also available in the app at **Help > Keyboard Shortcuts**.
 | View menu | **Mark Interactive Parts** rings everything you can double-click; **Describe Parts on Hover** turns the hover card off; **Show Current Flow** puts moving dots on the wires; **Show Live Values** annotates the drawing with what it is doing |
 | `Ctrl+N` / `Ctrl+O` / `Ctrl+S` / `Ctrl+Shift+S` | New / open / save / save as |
 | `Ctrl+P` | Print — a sheet each for the schematic, the traces and the parts list |
+| `Ctrl` `B` | Look inside the selected block — change a value in there, or probe a node |
 | `Ctrl+E` | Export — PNG, JPEG, BMP, SVG, PDF, a SPICE netlist, a KiCad netlist for a board, the traces as CSV, or the parts list as a BOM |
 | `Ctrl+Shift+E` | Browse the example circuits |
 | `Help > About` | Version, and the libraries this is built on — with a button that copies the lot |
