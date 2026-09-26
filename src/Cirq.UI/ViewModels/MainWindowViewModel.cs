@@ -31,6 +31,17 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         RebuildPalette();
 
         Scope.SamplingChanged += (_, _) => ApplyScopeSampling();
+
+        // A single-shot capture stops the run, the way a scope stops acquiring. The alternative is
+        // a photograph of something that has since scrolled a long way into the past, which is the
+        // situation single-shot exists to get out of.
+        Scope.SingleShotCaptured += (_, _) =>
+        {
+            if (!Simulation.IsRunning) return;
+
+            Simulation.Pause();
+            StatusMessage = $"Single shot: caught an edge at {Cirq.Core.Units.SiPrefix.Format(Scope.TriggeredAt ?? 0, "s", 4)} — run again to arm another";
+        };
         Inspector.ParameterChanged += (_, structural) =>
         {
             if (structural) Simulation.InvalidateTopology();

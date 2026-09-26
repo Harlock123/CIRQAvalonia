@@ -354,6 +354,171 @@ public sealed partial class ScopeViewModel : ObservableObject
     [ObservableProperty]
     public partial SignalProbe? SelectedProbe { get; set; }
 
+    // ---- triggering ------------------------------------------------------
+
+    /// <summary>
+    /// When the capture starts.
+    /// <para>
+    /// Off follows the newest samples, which is what this scope has always done and is right for
+    /// watching a circuit settle. Anything repeating wants Auto or Normal, which line the same
+    /// feature of the waveform up in the same place every repaint so it stands still; anything that
+    /// happens once wants Single.
+    /// </para>
+    /// </summary>
+    [ObservableProperty]
+    public partial TriggerMode TriggerMode { get; set; } = TriggerMode.Off;
+
+    /// <summary>
+    /// The trace the edge is looked for on. Null takes the first visible one, so turning triggering
+    /// on does something sensible before anything has been chosen.
+    /// </summary>
+    [ObservableProperty]
+    public partial SignalProbe? TriggerProbe { get; set; }
+
+    /// <summary>The value the trigger signal has to cross, in its own units.</summary>
+    [ObservableProperty]
+    public partial double TriggerLevel { get; set; }
+
+    [ObservableProperty]
+    public partial TriggerSlope TriggerSlope { get; set; } = TriggerSlope.Rising;
+
+    /// <summary>
+    /// Where along the screen the trigger sits, as a fraction of the window. A fifth of the way in
+    /// by default, so there is a little of what led up to the edge as well as what followed it —
+    /// which is most of why a scope has a trigger at all rather than a start button.
+    /// </summary>
+    [ObservableProperty]
+    public partial double TriggerPosition { get; set; } = 0.2;
+
+    public static IReadOnlyList<TriggerMode> TriggerModes { get; } = Enum.GetValues<TriggerMode>();
+
+    public static IReadOnlyList<TriggerSlope> TriggerSlopes { get; } = Enum.GetValues<TriggerSlope>();
+
+    /// <summary>The instant the displayed capture is lined up on, or null when nothing has been found.</summary>
+    [ObservableProperty]
+    public partial double? TriggeredAt { get; private set; }
+
+    /// <summary>True once a single-shot capture has happened, which is what holds it on screen.</summary>
+    [ObservableProperty]
+    public partial bool HasCaptured { get; private set; }
+
+    /// <summary>Raised when a single-shot trigger fires, so the run can be stopped on it.</summary>
+    public event EventHandler? SingleShotCaptured;
+
+    private double _armedAt;
+    private double _heldStart;
+
+    /// <summary>
+    /// Waits for the next edge. Single-shot only: the other modes are always looking.
+    /// </summary>
+    [RelayCommand]
+    public void Arm()
+    {
+        _armedAt = Probes.Count == 0 ? 0 : Probes.Max(p => p.HistoryBuffer.Count == 0
+            ? 0
+            : p.HistoryBuffer[p.HistoryBuffer.Count - 1].Time);
+
+        HasCaptured = false;
+        TriggeredAt = null;
+
+        OnPropertyChanged(nameof(TriggerStatus));
+    }
+
+    /// <summary>What the trigger is doing, in the words a scope's front panel uses.</summary>
+    public string TriggerStatus => TriggerMode switch
+    {
+        TriggerMode.Off => "Following the newest samples",
+        TriggerMode.Single when HasCaptured => $"Captured at {SiPrefix.Format(TriggeredAt ?? 0, "s", 4)}",
+        TriggerMode.Single => "Armed — waiting for an edge",
+        _ when TriggeredAt is { } at => $"Triggered at {SiPrefix.Format(at, "s", 4)}",
+        TriggerMode.Normal => "Waiting for an edge",
+        _ => "No edge yet — free running",
+    };
+
+    /// <summary>
+    /// Where the visible window starts, given the newest sample in the circuit.
+    /// <para>
+    /// The one place the trigger is actually applied. An edge is only worth lining up on once
+    /// everything that follows it on screen has been recorded — otherwise the picture grows to the
+    /// right as the samples arrive, which is the sliding a trigger is there to stop — so the search
+    /// is limited to edges at least the post-trigger part of the window old.
+    /// </para>
+    /// </summary>
+    public double WindowStart(double latest)
+    {
+        var window = WindowSeconds;
+        var free = AutoScroll ? Math.Max(0, latest - window) : 0;
+
+        if (TriggerMode == TriggerMode.Off)
+        {
+            TriggeredAt = null;
+            return free;
+        }
+
+        var probe = TriggerProbe ?? Probes.FirstOrDefault(p => p.IsVisible);
+
+        if (probe is null) return free;
+
+        // Held: a single-shot capture is a photograph, and it does not move afterwards.
+        if (TriggerMode == TriggerMode.Single && HasCaptured)
+            return TriggeredAt is { } held ? Start(held, window) : _heldStart;
+
+        var post = window * (1.0 - TriggerPosition);
+
+        var found = ScopeTrigger.Find(
+            probe.HistoryBuffer,
+            TriggerLevel,
+            TriggerSlope,
+            noLaterThan: latest - post,
+            after: TriggerMode == TriggerMode.Single ? _armedAt : null,
+            // Two percent of the screen. Noise on a slow edge crosses the level many times, and
+            // without a band to fall back past, the display jumps between those crossings.
+            hysteresis: VoltageSpan * 0.02);
+
+        if (found is not { } edge)
+        {
+            // Normal holds its last capture rather than showing something that did not trigger;
+            // Auto gives up and free-runs, which is what makes it the mode to leave a scope in.
+            TriggeredAt = null;
+            OnPropertyChanged(nameof(TriggerStatus));
+
+            return TriggerMode == TriggerMode.Auto ? free : _heldStart;
+        }
+
+        TriggeredAt = edge;
+        _heldStart = Start(edge, window);
+
+        if (TriggerMode == TriggerMode.Single && !HasCaptured)
+        {
+            HasCaptured = true;
+            SingleShotCaptured?.Invoke(this, EventArgs.Empty);
+        }
+
+        OnPropertyChanged(nameof(TriggerStatus));
+
+        return _heldStart;
+    }
+
+    private double Start(double edge, double window) => Math.Max(0, edge - (window * TriggerPosition));
+
+    partial void OnTriggerModeChanged(TriggerMode value)
+    {
+        TriggeredAt = null;
+        HasCaptured = false;
+
+        if (value == TriggerMode.Single) Arm();
+
+        OnPropertyChanged(nameof(IsTriggering));
+        OnPropertyChanged(nameof(IsSingleShot));
+        OnPropertyChanged(nameof(TriggerStatus));
+    }
+
+    /// <summary>True whenever an edge is being looked for, which shows the rest of the controls.</summary>
+    public bool IsTriggering => TriggerMode != TriggerMode.Off;
+
+    /// <summary>True in single-shot, which is the only mode with something to arm.</summary>
+    public bool IsSingleShot => TriggerMode == TriggerMode.Single;
+
     /// <summary>Total time span shown across the scope face, in seconds.</summary>
     public double WindowSeconds => TimebasePerDivision * HorizontalDivisions;
 

@@ -612,6 +612,7 @@ The scope controls, left to right:
 | **Layout** | *Unified* overlays all traces, *Stacked* offsets them into lanes, *Tiled* gives each its own axes |
 | **AC couple** | Subtracts each trace's DC average before display |
 | **Auto-scroll** | Follows the newest data instead of holding at t = 0 |
+| **Trigger** | Where the capture starts — see [below](#making-the-waveform-stand-still) |
 | **Measure** / **Cursors** | Readouts per trace, and two draggable time cursors — see [below](#measuring-what-is-on-the-scope) |
 | **Expression box** | Arithmetic on the traces: `Out / In` is a gain — see [below](#comparing-and-computing-traces) |
 | **Keep as reference** | A copy of what is on screen now, kept drawn while you change the circuit |
@@ -622,6 +623,47 @@ to remove the probe entirely.
 
 **Auto** is on by default and is the setting most people want: change a source's amplitude and the
 waveform stays on screen instead of running off the top.
+
+### Making the waveform stand still
+
+Left alone, the scope shows the newest samples. That is right for watching a circuit settle and
+wrong for everything that repeats: a sine whose period does not divide the window exactly slides
+sideways a little on every repaint, and reading anything off a moving waveform is guesswork.
+
+![Two stacked plots of the same 1 kHz sine. Above, four repaints drawn on top of each other with the
+trigger off: four sine waves in four different phases, crossing each other all across the screen.
+Below, the same four repaints with the trigger on: one sine wave, because all four are in the same
+place, with a dashed line marking the trigger a fifth of the way across](images/30-trigger.png)
+
+The **Trigger** control picks the mode:
+
+| Mode | What it does |
+| --- | --- |
+| **Off** | Follows the newest samples. What the scope has always done |
+| **Auto** | Lines the display up on an edge when it finds one, and free-runs when it does not — so there is always something on screen |
+| **Normal** | Lines up on an edge and shows nothing else: if nothing triggers, the last capture stays put |
+| **Single** | Waits for one edge, catches it, and stops the run |
+
+With a mode chosen, three more controls appear: which **trace** to watch, which **way** the signal
+has to be going through the level, and the **level** itself, in the trace's own units. The level is
+drawn across the face as a dotted line marked `T`, and the instant it fired as a dotted line down —
+so a trigger that never fires looks different from one set to a level the signal never reaches,
+which is nearly always what has happened.
+
+The trigger sits a fifth of the way across the screen rather than at the left edge, so you can see
+what led up to the edge as well as what followed it. That is most of why a scope has a trigger at
+all rather than a start button.
+
+**Single** is the one to reach for when something happens once — a start-up transient, a glitch, a
+fault that trips. Press **Arm**, run, and the first qualifying edge is caught and the simulation
+paused on it. By the time you could have seen it happen and reached for `F5`, it would be several
+screens into the past.
+
+Two details that stop it lying to you. An edge is only used once the whole window after it has
+actually been recorded, so the picture never grows to the right as samples arrive — that growth is
+the sliding the trigger is there to stop. And the crossing is **interpolated** between the two
+samples either side of the level rather than snapped to the nearer one; on a fast edge, one sample
+interval is most of the edge.
 
 ---
 

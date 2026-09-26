@@ -708,4 +708,84 @@ public class GuidePlotTests
                 "The step it chose: a hundred times shorter at each edge, growing back across each flat");
         });
     }
+
+    // ---- the trigger -------------------------------------------------------
+
+    /// <summary>
+    /// What a trigger is for, in one picture: four repaints of the same sine, drawn on top of each
+    /// other. Without one they lie in four different places; with one they lie in the same place.
+    /// </summary>
+    [Fact]
+    public void Trigger()
+    {
+        var circuit = new Circuit();
+        var scope = new ScopeViewModel(circuit);
+        var probe = new SignalProbe { Label = "In" };
+
+        // A kilohertz sine, recorded finely enough to interpolate an edge properly.
+        for (var t = 0.0; t <= 12e-3; t += 1e-6)
+            probe.Record(t, 2.0 * Math.Sin(2 * Math.PI * 1e3 * t));
+
+        scope.Probes.Add(probe);
+        scope.TimebasePerDivision = 2e-3 / ScopeViewModel.HorizontalDivisions;
+
+        // Four repaints, a third of a cycle apart — which is what a scope drawing at thirty frames a
+        // second against a signal at a kilohertz is doing.
+        double[] repaints = [8.0e-3, 8.3e-3, 8.7e-3, 9.1e-3];
+
+        List<(double[] X, double[] Y)> Capture(TriggerMode mode)
+        {
+            scope.TriggerMode = mode;
+            scope.TriggerLevel = 0;
+            scope.TriggerSlope = TriggerSlope.Rising;
+
+            List<(double[], double[])> captures = [];
+
+            foreach (var latest in repaints)
+            {
+                var start = scope.WindowStart(latest);
+                var window = scope.WindowSeconds;
+
+                var points = probe.HistoryBuffer
+                    .Where(s => s.Time >= start && s.Time <= start + window)
+                    .ToList();
+
+                captures.Add(([.. points.Select(s => s.Time - start)], [.. points.Select(s => s.Value)]));
+            }
+
+            return captures;
+        }
+
+        var free = Capture(TriggerMode.Off);
+        var triggered = Capture(TriggerMode.Auto);
+
+        // The assertion the picture is making: untriggered, the four captures start at four
+        // different points in the cycle; triggered, they start at the same one.
+        var freeSpread = free.Max(c => c.Y[0]) - free.Min(c => c.Y[0]);
+        var triggeredSpread = triggered.Max(c => c.Y[0]) - triggered.Min(c => c.Y[0]);
+
+        Assert.True(freeSpread > 1.0, $"the free-running captures should differ: {freeSpread:g3} V");
+        Assert.True(triggeredSpread < 0.02, $"the triggered captures should not: {triggeredSpread:g3} V");
+
+        DocPlot.Stack("30-trigger.png", (loose, locked) =>
+        {
+            DocPlot.Style(loose, "Time across the screen (s)", "Input (V)");
+            DocPlot.SiBottom(loose);
+
+            for (var i = 0; i < free.Count; i++) DocPlot.Line(loose, free[i].X, free[i].Y, i);
+
+            DocPlot.Title(loose, "Trigger off: four repaints, four different places on the screen");
+
+            DocPlot.Style(locked, "Time across the screen (s)", "Input (V)");
+            DocPlot.SiBottom(locked);
+
+            for (var i = 0; i < triggered.Count; i++)
+                DocPlot.Line(locked, triggered[i].X, triggered[i].Y, i);
+
+            DocPlot.Vertical(locked, scope.WindowSeconds * scope.TriggerPosition, "trigger");
+
+            DocPlot.Title(locked,
+                "Trigger on a rising edge through zero: the same four repaints, lying on top of each other");
+        });
+    }
 }

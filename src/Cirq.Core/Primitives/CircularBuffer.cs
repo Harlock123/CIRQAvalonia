@@ -6,7 +6,7 @@ namespace Cirq.Core.Primitives;
 /// Fixed-capacity ring buffer that overwrites its oldest entry once full. Reads and writes are
 /// guarded by an internal lock so a simulation thread may append while the UI thread snapshots.
 /// </summary>
-public sealed class CircularBuffer<T> : IEnumerable<T>
+public sealed class CircularBuffer<T> : IReadOnlyList<T>
 {
     private readonly T[] _items;
     private readonly Lock _gate = new();

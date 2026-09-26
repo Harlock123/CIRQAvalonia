@@ -199,6 +199,14 @@ steps a parameter and re-solves the operating point at each value, which draws t
 are specified by — a diode's exponential, a transistor's output characteristic, a panel's maximum
 power point. Stepping a second parameter as well turns the last of those into a curve tracer.
 
+The scope **triggers**, in the four modes a bench scope has: off, auto, normal and single. An edge
+is only used once the whole window after it has been recorded, which is what makes a repeating
+waveform stand still rather than slide a little on every repaint, and the crossing is interpolated
+between the samples either side of the level — snapping to the nearer sample would jitter the
+display by up to a sample interval, which on a fast edge is most of the edge. Single-shot arms,
+catches one edge and pauses the run on it, for the glitch or the start-up transient that is several
+screens into the past by the time anybody could reach for the pause key.
+
 To those, three measurements of the traces themselves: the scope's **automatic readouts** (peak to
 peak, mean, RMS, frequency, duty cycle, 10–90 % rise time) with a pair of draggable time cursors;
 an **FFT** of whatever has been recorded; and **protocol decoding**, which reads the traces as

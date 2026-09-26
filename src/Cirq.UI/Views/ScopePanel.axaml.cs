@@ -102,7 +102,9 @@ public partial class ScopePanel : UserControl, Cirq.UI.Services.IScopeSource
 
         var window = scope.WindowSeconds;
         var latest = scope.Probes.Count == 0 ? 0 : scope.Probes.Max(LastSampleTime);
-        var start = scope.AutoScroll ? Math.Max(0, latest - window) : 0;
+        // Where the capture starts: the newest samples, or an edge lined up in the same place every
+        // repaint so a repeating waveform stands still. See ScopeViewModel.WindowStart.
+        var start = scope.WindowStart(latest);
         var scale = ChooseTimeScale(window);
 
         // Measured before the plot is built, so the cursor lines below are drawn where the
@@ -118,6 +120,8 @@ public partial class ScopePanel : UserControl, Cirq.UI.Services.IScopeSource
 
         // Cursors mark instants, and in XY mode the horizontal axis is not time.
         if (scope.ShowCursors && scope.Layout != ScopeLayout.Xy) AddCursors(scope, scale);
+
+        if (scope.IsTriggering && scope.Layout != ScopeLayout.Xy) AddTriggerMarks(scope, scale);
 
         _lastScale = scale;
         _plot.Refresh();
@@ -349,6 +353,34 @@ public partial class ScopePanel : UserControl, Cirq.UI.Services.IScopeSource
 
             AddCursor(plot, scope.CursorA * scale.Factor, "A");
             AddCursor(plot, scope.CursorB * scale.Factor, "B");
+        }
+    }
+
+    /// <summary>
+    /// Where the trigger is looking, drawn on the face: the level across, and the instant it fired
+    /// down. Without them a trigger that never fires is indistinguishable from one set to a level
+    /// the signal does not reach, which is nearly always what has happened.
+    /// </summary>
+    private void AddTriggerMarks(ScopeViewModel scope, TimeScale scale)
+    {
+        var count = Math.Max(_plot!.Multiplot.Count(), 1);
+
+        for (var i = 0; i < count; i++)
+        {
+            var plot = count == 1 ? _plot.Plot : _plot.Multiplot.GetPlot(i);
+
+            var level = plot.Add.HorizontalLine(scope.TriggerLevel);
+            level.Color = FromTheme("PlotAxis");
+            level.LineWidth = 1;
+            level.LinePattern = LinePattern.Dotted;
+            level.Text = "T";
+
+            if (scope.TriggeredAt is not { } at) continue;
+
+            var edge = plot.Add.VerticalLine(at * scale.Factor);
+            edge.Color = FromTheme("PlotAxis");
+            edge.LineWidth = 1;
+            edge.LinePattern = LinePattern.Dotted;
         }
     }
 

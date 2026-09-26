@@ -8,6 +8,28 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**The scope triggers.** Off, Auto, Normal and Single, the four modes a bench scope has, with the
+trace, the slope and the level beside them.
+
+Without one the display shows the newest samples, which is right for watching a circuit settle and
+wrong for anything that repeats: a sine whose period does not divide the window exactly slides
+sideways on every repaint, and reading a number off a moving waveform is guesswork. A trigger pins
+one feature of the waveform to one place on the screen and lets everything else be measured against
+it.
+
+**Single** is the other half of what a trigger is for. Something that happens once — a start-up
+transient, a glitch, a fault that trips — is several screens into the past by the time anybody has
+seen it and reached for the pause key. Arm it, run, and the first qualifying edge is caught and the
+run stopped on it.
+
+Two details decide whether a trigger is any use. An edge is only lined up on once the whole window
+that follows it has actually been recorded, or the picture grows to the right as the samples arrive
+— which is the sliding the trigger was meant to stop. And the crossing is interpolated between the
+two samples either side of the level rather than snapped to the nearer one, because a sample
+interval on a fast edge is most of the edge. The level is drawn across the face and the instant it
+fired down it, so a trigger waiting for an edge looks different from one set to a level the signal
+never reaches — which is nearly always what has happened.
+
 **The solver can choose its own time step.** *Simulate > Conditions* has a box for it, and it is
 saved with the circuit. Off by default: a fixed step is repeatable, and that is worth a great deal in
 something whose answers people check by eye.

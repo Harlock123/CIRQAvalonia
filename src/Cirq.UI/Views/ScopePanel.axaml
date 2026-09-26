@@ -54,6 +54,39 @@
 
         <Separator Classes="vertical" />
 
+        <TextBlock Classes="label" Text="Trigger" VerticalAlignment="Center" />
+        <ComboBox FontSize="12" MinWidth="86" AutomationProperties.Name="When the capture starts"
+                  ItemsSource="{Binding Source={x:Static vm:ScopeViewModel.TriggerModes}}"
+                  SelectedItem="{Binding TriggerMode, Mode=TwoWay}"
+                  ToolTip.Tip="Off follows the newest samples. Auto and Normal line an edge up in the same place every repaint, so a repeating waveform stands still. Single catches one edge and stops." />
+
+        <ComboBox FontSize="12" MinWidth="96" IsVisible="{Binding IsTriggering}"
+                  AutomationProperties.Name="Which trace to trigger on"
+                  ItemsSource="{Binding Probes}" DisplayMemberBinding="{Binding Label}"
+                  SelectedItem="{Binding TriggerProbe, Mode=TwoWay}"
+                  ToolTip.Tip="Which trace the edge is looked for on. The first visible one until you choose." />
+
+        <ComboBox FontSize="12" MinWidth="76" IsVisible="{Binding IsTriggering}"
+                  AutomationProperties.Name="Which way the signal has to be going"
+                  ItemsSource="{Binding Source={x:Static vm:ScopeViewModel.TriggerSlopes}}"
+                  SelectedItem="{Binding TriggerSlope, Mode=TwoWay}" />
+
+        <TextBox Width="64" FontSize="11" Padding="6,3" MinHeight="0"
+                 IsVisible="{Binding IsTriggering}"
+                 AutomationProperties.Name="The level to trigger at"
+                 Text="{Binding TriggerLevel, Mode=TwoWay}"
+                 ToolTip.Tip="The value the signal has to cross, in the trace's own units" />
+
+        <Button Classes="toolbar" Content="Arm" Command="{Binding ArmCommand}"
+                IsVisible="{Binding IsSingleShot}"
+                ToolTip.Tip="Wait for the next edge, catch it, and stop" />
+
+        <TextBlock Classes="label" VerticalAlignment="Center" MaxWidth="200"
+                   IsVisible="{Binding IsTriggering}" TextTrimming="CharacterEllipsis"
+                   Text="{Binding TriggerStatus}" />
+
+        <Separator Classes="vertical" />
+
         <CheckBox FontSize="12" Content="Measure" IsChecked="{Binding ShowMeasurements}"
                   ToolTip.Tip="Show what each trace is doing — peak to peak, frequency, and the rest on the row's tooltip" />
         <CheckBox FontSize="12" Content="Cursors" IsChecked="{Binding ShowCursors}"
