@@ -113,11 +113,15 @@ public static class CommandLine
         if (verb == "netlist")
         {
             output.WriteLine("""
-                cirq netlist <circuit.cirq> [-o <path>]
+                cirq netlist <circuit.cirq> [-o <path>] [--kicad]
 
                   Writes the circuit out as a SPICE deck, to the screen or to a file. Anything that
                   has no SPICE element — an annotation, a development board — is named on the error
                   stream rather than left out silently.
+
+                  --kicad             Write a KiCad netlist instead: every part with its designator,
+                                      value and footprint, and every net with the pins on it. Parts
+                                      with no footprint are named on the error stream.
                 """);
             return;
         }
@@ -161,7 +165,7 @@ public static class CommandLine
               cirq baseline <circuit.cirq>  Record what it does now, into the circuit
               cirq compare <circuit.cirq>   Run it again and say what moved since
               cirq run <circuit.cirq>       Run it and write the traces as CSV
-              cirq netlist <circuit.cirq>   Write it out as a SPICE netlist
+              cirq netlist <circuit.cirq>   Write it out as a SPICE netlist, or --kicad for a board
               cirq info <circuit.cirq>      What is in it: parts, nets, probes, requirements
               cirq version                  What version this is
 

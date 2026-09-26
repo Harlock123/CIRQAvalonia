@@ -154,6 +154,20 @@ public abstract partial class CircuitComponent : ObservableObject
     [ObservableProperty]
     public partial string Sheet { get; set; } = string.Empty;
 
+    /// <summary>
+    /// What this part is to be built as — <c>Resistor_SMD:R_0805_2012Metric</c>, or whatever the
+    /// board library calls it. Empty for the great majority of parts, which are never going to be
+    /// built.
+    /// <para>
+    /// A string rather than a chosen thing from a list, because the list belongs to whatever board
+    /// tool is on the other end and this one has no business having an opinion about it. It is
+    /// carried rather than used: nothing here simulates a footprint, and the only thing that reads
+    /// it is the netlist written out for a board.
+    /// </para>
+    /// </summary>
+    [ObservableProperty]
+    public partial string Footprint { get; set; } = string.Empty;
+
     /// <summary>Clears all internal history, returning the component to its power-on state.</summary>
     public virtual void ResetState() { }
 

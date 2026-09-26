@@ -1,5 +1,6 @@
 using System.Globalization;
 using Cirq.Components.Serialization;
+using Cirq.Components.Eda;
 using Cirq.Components.Spice;
 using Cirq.Core.Primitives;
 using Cirq.Core.Probing;
@@ -284,30 +285,69 @@ public static class Commands
 
         if (circuit is null) return exit;
 
+        var path = options.Text("o") ?? options.Text("out");
+
+        // Two different files for two different jobs: a SPICE deck says what the circuit does, a
+        // KiCad netlist says what it is. Which one is wanted is not something to guess from the
+        // extension.
+        var board = options.Has("kicad");
+
+        var text = board
+            ? Kicad(circuit, path, output, error)
+            : Spice(circuit, output, error);
+
+        if (text is null) return CommandLine.Misused;
+
+        if (path is null)
+        {
+            output.Write(text);
+        }
+        else
+        {
+            File.WriteAllText(path, text);
+            output.WriteLine($"Wrote {(board ? "a KiCad netlist" : "a SPICE deck")} to {path}");
+        }
+
+        return CommandLine.Ok;
+    }
+
+    private static string? Spice(Circuit circuit, TextWriter output, TextWriter error)
+    {
         var written = SpiceNetlistWriter.Write(circuit, circuit.Title);
 
         if (written.IsEmpty)
         {
             error.WriteLine("cirq: nothing in this circuit can be written as a netlist.");
-            return CommandLine.Misused;
-        }
-
-        var path = options.Text("o") ?? options.Text("out");
-
-        if (path is null)
-        {
-            output.Write(written.Netlist);
-        }
-        else
-        {
-            File.WriteAllText(path, written.Netlist);
-            output.WriteLine($"Wrote {written.Written.Count} part(s) to {path}");
+            return null;
         }
 
         // Said on the error stream so that redirecting the deck to a file still shows them.
         foreach (var skipped in written.Skipped) error.WriteLine($"cirq: skipped {skipped}");
 
-        return CommandLine.Ok;
+        return written.Netlist;
+    }
+
+    private static string? Kicad(Circuit circuit, string? path, TextWriter output, TextWriter error)
+    {
+        var board = KiCadNetlist.Write(circuit, path is null ? circuit.Title : Path.GetFileName(path));
+
+        if (board.IsEmpty)
+        {
+            error.WriteLine("cirq: there is nothing in this circuit to build.");
+            return null;
+        }
+
+        // A netlist of forty parts and no footprints is forty things to assign by hand, which is
+        // worth knowing before the import rather than during it.
+        if (board.WithoutFootprints.Count > 0)
+        {
+            error.WriteLine(
+                $"cirq: {board.WithoutFootprints.Count} of {board.Written.Count} part(s) have no " +
+                $"footprint: {string.Join(", ", board.WithoutFootprints.Take(8))}" +
+                (board.WithoutFootprints.Count > 8 ? ", ..." : string.Empty));
+        }
+
+        return board.Netlist;
     }
 
     /// <summary>What is in the circuit, without running it.</summary>

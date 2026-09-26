@@ -452,4 +452,55 @@ public class CommandLineTests : IDisposable
         Assert.Contains("cirq compare", Output);
         Assert.Contains("one percent", Output);
     }
+
+    // ---- the board netlist ---------------------------------------------------
+
+    [Fact]
+    public void TheKicadNetlistIsADifferentFileFromTheSpiceOne()
+    {
+        var circuit = Divider();
+
+        Assert.Equal(CommandLine.Ok, Run("netlist", circuit, "--kicad"));
+
+        // The shape KiCad reads, with the parts and the nets in it.
+        Assert.StartsWith("(export (version", Output);
+        Assert.Contains("(comp (ref \"R1\")", Output);
+        Assert.Contains("(net (code", Output);
+
+        // And it is not the SPICE deck, which starts with a title line and has no s-expressions.
+        Assert.DoesNotContain("R1 ", Output.Split('\n')[0]);
+    }
+
+    [Fact]
+    public void PartsWithNoFootprintAreNamedBeforeTheImport()
+    {
+        Assert.Equal(CommandLine.Ok, Run("netlist", Divider(), "--kicad"));
+
+        // On the error stream, so redirecting the netlist into a file still shows them.
+        Assert.Contains("have no footprint", Error);
+        Assert.Contains("R1", Error);
+    }
+
+    [Fact]
+    public void TheBoardNetlistGoesToAFileToo()
+    {
+        var circuit = Divider();
+        var net = Path.ChangeExtension(circuit, ".net");
+
+        _files.Add(net);
+
+        Assert.Equal(CommandLine.Ok, Run("netlist", circuit, "--kicad", "-o", net));
+
+        Assert.Contains("KiCad netlist", Output);
+        Assert.Contains("(export (version", File.ReadAllText(net));
+    }
+
+    [Fact]
+    public void NetlistHelpMentionsBothKinds()
+    {
+        Assert.Equal(CommandLine.Ok, Run("netlist", "--help"));
+
+        Assert.Contains("--kicad", Output);
+        Assert.Contains("SPICE deck", Output);
+    }
 }

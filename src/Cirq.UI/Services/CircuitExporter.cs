@@ -21,6 +21,17 @@ public enum ExportFormat
     /// </summary>
     Netlist,
 
+    /// <summary>
+    /// A KiCad netlist — the step between a simulation that works and a board.
+    /// <para>
+    /// The SPICE deck says what the circuit does; this says what it is. Every part with its
+    /// designator, value and footprint, and every net with the pins on it, in the file Pcbnew
+    /// reads — so the board is wired from the netlist that was simulated rather than from one
+    /// somebody typed again.
+    /// </para>
+    /// </summary>
+    KiCad,
+
     /// <summary>The recorded traces as comma-separated values, for a spreadsheet or a script.</summary>
     Csv,
 
@@ -131,6 +142,17 @@ public static class CircuitExporter
             var result = Cirq.Components.Spice.SpiceNetlistWriter.Write(circuit);
 
             File.WriteAllText(path, result.Netlist);
+            return path;
+        }
+
+        if (options.Format == ExportFormat.KiCad)
+        {
+            var board = Cirq.Components.Eda.KiCadNetlist.Write(circuit, Path.GetFileName(path));
+
+            if (board.IsEmpty)
+                throw new InvalidOperationException("There is nothing on the schematic to build.");
+
+            File.WriteAllText(path, board.Netlist);
             return path;
         }
 
@@ -362,6 +384,7 @@ public static class CircuitExporter
         ExportFormat.Bmp => ".bmp",
         ExportFormat.Svg => ".svg",
         ExportFormat.Netlist => ".cir",
+        ExportFormat.KiCad => ".net",
         ExportFormat.Csv => ".csv",
         _ => ".pdf",
     };
@@ -371,7 +394,7 @@ public static class CircuitExporter
     /// canvas the picture formats share, and they ignore everything about layout.
     /// </summary>
     public static bool IsText(ExportFormat format) =>
-        format is ExportFormat.Netlist or ExportFormat.Csv or ExportFormat.Bom;
+        format is ExportFormat.Netlist or ExportFormat.KiCad or ExportFormat.Csv or ExportFormat.Bom;
 
     /// <summary>True for the formats that have a resolution rather than being drawn as shapes.</summary>
     /// <summary>

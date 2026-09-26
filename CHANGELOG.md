@@ -8,6 +8,21 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+**A KiCad netlist, for when the simulation is right and you want a board.** *File > Export* has it
+as a format, and `cirq netlist --kicad` writes it from the command line. Every part with its
+designator, value and footprint; every net with the pins on it.
+
+The SPICE deck says what the circuit does; this says what it is. It is written from the same netlist
+the solver uses, which matters more than it sounds: a board wired from a second, separately derived
+list is a board wired from something nobody simulated.
+
+Every part gained a **Footprint** box in the properties panel to go with it — a plain text field,
+because the list of footprints belongs to the board tool and this one has no business having an
+opinion about it. Parts with none are named when the file is written, so forty footprints to assign
+is something you find out before the import rather than during it. Ground symbols, net labels and
+annotations are left out as notation rather than parts, and a packaged part keeps its datasheet pin
+numbers — a 555's discharge pin is pin 7 in the file as well as on the drawing.
+
 **`cirq baseline` and `cirq compare`: regression testing for waveforms.** Record what the circuit
 does now — into the circuit file, the same baseline the application takes under *Simulate >
 Baseline* — and later run it again and find out what moved. `compare` exits 1 when anything did.

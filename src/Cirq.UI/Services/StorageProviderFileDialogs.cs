@@ -125,7 +125,9 @@ public sealed class StorageProviderFileDialogs : ICircuitFileDialogs
         ExportFormat.Svg => new FilePickerFileType("SVG drawing")
             { Patterns = ["*.svg"], MimeTypes = ["image/svg+xml"] },
         ExportFormat.Netlist => new FilePickerFileType("SPICE netlist")
-            { Patterns = ["*.cir", "*.net", "*.sp"], MimeTypes = ["text/plain"] },
+            { Patterns = ["*.cir", "*.sp"], MimeTypes = ["text/plain"] },
+        ExportFormat.KiCad => new FilePickerFileType("KiCad netlist")
+            { Patterns = ["*.net"], MimeTypes = ["text/plain"] },
         ExportFormat.Csv => new FilePickerFileType("Comma-separated values")
             { Patterns = ["*.csv"], MimeTypes = ["text/csv"] },
         ExportFormat.Bom => new FilePickerFileType("Parts list")
@@ -159,6 +161,7 @@ public sealed class StorageProviderFileDialogs : ICircuitFileDialogs
                 "SVG  —  vector, scales and stays editable",
                 "PDF  —  vector, for documents and printing",
                 "SPICE netlist  —  the circuit as text, for ngspice or LTspice",
+                "KiCad netlist  —  parts and nets, for laying out a board",
                 "CSV  —  the recorded traces as numbers, for a spreadsheet",
                 "Parts list  —  a bill of materials, as CSV",
             },
@@ -247,6 +250,10 @@ public sealed class StorageProviderFileDialogs : ICircuitFileDialogs
                 ExportFormat.Netlist =>
                     "Writes the circuit as a SPICE deck. Parts with no SPICE equivalent — logic, " +
                     "buses, sensors — are named in the file as comments rather than left out.",
+                ExportFormat.KiCad =>
+                    "Every part with its designator, value and footprint, and every net with the " +
+                    "pins on it — the file KiCad reads to lay out a board. Set each part's " +
+                    "Footprint in the properties panel first, or assign them in KiCad afterwards.",
                 ExportFormat.Csv =>
                     "Writes everything the probes have recorded, not just the window on screen.",
                 ExportFormat.Bom =>

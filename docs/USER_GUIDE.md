@@ -5389,6 +5389,31 @@ The verdict goes at the top, before anything else. A report whose verdict is on 
 report whose verdict nobody knows.
 
 
+### Taking it to a board
+
+**KiCad netlist** is the step between a simulation that works and something you can build. The SPICE
+deck says what the circuit *does*; this says what it *is* — every part with its designator, its
+value and its footprint, and every net with the pins on it, in the file KiCad reads.
+
+It is written from **the same netlist the solver uses**. That matters more than it sounds: a board
+wired from a second, separately derived list is a board wired from something nobody simulated.
+
+Every part has a **Footprint** box in the properties panel — `Resistor_SMD:R_0805_2012Metric`, or
+whatever your board library calls it. It is a plain text field rather than a list to pick from,
+because the list belongs to the board tool and this one has no business having an opinion about it.
+Nothing here uses it; it is carried. Parts with none are named when the file is written, so you know
+before the import rather than during it that there are forty footprints to assign.
+
+Three things are deliberately left out, because they are notation rather than parts: ground symbols,
+net labels, and the annotations. A net with only one pin left on it after that is not written
+either — it is not a connection, and KiCad reports it as unconnected anyway.
+
+Pin numbers come from the part. Anything built as a package numbers its pins the way its datasheet
+does — a 555's discharge pin is pin 7 — and everything else is numbered in the order its terminals
+were declared, which for a two-terminal part is the 1 and 2 every board library uses.
+
+---
+
 ## The command line
 
 Everything above happens in a window. `cirq` is the same engine with no window at all — for a build
@@ -5400,7 +5425,7 @@ cirq check <circuit.cirq>     Hold it to the requirements saved in it
 cirq baseline <circuit.cirq>  Record what it does now, into the circuit
 cirq compare <circuit.cirq>   Run it again and say what moved since
 cirq run <circuit.cirq>       Run it and write the traces as CSV
-cirq netlist <circuit.cirq>   Write it out as a SPICE netlist
+cirq netlist <circuit.cirq>   Write it out as a SPICE netlist, or --kicad for a board
 cirq info <circuit.cirq>      What is in it: parts, nets, probes, requirements
 ```
 
@@ -5475,7 +5500,8 @@ numbers.
 
 `cirq netlist` writes the SPICE deck, to the screen or to a file with `-o`. Anything with no SPICE
 element is named on the error stream rather than dropped silently, so redirecting the deck to a file
-still shows you what was left out.
+still shows you what was left out. `--kicad` writes the board netlist instead, and names the parts
+with no footprint the same way.
 
 `cirq info` says what is in a circuit without running it: how many parts, wires and nodes, the
 sheets, the probes, the requirements, the named parameters, and what temperature it is set to run

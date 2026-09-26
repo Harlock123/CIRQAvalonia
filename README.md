@@ -33,7 +33,7 @@ Core ← Engine ← Components ← UI, which keeps the whole engine headless-tes
 ```bash
 dotnet run --project src/Cirq.UI     # the editor
 dotnet run --project src/Cirq.Cli    # the same engine, no window
-dotnet test                          # 3618 tests
+dotnet test                          # 3674 tests
 ./scripts/build-guide.sh             # the user guide as a PDF
 ```
 
@@ -100,7 +100,7 @@ cirq check <circuit.cirq>     Hold it to the requirements saved in it
 cirq baseline <circuit.cirq>  Record what it does now, into the circuit
 cirq compare <circuit.cirq>   Run it again and say what moved since
 cirq run <circuit.cirq>       Run it and write the traces as CSV
-cirq netlist <circuit.cirq>   Write it out as a SPICE netlist
+cirq netlist <circuit.cirq>   Write it out as a SPICE netlist, or --kicad for a board
 cirq info <circuit.cirq>      What is in it: parts, nets, probes, requirements
 ```
 
@@ -236,6 +236,12 @@ overshoot is time it never spent charging, and the rate comes out 27 % low. So a
 crossed something and where. If it did, the step is thrown away and retaken to land on the crossing.
 Uncommitted state is what makes that cheap, and a test holds the two against each other: the same
 circuit at the same ceiling, wrong with a fixed step and right with a chosen one.
+
+**To a board.** A **KiCad netlist** export writes every part with its designator, value and
+footprint, and every net with the pins on it — from the same netlist the solver uses, so the board
+is wired from the circuit that was simulated rather than from a second list somebody typed again.
+Every part carries a `Footprint` string for it; ground symbols, net labels and annotations are left
+out as notation, and a packaged part keeps its datasheet pin numbers.
 
 **Analyses.** A good many, and they answer genuinely different questions — the guide's
 [index of them](docs/USER_GUIDE.md#which-analysis-answers-which-question) is the map. The four the
@@ -616,6 +622,7 @@ one passes against a button that would never have fired.
 | Power and interface | A PPTC carrying its hold current for ever and tripping on a fault to a trickle rather than to nothing, and cooling back far slower than it tripped; a solid-state relay commanded at a mains peak refusing to fire until the next zero crossing and then conducting properly; an LM324 running four independent followers off one supply pair with the fourth saturating exactly where its family's headroom says; an A4988 holding 0.8 A out of a supply that would otherwise force 4.3 A, reversing the winding rather than switching it off, and commanding intermediate currents when microstepping is selected; and a MAX232 making ±8.5 V from a single 5 V rail, inverting TTL onto the line and back, deciding with half a volt of hysteresis, and sagging its pump when the line load is heavier than the standard allows |
 | New devices | Tri-state outputs genuinely releasing a bus where a pull-down alone then decides it, a CAN bus going dominant whenever any node sends a zero and the recessive node knowing it lost, an IGBT conducting with a voltage offset where a MOSFET holds a resistance and still passing current after its gate has gone, a photodiode linear across decades with a thousandth of a phototransistor's current and saturating when its load resistor is too big, and a synchronous counter whose carry is gated by the enable that chains it |
 | Behavioural sources | A linear formula agreeing exactly with the VCVS it imitates, six formulas giving back what the arithmetic says, a soft limiter matching 2.5·tanh to five figures across its knee, a current output driving its load the right way round, a formula in time alone being a waveform and not making the circuit non-linear, two sines multiplied producing the sum and difference frequencies and neither input, a formula that will not parse producing nothing rather than an arbitrary number, an unknown name refused, a division by zero costing an instant rather than the matrix, and an unwired input being zero rather than a singular matrix |
+| The board netlist | Parts written with their values and ground, net labels and annotations left out as notation rather than components, a footprint carried through and the parts without one named, every net carrying the pins on it with the rail named by its label and ground called GND, a packaged part keeping its datasheet pin numbers, a net with one pin left on it not being a connection, a quote inside a value escaped rather than ending the file early, the brackets balancing, and the file having the shape KiCad reads |
 | Baselines from the command line | A baseline recorded into the circuit file itself, an unchanged circuit comparing clean and exiting 0, a resistor changed by a factor of two exiting 1 with the trace named, comparing with no baseline being a misuse rather than a quiet pass, a probe added since counting as a change, and — the bug this found — a flat trace judged against its own level rather than against a swing it does not have, so a rail that fell from 5 V to 3.3 V is no longer reported as unchanged |
 | The command line | Every command against a real circuit file: a met requirement exiting 0 and an unmet one exiting 1, a circuit with no requirements or no probes being a misuse rather than a quiet pass, a file that is not there and a file that is not a circuit both reported rather than thrown, a number that is not a number refused before anything runs, the range check finding where a requirement gives out and passing over a range it survives, sweeping a part instead of the temperature, sweeping something that is not there, run writing a CSV with a real reading in it, netlist going to the screen and to a file, info naming the sheets — and help for a command describing that command rather than all of them |
 | Exporting a split drawing | Every sheet getting its own file and the two files differing, every sheet getting a page of one PDF rather than several files — a deliberately broken loop proving the page count is actually counted — a single page still being a single file when one is asked for, a one-page drawing ignoring the request rather than growing a suffix, and printing giving a page to each sheet |
