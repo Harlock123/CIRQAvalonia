@@ -11,6 +11,21 @@ schematic editor with a live oscilloscope on top.
 **[Read the User Guide](docs/USER_GUIDE.md)** for how to drive the editor — also attached to every
 [release](../../releases) as a printable PDF. What follows is how it works underneath.
 
+## Download
+
+**[Get the latest release](../../releases/latest)**: the archive for your platform, then extract it and
+run `CirqAvalonia`. Each build is self-contained, so there is no .NET to install first.
+
+| Platform | Archive |
+| --- | --- |
+| Windows | `win-x64`, `win-x86` or `win-arm64` (.zip) |
+| macOS | `osx-arm64` for Apple Silicon, `osx-x64` for Intel (.tar.gz) |
+| Linux | `linux-x64` or `linux-arm64` (.tar.gz) |
+
+The `cirq` command line comes in the same archive, and the User Guide PDF sits beside them on the
+release page. The macOS builds are not signed yet, so the first launch needs one extra step:
+see [Running](#running) below.
+
 ```
 CirqAvalonia.slnx
 ├── src/
