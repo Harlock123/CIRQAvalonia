@@ -284,12 +284,14 @@ public sealed class ChatPanel : DockPanel
         return new StackPanel { Children = { heading, body } };
     }
 
+    /// <summary>Each picture decoded once, however often its line is redrawn.</summary>
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<ToolImage, Bitmap> Decoded = [];
+
     private static Control? Picture(ToolImage image, double width)
     {
         try
         {
-            using var stream = new MemoryStream(image.Data);
-            var bitmap = new Bitmap(stream);
+            var bitmap = Decoded.GetValue(image, i => new Bitmap(new MemoryStream(i.Data)));
             var frame = new Border
             {
                 BorderThickness = new Thickness(1), Margin = new Thickness(14, 2, 4, 2), HorizontalAlignment = HorizontalAlignment.Left,

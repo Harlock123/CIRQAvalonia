@@ -28,11 +28,9 @@
     <!-- Markdown to HTML for the printable guide, used only by tools/Cirq.Docs. BSD-2-Clause,
          no transitive dependencies on net10.0, and nothing the application ships references it. -->
     <PackageVersion Include="Markdig" Version="1.4.0" />
-    <!-- The AI side: the MCP server agents drive the editor through, the plots it shows them (the
-         core of the ScottPlot the scope already uses, at the same version), and the Anthropic SDK
-         the in-app chat talks to Claude with. -->
+    <!-- The AI side: the MCP server agents drive the editor through, and the Anthropic SDK the
+         in-app chat talks to Claude with. -->
     <PackageVersion Include="ModelContextProtocol.Core" Version="2.3.0" />
-    <PackageVersion Include="ScottPlot" Version="5.1.59" />
     <PackageVersion Include="Anthropic" Version="13.3.0" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
     <PackageVersion Include="xunit" Version="2.9.2" />

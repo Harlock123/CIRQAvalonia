@@ -16,8 +16,8 @@
   <ItemGroup>
     <!-- The official C# MCP SDK's core: the server, client and transports, without the hosting extras. -->
     <PackageReference Include="ModelContextProtocol.Core" />
-    <!-- Plots of a run for the agent to look at. The same ScottPlot the scope draws with. -->
-    <PackageReference Include="ScottPlot" />
+    <!-- Plots of a run for the agent to look at, drawn directly (see Plots.cs). -->
+    <PackageReference Include="SkiaSharp" />
   </ItemGroup>
 
   <ItemGroup>

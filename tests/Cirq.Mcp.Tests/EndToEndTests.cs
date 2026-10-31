@@ -24,7 +24,7 @@ public class EndToEndTests
     {
         using var b = new Bench();
         await using var s = await InProcess.Start(b.Host);
-        Assert.Equal("CirqAvalonia", s.Client.ServerInfo.Name);
+        Assert.Equal("CirqAvalonia", s.Client.ServerInfo!.Name);
         Assert.Contains("Ground part", s.Client.ServerInstructions!);
         Assert.Contains("Part.Pin", s.Client.ServerInstructions!);
 

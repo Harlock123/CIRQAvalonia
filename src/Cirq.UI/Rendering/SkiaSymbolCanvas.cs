@@ -197,6 +197,9 @@ public sealed class SkiaSymbolCanvas(SKCanvas canvas) : ISymbolCanvas, IDisposab
 
     private static SKTypeface? _typeface;
 
+    /// <summary>The font file the typeface is read from, kept for as long as the typeface is.</summary>
+    private static SKData? _typefaceData;
+
     /// <summary>
     /// Inter, the same face the canvas draws with, loaded out of the font package rather than
     /// looked up by name — the export has to come out the same on a machine that has never heard
@@ -211,7 +214,20 @@ public sealed class SkiaSymbolCanvas(SKCanvas canvas) : ISymbolCanvas, IDisposab
             using var stream = AssetLoader.Open(
                 new Uri("avares://Avalonia.Fonts.Inter/Assets/Inter-Regular.ttf"));
 
-            if (SKTypeface.FromStream(stream) is { } loaded) return loaded;
+            // Copied into Skia's own memory, which the typeface reads glyphs from for as long as it
+            // lives, rather than handed over as a stream: the font is read again for every glyph
+            // not seen before, long after a stream would have been closed.
+            using var bytes = new MemoryStream();
+            stream.CopyTo(bytes);
+            var data = SKData.CreateCopy(bytes.ToArray());
+
+            if (SKTypeface.FromData(data) is { } loaded)
+            {
+                _typefaceData = data;
+                return loaded;
+            }
+
+            data.Dispose();
         }
         catch (Exception)
         {
