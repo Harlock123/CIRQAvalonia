@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Cirq.Shots</RootNamespace>
+    <!-- Draws the guide's screenshots of the AI Chat: the real editor in a headless window, rendered
+         by Skia, with a recorded conversation standing in for Claude. A build tool, never shipped. -->
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia.Headless" />
+    <PackageReference Include="Avalonia.Skia" />
+    <PackageReference Include="SkiaSharp" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/Cirq.UI/Cirq.UI.csproj" />
+  </ItemGroup>
+
+</Project>

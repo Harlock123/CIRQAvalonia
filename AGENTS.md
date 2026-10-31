@@ -60,6 +60,9 @@ dotnet run --project src/Cirq.UI -- --mcp      # the MCP server on stdio, headle
 - `src/Cirq.Cli/`: the `cirq` tool. `CommandLine.Run` takes its writers as arguments, so tests drive it without
   starting a process.
 - `tools/Cirq.Docs/`: turns the Markdown guide into print-ready HTML (Markdig). It is never shipped.
+- `tools/Cirq.Shots/`: draws the guide's AI Chat screenshots (`docs/images/35-*.png`, `36-*.png`): the real editor
+  in a headless window rendered by Skia, with Claude's side replayed from a script and the tool calls run for real.
+  `dotnet run --project tools/Cirq.Shots -- docs/images`. Never shipped.
 - `tests/`: xUnit v2, one project per source project. `Cirq.UI.Tests/Support/HeadlessApp.cs` runs the real `App`
   on Avalonia's headless platform.
 - `scripts/`: the build, publish, verify and changelog scripts that CI also calls.

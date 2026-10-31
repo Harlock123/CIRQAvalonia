@@ -6,3 +6,7 @@ using System.Runtime.CompilerServices;
 // builder off the public surface while letting the suite reach the two dialogs that have between
 // them accounted for both of the UI bugs that have ever shipped.
 [assembly: InternalsVisibleTo("Cirq.UI.Tests")]
+
+// The guide's screenshots of the AI Chat are drawn by tools/Cirq.Shots, which opens a real window
+// headless and points its settings and chat folder somewhere of its own, as the tests do.
+[assembly: InternalsVisibleTo("Cirq.Shots")]

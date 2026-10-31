@@ -159,6 +159,8 @@ plot rolling off rather than guess from numbers. Six saved recipes (an RC low-pa
 resistor, a 555 astable, an inverting amplifier, a bridge rectifier and a decade counter) are served
 as MCP prompts, and every example circuit can be loaded by name.
 
+![The AI Chat building a 555 astable: the circuit Claude placed and wired on the canvas, its capacitor ramp and square-wave output in the scope, and the chat panel on the right with each tool call on a line, thumbnails of the schematic and the run it looked at, and its answer quoting the measured 989.5 Hz and 52.8 % duty cycle](docs/images/35-ai-chat.png)
+
 **The AI Chat** (`F12`, or *AI > AI Chat*) is a panel on the right of the window. Ask for a circuit
 (*"build an RC low-pass at 1 kHz and show me its response"*, *"make a 555 blink an LED at 2 Hz"*) and
 Claude builds it on the canvas in front of you. Each tool call shows as a line that opens to its
@@ -169,6 +171,8 @@ in the panel (it is kept in a file only your account can read, and only ever sho
 API account is billed for what it uses. Claude Opus, Sonnet and Haiku are offered; **Auto-continue**
 lets a long job carry on past the 60-calls-per-request limit by itself (up to 600), and Stop ends it
 at any point.
+
+![The AI Chat after designing a 1 kHz RC low-pass: the filter on the canvas, the square wave and its rounded response in the scope, and in the chat the frequency sweep opened to show its input, its result and the Bode plot Claude looked at, with its answer giving the corner at 997.3 Hz](docs/images/36-ai-chat-bode.png)
 
 **An outside agent** such as Claude Code or Claude Desktop can work in the open window too. Turn on
 *AI > Allow AI Agents (MCP)*, then give the agent the server, for Claude Code:

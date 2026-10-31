@@ -10,6 +10,7 @@
   </Folder>
   <Folder Name="/tools/">
     <Project Path="tools/Cirq.Docs/Cirq.Docs.csproj" />
+    <Project Path="tools/Cirq.Shots/Cirq.Shots.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Cirq.Chat.Tests/Cirq.Chat.Tests.csproj" />

@@ -5634,11 +5634,15 @@ want and press Enter (Shift+Enter starts a new line):
 - *Make a 555 blink an LED at about 2 Hz.*
 - *Why does the output of this amplifier clip? Try a 12 V supply instead.*
 
+![The AI Chat building a 555 astable: the circuit Claude placed and wired on the canvas, its capacitor ramp and square-wave output in the scope, and the chat panel on the right with each tool call on a line, thumbnails of the schematic and the run it looked at, and its answer quoting the measured 989.5 Hz and 52.8 % duty cycle](images/35-ai-chat.png)
+
 Claude says what it is about to build, then builds it: the parts appear on the canvas, the wires
 join them, the probes go on, and its runs land in the scope. Each thing it does shows in the panel
 as one line (`▸ add_parts Resistor, Capacitor, Ground → added 3`) that opens to the exact input and
 result when you click it, with small pictures of the schematics and plots it looked at. When it
 has finished it says what it made and what the numbers show.
+
+![The AI Chat after designing a 1 kHz RC low-pass: the filter on the canvas, the square wave and its rounded response in the scope, and in the chat the frequency sweep opened to show its input, its result and the Bode plot Claude looked at, with its answer giving the corner at 997.3 Hz](images/36-ai-chat-bode.png)
 
 It works on the circuit you have open, so it can explain or change one you built yourself, and
 everything it does is an ordinary edit: **each step is one undo step**, among your own, so `Ctrl+Z`
