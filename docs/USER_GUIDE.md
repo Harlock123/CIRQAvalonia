@@ -54,11 +54,12 @@ the [README](../README.md), and what changed between releases is in the
 42. [Printing](#printing)
 43. [Exporting](#exporting)
 44. [The command line](#the-command-line)
-45. [Appearance](#appearance)
-46. [What version is this](#what-version-is-this)
-47. [Closing a dialog](#closing-a-dialog)
-48. [Keyboard reference](#keyboard-reference)
-49. [When a circuit will not simulate](#when-a-circuit-will-not-simulate)
+45. [AI: the chat and agents](#ai-the-chat-and-agents)
+46. [Appearance](#appearance)
+47. [What version is this](#what-version-is-this)
+48. [Closing a dialog](#closing-a-dialog)
+49. [Keyboard reference](#keyboard-reference)
+50. [When a circuit will not simulate](#when-a-circuit-will-not-simulate)
 
 This guide is also attached to every [release](../../releases) as a PDF, with a contents page and
 the screenshots in place — the same document, laid out for reading away from the machine. Build it
@@ -5618,6 +5619,82 @@ Every command takes `--help`.
 
 ---
 
+## AI: the chat and agents
+
+CirqAvalonia can be driven by an AI. It is a Model Context Protocol (MCP) server: an agent gets the
+same palette, wiring, probes and analyses you use, as tools it calls, and the circuit it builds is
+the one on your canvas.
+
+### The AI Chat
+
+Press `F12`, or choose **AI > AI Chat**, and a panel opens on the right of the window. Type what you
+want and press Enter (Shift+Enter starts a new line):
+
+- *Build an RC low-pass at 1 kHz and show me its response.*
+- *Make a 555 blink an LED at about 2 Hz.*
+- *Why does the output of this amplifier clip? Try a 12 V supply instead.*
+
+Claude says what it is about to build, then builds it: the parts appear on the canvas, the wires
+join them, the probes go on, and its runs land in the scope. Each thing it does shows in the panel
+as one line (`▸ add_parts Resistor, Capacitor, Ground → added 3`) that opens to the exact input and
+result when you click it, with small pictures of the schematics and plots it looked at. When it
+has finished it says what it made and what the numbers show.
+
+It works on the circuit you have open, so it can explain or change one you built yourself, and
+everything it does is an ordinary edit: **each step is one undo step**, among your own, so `Ctrl+Z`
+takes its work back a step at a time and `Ctrl+Y` puts it back. A step that fails changes nothing.
+While a dialog is open over the window, or you are dragging a part, its next step waits for you.
+
+The row under the input box has the **model** (Claude Opus is the most capable; Sonnet and Haiku are
+quicker and cost less), **Auto-continue** and **Send**, which becomes **Stop** while Claude is
+working. One request may make 60 tool calls; with Auto-continue ticked it carries on by itself past
+that, up to 600, instead of stopping to ask you to say "continue". **New Chat** forgets the
+conversation (not the circuit).
+
+The chat needs an **Anthropic API key**, and your own Anthropic account is billed for what it uses.
+Set the `ANTHROPIC_API_KEY` environment variable before starting CirqAvalonia, or press **Key…** in
+the panel and paste one: it is kept in a file of its own beside `settings.json` that only your user
+account can read, is sent only to the Anthropic API, and is only ever shown masked (`sk-ant-…1234`).
+The environment variable wins when both are set. Files the chat opens or saves are in your Documents
+folder.
+
+### Letting an outside agent in
+
+An agent running outside the application, such as Claude Code or Claude Desktop, can work in the
+open window as well. Turn on **AI > Allow AI Agents (MCP)**: it stays on until you turn it off, and
+the status bar says when an agent connects. Then give the agent the server:
+**AI > Connect an Agent...** shows the exact lines for where the program is installed. For Claude
+Code it is
+
+```
+claude mcp add cirqavalonia -- /path/to/CirqAvalonia --mcp --attach
+```
+
+With `--attach` the agent works in the window you used last, and you watch every change as it
+happens, with the same one-step undo. The connection is a local named pipe that only your user
+account can open, so nothing outside the machine can reach it.
+
+Without `--attach`, `CirqAvalonia --mcp` is a server with no window at all and a circuit of its own,
+for an agent working on its own. `--root FOLDER` sets the folder its files are read from and written
+to; it can't open or write anything outside that folder, or write over a file it didn't make unless
+it is told to.
+
+### What an agent can do
+
+| | |
+| --- | --- |
+| Find parts | `list_parts`, `describe_part` (pins and settings), `list_examples`, `load_example` |
+| Build | `add_parts`, `set_part`, `remove_parts`, `connect`, `disconnect`, `add_probe`, `remove_probe`, `set_parameter`, `set_conditions` |
+| Check | `get_circuit`, `get_part`, `check_circuit`, `explain_circuit`, `render_schematic`, `get_spice_netlist` |
+| Run | `operating_point`, `run_transient`, `ac_sweep`, `dc_sweep`, `get_trace` |
+| The editor | `transport` (Run, Pause, Reset), `set_scope`, `undo`, `redo` |
+| Files | `new_circuit`, `open_circuit`, `save_circuit` |
+
+A run comes back as measurements (frequency, duty cycle, peak to peak, rise time, the −3 dB corner)
+and as a plot the agent looks at. The server also offers six recipes, step-by-step plans with the
+exact calls: an RC low-pass, an LED and its resistor, a 555 astable, an inverting amplifier, a
+bridge rectifier with smoothing and a decade counter.
+
 ## Appearance
 
 **File > Settings** opens preferences.
@@ -5695,6 +5772,7 @@ Also available in the app at **Help > Keyboard Shortcuts**.
 | Scope layout > Xy | Plot one trace against another instead of against time |
 | `Ctrl` `F` | Find a part — type into the palette's search box, Enter arms the first match |
 | `Ctrl` `Z` / `Ctrl` `Y` | Undo / redo (`Ctrl` `Shift` `Z` redoes as well) |
+| `F12` | The AI Chat — ask Claude to build, wire, probe and run circuits in this window |
 | `Delete` | Delete selection |
 | `Ctrl` `+` / `Ctrl` `-` | Zoom in / out (the numeric keypad's `+` and `-` work too) |
 | `F` | Zoom to fit — the whole circuit, captions and all |

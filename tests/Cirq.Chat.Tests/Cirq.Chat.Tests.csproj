@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="coverlet.collector" />
+    <!-- Named here, as Cirq.UI.Tests does, so the editor's Avalonia and ScottPlot agree on one SkiaSharp. -->
+    <PackageReference Include="SkiaSharp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/Cirq.Chat/Cirq.Chat.csproj" />
+    <ProjectReference Include="../../src/Cirq.UI/Cirq.UI.csproj" />
+  </ItemGroup>
+</Project>

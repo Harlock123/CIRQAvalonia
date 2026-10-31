@@ -27,6 +27,18 @@ public sealed class AppSettings
 {
     public AppTheme Theme { get; set; } = AppTheme.System;
 
+    /// <summary>
+    /// Whether AI agents outside the application may work in it (AI › Allow AI Agents). Off until
+    /// somebody turns it on: an agent driving the editor is something to choose, not to find.
+    /// </summary>
+    public bool AllowAgents { get; set; }
+
+    /// <summary>The AI Chat carries on by itself past its tool-call limit, rather than waiting for "continue".</summary>
+    public bool ChatAutoContinue { get; set; } = true;
+
+    /// <summary>The Claude model the AI Chat uses, by its API id; empty for the default.</summary>
+    public string ChatModel { get; set; } = string.Empty;
+
     public AppSettings Clone() => (AppSettings)MemberwiseClone();
 }
 

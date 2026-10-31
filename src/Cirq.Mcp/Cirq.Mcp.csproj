@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Cirq.Mcp</RootNamespace>
+    <!-- The MCP server: AI agents build and simulate circuits through it, headless over stdio or live
+         in the editor through a local pipe. No Avalonia: the palette, the examples and the schematic
+         picture come from the host (ICircuitLibrary), so this sits beside the UI rather than on it. -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Cirq.Core/Cirq.Core.csproj" />
+    <ProjectReference Include="../Cirq.Engine/Cirq.Engine.csproj" />
+    <ProjectReference Include="../Cirq.Components/Cirq.Components.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The official C# MCP SDK's core: the server, client and transports, without the hosting extras. -->
+    <PackageReference Include="ModelContextProtocol.Core" />
+    <!-- Plots of a run for the agent to look at. The same ScottPlot the scope draws with. -->
+    <PackageReference Include="ScottPlot" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Cirq.Mcp.Tests" />
+  </ItemGroup>
+
+</Project>

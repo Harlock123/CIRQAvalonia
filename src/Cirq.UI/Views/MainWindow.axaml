@@ -207,6 +207,18 @@
         </MenuItem>
       </MenuItem>
 
+      <MenuItem Header="_AI">
+        <MenuItem Header="AI _Chat" InputGesture="F12" ToggleType="CheckBox"
+                  IsChecked="{Binding IsChatOpen}" Command="{Binding ToggleChatCommand}"
+                  ToolTip.Tip="Ask Claude to build, wire, probe and run circuits in this window" />
+        <Separator />
+        <MenuItem Header="Allow AI _Agents (MCP)" ToggleType="CheckBox"
+                  IsChecked="{Binding AllowAgents, Mode=TwoWay}"
+                  ToolTip.Tip="Let AI agents outside the app (Claude Code, Claude Desktop) work in the window you used last, through CirqAvalonia --mcp --attach" />
+        <MenuItem Header="_Connect an Agent..." Command="{Binding ShowConnectAgentCommand}"
+                  ToolTip.Tip="How to give an AI agent CirqAvalonia's tools" />
+      </MenuItem>
+
       <MenuItem Header="_Help">
         <MenuItem Header="_Keyboard Shortcuts..." Command="{Binding ShowShortcutsCommand}" />
         <Separator />
@@ -245,6 +257,8 @@
         <ColumnDefinition Width="*" />
         <ColumnDefinition Width="{Binding InspectorSplitterWidth}" />
         <ColumnDefinition Width="{Binding InspectorColumnWidth}" />
+        <ColumnDefinition Width="{Binding ChatSplitterWidth}" />
+        <ColumnDefinition Width="{Binding ChatColumnWidth}" />
       </Grid.ColumnDefinitions>
 
       <!-- Palette -->
@@ -499,6 +513,13 @@
         </Grid>
        </Grid>
       </Border>
+
+      <GridSplitter Grid.Column="5" Background="{DynamicResource SplitterBackground}" IsVisible="{Binding IsChatOpen}" />
+
+      <!-- The AI Chat (F12). Its panel is made in code, on first use: it holds the conversation and
+           the in-process MCP server Claude works through, and a window nobody chats in needs neither. -->
+      <Border Grid.Column="6" Name="ChatHost" Classes="panel" BorderThickness="1,0,0,0"
+              IsVisible="{Binding IsChatOpen}" />
     </Grid>
   </DockPanel>
 </Window>

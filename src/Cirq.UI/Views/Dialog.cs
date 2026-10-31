@@ -29,14 +29,36 @@ public static class Dialog
     /// a test that no dialog is shown any other way.
     /// </para>
     /// </summary>
-    public static Task ShowModal(this Window dialog, Window owner)
+    public static async Task ShowModal(this Window dialog, Window owner)
     {
         ArgumentNullException.ThrowIfNull(dialog);
         ArgumentNullException.ThrowIfNull(owner);
 
         Wire(dialog);
 
-        return dialog.ShowDialog(owner);
+        lock (OpenOver) OpenOver[owner] = OpenOver.GetValueOrDefault(owner) + 1;
+        try
+        {
+            await dialog.ShowDialog(owner);
+        }
+        finally
+        {
+            lock (OpenOver)
+                if (--OpenOver[owner] == 0) OpenOver.Remove(owner);
+        }
+    }
+
+    /// <summary>How many dialogs are open over each window.</summary>
+    private static readonly Dictionary<Window, int> OpenOver = [];
+
+    /// <summary>
+    /// Whether a dialog is open over a window. An AI agent's call waits while there is one, rather
+    /// than changing the circuit under a dialog that may be in the middle of editing it. A dialog
+    /// only holds up its own window, as it does the person.
+    /// </summary>
+    public static bool IsOpenOver(Window window)
+    {
+        lock (OpenOver) return OpenOver.ContainsKey(window);
     }
 
     /// <summary>

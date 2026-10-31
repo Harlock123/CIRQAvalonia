@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Cirq.Chat</RootNamespace>
+    <!-- The in-app AI chat: the conversation, the Claude API client and the bridge to the MCP
+         server's tools. No UI: the panel that shows it is in Cirq.UI. -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Cirq.Mcp/Cirq.Mcp.csproj" />
+    <!-- The official Anthropic C# SDK. -->
+    <PackageReference Include="Anthropic" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Cirq.Chat.Tests" />
+  </ItemGroup>
+
+</Project>

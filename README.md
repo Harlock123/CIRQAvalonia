@@ -6,6 +6,10 @@ An electronic circuit analyzer and mixed-signal simulator: a SPICE-style Modifie
 solver for the analog side, an event-driven scheduler for the digital side, and an Avalonia
 schematic editor with a live oscilloscope on top.
 
+It also speaks the **Model Context Protocol**, so an AI can build and run circuits in it: press `F12`
+for the **AI Chat**, where Claude places parts, wires and probes them and runs the analyses while you
+watch, or connect an outside agent such as Claude Code. See [AI: the chat and agents](#ai-the-chat-and-agents).
+
 ![The CirqAvalonia editor: component palette on the left, schematic canvas in the centre, properties panel on the right, and the oscilloscope showing the input square wave and the capacitor charging against it](docs/images/01-overview.png)
 
 **[Read the User Guide](docs/USER_GUIDE.md)** for how to drive the editor — also attached to every
@@ -142,6 +146,49 @@ No Avalonia, deliberately: it references the document, the engine and the requir
 which know what a window is. The argument parsing is a few dozen lines rather than a library, for
 the same reason — and the whole program is a function taking a list of strings and two writers, so
 the tests drive exactly what the executable does, exit code included.
+
+## AI: the chat and agents
+
+CirqAvalonia is an MCP server. An AI agent gets the same parts, wiring, probes and analyses a person
+uses, as 31 tools: `list_parts` and `describe_part` to find a part and its pins, `add_parts`,
+`connect`, `set_part` and `add_probe` to build, `check_circuit`, `explain_circuit` and
+`render_schematic` to check the drawing, and `operating_point`, `run_transient`, `ac_sweep` and
+`dc_sweep` to run it. The runs come back as measurements (frequency, duty cycle, peak to peak, the
+−3 dB corner) **and** as plots the agent looks at, so it can see the capacitor charging or the Bode
+plot rolling off rather than guess from numbers. Six saved recipes (an RC low-pass, an LED and its
+resistor, a 555 astable, an inverting amplifier, a bridge rectifier and a decade counter) are served
+as MCP prompts, and every example circuit can be loaded by name.
+
+**The AI Chat** (`F12`, or *AI > AI Chat*) is a panel on the right of the window. Ask for a circuit
+(*"build an RC low-pass at 1 kHz and show me its response"*, *"make a 555 blink an LED at 2 Hz"*) and
+Claude builds it on the canvas in front of you. Each tool call shows as a line that opens to its
+input and result, with thumbnails of the schematics and plots it looked at; the scope shows its runs.
+Every change is **one undo step**, shared with your own, so `Ctrl+Z` takes Claude's work back a step
+at a time. It needs an Anthropic API key: set `ANTHROPIC_API_KEY` before starting, or press **Key…**
+in the panel (it is kept in a file only your account can read, and only ever shown masked). Your own
+API account is billed for what it uses. Claude Opus, Sonnet and Haiku are offered; **Auto-continue**
+lets a long job carry on past the 60-calls-per-request limit by itself (up to 600), and Stop ends it
+at any point.
+
+**An outside agent** such as Claude Code or Claude Desktop can work in the open window too. Turn on
+*AI > Allow AI Agents (MCP)*, then give the agent the server, for Claude Code:
+
+```
+claude mcp add cirqavalonia -- /path/to/CirqAvalonia --mcp --attach
+```
+
+*AI > Connect an Agent* shows the exact line for where the program is. With `--attach` the agent
+works in the window you used last, and you see every change. The connection is a local named pipe
+that only your user account can open: nothing outside the machine can reach it. Without `--attach`,
+`CirqAvalonia --mcp` is a headless server with a circuit of its own and no window at all, and
+`--root FOLDER` sets the folder its files are read from and saved to (an agent can't open or write
+anything outside it, or write over a file it didn't make unless told to).
+
+Underneath, `src/Cirq.Mcp` is the server (no Avalonia: the palette, the examples and the schematic
+picture are handed to it by the editor) and `src/Cirq.Chat` the chat's conversation and its Claude
+client. The chat runs the same server in-process, through the same host outside agents get, so they
+share one code path: the same argument checks, the same waiting while you have a dialog open or are
+dragging a part, the same undo steps.
 
 ## Building releases
 

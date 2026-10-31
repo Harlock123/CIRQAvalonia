@@ -4,6 +4,7 @@ using Avalonia.Input;
 using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using Cirq.Chat;
 using Cirq.UI.Controls;
 using Cirq.UI.Services;
 using Cirq.Components.Explaining;
@@ -67,6 +68,8 @@ public partial class MainWindow : Window
         });
 
         viewModel.RequestNewWindow += (_, _) => OpenAnother(viewModel.Clipboard);
+
+        WireUpAgents(viewModel);
 
         Dispatcher.UIThread.Post(async () =>
         {
@@ -938,10 +941,110 @@ public partial class MainWindow : Window
                     _viewModel?.ToggleInspectorCommand.Execute(null);
                     e.Handled = true;
                     return;
+
+                // The AI Chat, beside the properties panel.
+                case Key.F12:
+                    _viewModel?.ToggleChatCommand.Execute(null);
+                    e.Handled = true;
+                    return;
             }
         }
 
         base.OnKeyDown(e);
+    }
+
+    // ---- AI chat and agents ----------------------------------------------
+
+    private ChatPanel? _chat;
+    private LazyToolBridge? _chatTools;
+
+    /// <summary>
+    /// The folder the AI Chat's file paths start from and stay inside: the Documents folder, or the home folder where
+    /// there is none.
+    /// </summary>
+    internal string ChatRoot { get; set; } =
+        Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments) is { Length: > 0 } docs && Directory.Exists(docs)
+            ? docs
+            : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+
+    /// <summary>This window's AI Chat panel, made the first time it is opened (null until then).</summary>
+    internal ChatPanel? Chat => _chat;
+
+    private void WireUpAgents(MainWindowViewModel viewModel)
+    {
+        if (Application.Current is not App app) return;
+
+        viewModel.AllowAgents = app.Settings.AllowAgents;
+        viewModel.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(MainWindowViewModel.AllowAgents) && viewModel.AllowAgents != app.Settings.AllowAgents)
+                viewModel.StatusMessage = app.SetAllowAgents(viewModel.AllowAgents);
+            else if (e.PropertyName == nameof(MainWindowViewModel.IsChatOpen) && viewModel.IsChatOpen)
+                OpenChat(app, viewModel);
+        };
+        viewModel.RequestConnectAgent += async (_, _) => await ShowConnectAgentAsync(app);
+
+        // Outside agents work in the window used last.
+        app.Agents.Opened(viewModel, this);
+        app.Agents.Activated(viewModel);
+        Activated += (_, _) => app.Agents.Activated(viewModel);
+        Closed += async (_, _) =>
+        {
+            app.Agents.Closed(viewModel);
+            _chat?.Stop();
+            if (_chatTools is not null) await _chatTools.DisposeAsync();
+        };
+    }
+
+    /// <summary>Shows the chat, making it on first use: its conversation and the in-process MCP server it works through.</summary>
+    private void OpenChat(App app, MainWindowViewModel viewModel)
+    {
+        if (_chat is null)
+        {
+            _chatTools = new LazyToolBridge(async cancel => await McpToolBridge.StartAsync(app.Agents.ChatHost(viewModel, ChatRoot), cancel));
+            var folder = Path.GetDirectoryName(app.SettingsStore.Location) ?? Path.GetTempPath();
+            _chat = new ChatPanel(_chatTools, ApiKeyStore.ForApp(folder), text => viewModel.StatusMessage = text,
+                app.Settings, () => app.SettingsStore.Save(app.Settings));
+            _chat.CloseRequested += () => viewModel.IsChatOpen = false;
+            if (this.FindControl<Border>("ChatHost") is { } host) host.Child = _chat;
+        }
+        _chat.RefreshIntro();
+        _chat.FocusInput();
+    }
+
+    /// <summary>How to give an outside agent (Claude Code, Claude Desktop) CirqAvalonia's tools.</summary>
+    private async Task ShowConnectAgentAsync(App app)
+    {
+        var exe = Environment.ProcessPath ?? "CirqAvalonia";
+        var quoted = exe.Contains(' ') ? $"\"{exe}\"" : exe;
+        var text = new SelectableTextBlock
+        {
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+            FontSize = 13,
+            Text =
+                "CirqAvalonia is an MCP server: an AI agent can build, wire, probe and run circuits with the same parts and analyses you use.\n\n" +
+                "To have an agent work in this app, turn on AI › Allow AI Agents (it is " + (app.Settings.AllowAgents ? "on" : "off") + " now), then add the server to the agent. For Claude Code:\n\n" +
+                $"    claude mcp add cirqavalonia -- {quoted} --mcp --attach\n\n" +
+                "For Claude Desktop, in claude_desktop_config.json under \"mcpServers\":\n\n" +
+                $"    \"cirqavalonia\": {{ \"command\": \"{exe.Replace("\\", "\\\\")}\", \"args\": [\"--mcp\", \"--attach\"] }}\n\n" +
+                "The agent then works in the window you used last, and you see every change; Ctrl+Z undoes its steps. Without --attach the server works on a circuit of its own with no window, " +
+                "and --root FOLDER sets the folder its files are read from and saved to.\n\n" +
+                "Or press F12 for the AI Chat, which needs only an Anthropic API key.",
+        };
+        var close = new Button { Name = "CloseButton", Content = "Close", Width = 90, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right, HorizontalContentAlignment = Avalonia.Layout.HorizontalAlignment.Center };
+        var dialog = new Window
+        {
+            Title = "Connect an AI Agent",
+            Width = 640,
+            SizeToContent = SizeToContent.Height,
+            CanResize = false,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Content = new Border { Padding = new Thickness(18), Child = new StackPanel { Spacing = 14, Children = { text, close } } },
+        };
+        dialog.Bind(BackgroundProperty, dialog.GetResourceObservable("PanelBackground"));
+        text.Bind(SelectableTextBlock.ForegroundProperty, dialog.GetResourceObservable("TextPrimary"));
+        close.Click += (_, _) => dialog.Close();
+        await dialog.ShowModal(this);
     }
 
     // ---- sheet tabs ------------------------------------------------------

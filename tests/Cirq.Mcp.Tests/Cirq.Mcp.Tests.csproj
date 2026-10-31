@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="coverlet.collector" />
+    <!-- Named here, as Cirq.UI.Tests does, so the editor's Avalonia and ScottPlot agree on one SkiaSharp. -->
+    <PackageReference Include="SkiaSharp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/Cirq.Mcp/Cirq.Mcp.csproj" />
+    <!-- The editor's own palette, examples and schematic drawing (EditorLibrary), so the tools are tested
+         against the parts a person places rather than a stand-in list. -->
+    <ProjectReference Include="../../src/Cirq.UI/Cirq.UI.csproj" />
+  </ItemGroup>
+</Project>

@@ -17,4 +17,8 @@
     <ProjectReference Include="../../src/Cirq.Components/Cirq.Components.csproj" />
     <ProjectReference Include="../../src/Cirq.UI/Cirq.UI.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- The stand-in Anthropic API the chat tests use, so the window's AI Chat is tested the same way. -->
+    <Compile Include="../Cirq.Chat.Tests/FakeClaude.cs" Link="Support/FakeClaude.cs" />
+  </ItemGroup>
 </Project>

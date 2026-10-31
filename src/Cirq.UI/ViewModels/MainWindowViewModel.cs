@@ -382,6 +382,44 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         StatusMessage = value ? "Properties panel shown" : "Properties panel collapsed";
     }
 
+    // ---- the AI chat and agents -------------------------------------------
+
+    private const double ChatWidth = 380;
+
+    /// <summary>The AI Chat panel on the right (F12): Claude working in this window's circuit.</summary>
+    [ObservableProperty]
+    public partial bool IsChatOpen { get; set; }
+
+    public Avalonia.Controls.GridLength ChatColumnWidth => new(IsChatOpen ? ChatWidth : 0);
+
+    public Avalonia.Controls.GridLength ChatSplitterWidth => new(IsChatOpen ? 4 : 0);
+
+    partial void OnIsChatOpenChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ChatColumnWidth));
+        OnPropertyChanged(nameof(ChatSplitterWidth));
+    }
+
+    [RelayCommand]
+    private void ToggleChat() => IsChatOpen = !IsChatOpen;
+
+    /// <summary>
+    /// Whether AI agents outside the application may work in it (AI › Allow AI Agents): an MCP
+    /// server started as <c>CirqAvalonia --mcp --attach</c> reaches the window used last. An
+    /// application-wide preference; the window keeps it in the settings.
+    /// </summary>
+    [ObservableProperty]
+    public partial bool AllowAgents { get; set; }
+
+    /// <summary>Raised to show how to connect an agent.</summary>
+    public event EventHandler? RequestConnectAgent;
+
+    [RelayCommand]
+    private void ShowConnectAgent() => RequestConnectAgent?.Invoke(this, EventArgs.Empty);
+
+    /// <summary>True while a drag or another gesture on the canvas is under way (an agent's call waits for it).</summary>
+    public bool IsInGesture => _gesture is not null;
+
     // ---- file state ------------------------------------------------------
 
     /// <summary>Dialog provider, supplied by the window. Absent in tests unless one is injected.</summary>
@@ -1138,6 +1176,93 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         return true;
     }
 
+    // ---- for AI agents ----------------------------------------------------
+
+    /// <summary>
+    /// Takes back the last step, as Ctrl+Z does, and says which it was; null when there is nothing
+    /// to take back. The AI tools' way in, which needs the answer the command does not give.
+    /// </summary>
+    public string? UndoStep()
+    {
+        if (!History.CanUndo) return null;
+        var label = History.UndoLabel;
+        Undo();
+        return label;
+    }
+
+    /// <summary>Puts back the step last undone, as Ctrl+Y does, and says which it was.</summary>
+    public string? RedoStep()
+    {
+        if (!History.CanRedo) return null;
+        var label = History.RedoLabel;
+        Redo();
+        return label;
+    }
+
+    /// <summary>
+    /// Puts the circuit back as a snapshot has it without recording an undo step: how a change an
+    /// agent made is rolled back when the rest of it fails. Inside a gesture the history is already
+    /// suspended, so the gesture then finds nothing changed and records nothing.
+    /// </summary>
+    public void RestoreSnapshot(string json)
+    {
+        Simulation.Pause();
+        History.Suspend();
+        try
+        {
+            ReplaceCircuitWith(CircuitSerializer.FromJson(json).Circuit);
+        }
+        finally
+        {
+            History.Resume(Circuit);
+        }
+        Simulation.InvalidateTopology();
+        RequestRedraw?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// Adopts a circuit an agent opened, started or loaded as a new document: the same steps a file
+    /// open takes, without its dialogs. <paramref name="path"/> is its file, or null.
+    /// </summary>
+    public void AdoptCircuit(Circuit loaded, string? path, string status)
+    {
+        Simulation.Pause();
+        ReplaceCircuitWith(loaded);
+        CurrentFilePath = path;
+        IsModified = false;
+        History.Reset(Circuit);
+        Simulation.InvalidateTopology();
+        Simulation.Rebuild();
+        StatusMessage = status;
+        RequestZoomToFit?.Invoke(this, EventArgs.Empty);
+        RequestRedraw?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>The circuit was written to <paramref name="path"/> by an agent: it becomes the document's file.</summary>
+    public void MarkSaved(string path)
+    {
+        CurrentFilePath = path;
+        IsModified = false;
+        Autosave.Discard();
+        StatusMessage = $"Saved {Path.GetFileName(path)}";
+    }
+
+    /// <summary>
+    /// After an agent's edit: the engine rebuilds on the next run, the canvas and the properties
+    /// panel show the change, and the document counts as modified if anything changed.
+    /// </summary>
+    public void AfterAgentEdit(bool changed)
+    {
+        if (changed) IsModified = true;
+        Simulation.InvalidateTopology();
+        RefreshSheets();
+        Inspector.Refresh();
+        RequestRedraw?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>Asks the canvas to repaint, for a change it did not make itself.</summary>
+    public void Redraw() => RequestRedraw?.Invoke(this, EventArgs.Empty);
+
     /// <summary>
     /// Suspends recording for the span of a gesture, so a drag across the canvas costs one undo
     /// step rather than one per pointer movement.
@@ -1587,6 +1712,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
           Tab          Step to the next part on the sheet; Shift+Tab the previous
           Enter        Drop the armed part in the middle of the view
           Ctrl+L       Show live values — volts on every net, amps through every part
+          F12          AI Chat — ask Claude to build, wire, probe and run circuits
 
         Simulation
           F5           Run or pause

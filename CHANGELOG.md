@@ -8,6 +8,22 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+### Added
+
+**An AI Chat.** Press `F12` (or *AI > AI Chat*) and ask Claude for a circuit: *"build an RC low-pass
+at 1 kHz and show me its response"*. It places the parts on your canvas, wires and probes them, runs
+them, looks at the schematic and the plots, and tells you what the numbers show. Each step is one
+undo step among your own, so `Ctrl+Z` takes its work back. Needs an Anthropic API key
+(`ANTHROPIC_API_KEY`, or the panel's **Key…** button); your own API account is billed.
+
+**AI agents can drive the editor.** CirqAvalonia is now a Model Context Protocol server with 31
+tools: find parts, build, wire, probe, check, and run the operating point, transients, AC and DC
+sweeps, with measurements and plots coming back. Turn on *AI > Allow AI Agents* and connect Claude
+Code or Claude Desktop with `CirqAvalonia --mcp --attach` (*AI > Connect an Agent* shows the line);
+without `--attach` it is a headless server with a circuit of its own. Six recipes come with it: an
+RC low-pass, an LED and its resistor, a 555 astable, an inverting amplifier, a bridge rectifier and
+a decade counter.
+
 ## [0.39.0] - 2026-09-26
 
 A block can be given a symbol, and opened to measure inside it. Eight signals can be drawn as one

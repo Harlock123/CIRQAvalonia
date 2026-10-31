@@ -9,15 +9,17 @@ rules that keep it working.
 CirqAvalonia is an electronic circuit simulator in C# on .NET 10. It has a SPICE-style Modified Nodal Analysis
 solver for analog parts and an event-driven scheduler for digital ones. On top sits an Avalonia 12 schematic
 editor with a ScottPlot oscilloscope, and there is a `cirq` command line that runs the same engine with no window.
-Releases are self-contained builds for Windows, macOS and Linux.
+The editor is also an MCP server, so AI agents can build and run circuits in it, and it has an AI Chat panel (F12)
+where Claude does so through that server. Releases are self-contained builds for Windows, macOS and Linux.
 
 ## Commands
 
 ```bash
 dotnet build CirqAvalonia.slnx                 # no global.json: any .NET 10 SDK
-dotnet test CirqAvalonia.slnx                  # all four test projects, headless
+dotnet test CirqAvalonia.slnx                  # all six test projects, headless
 dotnet run --project src/Cirq.UI               # the editor
 dotnet run --project src/Cirq.Cli -- --help    # check, baseline, compare, run, netlist, info, version
+dotnet run --project src/Cirq.UI -- --mcp      # the MCP server on stdio, headless (--attach: the open editor)
 ./scripts/build-guide.sh [version]             # docs/USER_GUIDE.md to dist/CirqAvalonia-User-Guide.pdf (needs Chrome or Chromium)
 ./scripts/publish-all.sh 1.2.0 linux-x64       # self-contained archives in dist/; omit the RIDs for all seven
 ./scripts/verify-artifacts.sh                  # checks each archive in dist/ holds the right binary
@@ -43,6 +45,18 @@ dotnet run --project src/Cirq.Cli -- --help    # check, baseline, compare, run, 
     built-in example circuits.
   - `Views/` has one window per analysis. `Rendering/` draws the schematic, and `Services/` holds settings,
     autosave, export, printing and the `SimulationController`.
+- `src/Cirq.Mcp/`: the MCP server agents drive the editor through (ModelContextProtocol.Core). No Avalonia.
+  - `CircuitTools.cs` and `SimulationTools.cs` are the tools, as `[McpServerTool]` methods; `CircuitServer.cs` has the
+    instructions every agent is told and the argument checks; `Recipes.cs` the saved recipes (MCP prompts).
+  - Handlers touch the circuit only through `ICircuitHost.RunAsync` and an `ICircuitSession` (`Hosting.cs`):
+    `HeadlessHost` has a circuit of its own, `LiveHost` the open window's, on the UI thread. The palette, the
+    examples and the schematic picture come from the host's `ICircuitLibrary`, which the editor supplies.
+  - `LiveListener` (a per-user named pipe) and `LiveBridge` (`--mcp --attach`) let outside agents into the editor.
+- `src/Cirq.Chat/`: the AI Chat's conversation (`ChatSession`), its Claude client (the Anthropic SDK), the API key
+  store and the bridge to the MCP server's tools. No UI.
+- `src/Cirq.UI/Agents/`: the editor's side: `EditorLibrary` (the palette, examples and print-coloured PNG),
+  `EditorSession` (a window's document, undo and transport as an agent sees them) and `LiveAgents` (the pipe door
+  and every window's chat host). The panel is `Views/ChatPanel.cs`.
 - `src/Cirq.Cli/`: the `cirq` tool. `CommandLine.Run` takes its writers as arguments, so tests drive it without
   starting a process.
 - `tools/Cirq.Docs/`: turns the Markdown guide into print-ready HTML (Markdig). It is never shipped.
@@ -52,9 +66,9 @@ dotnet run --project src/Cirq.Cli -- --help    # check, baseline, compare, run, 
 
 ## Rules that keep it working
 
-- **Dependencies run one way.** Core, then Engine, then Components, then UI and Cli. Core holds the stamping
-  contract so parts can describe themselves without knowing the solver. Keep simulation logic out of `Cirq.UI`,
-  where it can't be tested without a window.
+- **Dependencies run one way.** Core, then Engine, then Components, then Mcp, then Chat, then UI; Cli sits on
+  Components. Core holds the stamping contract so parts can describe themselves without knowing the solver. Keep
+  simulation logic out of `Cirq.UI`, where it can't be tested without a window.
 - **Package versions live in `Directory.Packages.props`.** Central package management is on, so a
   `PackageReference` has no `Version`. Avalonia and ScottPlot move together because both must agree on SkiaSharp
   (see the note in that file).
@@ -72,11 +86,20 @@ dotnet run --project src/Cirq.Cli -- --help    # check, baseline, compare, run, 
   write PNGs into `docs/images/` through `DocPlot`. Expect those files to change after a test run, and commit them
   only when the change is intended.
 - **Warnings.** `TreatWarningsAsErrors` is off, but nullable reference types are on in every project.
+- **Agent tools.** Every change an agent makes goes through `CircuitTools.Edit`: one undo step, rolled back whole
+  if any part of it fails. Runs solve a serialised copy of the circuit on a worker thread, never the editor's own
+  simulator, then write a transient's samples back into the probes. A new tool needs a `[Description]` on it and
+  every parameter (snake_case names), and a place in `EndToEndTests.ToolNames`. Recipes are run call by call by
+  `EndToEndTests`, so a recipe that stops working fails the build.
+- **No real Anthropic API in tests.** The chat tests answer from `FakeClaude` (an `HttpMessageHandler` replaying
+  scripted streams) with a made-up key; window tests point the settings and the key file at a temp folder. The key
+  is only ever shown masked.
 
 ## Making a change
 
 - Add tests next to the code you touch: solver accuracy in `Cirq.Engine.Tests`, part behaviour in
-  `Cirq.Components.Tests`, and view models and windows in `Cirq.UI.Tests`.
+  `Cirq.Components.Tests`, view models and windows in `Cirq.UI.Tests`, MCP tools in `Cirq.Mcp.Tests` and the
+  chat in `Cirq.Chat.Tests`.
 - A new part goes in the matching `Cirq.Components` folder and into `ComponentCatalog.cs` so it appears in the
   palette. Add an example circuit to `Examples.cs` where it helps.
 - User-facing behaviour belongs in `docs/USER_GUIDE.md` as well as `README.md`.

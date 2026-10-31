@@ -25,5 +25,7 @@
     <ProjectReference Include="../Cirq.Core/Cirq.Core.csproj" />
     <ProjectReference Include="../Cirq.Engine/Cirq.Engine.csproj" />
     <ProjectReference Include="../Cirq.Components/Cirq.Components.csproj" />
+    <ProjectReference Include="../Cirq.Mcp/Cirq.Mcp.csproj" />
+    <ProjectReference Include="../Cirq.Chat/Cirq.Chat.csproj" />
   </ItemGroup>
 </Project>
