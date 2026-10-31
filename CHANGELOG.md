@@ -8,6 +8,12 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+## [0.40.0] - 2026-10-31
+
+Claude, built in. An AI Chat panel builds, wires, probes and runs circuits on your canvas while you
+watch, and an MCP server lets outside agents such as Claude Code do the same. 191 components in 16
+categories, 87 worked examples, 3804 tests.
+
 ### Added
 
 **An AI Chat.** Press `F12` (or *AI > AI Chat*) and ask Claude for a circuit: *"build an RC low-pass
@@ -2342,7 +2348,8 @@ First public build of CirqAvalonia — an electronic circuit analyzer and mixed-
 
 **501 tests** measure the solver against closed-form answers rather than recorded output.
 
-[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.39.0...HEAD
+[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.40.0...HEAD
+[0.40.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.39.0...v0.40.0
 [0.39.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.38.0...v0.39.0
 [0.38.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.37.0...v0.38.0
 [0.37.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.36.0...v0.37.0
