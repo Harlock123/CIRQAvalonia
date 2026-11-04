@@ -1,4 +1,6 @@
+using Cirq.Components.Boards;
 using Cirq.Components.Digital;
+using Cirq.Components.Ics;
 using Cirq.Components.Nonlinear;
 using Cirq.Components.Passive;
 using Cirq.Core.Probing;
@@ -115,6 +117,24 @@ public class ToolboxExampleTests
         Assert.InRange(lowest, 0.6, 1.5);
         Assert.InRange(dimmest, 0.05, 0.9);
         Assert.True(brightest - dimmest < 0.15, $"the glow swung from {dimmest:0.00} to {brightest:0.00}");
-        Assert.Empty(vm.Circuit.Components.OfType<Cirq.Components.Boards.DeveloperBoard>().Single().Violations);
+        Assert.Empty(vm.Circuit.Components.OfType<DeveloperBoard>().Single().Violations);
+    }
+
+    /// <summary>The board reads 0.25 V on A0 and 0.75 V on A1 at 25 °C, and a warmed LM35 reads more.</summary>
+    [Fact]
+    public void TheArduinoReadsBothThermometers()
+    {
+        using var vm = Load("Analog Thermometer");
+        var sim = vm.Simulation.Simulator!;
+        var board = vm.Circuit.Components.OfType<DeveloperBoard>().Single();
+        var lm35 = vm.Circuit.Components.OfType<TemperatureSensorIc>().Single(s => s.Model == TemperatureSensorModel.Lm35);
+
+        sim.Run(1e-3);
+        Assert.Contains("A0=0.25V", board.InputSummary);
+        Assert.Contains("A1=0.75V", board.InputSummary);
+
+        lm35.Interact();
+        sim.Run(1e-3);
+        Assert.Contains("A0=0.36V", board.InputSummary);
     }
 }

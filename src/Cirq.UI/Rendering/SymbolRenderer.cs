@@ -49,6 +49,7 @@ public static class SymbolRenderer
             case CanTransceiver can: DrawPackage(context, pen, zoom, can, "CAN"); break;
             case TransmissionLine line: DrawTransmissionLine(context, pen, zoom, line); break;
             case Ds18b20 sensor: DrawPackage(context, pen, zoom, sensor, "DS18B20"); break;
+            case TemperatureSensorIc analog: DrawPackage(context, pen, zoom, analog, analog.Model.Name); break;
             case OneWireMaster master: DrawPackage(context, pen, zoom, master, master.ComponentType); break;
             case HBridge bridge: DrawHBridge(context, pen, zoom, bridge); break;
             case LithiumCharger charger: DrawPackage(context, pen, zoom, charger, "Li-ION"); break;
@@ -2793,7 +2794,7 @@ public static class SymbolRenderer
         // The screen reaches 50 either side and the caption sits under the body.
         TransmissionLine => 62.0,
         ReedSwitch => 34.0,
-        Ds18b20 or OneWireMaster => 56.0,
+        Ds18b20 or OneWireMaster or TemperatureSensorIc => 56.0,
         AnalogMultiplier => 52.0,
         CommonModeChoke => 52.0,
         Rs485Transceiver => 78.0,

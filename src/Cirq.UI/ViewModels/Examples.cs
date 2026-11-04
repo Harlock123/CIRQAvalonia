@@ -202,6 +202,8 @@ public static class Examples
                 LoadLoadCell),
             new("Rotary Encoder", "Quadrature, where the direction is in the phase and not in either output",
                 LoadRotaryEncoder),
+            new("Analog Thermometer", "An LM35 and a TMP36 read by an Arduino's analog pins — 10 mV a degree, and the TMP36's half-volt offset",
+                LoadAnalogThermometer),
             new("Thermostat", "An NTC, a comparator and the feedback resistor that stops it chattering",
                 LoadThermostat),
             new("Transimpedance Amp", "A photodiode held at zero volts, its current read as a voltage",
@@ -5286,6 +5288,45 @@ public static class Examples
         var delivered = vm.Scope.AddProbe(load.A, "Load power");
         delivered.Kind = ProbeKind.Power;
         delivered.ReferenceTerminal = load.B;
+    }
+
+    /// <summary>
+    /// Two analog thermometer ICs on an Arduino's analog inputs, powered from its own 5 V pin.
+    /// <para>
+    /// The LM35 reads 250 mV at 25 °C and the TMP36 750 mV — the same ten millivolts a degree, the
+    /// second with half a volt added so it can say how far below freezing it is on a single supply.
+    /// The board's status line shows what each analog pin reads. Double-click either sensor to put
+    /// a hand round it, or move its Temperature in the CONTROLS panel.
+    /// </para>
+    /// </summary>
+    public static void LoadAnalogThermometer(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "Analog thermometer";
+
+        var uno = Place(circuit, new ArduinoUnoBoard { Pins = "A0=in; A1=in" }, -340, 0);
+        var lm35 = Place(circuit, new TemperatureSensorIc(TemperatureSensorModel.Lm35) { Temperature = 25.0 }, 60, -120);
+        var tmp36 = Place(circuit, new TemperatureSensorIc(TemperatureSensorModel.Tmp36) { Temperature = 25.0 }, 60, 100);
+
+        var gndBoard = Place(circuit, new Ground(), -340, 360);
+        var gnd = Place(circuit, new Ground(), -100, 240);
+
+        circuit.Connect(uno.GroundPins[0], gndBoard.Pin);
+
+        foreach (var sensor in new[] { lm35, tmp36 })
+        {
+            circuit.Connect(uno.Pin("5V"), sensor.Supply);
+            circuit.Connect(sensor.Ground, gnd.Pin);
+        }
+
+        circuit.Connect(lm35.Output, uno.Pin("A0"));
+        circuit.Connect(tmp36.Output, uno.Pin("A1"));
+
+        vm.Scope.TimebasePerDivision = 1e-3;
+        vm.Scope.VoltsPerDivision = 0.2;
+        vm.Scope.Layout = ScopeLayout.Tiled;
+        vm.Scope.AddProbe(lm35.Output, "LM35");
+        vm.Scope.AddProbe(tmp36.Output, "TMP36");
     }
 
     /// <summary>
