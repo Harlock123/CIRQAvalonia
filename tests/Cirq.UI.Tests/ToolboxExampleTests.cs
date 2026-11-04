@@ -199,4 +199,41 @@ public class ToolboxExampleTests
         Assert.True(keypad.InteractAt(local));
         Assert.True(keypad.Key1);
     }
+
+    [Fact]
+    public void ThePicoDimsItsLedAndReadsItsButtonAndThermometer()
+    {
+        using var vm = Load("Pico GPIO");
+        var sim = vm.Simulation.Simulator!;
+        var pico = vm.Circuit.Components.OfType<RaspberryPiPicoBoard>().Single();
+
+        sim.Run(3e-3);
+
+        Assert.Contains("GP14=1", pico.InputSummary);
+        Assert.Contains("GP26=0.75V", pico.InputSummary);
+
+        pico.CheckLimits(sim.System);
+        Assert.Empty(pico.Violations);
+
+        vm.Circuit.Components.OfType<PushButton>().Single().Interact();
+        sim.Run(1e-3);
+        Assert.Contains("GP14=0", pico.InputSummary);
+    }
+
+    [Fact]
+    public void TheEsp32ReadsItsKnobOnAnInputOnlyPin()
+    {
+        using var vm = Load("ESP32 GPIO");
+        var sim = vm.Simulation.Simulator!;
+        var esp = vm.Circuit.Components.OfType<Esp32DevKitBoard>().Single();
+
+        sim.Run(3e-3);
+
+        // The wiper at 0.3 of 3.3 V.
+        Assert.Contains("GPIO34=0.99V", esp.InputSummary);
+        Assert.Contains("GPIO4=1", esp.InputSummary);
+
+        esp.CheckLimits(sim.System);
+        Assert.Empty(esp.Violations);
+    }
 }

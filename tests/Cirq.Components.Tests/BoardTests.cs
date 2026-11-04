@@ -111,6 +111,8 @@ public class BoardHeaderTests
         yield return new ArduinoUnoBoard();
         yield return new ArduinoNanoBoard();
         yield return new ArduinoMegaBoard();
+        yield return new RaspberryPiPicoBoard();
+        yield return new Esp32DevKitBoard();
     }
 }
 

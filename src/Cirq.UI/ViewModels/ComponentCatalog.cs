@@ -462,6 +462,10 @@ public static class ComponentCatalog
             new("Arduino Uno R3", "14 digital, 6 analog, 5V logic", () => new ArduinoUnoBoard()),
             new("Arduino Nano", "14 digital, 8 analog, 5V logic", () => new ArduinoNanoBoard()),
             new("Arduino Mega 2560", "54 digital, 16 analog, 5V logic", () => new ArduinoMegaBoard()),
+            new("Raspberry Pi Pico", "RP2040 microcontroller board, 26 GPIO (3 ADC), 3.3V logic — not 5V tolerant",
+                () => new RaspberryPiPicoBoard()),
+            new("ESP32 DevKit", "ESP32-WROOM-32 DevKitC, 38 pins, 3.3V logic — input-only GPIO34-39, flash pins reserved",
+                () => new Esp32DevKitBoard()),
         ]),
     ];
 

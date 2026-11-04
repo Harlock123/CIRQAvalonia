@@ -170,7 +170,7 @@ Three of those are worth separating, because they are easy to confuse:
 
 Click a palette entry, then click the canvas. The part lands where you click, snapped to the grid.
 
-The palette holds **205 components in 16 categories**:
+The palette holds **207 components in 16 categories**:
 
 | Category | Count | Contents |
 | --- | --- | --- |
@@ -189,7 +189,7 @@ The palette holds **205 components in 16 categories**:
 | Digital I/O | 9 | Logic toggle, clock, **pattern generator**, rotary encoder, oscillator module, ADC and DAC bridges, and a **2K × 8 SRAM and ROM** — see [below](#something-worth-addressing) |
 | Sensors & Actuators | 20 | DC motor, LDR, thermistors, **LM35 and TMP36** analog thermometers, buzzers, speaker, microphone, servo, stepper in **unipolar and bipolar** wirings, thermocouple, load cell, HC-SR04 ranger, Hall switch, phototransistor, **reed switch** and **PIR motion sensor** — see [below](#sensors-and-actuators) |
 | Switching & Isolation | 11 | Relay, fuses and a **resettable PPTC**, optocouplers, ULN2003, H-bridge, **A4988 microstepping driver**, **solid-state relay**, **MOSFET gate driver** — see [below](#regulating-a-current-instead-of-applying-a-voltage) |
-| Dev Boards | 4 | Raspberry Pi, Arduino Uno / Nano / Mega — see [below](#development-boards) |
+| Dev Boards | 6 | Raspberry Pi, Arduino Uno / Nano / Mega, **Raspberry Pi Pico** and **ESP32 DevKit** — see [below](#development-boards) |
 
 Click a category header to open it — and whichever was open closes, so **one category is open at a
 time**. Four groups opened independently is already more than the sidebar is tall, and then

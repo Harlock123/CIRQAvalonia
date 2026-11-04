@@ -266,6 +266,10 @@ public static class Examples
                 LoadRaspberryPiGpio),
             new("Keypad Scanner", "An Arduino scanning a 4x4 keypad: one row low at a time, the columns on pull-ups — double-click a key",
                 LoadKeypadScanner),
+            new("Pico GPIO", "A Raspberry Pi Pico dimming an LED by PWM, reading a button, and reading a TMP36 on its ADC",
+                LoadPicoGpio),
+            new("ESP32 GPIO", "An ESP32 blinking an LED, reading a knob on an input-only pin, and a button on a pull-up",
+                LoadEsp32Gpio),
         ]),
     ];
 
@@ -1234,6 +1238,91 @@ public static class Examples
         vm.Scope.AddProbe(keypad.Rows[1], "R2");
         vm.Scope.AddProbe(keypad.Columns[0], "C1");
         vm.Scope.AddProbe(keypad.Columns[1], "C2");
+    }
+
+    /// <summary>
+    /// A Raspberry Pi Pico doing the three things a first program does: PWM on GP15 dims an LED, GP14
+    /// reads a button on its internal pull-up, and GP26 — ADC0 — reads a TMP36 run from the board's
+    /// own 3V3 pin. A TMP36 rather than an LM35 because it works from 3.3 V and the LM35 needs four.
+    /// The board's status line shows what GP14 and GP26 read; double-click the sensor to warm it.
+    /// </summary>
+    public static void LoadPicoGpio(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "Raspberry Pi Pico GPIO";
+
+        var pico = Place(circuit, new RaspberryPiPicoBoard { Pins = "GP15=pwm@1kHz:40%; GP14=in-pullup; GP26=in" }, -300, 0);
+
+        // 3.3 V through 150 Ω and a red LED is about 10 mA, inside the 12 mA a Pico pin can be set to.
+        var resistor = Place(circuit, new Resistor(150), -60, 240);
+        var led = Place(circuit, Led.OfColour("Red"), 80, 240);
+        var button = Place(circuit, new PushButton(), -60, 160);
+        var sensor = Place(circuit, new TemperatureSensorIc(TemperatureSensorModel.Tmp36) { Temperature = 25.0 }, 60, -60);
+
+        var gndBoard = Place(circuit, new Ground(), -300, 340);
+        var gnd = Place(circuit, new Ground(), 200, 320);
+
+        circuit.Connect(pico.GroundPins[0], gndBoard.Pin);
+
+        circuit.Connect(pico.Pin("GP15"), resistor.A);
+        circuit.Connect(resistor.B, led.Anode);
+        circuit.Connect(led.Cathode, gnd.Pin);
+
+        circuit.Connect(pico.Pin("GP14"), button.A);
+        circuit.Connect(button.B, gnd.Pin);
+
+        circuit.Connect(pico.Pin("3V3"), sensor.Supply);
+        circuit.Connect(sensor.Ground, gnd.Pin);
+        circuit.Connect(sensor.Output, pico.Pin("GP26"));
+
+        vm.Scope.TimebasePerDivision = 1e-3;
+        vm.Scope.VoltsPerDivision = 1.0;
+        vm.Scope.Layout = ScopeLayout.Tiled;
+        vm.Scope.AddProbe(pico.Pin("GP15"), "PWM");
+        vm.Scope.AddProbe(pico.Pin("GP14"), "Button");
+        vm.Scope.AddProbe(pico.Pin("GP26"), "TMP36");
+    }
+
+    /// <summary>
+    /// An ESP32 DevKit: GPIO2 clocks an LED, GPIO34 reads a potentiometer across the 3V3 rail, and
+    /// GPIO4 reads a button on its pull-up. GPIO34 is one of the six pins with no output driver at
+    /// all — they can only be read, which makes them the natural place for an analog input. Move the
+    /// knob in the CONTROLS panel and watch the board's status line follow it.
+    /// </summary>
+    public static void LoadEsp32Gpio(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "ESP32 GPIO";
+
+        var esp = Place(circuit, new Esp32DevKitBoard { Pins = "GPIO2=clock@500Hz; GPIO34=in; GPIO4=in-pullup" }, -300, 0);
+
+        var resistor = Place(circuit, new Resistor(220), -40, 120);
+        var led = Place(circuit, Led.OfColour("Blue"), 100, 120);
+        var button = Place(circuit, new PushButton(), -40, 200);
+        var knob = Place(circuit, new Potentiometer(10e3, 0.3), 60, -160);
+
+        var gndBoard = Place(circuit, new Ground(), -300, 320);
+        var gnd = Place(circuit, new Ground(), 220, 300);
+
+        circuit.Connect(esp.GroundPins[0], gndBoard.Pin);
+
+        circuit.Connect(esp.Pin("GPIO2"), resistor.A);
+        circuit.Connect(resistor.B, led.Anode);
+        circuit.Connect(led.Cathode, gnd.Pin);
+
+        circuit.Connect(esp.Pin("GPIO4"), button.A);
+        circuit.Connect(button.B, gnd.Pin);
+
+        circuit.Connect(esp.Pin("3V3"), knob.B);
+        circuit.Connect(knob.A, gnd.Pin);
+        circuit.Connect(knob.Wiper, esp.Pin("GPIO34"));
+
+        vm.Scope.TimebasePerDivision = 1e-3;
+        vm.Scope.VoltsPerDivision = 1.0;
+        vm.Scope.Layout = ScopeLayout.Tiled;
+        vm.Scope.AddProbe(esp.Pin("GPIO2"), "LED");
+        vm.Scope.AddProbe(esp.Pin("GPIO34"), "Knob");
+        vm.Scope.AddProbe(esp.Pin("GPIO4"), "Button");
     }
 
     /// <summary>

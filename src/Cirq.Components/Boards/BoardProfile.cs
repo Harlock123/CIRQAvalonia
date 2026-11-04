@@ -28,19 +28,27 @@ public enum PinFunction
 /// <param name="SupplyVoltage">For a <see cref="PinFunction.Power"/> pin, the rail it provides.</param>
 /// <param name="SupportsPwm">Whether hardware PWM is available here.</param>
 /// <param name="Alternate">Peripheral name shown alongside, such as <c>SDA</c> or <c>TXD</c>.</param>
+/// <param name="HasAdc">
+/// A general-purpose pin that is also an ADC input — a Pico's GP26, an ESP32's GPIO32 — so reading
+/// it gives a voltage rather than a logic level.
+/// </param>
 public sealed record BoardPin(
     int Number,
     string Name,
     PinFunction Function,
     double SupplyVoltage = 0.0,
     bool SupportsPwm = false,
-    string? Alternate = null)
+    string? Alternate = null,
+    bool HasAdc = false)
 {
     /// <summary>What the symbol prints against the pin.</summary>
     public string Label => Alternate is null ? Name : $"{Name}/{Alternate}";
 
     /// <summary>A pin the user can configure — everything except power, ground and reserved pins.</summary>
     public bool IsConfigurable => Function is PinFunction.Gpio or PinFunction.AnalogIn;
+
+    /// <summary>Whether reading the pin reports a voltage: an analog input, or a GPIO with an ADC behind it.</summary>
+    public bool ReadsVolts => Function is PinFunction.AnalogIn || HasAdc;
 }
 
 /// <summary>
@@ -69,8 +77,11 @@ public sealed record BoardProfile(
     private static BoardPin Gpio(int number, string name, bool pwm = false, string? alternate = null) =>
         new(number, name, PinFunction.Gpio, SupportsPwm: pwm, Alternate: alternate);
 
-    private static BoardPin Analog(int number, string name) =>
-        new(number, name, PinFunction.AnalogIn);
+    private static BoardPin AdcGpio(int number, string name, string alternate) =>
+        new(number, name, PinFunction.Gpio, SupportsPwm: true, Alternate: alternate, HasAdc: true);
+
+    private static BoardPin Analog(int number, string name, string? alternate = null) =>
+        new(number, name, PinFunction.AnalogIn, Alternate: alternate);
 
     private static BoardPin Power(int number, string name, double volts) =>
         new(number, name, PinFunction.Power, SupplyVoltage: volts);
@@ -289,6 +300,140 @@ public sealed record BoardProfile(
             RightPins: [.. digital.Skip(toLeft)]);
     }
 
+    /// <summary>
+    /// Raspberry Pi Pico (RP2040; the Pico W and Pico 2 share the header). A microcontroller board
+    /// rather than a computer, but the same 3.3 V and the same rule: <b>not</b> 5 V tolerant.
+    /// <para>
+    /// Laid out as the board is, pin 1 at the top left by the USB socket counting down to 20, and 21
+    /// at the bottom right counting back up to VBUS at 40 — so the right column reads 40 to 21 top
+    /// to bottom. Every GPIO can do PWM, and GP26 to GP28 are also the three ADC inputs. The pins can
+    /// be set to drive up to 12 mA; 50 mA is the budget for all of them together.
+    /// </para>
+    /// </summary>
+    public static readonly BoardProfile RaspberryPiPico = new(
+        "Raspberry Pi Pico",
+        LogicLevels.Cmos33V,
+        LogicVoltage: 3.3,
+        MaxPinCurrent: 0.012,
+        MaxTotalGpioCurrent: 0.050,
+        IsFiveVoltTolerant: false,
+        LeftPins:
+        [
+            Gpio(1, "GP0", pwm: true, alternate: "TX"),
+            Gpio(2, "GP1", pwm: true, alternate: "RX"),
+            Gnd(3),
+            Gpio(4, "GP2", pwm: true),
+            Gpio(5, "GP3", pwm: true),
+            Gpio(6, "GP4", pwm: true, alternate: "SDA"),
+            Gpio(7, "GP5", pwm: true, alternate: "SCL"),
+            Gnd(8),
+            Gpio(9, "GP6", pwm: true),
+            Gpio(10, "GP7", pwm: true),
+            Gpio(11, "GP8", pwm: true),
+            Gpio(12, "GP9", pwm: true),
+            Gnd(13),
+            Gpio(14, "GP10", pwm: true),
+            Gpio(15, "GP11", pwm: true),
+            Gpio(16, "GP12", pwm: true),
+            Gpio(17, "GP13", pwm: true),
+            Gnd(18),
+            Gpio(19, "GP14", pwm: true),
+            Gpio(20, "GP15", pwm: true),
+        ],
+        RightPins:
+        [
+            Power(40, "VBUS", 5.0),
+            new(39, "VSYS", PinFunction.Power, SupplyVoltage: 4.7),
+            Gnd(38),
+            Reserved(37, "3V3_EN"),
+            Power(36, "3V3", 3.3),
+            Reserved(35, "ADC_VREF"),
+            AdcGpio(34, "GP28", "ADC2"),
+            new(33, "AGND", PinFunction.Ground),
+            AdcGpio(32, "GP27", "ADC1"),
+            AdcGpio(31, "GP26", "ADC0"),
+            Reserved(30, "RUN"),
+            Gpio(29, "GP22", pwm: true),
+            Gnd(28),
+            Gpio(27, "GP21", pwm: true),
+            Gpio(26, "GP20", pwm: true),
+            Gpio(25, "GP19", pwm: true, alternate: "MOSI"),
+            Gpio(24, "GP18", pwm: true, alternate: "SCK"),
+            Gnd(23),
+            Gpio(22, "GP17", pwm: true, alternate: "CS"),
+            Gpio(21, "GP16", pwm: true, alternate: "MISO"),
+        ]);
+
+    /// <summary>
+    /// ESP32 DevKitC (ESP32-WROOM-32, 38 pins). 3.3 V and not 5 V tolerant, like the Pi.
+    /// <para>
+    /// Two headers of nineteen, numbered here 1 to 19 down the left (J2) and 20 to 38 down the right
+    /// (J3), antenna end at the top. Three things about its pins catch people, and all three are
+    /// here. GPIO34 to GPIO39 are <b>input only</b> — no output driver and no pull-ups — so they are
+    /// analog inputs that can only be read. GPIO6 to GPIO11 are wired to the module's flash chip and
+    /// cannot be used at all. And GPIO0, 2, 12 and 15 are strapping pins, read at reset, which work
+    /// as ordinary GPIO afterwards but can stop the board booting if a circuit holds them the wrong
+    /// way. Any output pin can do PWM; GPIO32 and GPIO33 are ADC1 inputs as well as GPIO (the ADC2
+    /// pins are not marked, since ADC2 cannot be used while the radio is on).
+    /// </para>
+    /// <para>
+    /// The per-pin figure is the 40 mA the datasheet gives at the strongest drive setting and the
+    /// total is an allowance rather than a datasheet number: the module's own limit is set by its
+    /// 3.3 V regulator more than by the pins.
+    /// </para>
+    /// </summary>
+    public static readonly BoardProfile Esp32DevKit = new(
+        "ESP32 DevKit",
+        LogicLevels.Cmos33V,
+        LogicVoltage: 3.3,
+        MaxPinCurrent: 0.040,
+        MaxTotalGpioCurrent: 0.200,
+        IsFiveVoltTolerant: false,
+        LeftPins:
+        [
+            Power(1, "3V3", 3.3),
+            Reserved(2, "EN"),
+            Analog(3, "GPIO36", "VP"),
+            Analog(4, "GPIO39", "VN"),
+            Analog(5, "GPIO34"),
+            Analog(6, "GPIO35"),
+            AdcGpio(7, "GPIO32", "ADC4"),
+            AdcGpio(8, "GPIO33", "ADC5"),
+            Gpio(9, "GPIO25", pwm: true, alternate: "DAC1"),
+            Gpio(10, "GPIO26", pwm: true, alternate: "DAC2"),
+            Gpio(11, "GPIO27", pwm: true),
+            Gpio(12, "GPIO14", pwm: true),
+            Gpio(13, "GPIO12", pwm: true),
+            Gnd(14),
+            Gpio(15, "GPIO13", pwm: true),
+            Reserved(16, "SD2"),
+            Reserved(17, "SD3"),
+            Reserved(18, "CMD"),
+            Power(19, "5V", 5.0),
+        ],
+        RightPins:
+        [
+            Gnd(20),
+            Gpio(21, "GPIO23", pwm: true, alternate: "MOSI"),
+            Gpio(22, "GPIO22", pwm: true, alternate: "SCL"),
+            Gpio(23, "GPIO1", pwm: true, alternate: "TX0"),
+            Gpio(24, "GPIO3", pwm: true, alternate: "RX0"),
+            Gpio(25, "GPIO21", pwm: true, alternate: "SDA"),
+            Gnd(26),
+            Gpio(27, "GPIO19", pwm: true, alternate: "MISO"),
+            Gpio(28, "GPIO18", pwm: true, alternate: "SCK"),
+            Gpio(29, "GPIO5", pwm: true, alternate: "SS"),
+            Gpio(30, "GPIO17", pwm: true),
+            Gpio(31, "GPIO16", pwm: true),
+            Gpio(32, "GPIO4", pwm: true),
+            Gpio(33, "GPIO0", pwm: true),
+            Gpio(34, "GPIO2", pwm: true),
+            Gpio(35, "GPIO15", pwm: true),
+            Reserved(36, "SD1"),
+            Reserved(37, "SD0"),
+            Reserved(38, "CLK"),
+        ]);
+
     public static readonly IReadOnlyList<BoardProfile> Library =
-        [RaspberryPi40, ArduinoUno, ArduinoNano, ArduinoMega];
+        [RaspberryPi40, ArduinoUno, ArduinoNano, ArduinoMega, RaspberryPiPico, Esp32DevKit];
 }
