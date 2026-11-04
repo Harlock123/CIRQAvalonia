@@ -167,7 +167,7 @@ Three of those are worth separating, because they are easy to confuse:
 
 ## Placing components
 
-![The component palette: a Find a part box at the top, "308 parts in 17 groups" under it, and the seventeen categories with their counts — passive 11, switches 5, sources 16, semiconductors 13, transistors 13, LEDs and displays 11, power 10, analog ICs 13, logic gates 14, 74xx series 79, 40xx series 47, buses 19, digital I/O 9, memory and CPUs 11, sensors and actuators 20, switching and isolation 11, dev boards 6 — every group closed, so all seventeen headings fit on screen at once](images/02-palette.png)
+![The component palette: a Find a part box at the top, "313 parts in 17 groups" under it, and the seventeen categories with their counts — passive 11, switches 5, sources 16, semiconductors 13, transistors 13, LEDs and displays 11, power 10, analog ICs 13, logic gates 14, 74xx series 79, 40xx series 47, buses 19, digital I/O 9, memory and CPUs 16, sensors and actuators 20, switching and isolation 11, dev boards 6 — every group closed, so all seventeen headings fit on screen at once](images/02-palette.png)
 
 Click a palette entry, then click the canvas. The part lands where you click, snapped to the grid.
 
@@ -5884,7 +5884,7 @@ $8000 LDX #$FF   R $8001 FF   $8002 TXS   R $8003 A9   $8003 LDA #$E0   R $8004 
 $8005 STA $6003   R $8006 03   R $8007 60   W $6003 E0   $8008 LDX #$00 ...
 ```
 
-![The bus decode window reading the 6502's bus: "Read as Cpu6502", a transcript of the first sixty cycles from the reset sequence's reads of $FFFC and $FFFD through LDX #$FF, TXS, LDA #$E0 and STA $6003 to the first JSR, and below it a row per cycle with its time, kind and text](images/48-bus-decode-6502.png)
+![The bus decode window reading the 6502's bus: "Read as Cpu6502", a transcript of the first sixty cycles from the reset sequence's reads of $FFFC and $FFFD through LDX #$FF, TXS, LDA #$E0 and STA $6003 to the first JSR, and below it a row per cycle with its time, kind and text, and a summary naming the chip, "U2 (W65C02S): 60 cycles, 17 instructions, 8 writes"](images/48-bus-decode-6502.png)
 
 #### Single-stepping
 

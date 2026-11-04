@@ -35,7 +35,7 @@ CirqAvalonia.slnx
 ├── src/
 │   ├── Cirq.Core/         Domain model: components, terminals, nets, MNA stamping contract
 │   ├── Cirq.Engine/       LU solver, Newton-Raphson, transient loop, digital event scheduler
-│   ├── Cirq.Components/   Component library (RCL, transistors, diodes, thyristors, 741, 555, 74xx/4000, memories, 6502, displays, boards)
+│   ├── Cirq.Components/   Component library (RCL, transistors, diodes, thyristors, 741, 555, 74xx/4000, memories, 6502/6510, CIA, SID, displays, boards)
 │   └── Cirq.UI/           Avalonia editor, schematic canvas, inspector, ScottPlot scope
 └── tests/
     ├── Cirq.Engine.Tests/      Solver accuracy against closed-form solutions
@@ -52,7 +52,7 @@ Core ← Engine ← Components ← UI, which keeps the whole engine headless-tes
 ```bash
 dotnet run --project src/Cirq.UI     # the editor
 dotnet run --project src/Cirq.Cli    # the same engine, no window
-dotnet test                          # 4517 tests
+dotnet test                          # 4593 tests
 ./scripts/build-guide.sh             # the user guide as a PDF
 ```
 
@@ -615,6 +615,7 @@ one passes against a button that would never have fired.
 | Memories | Every EPROM, EEPROM and RAM on its JEDEC pinout pin by pin, data an access time after the address and released when deselected, a RAM written and read back through a tri-state buffer, a 28C256 write that is only loaded, polled through bit 7 inverted and bit 6 toggling, then in the cells a write cycle later; Intel HEX with segment and linear records, every malformed line refused with its number and reason, a binary at an offset, an image wrapped into the chip and one too big for it refused, a 32K image surviving the circuit file, and the original 2K part's file form unchanged |
 | 6502 core | Binary and decimal ADC/SBC with each part's flags, the dummy cycles of indexed and read-modify-write instructions differing between the NMOS part and the 65C02 exactly as the silicon's do, the NMOS JMP ($xxFF) bug and the 65C02's extra cycle fixing it, JSR/RTS/BRK bus sequences, the 65C02's additions and the NMOS undocumented opcodes, reset, IRQ latency after CLI, NMI once per edge, WAI — and a self-checking program, assembled from source in the test, passing on both parts in an array and on a schematic. Locally the core also passes every case of the published per-cycle suites (2,560,000 NMOS, 2,540,000 65C02) and Klaus Dormann's functional and extended-opcode tests; those are not in the repository |
 | 6502 computer | The self-check running from ROM through the analog solve with no undefined bus reads, the bus cycles a microsecond apart and disassembled, reset holding and restarting, a ROM too slow for a 6 MHz clock giving the wrong bytes, the 6522's ports, Timer 1 free-running a 100-cycle square wave on PB7 while its interrupt is counted, Timer 2 counting PB6 pulses, CA1 interrupting and CA2 handshaking, the 6551's greeting reaching a terminal and the terminal's text echoed back, the HD44780's busy flag and display memory read back, and the examples' ROMs holding exactly the programs the guide prints |
+| 6510, CIA and SID | The 6510's pinout, its port's direction and data registers driving and reading P0-P5 while the RAM underneath takes the writes, reset releasing the port, AEC releasing the buses, and the self-check and bus decode on the shared core; every 6526 register from a program — ports read at the pins through their pull-ups, /PC, both timers continuous and one-shot with PB6 toggling and PB7 pulsing, force load, timer B counting A's underflows, CNT edges and gated by CNT, the time of day set, stopped, latched, rolled over at 11:59 and 12:59 and alarmed, the serial port out MSB first and in on CNT, /FLAG, the mask writes and /IRQ a cycle after its flag; the SID's oscillators, every waveform, the noise register, sync, ring modulation and test, the envelope's datasheet times, exponential decay, sustain, hold at zero and delay bug, the readback registers and the mix; AUDIO OUT at half VDD, the filter's low-, band- and high-pass gain against a second-order response, moving when its capacitors are doubled, resonance at its Q, the 6581's volume offset, and the paddles timed from their R and C; the SID player playing its first bar and the keypad's keys reaching the LCD |
 | LM339 | Per-channel comparison, wired-AND when outputs are tied, release when unpowered |
 | Regulators | Line and load regulation, dropout, current limiting, LM317 divider programming |
 | BJT | Beta in forward active, saturation, cutoff, exponential Vbe, PNP mirroring, KCL at all three terminals |
@@ -905,7 +906,12 @@ attached to it, and any part that said it had not settled — all of which name 
 drawing to go and look, which "try a smaller time step" does not.
 
 The palette holds 313 components in 17 collapsible categories, with a **Find a part** box
-(`Ctrl+F`) over them. Among the newest: **eighty-one more 74 and 4000 series chips** — open-collector
+(`Ctrl+F`) over them. Among the newest: **the Commodore 64's chips** — the 6510 (and 8500), the 6502
+core with its I/O port at $0000/$0001 and AEC; the 6526 CIA with its pulled-up ports, two timers,
+time-of-day clock, serial port and interrupts; and the 6581 and 8580 SID, three voices with the real
+envelope rates and the delay bug, a state-variable filter solved on the capacitors at its CAP pins,
+and an AUDIO OUT that drives the circuit — with a SID player that plays a tune of its own and a
+keypad read through a CIA as examples. Before that: **eighty-one more 74 and 4000 series chips** — open-collector
 and tri-state gates, every common JK and D package, ripple, synchronous and up/down counters, the
 74181 ALU with its 74182 look-ahead, the 7485 comparator, universal shift registers, octal buffers,
 the 74121, 74123, 74221, 4528, 4538 and 4047 one-shots and timers timed by a real R and C, the 4026
@@ -921,7 +927,7 @@ tri-state buffer, a TIP120 Darlington, LM35 and TMP36 thermometers, a WS2812B Ne
 matrix keypad, Raspberry Pi Pico and ESP32 boards, and the 7483 / 74283 adders and 74192 / 74193
 up/down counters.
 
-![The component palette: a Find a part box at the top, "308 parts in 17 groups" under it, and the seventeen categories with their counts — passive 11, switches 5, sources 16, semiconductors 13, transistors 13, LEDs and displays 11, power 10, analog ICs 13, logic gates 14, 74xx series 79, 40xx series 47, buses 19, digital I/O 9, memory and CPUs 11, sensors and actuators 20, switching and isolation 11, dev boards 6 — every group closed, so all seventeen headings fit on screen at once](docs/images/02-palette.png)
+![The component palette: a Find a part box at the top, "313 parts in 17 groups" under it, and the seventeen categories with their counts — passive 11, switches 5, sources 16, semiconductors 13, transistors 13, LEDs and displays 11, power 10, analog ICs 13, logic gates 14, 74xx series 79, 40xx series 47, buses 19, digital I/O 9, memory and CPUs 16, sensors and actuators 20, switching and isolation 11, dev boards 6 — every group closed, so all seventeen headings fit on screen at once](docs/images/02-palette.png)
 
 Selecting a component fills the properties panel. It is built by reflection, so a new component
 type gets a complete editor without any UI code:

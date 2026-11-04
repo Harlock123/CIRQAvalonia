@@ -8,6 +8,62 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+## [0.44.0] - 2026-11-04
+
+The Commodore 64's chips. A 6510 on the 6502's core with its I/O port, a 6526 CIA with every
+timer, clock and serial mode, and a 6581 SID — and its 8580 successor — whose three voices play
+into the circuit through a filter built on the capacitors you wire to it. A SID player that plays a
+tune of its own and a keypad read through a CIA, as examples. 313 components in 17 categories, 108
+worked examples, 4593 tests.
+
+### Added
+
+**The 6510 and 8500.** The C64's processor: the NMOS 6502 core, cycle for cycle and quirk for
+quirk, on the 6510's own DIP-40 pinout, with a six-bit I/O port — its direction register at $0000
+and data register at $0001 — and AEC to let go of the buses. As on the silicon, a write to the port
+still goes out on the bus (the RAM underneath takes it too), and a read takes the port's register
+whatever the bus says. The 8500 is the HMOS version under its own number.
+
+**The 6526 CIA.** Two ports with the datasheet's passive pull-ups, read at the pins, so a port can
+scan a key matrix as open-drain lines; /PC after each port B access; two 16-bit timers, one-shot or
+continuous, with force load, PB6 and PB7 pulse or toggle outputs, and timer B counting PHI2, CNT,
+timer A's underflows or those gated by CNT; the BCD time-of-day clock from the TOD pin at 50 or
+60 Hz, latched by reading the hours, stopped by writing them, with AM/PM and its alarm; the serial
+shift register, out on SP clocked by timer A and in on CNT; /FLAG; the interrupt control register
+with read-clear flags and bit-7 mask writes; and /IRQ a cycle after its flag, as the original 6526
+— not the 6526A — has it.
+
+**The 6581 and 8580 SID.** Three voices, written from the register documentation: 24-bit
+oscillators, sawtooth, triangle, pulse and the 23-bit noise register, sync, ring modulation and the
+test bit, combined waveforms as their AND; ADSR envelopes on the datasheet's rates with the
+exponential decay steps and the ADSR delay bug; OSC3 and ENV3; and the paddles timed from the
+resistor and capacitor on the POT pins. **AUDIO OUT drives the circuit** — a source at half VDD,
+updated every PHI2 cycle — into a speaker, the scope or the spectrum. **The filter is analog**: a
+state-variable filter solved on the real capacitors at the CAP pins, so changing them moves the
+cutoff, with low-, band- and high-pass, resonance, per-voice routing and EXT IN. The 8580's cutoff is
+a straight line; the 6581's is an approximation of its curve, without its distortion. The 6581's
+volume offset — the trick C64 software plays samples through — is there.
+
+**Two examples in File > Examples > Computers.** *6510 SID Player*: a 6510, ROM, RAM, a 7400 and a
+74139, a CIA whose timer interrupts 200 times a second, and a SID playing a sixteen-step original
+tune — a filtered, plucked bass, a pulse arpeggio with its width sweeping, a lead with vibrato —
+through a coupling capacitor to an amplifier and a speaker. *CIA Keypad*: the same machine scanning
+a 4×4 keypad through the CIA's ports a row at a time and printing each key on a four-bit LCD. The
+guide prints both programs; a test checks the ROMs hold them.
+
+**Agent tools.** `sid_state` reports a SID's voices, envelopes, filter and volume; `cpu_state`
+gives a 6510's port. A `sid_player` recipe tours the example. 36 tools and eight recipes.
+
+### Changed
+
+**Boards with a few capacitors on them solve faster.** When the matrix moves in only a few places
+— a capacitor's companion as the step length changes, which on a logic board is every step — it is
+solved from the last factorisation with a low-rank correction, checked against its residual,
+instead of being factored again. The SID player runs about two and a half times faster for it.
+
+**Simulate > Decode Bus** names the processor it read, so a 6510 says it is one; its bus decodes
+as a 6502's, the core being the same.
+
 ## [0.43.0] - 2026-11-04
 
 The rest of the 74 and 4000 series. Eighty-one more logic chips on their datasheet pinouts — the
@@ -2548,7 +2604,8 @@ First public build of CirqAvalonia — an electronic circuit analyzer and mixed-
 
 **501 tests** measure the solver against closed-form answers rather than recorded output.
 
-[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.43.0...HEAD
+[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.44.0...HEAD
+[0.44.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.43.0...v0.44.0
 [0.43.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.42.0...v0.43.0
 [0.42.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.41.1...v0.42.0
 [0.41.1]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.41.0...v0.41.1

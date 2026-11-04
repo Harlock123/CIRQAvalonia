@@ -40,9 +40,11 @@ dotnet run --project src/Cirq.UI -- --mcp      # the MCP server on stdio, headle
   `Buses`, `Boards`, `Processors` and more).
   - `Digital/ParallelMemory.cs` is every byte-wide ROM and RAM, built from a pin table (`MemoryChips.cs`);
     `MemoryImage.cs` reads binary and Intel HEX images.
-  - `Processors/` is the 6502: `Mos6502Core` (the instruction set as bus cycles, no circuit),
+  - `Processors/` is the 6502 family: `Mos6502Core` (the instruction set as bus cycles, no circuit),
     `Opcodes6502` (the opcode table the core and the disassembler share), `Processor6502` (the 40-pin
-    parts, `Cpu65C02` and `Cpu6502`, clocked from their PHI2 pin), the 6522 and 6551, and the bus decoder.
+    parts, `Cpu65C02`, `Cpu6502`, and `Cpu6510`/`Cpu8500` in `Cpu6510.cs`, clocked from their PHI2 or
+    Φ0 pin), the 6522, 6551 and 6526 (`Cia6526`), the SID (`SidCore`, the voices with no circuit, and
+    `SidChip`, the 6581 and 8580 parts), and the bus decoder.
   - `Serialization/` reads and writes `.cirq` files (indented JSON).
   - `Spice/` imports and exports SPICE models and netlists.
 - `src/Cirq.UI/`: the Avalonia editor.
@@ -117,6 +119,27 @@ dotnet run --project src/Cirq.UI -- --mcp      # the MCP server on stdio, headle
   and Klaus Dormann's functional tests, downloaded outside the repository — neither is committed, and
   no test may need the network. Example ROMs are byte arrays in `Examples.cs`; a UI test assembles the
   source the guide prints and checks the bytes match, so change both together.
+- **One 6502 core, several packages.** `Processor6502` builds its pins from a `ProcessorPackage`
+  (65C02, 6502, 6510); the core is shared, never copied. The 6510's port lives in `Processor6510`
+  through the base's hooks (`ReadInternal`, `WriteInternal`, `EndCycle`, `ResetPort`): a $0000/$0001
+  access still runs its bus cycle, so the bus log, the decoder and the RAM all see it.
+- **The CIA counts on PHI2; its TOD on its own pin.** `Cia6526` does every register's side effects
+  as PHI2 falls, like the 6522. The time-of-day clock counts rising edges on TOD, five or six to a
+  tenth, so a test feeds TOD a fast clock rather than 50 Hz. The ports' pull-ups are stamped
+  resistors (`Cia6526.PullUpResistance`).
+- **The SID's audio is stamped, its voices are not.** `SidCore` runs a cycle per PHI2 fall and
+  leaves two mixes, round the filter and into it. `SidChip.StampMatrix` turns them into AUDIO OUT, a
+  source at half VDD (stamped as half of VDD's node voltage, so the bias is right from the first
+  solve), and into the filter: two ideal integrators whose capacitors are the real parts on the CAP
+  pins, so the cutoff is gm/C with gm scaled to the datasheet capacitor. Only the right-hand side
+  moves with the voices; the matrix moves when the cutoff, resonance, mode or volume is written.
+  Keep it linear — a diode or anything non-linear on the same board doubles the cost of every time
+  point, which is why the SID player has no LED.
+- **A few changed entries need no refactorisation.** When the matrix differs from the last one
+  factored in up to 24 entries — a capacitor's companion as the step length changes —
+  `CircuitSimulator.SolveCorrected` solves it by the Woodbury identity from the old factorisation,
+  refines it and checks the residual, factoring only if that fails. Below 48 unknowns it always
+  factors, as before.
 - **Logic families are bases with pin tables.** A 74/4000 part is usually a few lines on a shared base in
   `Digital/` — `MultiGateIc` (with an open-collector option), `DualJkFlipFlopIc`, `ClockedRegisterIc`,
   `SynchronousCounterIc`, `CmosRippleCounterIc`, `DecodedCounterIc`, `ParallelInSerialOutIc`,
@@ -131,8 +154,8 @@ dotnet run --project src/Cirq.UI -- --mcp      # the MCP server on stdio, headle
 - **Constructor arguments are not saved.** Only public settable properties round-trip, so a part built
   with `new PatternGenerator(3)` reopens with the default four lines; examples must use what a file can
   rebuild (`EveryExampleSurvivesASaveAndReopen` catches it).
-- **Runs hand back their end state.** A part implementing `IRunState` (processors, memories, the LCD) has
-  the state its copy ended in written back after an agent's `run_transient`.
+- **Runs hand back their end state.** A part implementing `IRunState` (processors, memories, the LCD,
+  the CIA and the SID) has the state its copy ended in written back after an agent's `run_transient`.
 - **Logic speed.** The simulator reuses an LU factorisation while the stamped matrix is unchanged, so a
   part must stamp through `MnaSystem.Add` (never write `Matrix` directly) or the reuse check misses it.
 - **No real Anthropic API in tests.** The chat tests answer from `FakeClaude` (an `HttpMessageHandler` replaying
