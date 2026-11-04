@@ -67,7 +67,7 @@ public static class Cpu6502BusDecoder
         var entry = Opcodes6502.For(variant)[fetch.Data];
         Dictionary<int, byte> bytes = new() { [fetch.Address] = fetch.Data };
 
-        for (var k = index + 1; k < cycles.Count && k <= index + 3 && !cycles[k].Sync; k++)
+        for (var k = index + 1; k < cycles.Count && k <= index + 7 && !cycles[k].Sync; k++)
         {
             var offset = (cycles[k].Address - fetch.Address) & 0xFFFF;
             if (cycles[k].IsRead && offset is > 0 and < 3 && offset < entry.Length) bytes.TryAdd(cycles[k].Address, cycles[k].Data);

@@ -240,7 +240,7 @@ public abstract partial class Processor6502 : DigitalIc, IRunState
 
                 // The latest fetch whose operands have all been read: the one just fetched may not
                 // have got that far yet.
-                var text = Cpu6502BusDecoder.Instruction(Variant, [.. Enumerable.Range(i, Math.Min(4, _logCount - i)).Select(k => _log[(_logStart + k) % BusLogCapacity])]);
+                var text = Cpu6502BusDecoder.Instruction(Variant, [.. Enumerable.Range(i, Math.Min(8, _logCount - i)).Select(k => _log[(_logStart + k) % BusLogCapacity])]);
                 if (!text.EndsWith(" ?", StringComparison.Ordinal)) return text;
             }
 
