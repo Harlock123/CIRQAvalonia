@@ -55,4 +55,42 @@ public class ProcessorToolTests
         await b.Tools.AddParts([new() { Kind = "Resistor" }]);
         Assert.Contains("no 6502", await Error(b.Tools.CpuState()));
     }
+
+    /// <summary>sid_state before and after a run of the SID player, and what it says without a SID.</summary>
+    [Fact]
+    public async Task Sid_state_describes_the_voices_after_a_run()
+    {
+        using var b = new Bench();
+        await b.Tools.LoadExample("6510 SID Player");
+
+        var before = await Parse(b.Tools.SidState());
+        Assert.Contains("hasn't been clocked", (string)before["note"]!);
+        Assert.Equal("6581", (string)before["chip"]!);
+
+        await b.Tools.RunTransient(System.Text.Json.JsonSerializer.SerializeToElement("8m"), plot: false);
+
+        var after = await Parse(b.Tools.SidState("U8"));
+        Assert.Equal(15, (int)after["volume"]!);
+        Assert.Equal(1e6, (double)after["clock_hz"]!, 1.0);
+        var bass = after["voices"]![0]!;
+        Assert.Equal(["sawtooth"], bass["waveforms"]!.AsArray().Select(w => (string)w!));
+        Assert.True((bool)bass["filtered"]!);
+        Assert.Equal("$0735", (string)bass["frequency"]!);
+        Assert.Equal(["pulse"], after["voices"]![1]!["waveforms"]!.AsArray().Select(w => (string)w!));
+        Assert.Equal(8, (int)after["filter"]!["resonance"]!);
+
+        var cpu = await Parse(b.Tools.CpuState("U2", cycles: 0));
+        Assert.Equal("6510", (string)cpu["chip"]!);
+        Assert.Equal("$01", (string)cpu["port"]!["direction"]!);
+
+        Assert.Contains("not a SID", await Error(b.Tools.SidState("U2")));
+    }
+
+    [Fact]
+    public async Task Sid_state_needs_a_sid()
+    {
+        using var b = new Bench();
+        await b.Tools.AddParts([new() { Kind = "Resistor" }]);
+        Assert.Contains("no SID", await Error(b.Tools.SidState()));
+    }
 }

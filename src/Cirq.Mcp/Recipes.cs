@@ -263,6 +263,19 @@ public static class Recipes
         return recipe.Text("Tell the person what the LCD says and how the program got it there. To run their own program, assemble it for $8000 and load it into U3 with load_memory (Intel HEX, or a 32K binary), then run again. Every bus cycle is in the processor's log: cpu_state lists the latest.");
     }
 
+    [McpServerPrompt(Name = "sid_player", Title = "A SID player")]
+    [Description("Opens the 6510 SID Player example (a 6510, a 6526 CIA and a 6581 SID playing a three-voice tune from ROM), reads the player's interrupt handler, runs it, and checks what the processor, its port and the SID's voices, envelopes and filter are doing.")]
+    public static string SidPlayer()
+    {
+        var recipe = new Recipe("Explore a SID player: the example is a 6510 (U2) with a 28C256 ROM (U3, at $8000), a 62256 RAM (U4), a 6526 CIA (U7, at $4000) whose timer A interrupts 200 times a second, and a 6581 SID (U8, at $5000) whose AUDIO OUT drives an amplifier and a speaker. Each interrupt is a tick of the tune.");
+        recipe.Step("Open the example. If it refuses because the open circuit has unsaved changes, save that first, or ask the person whether to discard it.", "load_example", new { name = "6510 SID Player" });
+        recipe.Step("Read the player's interrupt handler in the ROM: the IRQ vector says where it is.", "disassemble", new { part = "U3", address = 0x8065, origin = 0x8000, count = 16, variant = "6502" });
+        recipe.Step("Run it for 12 ms of simulated time: two interrupts' worth of ticks, the first notes struck. Every bus cycle is solved on the pins, so this takes some seconds.", "run_transient", new { duration = "12m", plot = false });
+        recipe.Step("Where the 6510 got to, and its I/O port: P0 is an output, the beat.", "cpu_state", new { cycles = 4 });
+        recipe.Step("What the SID is playing: three voices, their waveforms, envelopes and frequencies, and the filter on the bass.", "sid_state", new { });
+        return recipe.Text("Tell the person what each voice is playing (the bass at 110 Hz is A2) and how the CIA's interrupt drives it. To hear it, give the speaker LS1 a RecordingPath with set_part, run for 400 ms (minutes of solving) and play the WAV file.");
+    }
+
     private sealed class Recipe(string intro)
     {
         private readonly StringBuilder _text = new(intro + "\n\nFollow these steps in order. A line starting with \"" + CallMarker.Trim() + "\" is one tool call, with its arguments as JSON. If a step fails, read the error, fix the cause and carry on.\n");

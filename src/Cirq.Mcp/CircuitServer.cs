@@ -35,11 +35,11 @@ public static class CircuitServer
         - ac_sweep: gain and phase against frequency (a Bode plot), driven by sources' AC magnitude; for filters and amplifiers.
         - dc_sweep: the probes against a swept setting (a supply's Voltage, a resistance, temperature), optionally stepped by a second.
         - check_circuit before running a circuit that won't solve, and explain_circuit to hear what the editor recognises it as.
-        - Memories and processors: load_memory puts a ROM image (Intel HEX, plain hex bytes, base64 or a .bin/.hex file) into a memory part and read_memory reads its bytes back; cpu_state reports a 6502's registers and recent bus cycles, and disassemble lists the code in a memory part. After run_transient they describe where the run ended.
+        - Memories and processors: load_memory puts a ROM image (Intel HEX, plain hex bytes, base64 or a .bin/.hex file) into a memory part and read_memory reads its bytes back; cpu_state reports a 6502's (or 6510's) registers, port and recent bus cycles, disassemble lists the code in a memory part, and sid_state says what a SID's voices, envelopes and filter are doing. After run_transient they describe where the run ended.
 
         A good way to build: list_parts with a search for what you need, describe_part for pins and settings; add_parts with positions laid out left to right (with Ground parts below); connect the pins; get_circuit to check the nets; add_probe on the input and the output; render_schematic to check the drawing reads well; operating_point, then run_transient (or ac_sweep); read the measurements and look at the plot; adjust values with set_part and run again; save_circuit as .cirq.
 
-        The server's prompts are saved recipes (an RC low-pass filter, an LED with its resistor, a 555 astable, an inverting op-amp amplifier, a bridge rectifier with smoothing, a logic counter, a 6502 computer): step-by-step plans with the exact tool calls, to follow or adapt. load_example opens any of the editor's own example circuits.
+        The server's prompts are saved recipes (an RC low-pass filter, an LED with its resistor, a 555 astable, an inverting op-amp amplifier, a bridge rectifier with smoothing, a logic counter, a 6502 computer, a SID player): step-by-step plans with the exact tool calls, to follow or adapt. load_example opens any of the editor's own example circuits.
         """;
 
     /// <summary>The MCP tools, bound to a host.</summary>

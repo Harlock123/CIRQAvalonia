@@ -17,7 +17,7 @@ public class EndToEndTests
         "load_example", "undo", "redo", "add_parts", "set_part", "remove_parts", "connect", "disconnect", "add_probe",
         "remove_probe", "set_parameter", "set_conditions", "check_circuit", "explain_circuit", "render_schematic",
         "get_spice_netlist", "load_memory",
-        "read_memory", "cpu_state", "disassemble", "operating_point", "run_transient", "get_trace", "ac_sweep", "dc_sweep", "transport", "set_scope",
+        "read_memory", "cpu_state", "disassemble", "sid_state", "operating_point", "run_transient", "get_trace", "ac_sweep", "dc_sweep", "transport", "set_scope",
     ];
 
     [Fact]
@@ -46,7 +46,7 @@ public class EndToEndTests
         Assert.Equal(ToolNames, CircuitServer.Definitions().Select(t => t.Name));
 
         var prompts = await s.Client.ListPromptsAsync(cancellationToken: CancellationToken.None);
-        Assert.Equal(["rc_low_pass", "led_with_resistor", "astable_555", "inverting_amplifier", "bridge_rectifier", "decade_counter", "computer_6502"], prompts.Select(p => p.Name));
+        Assert.Equal(["rc_low_pass", "led_with_resistor", "astable_555", "inverting_amplifier", "bridge_rectifier", "decade_counter", "computer_6502", "sid_player"], prompts.Select(p => p.Name));
     }
 
     [Fact]
@@ -135,6 +135,10 @@ public class EndToEndTests
         Assert.Equal("$8000", (string)Last("computer_6502", "disassemble")["vectors"]!["reset"]!);
         Assert.Equal("$8022 JMP $8022", (string)Last("computer_6502", "cpu_state")["instruction"]!);
         Assert.Equal("\"Hello, world!\"", (string)Last("computer_6502", "get_part")["value"]!);
+        Assert.Equal("$01", (string)Last("sid_player", "cpu_state")["port"]!["direction"]!);
+        var sid = Last("sid_player", "sid_state");
+        Assert.Equal(110, (double)sid["voices"]![0]!["hz"]!, 0.5);
+        Assert.Equal("low-pass", (string)sid["filter"]!["modes"]![0]!);
 
         // A prompt's arguments are read from text, engineering notation and all.
         var faster = await s.Client.GetPromptAsync("astable_555", new Dictionary<string, object?> { ["frequency_hz"] = "2k" }, cancellationToken: CancellationToken.None);

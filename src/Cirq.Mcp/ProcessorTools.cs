@@ -7,11 +7,11 @@ using ModelContextProtocol.Server;
 
 namespace Cirq.Mcp;
 
-/// <summary>The tools for a 6502 in the circuit: where it is, and what a program in a memory part says.</summary>
+/// <summary>The tools for a 6502 in the circuit: where it is, what a program in a memory part says, and what a SID is playing.</summary>
 public sealed partial class CircuitTools
 {
     [McpServerTool(Name = "cpu_state", ReadOnly = true, Idempotent = true)]
-    [Description("A 6502 or 65C02's state: its registers (A, X, Y, S, PC), its flags (NV-BDIZC, capitals set), the instruction it is executing (disassembled from its bus), how many cycles and instructions it has run, whether it is running, waiting (WAI) or stopped (STP/JAM), any reads that found the data bus at no logic level, and its last bus cycles. In the app this is the live simulation; otherwise where the last run_transient left it.")]
+    [Description("A 6502, 65C02, 6510 or 8500's state: its registers (A, X, Y, S, PC), its flags (NV-BDIZC, capitals set), the instruction it is executing (disassembled from its bus), how many cycles and instructions it has run, whether it is running, waiting (WAI) or stopped (STP/JAM), any reads that found the data bus at no logic level, its last bus cycles, and on a 6510 or 8500 its I/O port ($0000 direction, $0001 data, and the P0-P5 pins). In the app this is the live simulation; otherwise where the last run_transient left it.")]
     public Task<string> CpuState(
         [Description("The processor's designator, e.g. \"U2\". Optional when the circuit has only one.")] string? part = null,
         [Description("How many of its most recent bus cycles to list, from 0 to 64. Default 16.")] int cycles = 16,
@@ -41,6 +41,17 @@ public sealed partial class CircuitTools
                 ["state"] = core.IsStopped ? "stopped" : core.IsWaiting ? "waiting" : core.ResetAsserted ? "held in reset" : "running",
                 ["recent_cycles"] = new JsonArray(recent),
             };
+            if (cpu is Processor6510 port)
+            {
+                result["port"] = new JsonObject
+                {
+                    ["direction"] = $"${port.PortDirection:X2}",
+                    ["data"] = $"${port.PortOutput:X2}",
+                    ["pins"] = $"${port.PortPins:X2}",
+                    ["reads_as"] = $"${port.PortValue:X2}",
+                };
+            }
+
             if (cpu.UndefinedReads > 0) result["undefined_reads"] = $"{cpu.UndefinedReads}, first at ${cpu.FirstUndefinedRead:X4}";
             if (core.Cycles == 0) result["note"] = "It hasn't run a cycle yet: run_transient runs the circuit (or transport run, in the app).";
             return result;
@@ -92,6 +103,86 @@ public sealed partial class CircuitTools
             return result;
         }, cancel);
 
+    [McpServerTool(Name = "sid_state", ReadOnly = true, Idempotent = true)]
+    [Description("A 6581 or 8580 SID's state: for each voice its frequency (register and hertz at the measured clock), pulse width, waveforms, gate/sync/ring/test bits, attack/decay/sustain/release nibbles and its envelope's phase and level; the filter's cutoff (register, and hertz with the datasheet capacitors), resonance, which voices go through it and the modes; the volume, voice 3 off, OSC3, ENV3 and the paddles; and the voltage AUDIO OUT is driven to. In the app this is the live simulation; otherwise where the last run_transient left it.")]
+    public Task<string> SidState(
+        [Description("The SID's designator, e.g. \"U8\". Optional when the circuit has only one.")] string? part = null,
+        CancellationToken cancel = default) =>
+        Read("sid_state", s =>
+        {
+            var all = s.Circuit.Components.OfType<SidChip>().ToList();
+            SidChip sid;
+            if (string.IsNullOrWhiteSpace(part))
+            {
+                sid = all.Count switch
+                {
+                    1 => all[0],
+                    0 => throw new ArgumentException("The circuit has no SID (6581 or 8580)."),
+                    _ => throw new ArgumentException($"The circuit has {all.Count} SIDs ({string.Join(", ", all.Select(c => c.Name))}): say which with part."),
+                };
+            }
+            else
+            {
+                var c = Pins.Part(s.Circuit, part);
+                sid = c as SidChip ?? throw new ArgumentException($"{c.Name} is a {c.ComponentType}, not a SID.");
+            }
+
+            var core = sid.Core;
+            var voices = new JsonArray();
+            for (var i = 0; i < 3; i++)
+            {
+                var v = core.Voices[i];
+                var waves = new[] { (SidCore.Triangle, "triangle"), (SidCore.Sawtooth, "sawtooth"), (SidCore.Pulse, "pulse"), (SidCore.Noise, "noise") }
+                    .Where(w => (v.Control & w.Item1) != 0).Select(w => (JsonNode)w.Item2).ToArray();
+                var bits = new[] { (SidCore.Gate, "gate"), (SidCore.Sync, "sync"), (SidCore.Ring, "ring"), (SidCore.Test, "test") }
+                    .Where(w => (v.Control & w.Item1) != 0).Select(w => (JsonNode)w.Item2).ToArray();
+                voices.Add(new JsonObject
+                {
+                    ["voice"] = i + 1,
+                    ["frequency"] = $"${v.Frequency:X4}",
+                    ["hz"] = Math.Round(sid.VoiceFrequency(i), 2),
+                    ["pulse_width"] = string.Create(CultureInfo.InvariantCulture, $"${v.PulseWidth:X3} ({v.PulseWidth / 40.96:0.#} %)"),
+                    ["waveforms"] = new JsonArray(waves),
+                    ["bits"] = new JsonArray(bits),
+                    ["adsr"] = $"{v.AttackDecay >> 4:X}{v.AttackDecay & 15:X}{v.SustainRelease >> 4:X}{v.SustainRelease & 15:X}",
+                    ["envelope"] = new JsonObject
+                    {
+                        ["phase"] = v.Phase switch { EnvelopePhase.Attack => "attack", EnvelopePhase.DecaySustain => "decay/sustain", _ => "release" },
+                        ["level"] = v.Envelope,
+                    },
+                    ["filtered"] = (core.Routing & (1 << i)) != 0,
+                });
+            }
+
+            var modes = new[] { (core.LowPass, "low-pass"), (core.BandPass, "band-pass"), (core.HighPass, "high-pass") }
+                .Where(m => m.Item1).Select(m => (JsonNode)m.Item2).ToArray();
+            var result = new JsonObject
+            {
+                ["part"] = sid.Name,
+                ["chip"] = sid.PartNumber,
+                ["clock_hz"] = double.IsNaN(sid.ClockFrequency) ? null : Math.Round(sid.ClockFrequency),
+                ["voices"] = voices,
+                ["filter"] = new JsonObject
+                {
+                    ["cutoff"] = core.Cutoff,
+                    ["cutoff_hz"] = Math.Round(sid.CutoffFrequency),
+                    ["resonance"] = core.Resonance,
+                    ["modes"] = new JsonArray(modes),
+                    ["ext_in_filtered"] = (core.Routing & 8) != 0,
+                },
+                ["volume"] = core.Volume,
+                ["voice3_off"] = core.Voice3Off,
+                ["osc3"] = $"${core.Read(0x1B):X2}",
+                ["env3"] = $"${core.Read(0x1C):X2}",
+                ["pot_x"] = core.PotX,
+                ["pot_y"] = core.PotY,
+                ["audio_out_v"] = Math.Round(sid.OutputLevel, 3),
+                ["cycles"] = core.Cycles,
+            };
+            if (core.Cycles == 0) result["note"] = "It hasn't been clocked yet: run_transient runs the circuit (or transport run, in the app).";
+            return result;
+        }, cancel);
+
     /// <summary>The processor called <paramref name="name"/>, or the circuit's only one.</summary>
     private static Processor6502 Processor(Circuit circuit, string? name)
     {
@@ -101,7 +192,7 @@ public sealed partial class CircuitTools
             return all.Count switch
             {
                 1 => all[0],
-                0 => throw new ArgumentException("The circuit has no 6502 or 65C02."),
+                0 => throw new ArgumentException("The circuit has no 6502, 65C02 or 6510."),
                 _ => throw new ArgumentException($"The circuit has {all.Count} processors ({string.Join(", ", all.Select(c => c.Name))}): say which with part."),
             };
         }
