@@ -30,7 +30,7 @@ public sealed record ExampleCategory(string Name, IReadOnlyList<ExampleCircuit> 
 /// Pre-wired circuits that exercise each part of the engine, so the application has something
 /// running the moment it opens.
 /// </summary>
-public static class Examples
+public static partial class Examples
 {
     /// <summary>
     /// Every example, grouped the way the palette groups components.
@@ -75,6 +75,8 @@ public static class Examples
                 LoadNoiseAndHysteresis),
             new("Quad Op-Amp", "One LM324 doing four jobs on a single supply — bias, buffer, gain and invert",
                 LoadQuadOpAmpChain),
+            new("Stereo Selector", "A 4052 switching a left and a right channel between two sources with one address",
+                LoadStereoSelector),
         ]),
 
         new("Power Supplies",
@@ -157,6 +159,12 @@ public static class Examples
                 LoadUpDownCounter),
             new("Ripple Counter", "Four T flip-flops, each clocked by the last — a binary counter, and the glitch a ripple carry makes",
                 LoadRippleCounter),
+            new("4-Bit ALU", "A 74181 adding 9 and 5 on toggles — change S and M for its other 31 functions, and A=B lights when they match",
+                LoadAlu),
+            new("Magnitude Comparator", "A 7485 deciding A>B, A=B or A<B for two nibbles on toggles",
+                LoadComparator),
+            new("Two-Digit Counter", "Two 4026s counting to 99 on two displays — counter, decoder and drivers in one chip each",
+                LoadTwoDigitCounter),
         ]),
 
         new("Timers & Oscillators",
@@ -168,6 +176,8 @@ public static class Examples
                 LoadCrystalQ),
             new("Phase-Locked Loop", "A 4046 dragging its oscillator onto an incoming signal and holding it",
                 LoadPhaseLockedLoop),
+            new("Pulse Stretcher", "A 4538 one-shot turning short triggers into 1 ms pulses — and a burst into one long one, because it retriggers",
+                LoadPulseStretcher),
         ]),
 
         new("Buses & Interfaces",
@@ -267,6 +277,8 @@ public static class Examples
                 LoadI2cLcd),
             new("NeoPixel Chaser", "A WS2812B strip of eight, sent a colour per pixel over one wire at 800 kHz — a pattern generator plays the bit timing",
                 LoadNeoPixelChaser),
+            new("Serial Display", "Bytes into a 4094 over three wires, shown on eight LEDs only when strobed",
+                LoadSerialDisplay),
         ]),
 
         new("Development Boards",
