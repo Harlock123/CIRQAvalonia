@@ -25,9 +25,11 @@ public abstract class FullAdderIc : DigitalIc
     /// <param name="pinout">
     /// Pin numbers in the order A1–A4, B1–B4, Σ1–Σ4, C0, C4, GND, VCC.
     /// </param>
-    protected FullAdderIc(int[] pinout) : base(16)
+    /// <param name="cmos">The 4008: CMOS levels and speed, VDD and VSS.</param>
+    protected FullAdderIc(int[] pinout, bool cmos = false) : base(16)
     {
-        PropagationDelay = 16e-9;
+        PropagationDelay = cmos ? 400e-9 : 16e-9;
+        if (cmos) Levels = LogicLevels.Cmos5V;
 
         var pins = new Terminal[17];
 
@@ -43,8 +45,8 @@ public abstract class FullAdderIc : DigitalIc
 
         CarryIn = Pin(pinout[12], "C0", TerminalType.Input);
         CarryOut = Pin(pinout[13], "C4", TerminalType.Output);
-        Gnd = Pin(pinout[14], "GND", TerminalType.Ground);
-        Vcc = Pin(pinout[15], "VCC", TerminalType.Power);
+        Gnd = Pin(pinout[14], cmos ? "VSS" : "GND", TerminalType.Ground);
+        Vcc = Pin(pinout[15], cmos ? "VDD" : "VCC", TerminalType.Power);
 
         Terminals = [.. pins.Skip(1)];
 
@@ -139,4 +141,17 @@ public sealed class Ic74283() : FullAdderIc([5, 3, 14, 12, 6, 2, 15, 11, 4, 1, 1
 public sealed class Ic7483() : FullAdderIc([10, 8, 3, 1, 11, 7, 4, 16, 9, 6, 2, 15, 13, 14, 12, 5])
 {
     public override string PartNumber => "7483";
+}
+
+/// <summary>
+/// 4008 4-bit full adder, CMOS — the 74283's job on a pinout of its own, with the carry rippling
+/// through four stages rather than looked ahead, so about 400 ns at 5 V for the whole sum.
+/// <para>
+/// Pinout: 1=A4, 2=B3, 3=A3, 4=B2, 5=A2, 6=B1, 7=A1, 8=VSS, 9=C0 (carry in), 10=S1, 11=S2, 12=S3,
+/// 13=S4, 14=C4 (carry out), 15=B4, 16=VDD.
+/// </para>
+/// </summary>
+public sealed class Ic4008() : FullAdderIc([7, 5, 3, 1, 6, 4, 2, 15, 10, 11, 12, 13, 9, 14, 8, 16], cmos: true)
+{
+    public override string PartNumber => "4008";
 }
