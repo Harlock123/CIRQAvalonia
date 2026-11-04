@@ -545,6 +545,8 @@ public static class ComponentCatalog
                 () => new Via6522()),
             new("6551 ACIA", "Serial port for a 6502's bus, 50 to 19,200 baud from a 1.8432 MHz crystal — talks to the Serial Terminal",
                 () => new Acia6551()),
+            new("6526 CIA", "Complex interface adapter, two in every C64: two ports with pull-ups, two timers, a time-of-day clock, a serial port and interrupts",
+                () => new Cia6526()),
         ]),
 
         new("Sensors & Actuators",
