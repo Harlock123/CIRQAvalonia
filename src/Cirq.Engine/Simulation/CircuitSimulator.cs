@@ -117,6 +117,7 @@ public sealed class CircuitSimulator
         System = new MnaSystem(Netlist, Netlist.NodeCount, branches);
         _lu = new LuSolver(System.Size);
         _factorCurrent = false;
+        _correction = null;
         _iterationDelta = new double[System.Size];
 
         Scheduler = new DigitalScheduler(System);
@@ -522,20 +523,22 @@ public sealed class CircuitSimulator
             StampGmin(Settings.Gmin + gminBoost);
 
             // A matrix stamped exactly as the last one factored needs no factoring again: logic
-            // switching high and low only moves the right-hand side.
-            if (!_factorCurrent || !System.Matches(_factored))
+            // switching high and low only moves the right-hand side. One that differs in a few
+            // entries is solved from that factorisation with a low-rank correction.
+            if (_factorCurrent && System.Matches(_factored))
+            {
+                ReusedFactorisations++;
+                _lu!.Solve(System.Rhs, System.Solution);
+            }
+            else if (!(_factorCurrent && SolveCorrected()))
             {
                 _factorCurrent = false;
                 _lu!.Factor(System.Matrix);
                 System.Record(_factored);
                 _factorCurrent = true;
+                _correction = null;
+                _lu.Solve(System.Rhs, System.Solution);
             }
-            else
-            {
-                ReusedFactorisations++;
-            }
-
-            _lu!.Solve(System.Rhs, System.Solution);
 
             residual = 0;
             for (var i = 0; i < System.Size; i++)
@@ -585,6 +588,148 @@ public sealed class CircuitSimulator
 
     /// <summary>How many solves reused the previous factorisation because the matrix had not changed.</summary>
     public long ReusedFactorisations { get; private set; }
+
+    /// <summary>How many solves used the previous factorisation with a low-rank correction for a few changed entries.</summary>
+    public long CorrectedSolves { get; private set; }
+
+    /// <summary>The most entries that may have changed for a correction to be tried rather than a refactorisation.</summary>
+    private const int CorrectionLimit = 24;
+
+    private readonly List<(int Row, int Col, double Change)> _changes = [];
+
+    /// <summary>The rows a correction is for, and the factored matrix's inverse applied to each of their unit vectors.</summary>
+    private sealed record Correction(int[] Rows, double[][] Columns);
+
+    private Correction? _correction;
+
+    /// <summary>
+    /// Solves a matrix that differs from the factored one, A, in a few entries, without factoring it.
+    /// <para>
+    /// The change is E·C, with E picking the k rows it is in and C (k × n) holding it, so by the
+    /// Woodbury identity (A + E·C)⁻¹b = y − Z·(I + C·Z)⁻¹·C·y, where y = A⁻¹b and Z = A⁻¹E. Z is k solves,
+    /// kept while the same rows change; after that each time point costs one solve and a k × k system
+    /// instead of a factorisation. That matters for a logic-heavy board with a few capacitors on it —
+    /// a SID's filter, a speaker's coupling — where every step is cut to land on some gate's edge, the
+    /// step length is never the same twice, and each length gives the capacitors a new companion
+    /// conductance: without this every time point was a factorisation of the whole board.
+    /// </para>
+    /// <para>
+    /// The answer is checked against the matrix it is for, row by row, refined against its residual
+    /// if it needs it, and if it is still not good to a part in 10¹⁰ (or 10⁻¹⁵ outright, for a row
+    /// only gmin holds) the caller factors after all — so this can only make a solve cheaper, never
+    /// worse.
+    /// Small circuits, which factor in no time, are left to factor as they always have.
+    /// </para>
+    /// </summary>
+    private bool SolveCorrected()
+    {
+        if (System.Size < LuSolver.DenseBelow) return false;
+        if (!System.Differences(_factored, _changes, CorrectionLimit) || _changes.Count == 0) return false;
+
+        var rows = _changes.Select(c => c.Row).Distinct().Order().ToArray();
+        if (_correction is null || !_correction.Rows.AsSpan().SequenceEqual(rows))
+        {
+            var columns = new double[rows.Length][];
+            var unit = new double[System.Size];
+            for (var j = 0; j < rows.Length; j++)
+            {
+                unit[rows[j]] = 1;
+                columns[j] = new double[System.Size];
+                _lu!.Solve(unit, columns[j]);
+                unit[rows[j]] = 0;
+            }
+
+            _correction = new Correction(rows, columns);
+        }
+
+        var z = _correction.Columns;
+        var k = rows.Length;
+
+        // M = I + C·Z, row by row of the change.
+        var m = new double[k, k];
+        for (var i = 0; i < k; i++) m[i, i] = 1;
+        foreach (var (row, col, change) in _changes)
+        {
+            var i = Array.BinarySearch(rows, row);
+            for (var j = 0; j < k; j++) m[i, j] += change * z[j][col];
+        }
+
+        var y = System.Solution;
+        if (!ApplyCorrected(System.Rhs, y, m, rows, z)) return false;
+
+        // A big change — a large capacitor's companion when the step shrinks a thousandfold — leaves
+        // the corrected answer good to a few digits rather than to the last: refining it against
+        // its own residual, with the same operator, recovers the rest in a pass or two.
+        var residual = new double[System.Size];
+        var step = new double[System.Size];
+        for (var pass = 0; ; pass++)
+        {
+            if (System.Residual(y, residual, 1e-10, 1e-15)) break;
+            if (pass == 3 || !ApplyCorrected(residual, step, m, rows, z)) return false;
+            for (var i = 0; i < y.Length; i++) y[i] += step[i];
+        }
+
+        CorrectedSolves++;
+        return true;
+    }
+
+    /// <summary>x = y − Z·M⁻¹·C·y with y = A⁻¹b: the Woodbury solve of the changed matrix.</summary>
+    private bool ApplyCorrected(double[] b, double[] x, double[,] m, int[] rows, double[][] z)
+    {
+        _lu!.Solve(b, x);
+
+        var k = rows.Length;
+        var cy = new double[k];
+        foreach (var (row, col, change) in _changes) cy[Array.BinarySearch(rows, row)] += change * x[col];
+
+        if (!SolveSmall((double[,])m.Clone(), cy)) return false;
+
+        for (var j = 0; j < k; j++)
+        {
+            var w = cy[j];
+            if (w == 0) continue;
+            var column = z[j];
+            for (var i = 0; i < x.Length; i++) x[i] -= column[i] * w;
+        }
+
+        return true;
+    }
+
+    /// <summary>Gaussian elimination with partial pivoting on a small dense system, in place; false if singular.</summary>
+    private static bool SolveSmall(double[,] a, double[] b)
+    {
+        var n = b.Length;
+        for (var p = 0; p < n; p++)
+        {
+            var best = p;
+            for (var r = p + 1; r < n; r++)
+                if (Math.Abs(a[r, p]) > Math.Abs(a[best, p])) best = r;
+            if (Math.Abs(a[best, p]) < 1e-300) return false;
+
+            if (best != p)
+            {
+                for (var c = 0; c < n; c++) (a[p, c], a[best, c]) = (a[best, c], a[p, c]);
+                (b[p], b[best]) = (b[best], b[p]);
+            }
+
+            for (var r = p + 1; r < n; r++)
+            {
+                var f = a[r, p] / a[p, p];
+                if (f == 0) continue;
+                for (var c = p; c < n; c++) a[r, c] -= f * a[p, c];
+                b[r] -= f * b[p];
+            }
+        }
+
+        for (var p = n - 1; p >= 0; p--)
+        {
+            var sum = b[p];
+            for (var c = p + 1; c < n; c++) sum -= a[p, c] * b[c];
+            b[p] = sum / a[p, p];
+        }
+
+        return true;
+    }
 
     private void StampGmin(double gmin)
     {

@@ -194,4 +194,37 @@ public class LogicSolveTests
             _first = _second = WentHigh = false;
         }
     }
+
+    /// <summary>
+    /// A board big enough to be eliminated sparsely, with a capacitor on it, stepped at lengths that
+    /// never repeat: each length changes the capacitor's companion in four entries, which is solved
+    /// from the previous factorisation with a low-rank correction rather than by factoring again —
+    /// and the charging curve is still the RC one.
+    /// </summary>
+    [Fact]
+    public void AFewChangedEntriesAreSolvedWithoutRefactoring()
+    {
+        var (circuit, rail, ground) = Bench();
+        Terminal at = rail.Positive;
+        for (var i = 0; i < 60; i++)
+        {
+            var r = circuit.Add(new Cirq.Components.Passive.Resistor(1000.0 / 60));
+            circuit.Connect(r.A, at);
+            at = r.B;
+        }
+
+        var c = circuit.Add(new Cirq.Components.Passive.Capacitor(1e-6) { InitialVoltage = 0 });
+        circuit.Connect(c.A, at);
+        circuit.Connect(c.B, ground.Pin);
+
+        var sim = new CircuitSimulator(circuit, new SimulationSettings { TimeStep = 1e-6, MinTimeStep = 1e-12, MaxTimeStep = 1e-4, UseInitialConditions = true });
+        sim.Reset();
+        sim.SolveOperatingPoint();
+
+        double[] steps = [1e-6, 3.1e-6, 0.7e-6, 5.3e-6, 2.2e-6];
+        for (var i = 0; sim.Time < 2e-3; i++) sim.Step(steps[i % steps.Length]);
+
+        Assert.True(sim.CorrectedSolves > 100, $"only {sim.CorrectedSolves} corrected solves");
+        Assert.Equal(5 * (1 - Math.Exp(-sim.Time / 1e-3)), sim.NodeVoltage(c.A), 3e-3);
+    }
 }

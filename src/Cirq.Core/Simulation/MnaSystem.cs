@@ -102,6 +102,62 @@ public sealed class MnaSystem
         return true;
     }
 
+    /// <summary>
+    /// The entries where the matrix differs from <paramref name="snapshot"/>, as (row, column, change),
+    /// when the same entries were stamped in the same order and no more than <paramref name="limit"/>
+    /// of them changed; false otherwise. This is what lets a matrix that moved in a handful of places
+    /// — the companion conductances of a few capacitors when the step changes — be solved from the
+    /// factorisation of the one before, corrected, rather than factored again.
+    /// </summary>
+    public bool Differences(MatrixSnapshot snapshot, List<(int Row, int Col, double Change)> changes, int limit)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        ArgumentNullException.ThrowIfNull(changes);
+        changes.Clear();
+        if (snapshot.Indices.Count != _touchedList.Count) return false;
+
+        for (var k = 0; k < _touchedList.Count; k++)
+        {
+            if (snapshot.Indices[k] != _touchedList[k]) return false;
+            var (row, col) = _touchedCells[k];
+            var now = Matrix[row][col];
+            if (snapshot.Values[k].Equals(now)) continue;
+            if (changes.Count == limit) return false;
+            changes.Add((row, col, now - snapshot.Values[k]));
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// The residual b − Ax into <paramref name="residual"/>, and whether it is within a relative
+    /// <paramref name="tolerance"/> in every row — against the size of the terms in that row — or
+    /// within <paramref name="floor"/> outright, for the rows of a node that only gmin holds.
+    /// </summary>
+    public bool Residual(double[] x, double[] residual, double tolerance, double floor)
+    {
+        ArgumentNullException.ThrowIfNull(x);
+        ArgumentNullException.ThrowIfNull(residual);
+        _scale ??= new double[Size];
+        Array.Copy(Rhs, residual, Size);
+        for (var i = 0; i < Size; i++) _scale[i] = Math.Abs(Rhs[i]);
+
+        foreach (var (row, col) in _touchedCells)
+        {
+            var term = Matrix[row][col] * x[col];
+            residual[row] -= term;
+            _scale[row] += Math.Abs(term);
+        }
+
+        var good = true;
+        for (var i = 0; i < Size && good; i++)
+            if (Math.Abs(residual[i]) > (tolerance * _scale[i]) + floor) good = false;
+
+        return good;
+    }
+
+    private double[]? _scale;
+
     /// <summary>Records the matrix as it stands into <paramref name="snapshot"/>.</summary>
     public void Record(MatrixSnapshot snapshot)
     {
