@@ -17,7 +17,7 @@ public class EndToEndTests
         "load_example", "undo", "redo", "add_parts", "set_part", "remove_parts", "connect", "disconnect", "add_probe",
         "remove_probe", "set_parameter", "set_conditions", "check_circuit", "explain_circuit", "render_schematic",
         "get_spice_netlist", "load_memory",
-        "read_memory", "operating_point", "run_transient", "get_trace", "ac_sweep", "dc_sweep", "transport", "set_scope",
+        "read_memory", "cpu_state", "disassemble", "operating_point", "run_transient", "get_trace", "ac_sweep", "dc_sweep", "transport", "set_scope",
     ];
 
     [Fact]
@@ -46,7 +46,7 @@ public class EndToEndTests
         Assert.Equal(ToolNames, CircuitServer.Definitions().Select(t => t.Name));
 
         var prompts = await s.Client.ListPromptsAsync(cancellationToken: CancellationToken.None);
-        Assert.Equal(["rc_low_pass", "led_with_resistor", "astable_555", "inverting_amplifier", "bridge_rectifier", "decade_counter"], prompts.Select(p => p.Name));
+        Assert.Equal(["rc_low_pass", "led_with_resistor", "astable_555", "inverting_amplifier", "bridge_rectifier", "decade_counter", "computer_6502"], prompts.Select(p => p.Name));
     }
 
     [Fact]
@@ -112,7 +112,7 @@ public class EndToEndTests
             {
                 var name = call.Groups[1].Value;
                 var args = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(call.Groups[2].Value)!;
-                if (name == "new_circuit") args["discard_changes"] = JsonSerializer.SerializeToElement(true);
+                if (name is "new_circuit" or "load_example") args["discard_changes"] = JsonSerializer.SerializeToElement(true);
                 var result = await s.Client.CallToolAsync(name, args.ToDictionary(kv => kv.Key, kv => (object?)kv.Value), cancellationToken: CancellationToken.None);
                 Assert.True(result.IsError != true, $"{prompt.Name}: {name} failed: {Text(result)}");
                 ran.Add((name, result));
@@ -132,6 +132,9 @@ public class EndToEndTests
         var counter = Last("decade_counter", "run_transient");
         Assert.InRange((double)Probe(counter, "Q2")["high_fraction"]!, 0.05, 0.2);
         Assert.Equal("10 %", (string)Probe(counter, "Q2")["duty_cycle"]!);
+        Assert.Equal("$8000", (string)Last("computer_6502", "disassemble")["vectors"]!["reset"]!);
+        Assert.Equal("$8022 JMP $8022", (string)Last("computer_6502", "cpu_state")["instruction"]!);
+        Assert.Equal("\"Hello, world!\"", (string)Last("computer_6502", "get_part")["value"]!);
 
         // A prompt's arguments are read from text, engineering notation and all.
         var faster = await s.Client.GetPromptAsync("astable_555", new Dictionary<string, object?> { ["frequency_hz"] = "2k" }, cancellationToken: CancellationToken.None);

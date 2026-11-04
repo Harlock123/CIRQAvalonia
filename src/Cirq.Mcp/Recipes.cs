@@ -249,6 +249,20 @@ public static class Recipes
 
     // ───────────────────────────── plumbing ─────────────────────────────
 
+    [McpServerPrompt(Name = "computer_6502", Title = "A 6502 computer")]
+    [Description("Opens the Ben Eater 6502 computer example (a 65C02, a 28C256 ROM, a 62256 RAM and a 6522 driving an LCD), reads the program in its ROM, runs it, and checks what the processor, the LCD and the RAM show afterwards.")]
+    public static string Computer6502()
+    {
+        var recipe = new Recipe("Explore a 6502 computer: the example machine runs a hello world from ROM, cycle by cycle, onto an HD44780 LCD through a 6522. The processor is U2, the ROM U3 (decoded at $8000), the RAM U4 ($0000-$3FFF), the VIA U6 ($6000) and the LCD U7.");
+        recipe.Step("Open the example. If it refuses because the open circuit has unsaved changes, save that first, or ask the person whether to discard it.", "load_example", new { name = "Ben Eater 6502 Computer" });
+        recipe.Step("Read the program in the ROM, as the processor sees it from $8000: the reset vector says where it starts.", "disassemble", new { part = "U3", origin = 0x8000, count = 20 });
+        recipe.Step("Run it for 4 ms of simulated time: about 4000 bus cycles, enough to set the display up and write the message. Each cycle is solved on the pins, so this takes some seconds.", "run_transient", new { duration = "4m", plot = false });
+        recipe.Step("Where the processor got to: it should be idling in its last loop, with no undefined reads.", "cpu_state", new { cycles = 8 });
+        recipe.Step("What the LCD shows: its value is the text on the first line.", "get_part", new { name = "U7" });
+        recipe.Step("The top of the stack, in the RAM: return addresses the subroutine calls left there.", "read_memory", new { part = "U4", start = 0x1F0, length = 16 });
+        return recipe.Text("Tell the person what the LCD says and how the program got it there. To run their own program, assemble it for $8000 and load it into U3 with load_memory (Intel HEX, or a 32K binary), then run again. Every bus cycle is in the processor's log: cpu_state lists the latest.");
+    }
+
     private sealed class Recipe(string intro)
     {
         private readonly StringBuilder _text = new(intro + "\n\nFollow these steps in order. A line starting with \"" + CallMarker.Trim() + "\" is one tool call, with its arguments as JSON. If a step fails, read the error, fix the cause and carry on.\n");

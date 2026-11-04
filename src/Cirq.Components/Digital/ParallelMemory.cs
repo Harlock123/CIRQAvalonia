@@ -43,7 +43,7 @@ namespace Cirq.Components.Digital;
 /// the slowest of them.
 /// </para>
 /// </summary>
-public abstract partial class ParallelMemory : DigitalIc
+public abstract partial class ParallelMemory : DigitalIc, IRunState
 {
     private const int Width = 8;
 
@@ -205,6 +205,17 @@ public abstract partial class ParallelMemory : DigitalIc
 
     /// <summary>A copy of the whole memory as it is now.</summary>
     public byte[] Snapshot() => (byte[])_memory.Clone();
+
+    /// <summary>The bytes as a run left them; the preset stays what it was.</summary>
+    public object CaptureRunState() => Snapshot();
+
+    public void AdoptRunState(object state)
+    {
+        if (state is not byte[] bytes || bytes.Length != Size) return;
+        Array.Copy(bytes, _memory, Size);
+        OnPropertyChanged(nameof(Contents));
+        NotifyValueChanged();
+    }
 
     /// <summary>
     /// Puts an image into the memory and makes it the preset, so it is what every run starts from

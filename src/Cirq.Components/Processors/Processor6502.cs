@@ -36,7 +36,7 @@ public readonly record struct BusCycle(double Time, ushort Address, byte Data, b
 /// The control pins are not pulled up inside, so tie the ones you are not using high.
 /// </para>
 /// </summary>
-public abstract partial class Processor6502 : DigitalIc
+public abstract partial class Processor6502 : DigitalIc, IRunState
 {
     /// <summary>How many bus cycles the bus log keeps, newest last.</summary>
     public const int BusLogCapacity = 1 << 16;
@@ -228,7 +228,7 @@ public abstract partial class Processor6502 : DigitalIc
         ]
         : [];
 
-    /// <summary>The instruction at the last opcode fetch, disassembled from the bus.</summary>
+    /// <summary>The latest instruction fetched, disassembled from the bus.</summary>
     public string CurrentInstruction
     {
         get
@@ -237,7 +237,11 @@ public abstract partial class Processor6502 : DigitalIc
             {
                 var cycle = _log[(_logStart + i) % BusLogCapacity];
                 if (!cycle.Sync) continue;
-                return Cpu6502BusDecoder.Instruction(Variant, [.. Enumerable.Range(i, _logCount - i).Select(k => _log[(_logStart + k) % BusLogCapacity])]);
+
+                // The latest fetch whose operands have all been read: the one just fetched may not
+                // have got that far yet.
+                var text = Cpu6502BusDecoder.Instruction(Variant, [.. Enumerable.Range(i, Math.Min(4, _logCount - i)).Select(k => _log[(_logStart + k) % BusLogCapacity])]);
+                if (!text.EndsWith(" ?", StringComparison.Ordinal)) return text;
             }
 
             return string.Empty;
@@ -401,6 +405,24 @@ public abstract partial class Processor6502 : DigitalIc
         _logCount = 0;
         UndefinedReads = 0;
         FirstUndefinedRead = -1;
+    }
+
+    private sealed record RunState(Mos6502Core Core, BusCycle[] Log, int Start, int Count, int UndefinedReads, int FirstUndefinedRead);
+
+    public object CaptureRunState() =>
+        new RunState(Core, (BusCycle[])_log.Clone(), _logStart, _logCount, UndefinedReads, FirstUndefinedRead);
+
+    public void AdoptRunState(object state)
+    {
+        if (state is not RunState run) return;
+
+        Core = run.Core;
+        Array.Copy(run.Log, _log, BusLogCapacity);
+        _logStart = run.Start;
+        _logCount = run.Count;
+        UndefinedReads = run.UndefinedReads;
+        FirstUndefinedRead = run.FirstUndefinedRead;
+        NotifyValueChanged();
     }
 
     /// <summary>The registers as a line: <c>PC=8012 A=48 X=00 Y=00 S=FD P=nv-bdIzc</c>.</summary>

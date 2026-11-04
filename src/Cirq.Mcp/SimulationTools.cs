@@ -96,6 +96,11 @@ public sealed partial class CircuitTools
             return copy.Probes.Select(p => new Plots.Trace(p.Label, p.Kind, p.HistoryBuffer.ToArray())).ToList();
         }, cancel).ConfigureAwait(false);
 
+        // Where the run left the processors, memories and displays, to hand back to the circuit's own parts.
+        var ended = copy.Components.OfType<IRunState>()
+            .GroupBy(c => ((CircuitComponent)c).Name)
+            .ToDictionary(g => g.Key, g => g.First().CaptureRunState());
+
         // What the agent saw goes into the circuit's own probes, so the scope shows the same run.
         await Run("ran the circuit", s =>
         {
@@ -108,6 +113,11 @@ public sealed partial class CircuitTools
                     probe.ResetHistory();
                     foreach (var point in trace.Samples) probe.Record(point.Time, point.Value);
                 }
+
+                // A processor's registers, a RAM's bytes, an LCD's text: as the run left them, so
+                // cpu_state and read_memory answer about the run, and the canvas shows it.
+                foreach (var part in s.Circuit.Components.OfType<IRunState>())
+                    if (ended.TryGetValue(((CircuitComponent)part).Name, out var state)) part.AdoptRunState(state);
             });
             return true;
         }, cancel).ConfigureAwait(false);

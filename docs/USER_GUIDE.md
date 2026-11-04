@@ -6229,13 +6229,17 @@ it is told to.
 | Build | `add_parts`, `set_part`, `remove_parts`, `connect`, `disconnect`, `add_probe`, `remove_probe`, `set_parameter`, `set_conditions` |
 | Check | `get_circuit`, `get_part`, `check_circuit`, `explain_circuit`, `render_schematic`, `get_spice_netlist` |
 | Run | `operating_point`, `run_transient`, `ac_sweep`, `dc_sweep`, `get_trace` |
+| Memories and processors | `load_memory` (an image as Intel HEX, hex bytes, base64 or a file), `read_memory`, `cpu_state` (registers, flags, recent bus cycles), `disassemble` |
 | The editor | `transport` (Run, Pause, Reset), `set_scope`, `undo`, `redo` |
 | Files | `new_circuit`, `open_circuit`, `save_circuit` |
 
 A run comes back as measurements (frequency, duty cycle, peak to peak, rise time, the −3 dB corner)
-and as a plot the agent looks at. The server also offers six recipes, step-by-step plans with the
+and as a plot the agent looks at. The server also offers seven recipes, step-by-step plans with the
 exact calls: an RC low-pass, an LED and its resistor, a 555 astable, an inverting amplifier, a
-bridge rectifier with smoothing and a decade counter.
+bridge rectifier with smoothing, a decade counter, and a tour of the 6502 computer — its ROM
+disassembled, a run, and the processor, LCD and RAM read afterwards. A transient run hands its end
+state back to the circuit, so a processor's registers, a memory's bytes and an LCD's text are where
+the run left them.
 
 ## Appearance
 

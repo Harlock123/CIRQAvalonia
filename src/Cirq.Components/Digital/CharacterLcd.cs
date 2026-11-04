@@ -31,7 +31,7 @@ namespace Cirq.Components.Digital;
 /// low and wait a fixed time, as most driver code does, and reading never comes into it.
 /// </para>
 /// </summary>
-public sealed partial class CharacterLcd : DigitalIc
+public sealed partial class CharacterLcd : DigitalIc, IRunState
 {
     /// <summary>Characters of DDRAM per line. Only the first sixteen of each are visible.</summary>
     private const int LineCapacity = 40;
@@ -123,6 +123,22 @@ public sealed partial class CharacterLcd : DigitalIc
 
     /// <summary>Where the next character will go, as a line and column.</summary>
     public (int Line, int Column) Cursor => (_cursorLine, _cursorColumn);
+
+    private sealed record RunState(char[][] Memory, bool DisplayOn, bool FourBit, int Line, int Column);
+
+    public object CaptureRunState() =>
+        new RunState([.. _memory.Select(l => (char[])l.Clone())], DisplayOn, _fourBitMode, _cursorLine, _cursorColumn);
+
+    public void AdoptRunState(object state)
+    {
+        if (state is not RunState run) return;
+        for (var i = 0; i < Lines; i++) Array.Copy(run.Memory[i], _memory[i], LineCapacity);
+        _fourBitMode = run.FourBit;
+        _cursorLine = run.Line;
+        _cursorColumn = run.Column;
+        DisplayOn = run.DisplayOn;
+        NotifyValueChanged();
+    }
 
     /// <summary>The visible sixteen characters of one line.</summary>
     public string Line(int index) => new(_memory[index], 0, Columns);
