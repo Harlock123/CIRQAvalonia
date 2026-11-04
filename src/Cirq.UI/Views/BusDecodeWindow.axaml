@@ -45,9 +45,10 @@
         </StackPanel>
 
         <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-          <TextBlock Text="{Binding LabelA}" Width="44" VerticalAlignment="Center" Opacity="0.7" />
+          <TextBlock Text="{Binding LabelA}" Width="44" VerticalAlignment="Center" Opacity="0.7"
+                     IsVisible="{Binding UsesA}" />
           <ComboBox Width="150" ItemsSource="{Binding Traces}" DisplayMemberBinding="{Binding Label}"
-                    SelectedItem="{Binding ChannelA, Mode=TwoWay}" />
+                    SelectedItem="{Binding ChannelA, Mode=TwoWay}" IsVisible="{Binding UsesA}" />
 
           <TextBlock Text="{Binding LabelB}" Width="44" VerticalAlignment="Center" Opacity="0.7"
                      IsVisible="{Binding UsesB}" />

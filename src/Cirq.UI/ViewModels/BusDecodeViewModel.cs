@@ -126,6 +126,13 @@ public sealed partial class BusDecodeViewModel : ObservableObject
 
     public string LabelD => Protocol == BusProtocol.Spi ? "CS" : string.Empty;
 
+    /// <summary>
+    /// Channel A, except on a 6502 bus with only one processor in the circuit: the decode reads that
+    /// processor's own record, so a picker there would only show some unrelated probe.
+    /// </summary>
+    public bool UsesA => Protocol != BusProtocol.Cpu6502
+                         || _circuit.Components.OfType<Cirq.Components.Processors.Processor6502>().Count() > 1;
+
     public bool UsesB => LabelB.Length > 0;
 
     public bool UsesC => LabelC.Length > 0;
@@ -145,7 +152,7 @@ public sealed partial class BusDecodeViewModel : ObservableObject
         foreach (var name in new[]
                  {
                      nameof(LabelA), nameof(LabelB), nameof(LabelC), nameof(LabelD),
-                     nameof(UsesB), nameof(UsesC), nameof(UsesD),
+                     nameof(UsesA), nameof(UsesB), nameof(UsesC), nameof(UsesD),
                      nameof(NeedsBitRate), nameof(NeedsMode),
                  })
         {

@@ -69,6 +69,22 @@ public class ComputerExampleTests
     }
 
     /// <summary>
+    /// With one processor the decode reads its record whatever channel A says, so the window hides
+    /// that picker rather than show an unrelated probe (the LCD's E line) under the word CPU.
+    /// </summary>
+    [Fact]
+    public void OneProcessorNeedsNoProcessorPicker()
+    {
+        using var vm = Run("Ben Eater 6502 Computer", 1e-6);
+
+        var decode = new BusDecodeViewModel(vm.Circuit);
+        Assert.False(decode.UsesA);
+
+        decode.Protocol = BusProtocol.Uart;
+        Assert.True(decode.UsesA);
+    }
+
+    /// <summary>
     /// Each example's ROM holds the program the guide prints, assembled — so the source a reader is
     /// shown is the program that runs, and the reset vector points at it.
     /// </summary>

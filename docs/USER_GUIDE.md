@@ -5693,7 +5693,8 @@ Press Run and "Hello, world!" appears after about 3.3 ms of simulated time. Hove
 processor to see where it is — its value is the address of the instruction it is executing — or
 **Simulate > Decode Bus...**, which offers a **Cpu6502** decode: every cycle as an address, a byte and
 a direction, with the instruction disassembled on each opcode fetch. The processor records the
-cycles itself, the last 65,536 of them, so no probes are needed:
+cycles itself, the last 65,536 of them, so no probes are needed. With two processors in the
+circuit, a **CPU** picker chooses which one by a probe on it:
 
 ```
 $8000 LDX #$FF   R $8001 FF   $8002 TXS   R $8003 A9   $8003 LDA #$E0   R $8004 E0
