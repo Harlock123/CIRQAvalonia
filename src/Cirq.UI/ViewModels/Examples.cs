@@ -144,10 +144,18 @@ public static class Examples
             new("Shared Bus", "Two 74245 transceivers taking turns on eight wires",
                 LoadSharedBus),
             new("Ring Oscillator", "Three inverters with unequal delays", LoadRingOscillator),
-            new("Ripple Counter", "Four T flip-flops, each clocked by the last — a binary counter, and the glitch a ripple carry makes",
-                LoadRippleCounter),
             new("Tri-State Bus", "Two tri-state buffers taking turns on one wire, with a pull-down for when neither drives it",
                 LoadTriStateBus),
+        ]),
+
+        new("Counting & Arithmetic",
+        [
+            new("4-Bit Adder", "A 74283 adding two nibbles set on toggles, the five-bit answer on LEDs — 5 + 6 + carry",
+                LoadFourBitAdder),
+            new("Up/Down Counter", "A 74192 counted up twelve and down six by separate clocks, into a 7447 and a display",
+                LoadUpDownCounter),
+            new("Ripple Counter", "Four T flip-flops, each clocked by the last — a binary counter, and the glitch a ripple carry makes",
+                LoadRippleCounter),
         ]),
 
         new("Timers & Oscillators",
@@ -919,6 +927,136 @@ public static class Examples
         vm.Scope.AddProbe(register.Outputs[0], "QA");
         vm.Scope.AddProbe(register.Outputs[3], "QD");
         vm.Scope.AddProbe(register.Outputs[7], "QH");
+    }
+
+    /// <summary>
+    /// A 74283 adding two four-bit numbers. The top row of toggles is A (0101, five), the bottom row
+    /// B (0110, six), and the lone one is the carry in, set — so the LEDs read 01100, twelve, with
+    /// C4 dark. Flip any toggle to add something else; set them all and C4 lights for the 31 that
+    /// four bits cannot hold.
+    /// </summary>
+    public static void LoadFourBitAdder(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "74283 four-bit adder";
+
+        var supply = Place(circuit, new DcVoltageSource(5.0), -480, 280);
+        supply.RotationDegrees = 90;
+        var gnd = Place(circuit, new Ground(), -480, 420);
+        var ledGround = Place(circuit, new Ground(), 380, 340);
+
+        var adder = Place(circuit, new Ic74283(), 0, 0);
+
+        circuit.Connect(supply.Negative, gnd.Pin);
+        circuit.Connect(adder.Vcc, supply.Positive);
+        circuit.Connect(adder.Gnd, gnd.Pin);
+
+        const int a = 5;
+        const int b = 6;
+
+        for (var i = 0; i < 4; i++)
+        {
+            var toggleA = Place(circuit, new LogicToggle(((a >> i) & 1) == 1), -340, -150 + (i * 50));
+            var toggleB = Place(circuit, new LogicToggle(((b >> i) & 1) == 1), -200, -150 + (i * 50));
+
+            circuit.Connect(toggleA.Out, adder.A[i]);
+            circuit.Connect(toggleB.Out, adder.B[i]);
+        }
+
+        var carryIn = Place(circuit, new LogicToggle(true), -270, 150);
+        circuit.Connect(carryIn.Out, adder.CarryIn);
+
+        // S1 to S4 and C4, least significant at the top.
+        Terminal[] outputs = [.. adder.Sum, adder.CarryOut];
+        string[] colours = ["Green", "Green", "Green", "Green", "Red"];
+
+        for (var i = 0; i < outputs.Length; i++)
+        {
+            var y = -120 + (i * 50);
+            var resistor = Place(circuit, new Resistor(330), 180, y);
+            var led = Place(circuit, Led.OfColour(colours[i]), 300, y);
+
+            circuit.Connect(outputs[i], resistor.A);
+            circuit.Connect(resistor.B, led.Anode);
+            circuit.Connect(led.Cathode, ledGround.Pin);
+        }
+
+        vm.Scope.TimebasePerDivision = 1e-3;
+        vm.Scope.VoltsPerDivision = 2.0;
+        vm.Scope.Layout = ScopeLayout.Tiled;
+        vm.Scope.AddProbe(adder.Sum[2], "S3");
+        vm.Scope.AddProbe(adder.Sum[3], "S4");
+        vm.Scope.AddProbe(adder.CarryOut, "C4");
+    }
+
+    /// <summary>
+    /// A 74192 with its two clocks driven separately by a pattern generator: twelve pulses on UP,
+    /// then six on DOWN and a pause, a step a millisecond — about one a second at the editor's usual
+    /// speed, round again every forty. The
+    /// display counts 1 to 9, round through 0 to 2, then back down 1, 0, 9, 8, 7, 6. CO pulses low
+    /// as the count passes 9 going up and BO as it passes 0 going down, which is what would clock a
+    /// second decade.
+    /// </summary>
+    public static void LoadUpDownCounter(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "74192 up/down counter";
+
+        var supply = Place(circuit, new DcVoltageSource(5.0), -460, 220);
+        supply.RotationDegrees = 90;
+        var gnd = Place(circuit, new Ground(), -460, 360);
+
+        var clocks = Place(circuit, new PatternGenerator
+        {
+            Pattern = string.Concat(Enumerable.Repeat("01", 12)) + new string('1', 16) + "\n"
+                      + new string('1', 24) + string.Concat(Enumerable.Repeat("01", 6)) + "1111",
+            StepRate = 1e3,
+        }, -380, -40);
+
+        var counter = Place(circuit, new Ic74192(), -160, 0);
+        var decoder = Place(circuit, new Ic7447(), 60, 0);
+        var display = Place(circuit, new SevenSegmentDisplay(commonAnode: true), 340, 0);
+
+        circuit.Connect(supply.Negative, gnd.Pin);
+
+        foreach (var ic in new DigitalIc[] { counter, decoder })
+        {
+            circuit.Connect(ic.Vcc, supply.Positive);
+            circuit.Connect(ic.Gnd, gnd.Pin);
+        }
+
+        circuit.Connect(clocks.Terminals[0], counter.Up);
+        circuit.Connect(clocks.Terminals[1], counter.Down);
+
+        // Load released (high), clear released (low), and the load inputs grounded.
+        circuit.Connect(counter.Load, supply.Positive);
+        circuit.Connect(counter.Clear, gnd.Pin);
+        foreach (var d in counter.Data) circuit.Connect(d, gnd.Pin);
+
+        circuit.Connect(counter.Outputs[0], decoder.InputA);
+        circuit.Connect(counter.Outputs[1], decoder.InputB);
+        circuit.Connect(counter.Outputs[2], decoder.InputC);
+        circuit.Connect(counter.Outputs[3], decoder.InputD);
+
+        circuit.Connect(decoder.LampTest, supply.Positive);
+        circuit.Connect(decoder.BlankingInput, supply.Positive);
+        circuit.Connect(decoder.RippleBlankingInput, supply.Positive);
+
+        circuit.Connect(display.Common, supply.Positive);
+        for (var i = 0; i < 7; i++)
+        {
+            var resistor = Place(circuit, new Resistor(330), 200, -90 + (i * 30));
+            circuit.Connect(decoder.Segments[i], resistor.A);
+            circuit.Connect(resistor.B, display.Segments[i]);
+        }
+
+        vm.Scope.TimebasePerDivision = 5e-3;
+        vm.Scope.VoltsPerDivision = 2.0;
+        vm.Scope.Layout = ScopeLayout.Tiled;
+        vm.Scope.AddProbe(counter.Up, "UP");
+        vm.Scope.AddProbe(counter.Down, "DOWN");
+        vm.Scope.AddProbe(counter.Carry, "CO");
+        vm.Scope.AddProbe(counter.Borrow, "BO");
     }
 
     /// <summary>

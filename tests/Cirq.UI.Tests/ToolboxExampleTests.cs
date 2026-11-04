@@ -236,4 +236,35 @@ public class ToolboxExampleTests
         esp.CheckLimits(sim.System);
         Assert.Empty(esp.Violations);
     }
+
+    /// <summary>5 + 6 + 1 is twelve: S3 and S4 lit, C4 dark.</summary>
+    [Fact]
+    public void TheAdderShowsTwelve()
+    {
+        using var vm = Load("4-Bit Adder");
+        var sim = vm.Simulation.Simulator!;
+        var adder = vm.Circuit.Components.OfType<Ic74283>().Single();
+
+        sim.Run(1e-6);
+
+        Assert.Equal(12, adder.Result);
+        Assert.Equal(new[] { false, false, true, true, false },
+            adder.Sum.Append(adder.CarryOut).Select(t => sim.NodeVoltage(t) > 2.0));
+    }
+
+    /// <summary>Twelve up from zero is 2; six down from there is 6, through zero.</summary>
+    [Fact]
+    public void TheUpDownCounterWrapsBothWays()
+    {
+        using var vm = Load("Up/Down Counter");
+        var sim = vm.Simulation.Simulator!;
+        var counter = vm.Circuit.Components.OfType<Ic74192>().Single();
+
+        // Twelve UP edges by 23 ms, then six on DOWN from 25 ms.
+        sim.Run(24.5e-3);
+        Assert.Equal(2, counter.Count);
+
+        sim.Run(12e-3);
+        Assert.Equal(6, counter.Count);
+    }
 }

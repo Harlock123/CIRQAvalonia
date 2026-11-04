@@ -170,7 +170,7 @@ Three of those are worth separating, because they are easy to confuse:
 
 Click a palette entry, then click the canvas. The part lands where you click, snapped to the grid.
 
-The palette holds **207 components in 16 categories**:
+The palette holds **211 components in 16 categories**:
 
 | Category | Count | Contents |
 | --- | --- | --- |
@@ -183,7 +183,7 @@ The palette holds **207 components in 16 categories**:
 | Power | 10 | Fixed and adjustable regulators, TL431 shunt reference, ICL7660 charge pump, MC34063 switching controller, **TP4056 lithium charger** — see [below](#charging-a-lithium-cell) |
 | Analog ICs | 13 | LM741, TL081, LM358, MCP6002 rail-to-rail, the **LM324 quad**, NE555, LM311, LM339, LM386 audio amp, INA126 instrumentation amp and an **AD633 analog multiplier** — see [below](#four-in-one-package) |
 | Logic Gates | 14 | AND, OR, NAND, NOR, XOR, XNOR, NOT, buffer and **tri-state buffer**, and the generic **D, JK and T flip-flops** and **SR and D latches** |
-| 74xx Series | 21 | Counters (including the synchronous **74161**), decoders, flip-flops, shift registers, the **74245 bus transceiver** and **74373 latch**, multiplexers, Schmitt inverter — see [below](#sharing-a-bus) |
+| 74xx Series | 25 | Counters (including the synchronous **74161** and the **74192 / 74193 up/down counters**), the **7483 and 74283 adders**, decoders, flip-flops, shift registers, the **74245 bus transceiver** and **74373 latch**, multiplexers, Schmitt inverter — see [below](#sharing-a-bus) |
 | 40xx Series | 15 | CMOS gates, counters, flip-flops, analog switches and a **4046 phase-locked loop** — see [below](#phase-locked-loops) |
 | Buses | 19 | **Bus tap** and **bus line**, I2C master, EEPROM, port expander, DS1307 clock, ADS1115 ADC, MCP4725 DAC and INA219 current sensor, SPI master and **MCP3008 ADC**, 1-Wire master and DS18B20 thermometer, serial terminal and device, **RS-485**, **CAN** and **RS-232 (MAX232)** transceivers, level shifter — see [below](#making-its-own-rails) |
 | Digital I/O | 9 | Logic toggle, clock, **pattern generator**, rotary encoder, oscillator module, ADC and DAC bridges, and a **2K × 8 SRAM and ROM** — see [below](#something-worth-addressing) |
