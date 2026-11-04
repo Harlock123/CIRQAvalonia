@@ -16,7 +16,8 @@ public class EndToEndTests
         "list_parts", "describe_part", "get_circuit", "get_part", "new_circuit", "open_circuit", "save_circuit", "list_examples",
         "load_example", "undo", "redo", "add_parts", "set_part", "remove_parts", "connect", "disconnect", "add_probe",
         "remove_probe", "set_parameter", "set_conditions", "check_circuit", "explain_circuit", "render_schematic",
-        "get_spice_netlist", "operating_point", "run_transient", "get_trace", "ac_sweep", "dc_sweep", "transport", "set_scope",
+        "get_spice_netlist", "load_memory",
+        "read_memory", "operating_point", "run_transient", "get_trace", "ac_sweep", "dc_sweep", "transport", "set_scope",
     ];
 
     [Fact]

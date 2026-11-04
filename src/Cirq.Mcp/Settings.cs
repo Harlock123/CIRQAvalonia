@@ -27,6 +27,9 @@ public static class Settings
         ("High", "V"), ("Low", "V"),
     ];
 
+    /// <summary>How much of a long text setting is shown before it is cut short.</summary>
+    private const int LongText = 600;
+
     public static string UnitFor(string propertyName)
     {
         foreach (var (suffix, unit) in UnitHints)
@@ -43,6 +46,14 @@ public static class Settings
             var type = Nullable.GetUnderlyingType(property.PropertyType) ?? property.PropertyType;
             var o = new JsonObject { ["name"] = property.Name, ["type"] = KindOf(property) };
             o["value"] = ToJson(property.GetValue(component));
+
+            // A memory's contents can run to a hundred kilobytes of hex, which is no use in a list of
+            // settings: the start of it, and read_memory for the rest.
+            if (property.GetValue(component) is string { Length: > LongText } text)
+            {
+                o["value"] = text[..LongText] + "…";
+                o["note"] = $"{text.Length} characters, cut short here." + (property.Name == "Contents" ? " read_memory reads a memory's bytes." : "");
+            }
             if ((type == typeof(double) || type == typeof(int)) && UnitFor(property.Name) is { Length: > 0 } unit) o["unit"] = unit;
             if (Nullable.GetUnderlyingType(property.PropertyType) != null) o["optional"] = true;
             if (type.IsEnum) o["choices"] = new JsonArray(Enum.GetNames(type).Select(n => (JsonNode)n).ToArray());
