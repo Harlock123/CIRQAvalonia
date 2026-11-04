@@ -299,6 +299,10 @@ public static partial class Examples
                 LoadBenEater6502),
             new("6502 Serial Terminal", "The same 6502 with a 6551 ACIA at 19,200 baud: a greeting, then an echo of what the terminal types",
                 LoadSerial6502),
+            new("6510 SID Player", "A 6510, a 6526 and a 6581: the CIA's timer interrupts 200 times a second and three voices play a tune — bass, arpeggio and lead",
+                LoadSidPlayer),
+            new("CIA Keypad", "A 6526 scanning a 4x4 keypad a row at a time, as the C64 scans its keyboard, and showing each key on a four-bit LCD",
+                LoadCiaKeypad),
         ]),
     ];
 

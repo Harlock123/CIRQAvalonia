@@ -17,7 +17,10 @@ public enum BusProtocol
     OneWire,
     Can,
 
-    /// <summary>A 6502's bus, cycle by cycle, from the processor's own record of it.</summary>
+    /// <summary>
+    /// A 6502's bus, cycle by cycle, from the processor's own record of it: the 65C02, the 6502, and
+    /// the 6510 and 8500, which share the NMOS core and decode as a 6502.
+    /// </summary>
     Cpu6502,
 }
 
@@ -228,6 +231,9 @@ public sealed partial class BusDecodeViewModel : ObservableObject
         var log = cpu.BusLog;
         var recent = log.Count > MaxCpuCycles ? log.Skip(log.Count - MaxCpuCycles).ToList() : log;
         var result = Cirq.Components.Processors.Cpu6502BusDecoder.Decode(cpu.Variant, recent);
+
+        // Which chip, since a 6510 reads as a 6502: the same core, the same opcodes.
+        result = result with { Summary = $"{cpu.Name} ({cpu.PartNumber}): {result.Summary}" };
 
         return log.Count > MaxCpuCycles
             ? result with { Summary = $"{result.Summary} — the last {MaxCpuCycles} of {log.Count} recorded" }

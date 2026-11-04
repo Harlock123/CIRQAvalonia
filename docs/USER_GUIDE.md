@@ -5696,8 +5696,10 @@ exist.
 
 The **Memory & CPUs** group has what a small 8-bit computer is built from: the **W65C02S** — the
 CMOS 6502 in Ben Eater's breadboard computer — and the original NMOS **6502**, the **6522 VIA**,
-the **6551 ACIA**, and the ROMs and RAMs to go with them. **File > Examples > Computers** has two
-complete machines that run a program out of ROM.
+the **6551 ACIA**, and the ROMs and RAMs to go with them — and the Commodore 64's chips: the
+**6510** processor (and its HMOS twin the **8500**), the **6526 CIA** and the **6581 SID** (and
+the **8580**). **File > Examples > Computers** has four complete machines that run a program out
+of ROM: two 6502s, a [SID player](#playing-a-tune) and a [keypad on a CIA](#scanning-a-keypad).
 
 ![Ben Eater's 6502 computer on the canvas: a W65C02S, a 28C256 ROM, a 62256 RAM, a 7400 decoding the addresses and a 6522 VIA, every bus pin named with a net label, a 1 MHz oscillator, a reset button and pull-ups on the left, and an HD44780 module along the bottom showing "Hello, world!"](images/46-ben-eater-6502.png)
 
@@ -5951,6 +5953,594 @@ The greeting takes about 7 ms at 19,200 baud. The terminal sends "hi there" at 8
 sends each character back as it arrives. Polling the status register like this is the simplest way
 to drive a 6551; set bit 1 of the command register clear and it interrupts on every byte instead.
 
+### The 6510
+
+The **6510** is the C64's processor: the NMOS 6502's core — the same one, cycle for cycle, quirks
+and undocumented opcodes included — on a pinout of its own, with two additions.
+
+- **A six-bit I/O port inside the chip**, P0-P5 on pins 29 to 24. Its direction register is at
+  **$0000** (a one makes the pin an output) and its data register at **$0001**. The registers are
+  in the processor, but the processor still runs an ordinary bus cycle for them: a **write** to
+  $0000 or $0001 goes out on the address and data lines as well, so the RAM underneath takes the
+  byte too — which is what happens on a C64 — and a **read** puts the address on the bus but takes
+  the port's register, whatever the bus holds. Reading $0001 gives the data register for the
+  output bits and the pins for the inputs.
+- **AEC** (pin 5), address enable control: low, the processor lets go of the address bus, the
+  data bus and R/W, so something else — on a C64, the video chip — can use them. It does not stop
+  the processor; RDY does that.
+
+It has no SYNC, no SO and no Φ1 output, and its address lines are moved round the supply pins:
+1 = Φ0 in, 2 = RDY, 3 = /IRQ, 4 = /NMI, 5 = AEC, 6 = VCC, 7-20 = A0-A13, 21 = VSS, 22-23 = A14-A15,
+24-29 = P5-P0, 30-37 = D7-D0, 38 = R/W, 39 = Φ2 out, 40 = /RES. **/RES** clears both port
+registers, so every port pin starts as an input. Not modelled: a port input with nothing on it
+reads as a one (the C64 has pull-ups on the lines it uses; there are none inside here), and bits 6
+and 7, which have no pins, simply read back what was written to them — on the silicon they only
+remember it for a while. The **8500** is the same part made in HMOS, and is the same here under
+its own number. **Decode Bus** reads a 6510's cycles exactly as it reads a 6502's, and names the
+chip in its summary.
+
+### The 6526 CIA
+
+The **6526 Complex Interface Adapter** is the C64's other workhorse — two of them, one reading the
+keyboard and joysticks, the other on the serial bus and the user port. Its sixteen registers, at
+RS0-RS3:
+
+| Reg | Name | What it does |
+| --- | --- | --- |
+| 0, 1 | PRA, PRB | The ports. A read gives the **pins**, outputs included |
+| 2, 3 | DDRA, DDRB | A one makes the pin an output |
+| 4, 5 | TA LO, HI | Timer A: write the latch; read the counter |
+| 6, 7 | TB LO, HI | Timer B, the same |
+| 8-B | TOD 10THS, SEC, MIN, HR | The time-of-day clock, in BCD; with CRB bit 7, the alarm |
+| C | SDR | The serial shift register |
+| D | ICR | Read: the flags (bit 7 if any enabled one is set), cleared by the read. Write: bit 7 set enables the bits given, clear disables them |
+| E | CRA | Timer A: start, PB6 on, toggle/pulse, one-shot, force load, count CNT, serial out, 50 Hz TOD |
+| F | CRB | Timer B: the same for PB7, its source (PHI2, CNT, A's underflows, A's underflows while CNT is high), alarm writes |
+
+What is modelled, cycle by cycle on PHI2:
+
+- **Ports with pull-ups.** Every port pin has the datasheet's passive pull-up, so an input with
+  nothing on it reads as a one and a port reads $FF after reset. Making a pin an output only while
+  it should be low turns the port into open-drain lines — which is how the keypad example scans
+  its rows. A read or write of PRB takes **/PC** low for the cycle after it.
+- **Timers.** Writing the high byte with the timer stopped loads the counter, and in one-shot mode
+  starts it too. A running timer underflows every latch + 1 counts, reloads, and sets its flag; in
+  one-shot mode it stops. PB6 (timer A) and PB7 (timer B) can be the timer's output — a one-cycle
+  pulse per underflow or a level that toggles, high when the timer starts. Timer B counts PHI2,
+  CNT's rising edges, timer A's underflows (a 32-bit timer) or those only while CNT is high.
+- **Time of day.** Tenths, seconds, minutes and hours 1-12 with bit 7 for PM, counted from the 50
+  or 60 Hz on the **TOD** pin. Reading the hours freezes all four until the tenths are read;
+  writing the hours stops the clock until the tenths are written. 11:59:59.9 AM goes to 12:00:00.0
+  PM; 12:59:59.9 goes to 1:00:00.0. The alarm sets its flag when the time reaches it.
+- **The serial port, both ways.** Output: a byte written to SDR goes out on **SP** most significant
+  bit first, one bit every two timer A underflows, with **CNT** as the clock, and a byte written
+  while one is going goes straight after it. Input: SP is shifted in on CNT's rising edges, and
+  the eighth bit puts the byte in SDR. Either way the eighth bit sets the SP flag.
+- **/FLAG**'s falling edge sets its flag; **/IRQ** is open drain, needs a pull-up, and goes low the
+  cycle *after* an enabled flag sets, as the original 6526's does.
+
+The 6526A (the 8521 in the C64C) pulls /IRQ a cycle sooner than the 6526, and timing-exact C64
+software has to know which it is running on; this is the 6526. Not modelled: the timers' internal
+pipeline (on the silicon a start or a load takes a cycle or two to reach the counter, and an ICR
+read in the very cycle timer B's flag would be set loses it), the TOD's 12-hour writing quirks,
+and timing finer than a whole cycle; here a timer started or loaded by a write counts from the
+next cycle. SP, CNT and /FLAG are pulled up like the ports, so they can be left open. Pinout:
+1 = VSS, 2-9 = PA0-PA7, 10-17 = PB0-PB7, 18 = /PC, 19 = TOD, 20 = VCC, 21 = /IRQ, 22 = R/W, 23 = /CS,
+24 = /FLAG, 25 = PHI2, 26-33 = D7-D0, 34 = /RES, 35-38 = RS3-RS0, 39 = SP, 40 = CNT.
+
+### The SID
+
+The **6581 Sound Interface Device** is three voices, a filter and a volume control in a 28-pin
+package; the **8580** is its successor in the C64C. Each voice has seven registers — voice 1 at
+$00, voice 2 at $07, voice 3 at $0E:
+
+| Offset | What | |
+| --- | --- | --- |
+| +0, +1 | Frequency, 16 bits | F × Φ2 / 2²⁴ hertz: 0.06 Hz a step at 1 MHz |
+| +2, +3 | Pulse width, 12 bits | The pulse is high while the oscillator's top twelve bits are at least this |
+| +4 | Control | Bit 0 gate, 1 sync, 2 ring mod, 3 test, 4 triangle, 5 sawtooth, 6 pulse, 7 noise |
+| +5 | Attack / decay | Four bits each |
+| +6 | Sustain / release | Four bits each |
+
+and then $15-$16 the filter cutoff (11 bits), $17 the resonance (top four bits) and which voices
+— and EXT IN — go through the filter, $18 the mode (bit 4 low-pass, 5 band-pass, 6 high-pass),
+voice 3 off (bit 7) and the volume (bits 0-3); and to read, $19 and $1A the paddles, $1B voice 3's
+oscillator and $1C its envelope. Every other register is write-only and reads as the last byte
+written to the chip.
+
+The model was written from the published register descriptions, not from any emulator.
+
+- **Oscillators and waveforms.** A 24-bit accumulator per voice, adding its frequency every Φ2
+  cycle. The sawtooth is its top twelve bits; the triangle bits 22-11 folded by bit 23; the pulse
+  compares with the pulse width; the noise is eight bits of a 23-bit shift register shifted each
+  time bit 19 rises. **Sync** resets a voice when the previous one's top bit rises, **ring mod**
+  folds its triangle by the previous voice's top bit instead, and **test** holds the oscillator at
+  zero. Selecting two waveforms at once gives their bitwise AND — a first approximation: the
+  silicon's combined waveforms are quieter and odder than that.
+- **Envelopes, with the real rate table.** The rates are the datasheet's — 2 ms to 8 s of attack,
+  three times that for decay and release — as a counter of cycles per step (9 for the fastest, 31,251
+  for the slowest). The attack is linear; decay and release step more slowly as the level falls past
+  93, 54, 26, 14 and 6, which is how the SID approximates an exponential. The decay stops at the
+  sustain level; at zero the envelope waits for the next gate. The **ADSR delay bug** is there too:
+  the rate counter is only reset when it equals the period, so changing to a faster rate after the
+  counter has passed the new period stalls the envelope for up to 33 ms while it counts round.
+- **The filter is on the real capacitors.** It is a state-variable filter as the chip's is — two
+  integrators in a loop, the capacitors on **CAP1A-CAP1B** and **CAP2A-CAP2B** in their feedback —
+  solved by the analog solver, so the capacitors are parts you wire and they set the cutoff: the
+  part is scaled so the datasheet's capacitor (**470 pF** on the 6581, as the C64 fits it; **22 nF**
+  on the 8580) gives the chip's cutoff range, and doubling them halves every cutoff. Low-, band- and
+  high-pass can be mixed (low plus high is a notch), with resonance. The 8580's cutoff follows the
+  register in a straight line, 30 Hz to 12 kHz. The 6581's does not — and differs from chip to chip
+  — so it is an approximation: flat at the bottom (about 220 Hz), about 2 kHz half way, 12 kHz at the
+  top. The 6581's distortion, its filter's non-linearity and the way it saturates, is not modelled.
+- **The volume trick.** The 6581's mixer has a DC offset that the volume scales, so writing the
+  volume register alone moves the output — which is how C64 software plays samples. The 8580 has
+  very little, and plays them very quietly.
+- **Paddles.** POTX and POTY are read as the chip reads them: every 512 cycles it holds the pin low
+  for 256, then counts the cycles until the resistor and capacitor on it charge past a threshold.
+  The threshold is chosen so the C64's paddle — 470 kΩ to +5 V with 1,000 pF to ground — reads 255;
+  an open pin reads 255.
+
+**AUDIO OUT drives the circuit.** It is a voltage source behind 470 Ω at half VDD — 6 V from the
+6581's 12 V, 4.5 V from the 8580's 9 V — plus half a volt per full-scale voice at full volume, so it
+feeds a speaker, the scope and the spectrum like any other source. The chip is clocked, and its
+output updated, **every Φ2 cycle**: a million updates a second at 1 MHz, the chip's own rate, with
+no decimation, and the solver lands on every clock edge anyway. On the silicon the output is a
+source follower needing a resistor to ground (the C64 has 1 kΩ); here it can also sink, so the
+resistor is optional. EXT IN is mixed in like a fourth voice, through the filter or round it.
+Pinout: 1-4 = CAP1A, CAP1B, CAP2A, CAP2B, 5 = /RES, 6 = Φ2, 7 = R/W, 8 = /CS, 9-13 = A0-A4,
+14 = GND, 15-22 = D0-D7, 23 = POTY, 24 = POTX, 25 = VCC, 26 = EXT IN, 27 = AUDIO OUT, 28 = VDD.
+
+**Speed, honestly.** Because the whole computer is being solved, a SID plays at the circuit's
+speed, not in real time: measured on the development machine (an 8-core ARM virtual machine) the
+SID player example runs at **about 7 ms of simulated time per second** in a release build and
+about 2 in a debug build. A second of music is two or three minutes of solving. What comes out is
+exact to the cycle; listen to it afterwards, at full speed, from the speaker's recording.
+
+### Playing a tune
+
+**File > Examples > Computers > 6510 SID Player** is a 6510, a 28C256 and a 62256 decoded as in
+the Ben Eater computer, with a 74139 splitting $4000-$7FFF by A12 and A13 into a **6526 at $4000**
+and a **6581 at $5000**. The oscillator drives the 6510's Φ0; everything else runs from its Φ2
+output, as on a C64. The CIA's timer A counts 5,000 cycles and interrupts — 200 times a second, four
+times a C64's 50 Hz frame, so the tune is short enough to hear in a reasonable run — and every
+interrupt is a tick of a player in ROM.
+
+![The 6510 SID player on the canvas: the 6510, ROM and RAM, the 7400 and 74139 decoding, the 6526 and the 6581 with its two 470 pF filter capacitors above it and a 12 V supply below, every bus pin named with a net label, and on the right AUDIO OUT into a 1 kΩ load, a 10 µF coupling capacitor, an amplifier and the speaker](images/53-sid-player.png)
+
+The tune is sixteen steps of five ticks — 25 ms a step, **400 ms** a phrase, then round again — over
+A minor, F, G and E minor, a bar each. **Voice 1** is the bass, a sawtooth through the low-pass with
+resonance, its cutoff swept down over each step so every note is plucked; **voice 2** an arpeggio of
+the bar's chord, a note a tick, a pulse whose width sweeps up from $200 to $DFF; **voice 3** the lead,
+a triangle with a vibrato of a step or two of its own top byte. The 6510's own port marks the beat
+on P0. Every envelope rate is the fastest, which keeps the delay bug from ever biting — set the
+bass's decay to 6 and its notes start late, or not at all, as they would on a real SID. The program, assembled into the ROM:
+
+```asm
+; A three-voice tune for the 6510 SID player: a 6510, a 28C256 at
+; $8000-$FFFF, a 62256 at $0000-$3FFF, a 6526 at $4000 and a 6581 at
+; $5000. The CIA's timer A interrupts 200 times a second; each interrupt
+; is a tick, five ticks a step and sixteen steps a phrase, round and round.
+
+SID     = $5000         ; the 6581's registers
+V1FREQ  = $5000         ; voice 1, the bass
+V1CTRL  = $5004
+V1AD    = $5005
+V1SR    = $5006
+V2FREQ  = $5007         ; voice 2, the arpeggio
+V2PW    = $5009
+V2CTRL  = $500B
+V2AD    = $500C
+V2SR    = $500D
+V3FREQ  = $500E         ; voice 3, the lead
+V3CTRL  = $5012
+V3AD    = $5013
+V3SR    = $5014
+FCHI    = $5016         ; filter cutoff, top eight bits
+RESFILT = $5017
+MODEVOL = $5018
+
+TALO    = $4004         ; the 6526's
+TAHI    = $4005
+ICR     = $400D
+CRA     = $400E
+
+tick    = $02           ; zero page; $00 and $01 are the 6510's port
+step    = $03
+arp     = $04
+vib     = $05
+pwlo    = $06
+pwhi    = $07
+leadlo  = $08
+leadhi  = $09
+cutoff  = $0A
+tmp     = $0B
+flo     = $0C
+fhi     = $0D
+
+        .org $8000
+reset:  sei
+        ldx #$FF
+        txs
+        lda #%00000001  ; P0 an output: the beat LED
+        sta $00
+        lda #0
+        ldx #$18
+clear:  sta SID,x       ; every SID register to zero
+        dex
+        bpl clear
+        sta tick
+        sta step
+        sta arp
+        sta vib
+        sta pwlo
+        lda #$02
+        sta pwhi
+        lda #$00        ; bass: every rate the fastest (see the delay bug), sustain 8
+        sta V1AD
+        lda #$80
+        sta V1SR
+        lda #$00        ; arpeggio: straight on at full level
+        sta V2AD
+        lda #$F0
+        sta V2SR
+        lda #$00        ; lead: an accent decaying to sustain 10
+        sta V3AD
+        lda #$A0
+        sta V3SR
+        lda #$81        ; resonance 8, the bass through the filter
+        sta RESFILT
+        lda #$1F        ; low-pass, full volume
+        sta MODEVOL
+        lda #$41        ; the arpeggio's pulse, gate on: it never stops
+        sta V2CTRL
+        lda #<4999      ; timer A: 5,000 cycles, 5 ms at 1 MHz
+        sta TALO
+        lda #>4999
+        sta TAHI
+        lda #$81        ; its interrupt on
+        sta ICR
+        lda #%00010001  ; force load, continuous, start
+        sta CRA
+        cli
+idle:   jmp idle
+
+; Every tick: a new step's notes when it is the step's first, then the
+; arpeggio, the vibrato and the filter sweep.
+irq:    pha
+        txa
+        pha
+        tya
+        pha
+        lda ICR         ; acknowledge timer A
+        lda tick
+        bne ticks
+        jsr newstep
+ticks:  jsr arpeggio
+        jsr lead
+        jsr bass
+        inc tick
+        lda tick
+        cmp #5
+        bne out
+        lda #0
+        sta tick
+        lda step
+        clc
+        adc #1
+        and #15
+        sta step
+out:    pla
+        tay
+        pla
+        tax
+        pla
+        rti
+
+; The step's bass note, struck again; the lead's note if it has a new one;
+; the beat LED, on for two steps in four.
+newstep: ldx step
+        ldy bassline,x
+        lda freqlo,y
+        sta V1FREQ
+        lda freqhi,y
+        sta V1FREQ+1
+        lda #$21        ; sawtooth, gate on: the attack starts again
+        sta V1CTRL
+        lda #$68
+        sta cutoff      ; the filter opens on each note and closes over the step
+        ldy melody,x
+        beq beat        ; 0: the lead holds its note
+        lda freqlo,y
+        sta leadlo
+        lda freqhi,y
+        sta leadhi
+        lda #$10        ; triangle, gate off...
+        sta V3CTRL
+        lda #$11        ; ...and on: a new note
+        sta V3CTRL
+beat:   txa
+        lsr
+        and #1
+        eor #1
+        sta $01         ; P0
+        rts
+
+; The chord for this bar, a note at a time; the pulse width sweeping up.
+arpeggio: lda step
+        lsr
+        lsr             ; the bar, 0-3
+        sta tmp
+        asl
+        clc
+        adc tmp         ; three notes a chord
+        adc arp
+        tay
+        ldx chords,y
+        lda freqlo,x
+        sta V2FREQ
+        lda freqhi,x
+        sta V2FREQ+1
+        ldx arp
+        inx
+        cpx #3
+        bne arpok
+        ldx #0
+arpok:  stx arp
+        lda pwlo
+        clc
+        adc #$40
+        sta pwlo
+        sta V2PW
+        lda pwhi
+        adc #0
+        cmp #$0E        ; $200 up to $DFF, then round again
+        bne pwok
+        lda #$02
+pwok:   sta pwhi
+        sta V2PW+1
+        rts
+
+; The lead's note plus or minus a step or two of its own top byte: vibrato.
+lead:   lda leadlo
+        sta flo
+        lda leadhi
+        sta fhi
+        ldx vib
+        ldy vibrato,x
+        beq vibset
+        bmi down
+up:     clc
+        lda flo
+        adc leadhi
+        sta flo
+        lda fhi
+        adc #0
+        sta fhi
+        dey
+        bne up
+        beq vibset
+down:   sec
+        lda flo
+        sbc leadhi
+        sta flo
+        lda fhi
+        sbc #0
+        sta fhi
+        iny
+        bne down
+vibset: lda flo
+        sta V3FREQ
+        lda fhi
+        sta V3FREQ+1
+        inx
+        txa
+        and #7
+        sta vib
+        rts
+
+; The filter closing over the step, and the bass let go on its last tick.
+bass:   lda cutoff
+        sta FCHI
+        sec
+        sbc #$0C
+        sta cutoff
+        lda tick
+        cmp #4
+        bne bassok
+        lda #$20        ; gate off
+        sta V1CTRL
+bassok: rts
+
+; A minor, F, G and E minor, a bar each.
+bassline: .byte 4, 4, 1, 4,  2, 2, 6, 2,  3, 3, 7, 3,  1, 1, 5, 1
+melody: .byte 15, 0, 14, 13,  11, 0, 13, 0,  12, 0, 14, 0,  15, 0, 0, 12
+chords: .byte 11, 13, 15,  9, 11, 13,  10, 12, 14,  8, 10, 12
+vibrato: .byte 0, 1, 2, 1, 0, $FF, $FE, $FF
+
+; E2 F2 G2 A2 B2 C3 D3, then E4 F4 G4 A4 B4 C5 D5 E5, as SID frequencies at 1 MHz.
+freqlo: .byte 0, <1383, <1465, <1644, <1845, <2071, <2195, <2463
+        .byte <5530, <5859, <6577, <7382, <8286, <8779, <9854, <11060
+freqhi: .byte 0, >1383, >1465, >1644, >1845, >2071, >2195, >2463
+        .byte >5530, >5859, >6577, >7382, >8286, >8779, >9854, >11060
+
+        .org $FFFC
+        .word reset     ; the reset vector
+        .word irq       ; IRQ: the player
+```
+
+AUDIO OUT goes into the C64's 1 kΩ load, then through a **10 µF coupling capacitor** (charged to
+the SID's 6 V at the start, as it would be after power-up) to an amplifier — a voltage-controlled
+source with a gain of two, standing in for the TV the C64 plugged into — and the speaker. The scope
+shows AUDIO OUT, the speaker and P0. To **listen**, give the speaker a **Recording Path** before
+running and play the WAV file afterwards; **Simulate > Spectrum** on AUDIO OUT shows the notes.
+
+![AUDIO OUT over ten milliseconds of the first bar, the sawtooth bass, the pulse arpeggio and the triangle lead added together, and below it the spectrum over forty milliseconds with peaks at A2's 110 Hz, A4, C5 and E5 marked, the pulse's harmonics spread above them](images/54-sid-output.png)
+
+### Scanning a keypad
+
+**File > Examples > Computers > CIA Keypad** is the same 6510 with the 6526 alone, doing what the
+C64's first CIA does: reading a key matrix. The 4×4 keypad's rows are on PA0-PA3 and its columns on
+PB0-PB3, held high by the CIA's own pull-ups. To scan, the program makes one row at a time an output
+— PRA holds it low — so a key down in that row pulls its column low, and the others float up and
+cannot short two driven rows together. Each new key is printed on an HD44780 in four-bit mode on
+the ports' other lines — D4-D7 on PB4-PB7, RS on PA4, E on PA5 — and every delay, from the display's
+37 µs to the scan's millisecond, is timer B in one-shot mode, started by writing its high byte and
+watched through ICR. Double-click the keys while it runs.
+
+![The CIA keypad example: the 6510 computer with the 6526's port A driving the keypad's rows and RS and E, port B reading its columns and driving the LCD's top four data lines, key 2 held down and the display reading "Keys: 6502"](images/55-cia-keypad.png)
+
+```asm
+; The 6526 as the C64 uses it: a 4x4 keypad scanned through its ports and
+; an HD44780 in four-bit mode on what is left of them, paced by timer B.
+; A 6510, a 28C256 at $8000-$FFFF, a 62256 at $0000-$3FFF, the 6526 at $4000.
+; Rows on PA0-PA3, columns on PB0-PB3; the LCD's D4-D7 on PB4-PB7, RS on PA4
+; and E on PA5.
+
+PRA     = $4000         ; the 6526's registers
+PRB     = $4001
+DDRA    = $4002
+DDRB    = $4003
+TBLO    = $4006
+TBHI    = $4007
+ICR     = $400D
+CRB     = $400F
+
+RS      = %00010000     ; PA4
+E       = %00100000     ; PA5
+LCD     = RS+E          ; the port A bits that are always outputs
+
+last    = $02           ; the key last seen, 0 for none
+column  = $03
+
+        .org $8000
+reset:  ldx #$FF
+        txs
+        lda #0
+        sta PRA         ; the rows' outputs are low; whether they drive is DDRA's say
+        lda #LCD
+        sta DDRA        ; RS and E out, the rows in until they are scanned
+        lda #%11110000
+        sta DDRB        ; the LCD's data out, the columns in on their pull-ups
+        lda #%00001000
+        sta CRB         ; timer B one-shot, counting PHI2
+        ldy #0          ; RS low: commands
+        ldx #0
+wake:   lda dance,x     ; eight bits three times, then four
+        beq ready
+        jsr nibble
+        lda #0
+        jsr delay
+        inx
+        bne wake
+ready:  ldx #0
+setup:  lda init,x      ; then the set-up commands, two nibbles each
+        beq title
+        jsr send
+        inx
+        bne setup
+title:  lda #7          ; the clear takes 1.52 ms
+        jsr delay
+        ldy #RS         ; RS high: characters
+        ldx #0
+name:   lda text,x
+        beq scan
+        jsr send
+        inx
+        bne name
+
+; Scans the keypad every millisecond and prints each key as it goes down.
+scan:   lda #0
+        sta last
+loop:   jsr key
+        cmp last
+        beq pause       ; the same as last time, pressed or not
+        sta last
+        cmp #0
+        beq pause       ; let go
+        jsr send        ; a new key: on the display
+pause:  lda #4          ; about a millisecond
+        jsr delay
+        jmp loop
+
+; The key held down as its character, or 0. One row at a time is made an
+; output, so only it is pulled low: the others float up on their pull-ups,
+; and a key held in an idle row cannot short two driven rows together.
+key:    ldx #0
+row:    lda rows,x
+        sta DDRA
+        lda PRB         ; the columns, read at the pins
+        and #$0F
+        cmp #$0F
+        bne press       ; one of them pulled low
+        inx
+        cpx #4
+        bne row
+        lda #LCD
+        sta DDRA        ; every row let go
+        lda #0
+        rts
+press:  ldy #0
+find:   lsr             ; the first zero bit is the column
+        bcc found
+        iny
+        bne find
+found:  sty column
+        txa
+        asl
+        asl
+        ora column
+        tax
+        lda #LCD
+        sta DDRA
+        ldy #RS
+        lda keys,x
+        rts
+
+; Sends A to the LCD as two nibbles, RS from Y, and waits for it.
+send:   pha
+        jsr nibble
+        pla
+        asl
+        asl
+        asl
+        asl
+        jsr nibble
+        lda #0          ; 65 us: the LCD's 37 us with room to spare
+        jmp delay
+
+; The top four bits of A onto D4-D7, and a pulse on E.
+nibble: and #$F0
+        sta PRB
+        tya
+        ora #E
+        sta PRA         ; E high...
+        sty PRA         ; ...and low: the LCD takes the nibble as E falls
+        rts
+
+; Waits A x 256 + 64 cycles on timer B, one-shot: writing its high byte
+; loads it and starts it, and its flag in ICR says when it has run out.
+delay:  pha
+        lda #$40
+        sta TBLO
+        pla
+        sta TBHI
+wait:   lda ICR
+        and #%00000010
+        beq wait
+        rts
+
+rows:   .byte LCD+%0001, LCD+%0010, LCD+%0100, LCD+%1000
+keys:   .byte "123A456B789C*0#D"
+dance:  .byte $30, $30, $30, $20, 0
+init:   .byte $28, $0C, $06, $01, 0     ; two lines, display on, entry mode, clear
+text:   .asciiz "Keys: "
+
+        .org $FFFC
+        .word reset
+        .word reset
+```
+
 ### Loading your own program
 
 Assemble to a raw binary for a ROM at $8000 — a 32K file whose first byte is the byte for $8000 —
@@ -5965,7 +6555,9 @@ at $8000-$FFFF lands where the decoding puts it. Reset the simulation and the ne
   examples do.
 - Only what reaches the pins is timed; the cycle-level model has no notion of internal gate delays.
 - The interrupt subtleties named above, the VIA's shift register and the ACIA's crystal and break are
-  not modelled.
+  not modelled; neither are the CIA's timer pipeline, the SID's filter distortion or its exact
+  combined waveforms.
+- Music plays at the circuit's speed: a SID's second of sound is minutes of solving.
 
 ---
 
