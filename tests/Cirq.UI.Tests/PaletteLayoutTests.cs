@@ -13,7 +13,7 @@ public class PaletteLayoutTests
     {
         using var vm = new MainWindowViewModel();
 
-        // All sixteen headings on screen at once, rather than one group's worth of parts and the
+        // All seventeen headings on screen at once, rather than one group's worth of parts and the
         // rest below the fold.
         Assert.All(vm.Palette, c => Assert.False(c.IsExpanded));
     }

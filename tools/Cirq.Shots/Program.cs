@@ -18,7 +18,7 @@ using Cirq.UI.Services;
 using Cirq.UI.ViewModels;
 using Cirq.UI.Views;
 
-// Draws the guide's palette picture (02-palette.png) and its screenshots of the AI Chat: the real editor, in a headless window rendered by Skia, with Claude's
+// Draws the guide's palette picture (02-palette.png), the 6502 bus decode (48-bus-decode-6502.png) and its screenshots of the AI Chat: the real editor, in a headless window rendered by Skia, with Claude's
 // side of the conversation replayed from a script. The tool calls are real (they run through the app's own MCP
 // server against the window's circuit) and so are the numbers Claude quotes at the end: they are read from the
 // results. Usage: dotnet run --project tools/Cirq.Shots -- <folder>
@@ -54,6 +54,28 @@ using (var picture = new RenderTargetBitmap(new PixelSize((int)(palette.Bounds.W
     picture.Render(palette);
     picture.Save(Path.Combine(folder, "02-palette.png"), PngBitmapEncoderOptions.Default);
     Console.WriteLine($"Wrote {Path.Combine(folder, "02-palette.png")}");
+}
+
+// ── The 6502 bus, decoded: the Ben Eater computer run for a few hundred cycles ──
+{
+    var computer = new MainWindowViewModel();
+    computer.Circuit.Clear();
+    computer.Scope.ClearProbes();
+    Examples.All.Single(e => e.Name == "Ben Eater 6502 Computer").Build(computer);
+    if (!computer.Simulation.Rebuild()) throw new InvalidOperationException(computer.Simulation.Status);
+    computer.Simulation.Simulator!.Run(60e-6);
+
+    var decode = new BusDecodeViewModel(computer.Circuit);
+    decode.Run();
+    var dialog = new BusDecodeWindow { DataContext = decode, Width = 880, Height = 600 };
+    dialog.Show();
+    for (var i = 0; i < 40; i++) Pump();
+    var frame = dialog.CaptureRenderedFrame() ?? throw new InvalidOperationException("Nothing was drawn.");
+    frame.Save(Path.Combine(folder, "48-bus-decode-6502.png"), PngBitmapEncoderOptions.Default);
+    Console.WriteLine($"Wrote {Path.Combine(folder, "48-bus-decode-6502.png")}");
+    dialog.Close();
+    computer.Dispose();
+    Pump();
 }
 
 var claude = new Replay();

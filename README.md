@@ -35,7 +35,7 @@ CirqAvalonia.slnx
 ├── src/
 │   ├── Cirq.Core/         Domain model: components, terminals, nets, MNA stamping contract
 │   ├── Cirq.Engine/       LU solver, Newton-Raphson, transient loop, digital event scheduler
-│   ├── Cirq.Components/   Component library (RCL, transistors, diodes, thyristors, 741, 555, 74xx/4000, displays, boards)
+│   ├── Cirq.Components/   Component library (RCL, transistors, diodes, thyristors, 741, 555, 74xx/4000, memories, 6502, displays, boards)
 │   └── Cirq.UI/           Avalonia editor, schematic canvas, inspector, ScottPlot scope
 └── tests/
     ├── Cirq.Engine.Tests/      Solver accuracy against closed-form solutions
@@ -52,7 +52,7 @@ Core ← Engine ← Components ← UI, which keeps the whole engine headless-tes
 ```bash
 dotnet run --project src/Cirq.UI     # the editor
 dotnet run --project src/Cirq.Cli    # the same engine, no window
-dotnet test                          # 3983 tests
+dotnet test                          # 4122 tests
 ./scripts/build-guide.sh             # the user guide as a PDF
 ```
 
@@ -283,6 +283,14 @@ family's VOH/VOL, inputs are classified against VIH/VIL, and transitions are que
 point lands exactly on the next queued transition or waveform edge, then resolves zero-delay
 propagation as delta cycles before accepting the step. That is what lets a 555 timer's comparators,
 latch and discharge transistor all interact with the RC network around them in one solve.
+
+A circuit that is mostly logic stamps the same matrix at nearly every time point — an output going
+high or low moves only the right-hand side — so the factorisation is kept and reused until the
+stamped entries actually change (an output released or taken back), the solve walks only the
+factor's non-zero columns, and only the entries that were stamped are cleared. On a 6502 computer of
+151 unknowns that made the whole run about four times faster. When an output is rescheduled, the
+latest scheduling wins even if an earlier one falls due later, which is what lets a memory let go of
+a bus in 50 ns while its 150 ns access is still pending.
 
 ![The digit counter example: a 7490 decade counter driving a 7447 decoder into a seven-segment display, with the QA and QD outputs plotted on a stacked scope](docs/images/05-digital.png)
 
@@ -601,6 +609,10 @@ one passes against a button that would never have fired.
 | LM741 | Closed-loop gain, virtual ground, rail saturation, open-loop gain, slew-rate limiting, −3 dB corner at GBW/gain |
 | NE555 | Astable frequency vs `1.44/((R1+2R2)C)` across four R/C combinations, duty cycle, supply independence |
 | 74xx | Truth tables end-to-end through the analog domain, 7474/7476 edge triggering and async clear, 7490 BCD sequence, 74138 one-hot decode, 74151 addressing, shift register load and clock inhibit |
+| Bus glue | The 74139's eight rows per half with the other half undisturbed, the 74244's two groups driving and letting go independently, the 74374 and 74574 taking their inputs only on the rising edge, and the 74573 following while LE is high and holding after — each on its datasheet pinout, pin by pin |
+| Memories | Every EPROM, EEPROM and RAM on its JEDEC pinout pin by pin, data an access time after the address and released when deselected, a RAM written and read back through a tri-state buffer, a 28C256 write that is only loaded, polled through bit 7 inverted and bit 6 toggling, then in the cells a write cycle later; Intel HEX with segment and linear records, every malformed line refused with its number and reason, a binary at an offset, an image wrapped into the chip and one too big for it refused, a 32K image surviving the circuit file, and the original 2K part's file form unchanged |
+| 6502 core | Binary and decimal ADC/SBC with each part's flags, the dummy cycles of indexed and read-modify-write instructions differing between the NMOS part and the 65C02 exactly as the silicon's do, the NMOS JMP ($xxFF) bug and the 65C02's extra cycle fixing it, JSR/RTS/BRK bus sequences, the 65C02's additions and the NMOS undocumented opcodes, reset, IRQ latency after CLI, NMI once per edge, WAI — and a self-checking program, assembled from source in the test, passing on both parts in an array and on a schematic. Locally the core also passes every case of the published per-cycle suites (2,560,000 NMOS, 2,540,000 65C02) and Klaus Dormann's functional and extended-opcode tests; those are not in the repository |
+| 6502 computer | The self-check running from ROM through the analog solve with no undefined bus reads, the bus cycles a microsecond apart and disassembled, reset holding and restarting, a ROM too slow for a 6 MHz clock giving the wrong bytes, the 6522's ports, Timer 1 free-running a 100-cycle square wave on PB7 while its interrupt is counted, Timer 2 counting PB6 pulses, CA1 interrupting and CA2 handshaking, the 6551's greeting reaching a terminal and the terminal's text echoed back, the HD44780's busy flag and display memory read back, and the examples' ROMs holding exactly the programs the guide prints |
 | LM339 | Per-channel comparison, wired-AND when outputs are tied, release when unpowered |
 | Regulators | Line and load regulation, dropout, current limiting, LM317 divider programming |
 | BJT | Beta in forward active, saturation, cutoff, exponential Vbe, PNP mirroring, KCL at all three terminals |
@@ -891,13 +903,17 @@ attached to it, and any part that said it had not settled — all of which name 
 drawing to go and look, which "try a smaller time step" does not.
 
 The palette holds 227 components in 17 collapsible categories, with a **Find a part** box
-(`Ctrl+F`) over them. Among the newest: an incandescent lamp with the inrush of a cold filament,
-generic D, JK and T flip-flops, SR and D latches and a tri-state buffer, a TIP120 Darlington, LM35
-and TMP36 thermometers, a WS2812B NeoPixel strip decoded by its real bit timing, a 4×4 matrix
-keypad you press by double-clicking a key, Raspberry Pi Pico and ESP32 boards, and the 7483 / 74283
-adders and 74192 / 74193 up/down counters.
+(`Ctrl+F`) over them. Among the newest: **a 6502 you can build a computer with** — a W65C02S and an
+NMOS 6502 that run their instruction sets cycle by cycle on their pins, a 6522 VIA and a 6551 ACIA,
+the 2716/2732/2764/27C256 EPROMs, a 28C256 EEPROM with page writes and data polling, 6116 and
+62256 RAMs that load binary or Intel HEX images, and the 74139, 74244, 74374, 74573 and 74574 bus
+glue — with Ben Eater's breadboard computer as an example, saying hello on an HD44780. Before that:
+an incandescent lamp with the inrush of a cold filament, generic flip-flops and latches and a
+tri-state buffer, a TIP120 Darlington, LM35 and TMP36 thermometers, a WS2812B NeoPixel strip, a 4×4
+matrix keypad, Raspberry Pi Pico and ESP32 boards, and the 7483 / 74283 adders and 74192 / 74193
+up/down counters.
 
-![The component palette: a Find a part box at the top, "211 parts in 16 groups" under it, and the sixteen categories with their counts — passive 11, switches 5, sources 16, semiconductors 13, transistors 13, LEDs and displays 11, power 10, analog ICs 13, logic gates 14, 74xx series 25, 40xx series 15, buses 19, digital I/O 9, sensors and actuators 20, switching and isolation 11, dev boards 6 — every group closed, so all sixteen headings fit on screen at once](docs/images/02-palette.png)
+![The component palette: a Find a part box at the top, "227 parts in 17 groups" under it, and the seventeen categories with their counts — passive 11, switches 5, sources 16, semiconductors 13, transistors 13, LEDs and displays 11, power 10, analog ICs 13, logic gates 14, 74xx series 30, 40xx series 15, buses 19, digital I/O 9, memory and CPUs 11, sensors and actuators 20, switching and isolation 11, dev boards 6 — every group closed, so all seventeen headings fit on screen at once](docs/images/02-palette.png)
 
 Selecting a component fills the properties panel. It is built by reflection, so a new component
 type gets a complete editor without any UI code:

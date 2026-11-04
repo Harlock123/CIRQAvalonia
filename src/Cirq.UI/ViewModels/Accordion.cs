@@ -12,7 +12,7 @@ public interface IExpandableGroup : INotifyPropertyChanged
 /// <summary>
 /// Keeps at most one group in a list open at a time.
 /// <para>
-/// The palette holds sixteen groups and the example browser twelve. Opened independently they
+/// The palette holds seventeen groups and the example browser fifteen. Opened independently they
 /// stack up: four open groups is more than a sidebar's height, so finding the fifth means
 /// scrolling past the four you already finished with. Closing the last one as the next opens keeps
 /// every heading on screen, which is what makes a long list browsable rather than a thing to
@@ -21,7 +21,7 @@ public interface IExpandableGroup : INotifyPropertyChanged
 /// <para>
 /// Bulk changes — an expand-all button, or a search opening everything it matched — go through
 /// <see cref="SetAll"/> and are exempt. Those are not somebody opening a group, and collapsing
-/// fifteen of the sixteen a button just opened would be an odd way to answer the button.
+/// sixteen of the seventeen a button just opened would be an odd way to answer the button.
 /// </para>
 /// </summary>
 public sealed class Accordion

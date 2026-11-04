@@ -81,7 +81,7 @@ write. Preferences are created on first use.
 
 ## The window
 
-![The CirqAvalonia editor running an RC low-pass: menu bar across the top, the component palette on the left with its Find a part box and sixteen closed groups, the schematic canvas in the centre with probe flags on the input and output, the properties panel on the right, the oscilloscope drawer across the bottom showing the square wave against the capacitor's charging curve, and the controls panel at the bottom right with the generator's frequency, amplitude, offset and duty](images/01-overview.png)
+![The CirqAvalonia editor running an RC low-pass: menu bar across the top, the component palette on the left with its Find a part box and seventeen closed groups, the schematic canvas in the centre with probe flags on the input and output, the properties panel on the right, the oscilloscope drawer across the bottom showing the square wave against the capacitor's charging curve, and the controls panel at the bottom right with the generator's frequency, amplitude, offset and duty](images/01-overview.png)
 
 Five regions, and they stay put:
 
@@ -167,7 +167,7 @@ Three of those are worth separating, because they are easy to confuse:
 
 ## Placing components
 
-![The component palette: a Find a part box at the top, "211 parts in 16 groups" under it, and the sixteen categories with their counts — passive 11, switches 5, sources 16, semiconductors 13, transistors 13, LEDs and displays 11, power 10, analog ICs 13, logic gates 14, 74xx series 25, 40xx series 15, buses 19, digital I/O 9, sensors and actuators 20, switching and isolation 11, dev boards 6 — every group closed, so all sixteen headings fit on screen at once](images/02-palette.png)
+![The component palette: a Find a part box at the top, "227 parts in 17 groups" under it, and the seventeen categories with their counts — passive 11, switches 5, sources 16, semiconductors 13, transistors 13, LEDs and displays 11, power 10, analog ICs 13, logic gates 14, 74xx series 30, 40xx series 15, buses 19, digital I/O 9, memory and CPUs 11, sensors and actuators 20, switching and isolation 11, dev boards 6 — every group closed, so all seventeen headings fit on screen at once](images/02-palette.png)
 
 Click a palette entry, then click the canvas. The part lands where you click, snapped to the grid.
 
@@ -2495,8 +2495,14 @@ performs therefore works here for the same reason it works on hardware.
 
 Two things catch people, and both behave here as they do on a real module. **Line two is an
 address, not a continuation**: running off the end of line one does not wrap onto it, you have to
-set the cursor to 0x40. And **reading is not modelled** — tie RW low. The busy flag is what RW is
-for, and virtually all driver code waits a fixed time instead of polling it.
+set the cursor to 0x40. And **it can be read**: with RW and E high it drives its data pins, RS low
+giving the **busy flag** on D7 and the address counter below it, RS high the character at the
+cursor. The flag is set for the datasheet's 37 µs after each byte and 1.52 ms after a clear or
+home, so code that polls it — the [6502 example](#a-6502-computer) does — waits as long as it would on
+a real module. Writes made while it is busy are still taken here, where a real controller would miss
+them; most driver code ties RW low and waits a fixed time, and reading never comes into it.
+
+The module's sixteen pins are along the top edge, pin 1 (VSS) at the left, as on the board's header.
 
 **File > Examples > Character LCD** drives one from an Arduino on the six pins everybody uses —
 `LiquidCrystal lcd(12, 11, 5, 4, 3, 2)`, so the wiring is the wiring on the breadboard. There is no
@@ -5534,10 +5540,11 @@ a breadboard. What is not modelled is anything inside a cycle that does not reac
 
 **How fast it runs.** Every one of those edges is a time point the solver lands on, and the whole
 board — about 150 unknowns — is solved at each, so this is not an emulator and does not run at one.
-Measured on the machine it was developed on (an 8-core ARM virtual machine), the Ben Eater computer
-runs at **about 5 to 10 ms of simulated time per second** in a release build, which at 1 MHz is
-5,000 to 10,000 instructions' worth of cycles a second; a debug build is two to three times slower.
-The hello world needs about 3.3 ms, so the text appears in under a second of solving. That is why
+Measured on the machine it was developed on (an 8-core ARM virtual machine, shared and busy), the Ben
+Eater computer runs at **about 5 to 20 ms of simulated time per second** in a release build — 5,000
+to 20,000 bus cycles a second at 1 MHz, the low end while the program is busy with the VIA and the
+LCD and the high end in a tight loop; a debug build is two to three times slower. The hello world
+needs about 3.3 ms, so the text appears in under a second of solving. That is why
 the examples run from the oscillator at **1 MHz**: a slower clock costs the same per cycle and only
 adds time steps between them, while a 1 MHz clock is the speed Ben Eater's machine famously also
 runs at. Logic-heavy circuits like this one got about four times faster in this release: the
@@ -5692,6 +5699,8 @@ cycles itself, the last 65,536 of them, so no probes are needed:
 $8000 LDX #$FF   R $8001 FF   $8002 TXS   R $8003 A9   $8003 LDA #$E0   R $8004 E0
 $8005 STA $6003   R $8006 03   R $8007 60   W $6003 E0   $8008 LDX #$00 ...
 ```
+
+![The bus decode window reading the 6502's bus: "Read as Cpu6502", a transcript of the first sixty cycles from the reset sequence's reads of $FFFC and $FFFD through LDX #$FF, TXS, LDA #$E0 and STA $6003 to the first JSR, and below it a row per cycle with its time, kind and text](images/48-bus-decode-6502.png)
 
 #### Single-stepping
 

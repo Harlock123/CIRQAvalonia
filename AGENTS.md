@@ -37,7 +37,12 @@ dotnet run --project src/Cirq.UI -- --mcp      # the MCP server on stdio, headle
   - The other files there are the analyses (AC, DC sweep, noise, Monte Carlo, pole-zero, stability and more).
   - `Numerics/` (LU solvers, FFT), `Digital/DigitalScheduler.cs` and `Decoding/` (I2C, SPI, UART, CAN, 1-Wire).
 - `src/Cirq.Components/`: the part library, one folder per family (`Passive`, `Nonlinear`, `Digital`, `Ics`,
-  `Buses`, `Boards` and more).
+  `Buses`, `Boards`, `Processors` and more).
+  - `Digital/ParallelMemory.cs` is every byte-wide ROM and RAM, built from a pin table (`MemoryChips.cs`);
+    `MemoryImage.cs` reads binary and Intel HEX images.
+  - `Processors/` is the 6502: `Mos6502Core` (the instruction set as bus cycles, no circuit),
+    `Opcodes6502` (the opcode table the core and the disassembler share), `Processor6502` (the 40-pin
+    parts, `Cpu65C02` and `Cpu6502`, clocked from their PHI2 pin), the 6522 and 6551, and the bus decoder.
   - `Serialization/` reads and writes `.cirq` files (indented JSON).
   - `Spice/` imports and exports SPICE models and netlists.
 - `src/Cirq.UI/`: the Avalonia editor.
@@ -60,8 +65,8 @@ dotnet run --project src/Cirq.UI -- --mcp      # the MCP server on stdio, headle
 - `src/Cirq.Cli/`: the `cirq` tool. `CommandLine.Run` takes its writers as arguments, so tests drive it without
   starting a process.
 - `tools/Cirq.Docs/`: turns the Markdown guide into print-ready HTML (Markdig). It is never shipped.
-- `tools/Cirq.Shots/`: draws the guide's palette picture (`docs/images/02-palette.png`, every group closed) and its AI
-  Chat screenshots (`docs/images/35-*.png`, `36-*.png`): the real editor
+- `tools/Cirq.Shots/`: draws the guide's palette picture (`docs/images/02-palette.png`, every group closed), the 6502
+  bus decode (`48-bus-decode-6502.png`) and its AI Chat screenshots (`docs/images/35-*.png`, `36-*.png`): the real editor
   in a headless window rendered by Skia, with Claude's side replayed from a script and the tool calls run for real.
   `dotnet run --project tools/Cirq.Shots -- docs/images`. Never shipped.
 - `tests/`: xUnit v2, one project per source project. `Cirq.UI.Tests/Support/HeadlessApp.cs` runs the real `App`
@@ -101,6 +106,21 @@ dotnet run --project src/Cirq.UI -- --mcp      # the MCP server on stdio, headle
   simulator, then write a transient's samples back into the probes. A new tool needs a `[Description]` on it and
   every parameter (snake_case names), and a place in `EndToEndTests.ToolNames`. Recipes are run call by call by
   `EndToEndTests`, so a recipe that stops working fails the build.
+- **Memory images travel in the file.** A memory part's `Contents` is its preset in hex (`@addr:` and
+  bytes, zero runs skipped), and `ParallelMemory.Load(MemoryImage)` writes a loaded binary or HEX file
+  into it, so a circuit opens complete. A reset puts the preset back; `Contents` reads what is there now.
+- **The 6502 core is a sequence of bus cycles.** Each instruction in `Mos6502Core` is an iterator that
+  yields once per cycle after setting `Address`, `IsRead` and `DataOut`; the caller does the cycle and
+  calls `Complete(data)`. Dummy reads and writes are real cycles and must stay exact. Test the core with
+  `Cpu6502CoreTests` (results, per-mode cycles, interrupts, a self-checking program built by the test-side
+  `Assembler6502`), and locally against Tom Harte's SingleStepTests (`65x02`: `6502/v1`, `wdc65c02/v1`)
+  and Klaus Dormann's functional tests, downloaded outside the repository — neither is committed, and
+  no test may need the network. Example ROMs are byte arrays in `Examples.cs`; a UI test assembles the
+  source the guide prints and checks the bytes match, so change both together.
+- **Runs hand back their end state.** A part implementing `IRunState` (processors, memories, the LCD) has
+  the state its copy ended in written back after an agent's `run_transient`.
+- **Logic speed.** The simulator reuses an LU factorisation while the stamped matrix is unchanged, so a
+  part must stamp through `MnaSystem.Add` (never write `Matrix` directly) or the reuse check misses it.
 - **No real Anthropic API in tests.** The chat tests answer from `FakeClaude` (an `HttpMessageHandler` replaying
   scripted streams) with a made-up key; window tests point the settings and the key file at a temp folder. The key
   is only ever shown masked.

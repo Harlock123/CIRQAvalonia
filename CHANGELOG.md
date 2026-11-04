@@ -8,6 +8,75 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+## [0.42.0] - 2026-11-04
+
+A computer you can build. A 65C02 and an NMOS 6502 that run their instruction sets cycle by cycle
+on their pins, a 6522 VIA and a 6551 ACIA, the EPROMs, EEPROM and RAMs they sit beside — loadable
+from binary and Intel HEX files — and the 74 series glue between them. Ben Eater's breadboard
+computer is an example, saying hello on its LCD. 227 components in 17 categories, 100 worked
+examples, 4122 tests.
+
+### Added
+
+**A 6502, cycle by cycle.** The W65C02S and the MOS 6502 are 40-pin parts on their datasheet
+pinouts, clocked from their PHI2 pin. Every instruction is the exact sequence of bus cycles the
+silicon performs — the dummy reads and writes included — and each cycle appears on the pins with
+the datasheet's timing: the address a moment after PHI2 falls, write data while it is high, and read
+data sampled as it falls, so address decoding and memory access times matter as they do on a
+breadboard. The 65C02 has the whole WDC instruction set (BRA, STZ, TSB/TRB, PHX/PLX, (zp), the bit
+instructions, WAI, STP) and correct decimal flags; the NMOS part has its decimal quirks, the
+JMP ($xxFF) bug and the undocumented opcodes. RESB, IRQB, NMIB, RDY, SOB and BE work as described.
+Both pass every case of the published per-cycle test suites, over five million of them.
+
+**The 6522 VIA and 6551 ACIA.** The VIA's two ports and direction registers, its handshake lines,
+both timers — including a square wave on PB7 with no software running — and its interrupt flags.
+The ACIA at 50 to 19,200 baud from a 1.8432 MHz crystal, talking to the Serial Terminal, whose
+symbol now shows the last two lines it received.
+
+**Memories by their part numbers.** The 2716, 2732, 2764 and 27C256 EPROMs, the 28C256 EEPROM —
+which writes as the real one does, a page load, a write cycle and data polling — and the 6116 and
+62256 static RAMs, each on its JEDEC pinout with its pin names printed on the symbol.
+**Edit > Load Memory Image...** reads a raw binary (at an offset you give) or an Intel HEX file into
+one, checksums checked and a bad line named; the image is saved inside the circuit.
+
+**Bus glue.** The 74139 dual 2-to-4 decoder, the 74244 octal buffer, the 74374 and 74574 octal
+D flip-flops and the 74573 transparent latch, all with tri-state outputs.
+
+**Two computers in File > Examples > Computers.** *Ben Eater 6502 Computer* — a 65C02, a 28C256, a
+62256 and a 6522 decoded by one 7400, as in his video series — prints "Hello, world!" on an HD44780,
+polling its busy flag before every byte. *6502 Serial Terminal* greets a terminal over a 6551 and
+echoes what it types. The guide prints both programs, with the memory map and how to single-step.
+
+**A 6502 bus decoder.** *Simulate > Decode Bus...* reads a processor's recorded bus: every cycle's
+address, data and direction, with the instruction disassembled on each opcode fetch.
+
+**Agent tools.** `load_memory` and `read_memory` put an image into a memory part and read its bytes
+back; `cpu_state` gives a processor's registers, flags and recent bus cycles; `disassemble` lists
+the code in a ROM. A transient run now leaves processors, memories and LCDs where it ended, and a
+new recipe tours the 6502 computer. 35 tools and seven recipes.
+
+### Changed
+
+**Logic-heavy circuits run about four times faster.** The solver keeps its factorisation while only
+logic levels change, solves over the factor's non-zero entries only, and clears only what was
+stamped.
+
+The HD44780 can be read: the busy flag, the address counter and the display memory, with the
+datasheet's execution times. Its pins are now along the top of the module, as the header is.
+
+A net label can be made **Compact** — the flag alone, without its designator and repeated name —
+for labelling a bus pin by pin.
+
+### Fixed
+
+**The Clock and the Oscillator could lose an edge** that landed exactly on a time point, because
+the phase was a plain floor and (n + ½) periods divided by the period is not always n + ½ in
+floating point. At a megahertz that was a missing clock cycle every few microseconds.
+
+**A logic output rescheduled to change sooner could still make the earlier, later change.** A part
+that asked for one level 150 ns away and then for another 50 ns away ended up at the first; the
+latest request now wins whenever either falls due.
+
 ## [0.41.1] - 2026-11-04
 
 A documentation release: nothing in the simulator changed.
@@ -2414,7 +2483,8 @@ First public build of CirqAvalonia — an electronic circuit analyzer and mixed-
 
 **501 tests** measure the solver against closed-form answers rather than recorded output.
 
-[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.41.1...HEAD
+[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.42.0...HEAD
+[0.42.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.41.1...v0.42.0
 [0.41.1]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.41.0...v0.41.1
 [0.41.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.40.0...v0.41.0
 [0.40.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.39.0...v0.40.0

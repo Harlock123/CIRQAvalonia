@@ -5,7 +5,7 @@ namespace Cirq.UI.Tests;
 /// <summary>
 /// Finding a part among two hundred-odd of them.
 /// <para>
-/// The palette is sixteen collapsible groups, and browsing only works if you already know which
+/// The palette is seventeen collapsible groups, and browsing only works if you already know which
 /// one a part lives in — that a 4017 is under "40xx Series", an optocoupler under "Switching &amp;
 /// Isolation", a thermistor under "Sensors &amp; Actuators". Somebody who knows they want a 555
 /// should not have to guess where it was filed.
@@ -27,7 +27,7 @@ public class PaletteSearchTests
         Assert.False(vm.IsPaletteSearching);
     }
 
-    /// <summary>Everything closed to begin with, so all sixteen headings are on screen at once.</summary>
+    /// <summary>Everything closed to begin with, so all seventeen headings are on screen at once.</summary>
     [Fact]
     public void TheGroupsStartClosed()
     {
