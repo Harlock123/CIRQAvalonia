@@ -412,7 +412,7 @@ and placed again, here or in another circuit — as a copy
 rather than a reference, which the docs say plainly rather than implying a link that is not there.
 **Notes, headings and boxes** can be put on the drawing too, and exports carry them.
 
-The palette has a **Find a part** box (`Ctrl+F`): 297 components in 17 groups is more than anybody
+The palette has a **Find a part** box (`Ctrl+F`): 299 components in 17 groups is more than anybody
 browses, and it matches on the name, on what the part does — `shift register` finds the 74164 — and
 on the group. Enter arms the first match, so a part can be found and placed without the mouse.
 
@@ -684,8 +684,8 @@ one passes against a button that would never have fired.
 | Files | Every component type round-trips with its parameters, pins, wires, waypoints and probes; a reloaded circuit solves to the same answer; damaged, unknown and newer-format files are handled without losing the open circuit |
 | Settings | Theme round-trips across a restart, corrupt and newer-format preference files fall back to defaults, opening the dialog writes nothing, choosing a theme saves immediately |
 | UI | Background transport, probe decimation, reflection-built inspector, dirty tracking, every example compiles, runs, saves and reopens, and both grouped lists opening one group at a time — starting closed, the open one closing as the next opens, bulk toggles exempt, and a search opening everything it matched and restoring the open group when cleared |
-| Copy and paste | A duplicate carrying every parameter including the model on an op-amp and the input count on a gate, its own designator and identity, a clipboard that survives the original being edited or deleted, repeated pastes cascading rather than stacking, an undoable paste, and every one of the 297 palette parts surviving the round trip |
-| Hover cards | A part described where it sits — designator, type, value, settings in operable-first order, a long list cut with a count, an oversized value shortened, the violations behind a red ring carried as words, and every one of the 297 palette parts describable without throwing |
+| Copy and paste | A duplicate carrying every parameter including the model on an op-amp and the input count on a gate, its own designator and identity, a clipboard that survives the original being edited or deleted, repeated pastes cascading rather than stacking, an undoable paste, and every one of the 299 palette parts surviving the round trip |
+| Hover cards | A part described where it sits — designator, type, value, settings in operable-first order, a long list cut with a count, an oversized value shortened, the violations behind a red ring carried as words, and every one of the 299 palette parts describable without throwing |
 | Convergence | A failure naming the net that was still moving and what is attached to it, the parts that say they have not settled listed separately from that — and a part that did not complain never blamed, because a branch current is a current inside a part rather than a place and is left unnamed rather than called a row number |
 | Arrange | Aligning left, right, top and bottom by the parts' edges and the two centre lines by their middles, a centre being the average so a selection does not drift, distributing leaving the two outermost exactly where they were with equal gaps between the rest, parts already in line left alone so nothing lands in the undo history for a move that did not happen, and everything rounded back onto the grid when snapping is on |
 | Find on sheet | An exact designator beating one that merely starts with the term, values and kinds and net names after that, case never mattering, a named net being one row however many parts are on it, blocks searched inside, and nothing matching nothing |
@@ -902,7 +902,7 @@ When the solver cannot find an answer it now says **where**: the net that was st
 attached to it, and any part that said it had not settled — all of which name somewhere on the
 drawing to go and look, which "try a smaller time step" does not.
 
-The palette holds 297 components in 17 collapsible categories, with a **Find a part** box
+The palette holds 299 components in 17 collapsible categories, with a **Find a part** box
 (`Ctrl+F`) over them. Among the newest: **a 6502 you can build a computer with** — a W65C02S and an
 NMOS 6502 that run their instruction sets cycle by cycle on their pins, a 6522 VIA and a 6551 ACIA,
 the 2716/2732/2764/27C256 EPROMs, a 28C256 EEPROM with page writes and data polling, 6116 and
@@ -913,7 +913,7 @@ tri-state buffer, a TIP120 Darlington, LM35 and TMP36 thermometers, a WS2812B Ne
 matrix keypad, Raspberry Pi Pico and ESP32 boards, and the 7483 / 74283 adders and 74192 / 74193
 up/down counters.
 
-![The component palette: a Find a part box at the top, "297 parts in 17 groups" under it, and the seventeen categories with their counts — passive 11, switches 5, sources 16, semiconductors 13, transistors 13, LEDs and displays 11, power 10, analog ICs 13, logic gates 14, 74xx series 74, 40xx series 41, buses 19, digital I/O 9, memory and CPUs 11, sensors and actuators 20, switching and isolation 11, dev boards 6 — every group closed, so all seventeen headings fit on screen at once](docs/images/02-palette.png)
+![The component palette: a Find a part box at the top, "299 parts in 17 groups" under it, and the seventeen categories with their counts — passive 11, switches 5, sources 16, semiconductors 13, transistors 13, LEDs and displays 11, power 10, analog ICs 13, logic gates 14, 74xx series 76, 40xx series 41, buses 19, digital I/O 9, memory and CPUs 11, sensors and actuators 20, switching and isolation 11, dev boards 6 — every group closed, so all seventeen headings fit on screen at once](docs/images/02-palette.png)
 
 Selecting a component fills the properties panel. It is built by reflection, so a new component
 type gets a complete editor without any UI code:

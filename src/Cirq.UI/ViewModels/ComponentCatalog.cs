@@ -331,6 +331,8 @@ public static class ComponentCatalog
                 () => new Ic74181()),
             new("74182", "Look-ahead carry generator for four 74181s — a 16-bit ALU without the ripple",
                 () => new Ic74182()),
+            new("74189", "16 × 4 static RAM, tri-state outputs that read back inverted", () => new Ic74189()),
+            new("74670", "4 × 4 register file, tri-state — read one word while writing another", () => new Ic74670()),
             new("74280", "9-bit odd/even parity generator and checker", () => new Ic74280()),
             new("74373", "Octal transparent latch — a wire while its enable is high, a memory after",
                 () => new Ic74373()),

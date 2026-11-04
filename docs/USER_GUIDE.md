@@ -167,11 +167,11 @@ Three of those are worth separating, because they are easy to confuse:
 
 ## Placing components
 
-![The component palette: a Find a part box at the top, "297 parts in 17 groups" under it, and the seventeen categories with their counts — passive 11, switches 5, sources 16, semiconductors 13, transistors 13, LEDs and displays 11, power 10, analog ICs 13, logic gates 14, 74xx series 74, 40xx series 41, buses 19, digital I/O 9, memory and CPUs 11, sensors and actuators 20, switching and isolation 11, dev boards 6 — every group closed, so all seventeen headings fit on screen at once](images/02-palette.png)
+![The component palette: a Find a part box at the top, "299 parts in 17 groups" under it, and the seventeen categories with their counts — passive 11, switches 5, sources 16, semiconductors 13, transistors 13, LEDs and displays 11, power 10, analog ICs 13, logic gates 14, 74xx series 76, 40xx series 41, buses 19, digital I/O 9, memory and CPUs 11, sensors and actuators 20, switching and isolation 11, dev boards 6 — every group closed, so all seventeen headings fit on screen at once](images/02-palette.png)
 
 Click a palette entry, then click the canvas. The part lands where you click, snapped to the grid.
 
-The palette holds **297 components in 17 categories**:
+The palette holds **299 components in 17 categories**:
 
 | Category | Count | Contents |
 | --- | --- | --- |
@@ -184,7 +184,7 @@ The palette holds **297 components in 17 categories**:
 | Power | 10 | Fixed and adjustable regulators, TL431 shunt reference, ICL7660 charge pump, MC34063 switching controller, **TP4056 lithium charger** — see [below](#charging-a-lithium-cell) |
 | Analog ICs | 13 | LM741, TL081, LM358, MCP6002 rail-to-rail, the **LM324 quad**, NE555, LM311, LM339, LM386 audio amp, INA126 instrumentation amp and an **AD633 analog multiplier** — see [below](#four-in-one-package) |
 | Logic Gates | 14 | AND, OR, NAND, NOR, XOR, XNOR, NOT, buffer and **tri-state buffer**, and the generic **D, JK and T flip-flops** and **SR and D latches** |
-| 74xx Series | 74 | Counters (including the synchronous **74161** and the **74192 / 74193 up/down counters**), the **7483 and 74283 adders**, decoders including the **74139**, flip-flops, shift registers, the **74245 bus transceiver**, **74244 buffer**, **74373 and 74573 latches** and **74374 and 74574 registers**, multiplexers, Schmitt inverter — see [below](#sharing-a-bus) |
+| 74xx Series | 76 | Counters (including the synchronous **74161** and the **74192 / 74193 up/down counters**), the **7483 and 74283 adders**, decoders including the **74139**, flip-flops, shift registers, the **74245 bus transceiver**, **74244 buffer**, **74373 and 74573 latches** and **74374 and 74574 registers**, multiplexers, Schmitt inverter — see [below](#sharing-a-bus) |
 | 40xx Series | 41 | CMOS gates, counters, flip-flops, analog switches and a **4046 phase-locked loop** — see [below](#phase-locked-loops) |
 | Buses | 19 | **Bus tap** and **bus line**, I2C master, EEPROM, port expander, DS1307 clock, ADS1115 ADC, MCP4725 DAC and INA219 current sensor, SPI master and **MCP3008 ADC**, 1-Wire master and DS18B20 thermometer, serial terminal and device, **RS-485**, **CAN** and **RS-232 (MAX232)** transceivers, level shifter — see [below](#making-its-own-rails) |
 | Digital I/O | 9 | Logic toggle, clock, **pattern generator**, rotary encoder, oscillator module, ADC and DAC bridges, and a **2K × 8 SRAM and ROM** — see [below](#something-worth-addressing) |
