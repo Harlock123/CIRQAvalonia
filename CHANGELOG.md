@@ -8,6 +8,65 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+## [0.41.0] - 2026-11-04
+
+A bigger toolbox: twenty new parts for the circuits people actually build first — a lamp that
+draws an inrush, flip-flops drawn the way they are taught, a TIP120, analog thermometers, a
+NeoPixel strip, a keypad, a Pico and an ESP32, and the adders and up/down counters from the 74
+series. 211 components in 16 categories, 98 worked examples, 3983 tests.
+
+### Added
+
+**An incandescent lamp.** Rated as a bulb is, by volts and watts, and modelled as a tungsten
+filament: power in, radiation out, and a heat capacity between them. Cold it is a tenth of its hot
+resistance, so switched on it draws ten times its running current for a few milliseconds — the
+inrush that blows fuses and kills lamps at switch-on — and the light follows the filament up,
+glowing dull red to white on the canvas. *Lamp Inrush* shows it.
+
+**Flip-flops, latches and buffers in the Logic Gates group.** D, JK and T flip-flops (rising edge, or
+falling with one setting), an SR latch and a D latch, a buffer, and a **tri-state buffer** whose
+output lets go of the wire so several can share it. Enable two that disagree and they meet
+mid-rail through their output resistances, sixty milliamps flowing between them, and both say so.
+The SR latch's forbidden state is the NOR pair's — both outputs low — and letting go of both at
+once is a race it reports as unknown rather than guesses at. *Ripple Counter* and *Tri-State Bus*.
+
+**A TIP120 Darlington**, modelled as the two transistors, two resistors and diode in the package:
+1.4 V to turn on, a volt across it saturated, a gain in the thousands. And the **2N2222** in the
+palette. *Darlington Lamp Dimmer* has an Arduino's PWM pin dimming a 12 V lamp through one.
+
+**LM35 and TMP36 temperature sensors** — 10 mV a degree, the TMP36 from a 500 mV offset so it reads
+below freezing. Each has its own temperature, double-click to warm it, or can follow the circuit's
+ambient so a DC sweep over temperature draws its line. *Analog Thermometer* reads both on an
+Arduino.
+
+**A WS2812B NeoPixel strip**, decoded the way the chip decodes it: a 0 or a 1 by how long the line
+is high, green-red-blue, the rest of the frame passed on out of DOUT to the next strip, and nothing
+shown until a 50 µs reset. Each pixel is drawn in the colour it was sent. A pattern generator at
+2.5 MHz plays the waveform, and *NeoPixel Chaser* runs a light along eight.
+
+**A 4×4 matrix keypad.** Double-click a key to press it. Sixteen contacts on eight wires and
+nothing else, so it has to be scanned — *Keypad Scanner* has an Arduino doing it — and three keys
+on a rectangle's corners ghost the fourth, as on a real one.
+
+**Raspberry Pi Pico and ESP32 DevKit boards**, with their real pinouts and everything the other
+boards do. The Pico's GP26–GP28 read as voltages; the ESP32's GPIO34–39 are input-only and its
+flash pins reserved. Both warn about 5 V on a pin. *Pico GPIO* and *ESP32 GPIO*.
+
+**The 74283 and 7483 adders and the 74192 and 74193 up/down counters**, on their datasheet
+pinouts, checked against all 512 sums and cascaded to 99 and back. A new **Counting & Arithmetic**
+group of examples has a 4-bit adder and an up/down counter driving a display.
+
+### Changed
+
+Text on a part turned half round — a toggle facing left, a net label pointing back — is drawn the
+right way up.
+
+### Fixed
+
+**A pattern generator at megahertz rates played some steps a time point late**, because the step a
+boundary starts was found with a plain floor and 3 × 0.4 µs ÷ 0.4 µs is 2.9999999. Harmless at a
+kilohertz; at the 2.5 MHz a NeoPixel needs, a pulse of the wrong width.
+
 ## [0.40.0] - 2026-10-31
 
 Claude, built in. An AI Chat panel builds, wires, probes and runs circuits on your canvas while you
