@@ -347,10 +347,10 @@ public class SevenSegmentTests
     [InlineData(3, 0b1111001)]
     [InlineData(4, 0b0110011)]
     [InlineData(5, 0b1011011)]
-    [InlineData(6, 0b1011111)]
+    [InlineData(6, 0b0011111)]   // no top bar: the 7447 draws 6 and 9 without tails
     [InlineData(7, 0b1110000)]
     [InlineData(8, 0b1111111)]
-    [InlineData(9, 0b1111011)]
+    [InlineData(9, 0b1110011)]   // no bottom bar
     public void DecoderProducesTheStandardGlyphForEachDigit(int value, int expected)
     {
         Assert.Equal(expected, Ic7447.PatternFor(value));

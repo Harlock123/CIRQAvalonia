@@ -107,11 +107,7 @@ public partial class SevenSegmentDisplay : CircuitComponent
                 if (_brightness[i] > 0.15)
                     pattern |= 1 << (6 - i);
 
-            for (var digit = 0; digit <= 9; digit++)
-                if (Digital.Ic7447.PatternFor(digit) == pattern)
-                    return digit;
-
-            return null;
+            return Digital.SevenSegmentGlyphs.DigitOf(pattern);
         }
     }
 
