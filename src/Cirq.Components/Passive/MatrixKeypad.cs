@@ -19,8 +19,8 @@ namespace Cirq.Components.Passive;
 /// </para>
 /// <para>
 /// Double-click a key on the canvas to press it, and again to let it go — or use its toggle in the
-/// CONTROLS panel. Pins are R1 to R4 down the left and C1 to C4 along the bottom, in the order a
-/// real module's eight-way connector has them.
+/// CONTROLS panel. The eight pins run along the bottom, R1 to R4 then C1 to C4, in the order a real
+/// module's ribbon connector has them.
 /// </para>
 /// </summary>
 public partial class MatrixKeypad : MechanicalContact, IPointInteractive
@@ -45,10 +45,11 @@ public partial class MatrixKeypad : MechanicalContact, IPointInteractive
 
     public MatrixKeypad()
     {
+        // All eight along the bottom edge, R1 on the left, as the module's ribbon has them.
         for (var i = 0; i < 4; i++)
         {
-            _rows[i] = new Terminal($"r{i + 1}", $"R{i + 1}", TerminalType.Passive, new Point(-80, KeyCentre(i)));
-            _columns[i] = new Terminal($"c{i + 1}", $"C{i + 1}", TerminalType.Passive, new Point(KeyCentre(i), 80));
+            _rows[i] = new Terminal($"r{i + 1}", $"R{i + 1}", TerminalType.Passive, new Point(PinX(i), PinY));
+            _columns[i] = new Terminal($"c{i + 1}", $"C{i + 1}", TerminalType.Passive, new Point(PinX(4 + i), PinY));
         }
 
         Terminals = [.. _rows, .. _columns];
@@ -93,6 +94,12 @@ public partial class MatrixKeypad : MechanicalContact, IPointInteractive
             return down.Length == 0 ? "none" : down;
         }
     }
+
+    /// <summary>How far below the centre the pins' ends are.</summary>
+    public const double PinY = 92.0;
+
+    /// <summary>Where along the bottom edge one of the eight pins is, R1 at 0 to C4 at 7.</summary>
+    public static double PinX(int index) => (index - 3.5) * 20.0;
 
     /// <summary>Where a key's row or column sits on the drawing.</summary>
     public static double KeyCentre(int index) => (index - 1.5) * KeyPitch;

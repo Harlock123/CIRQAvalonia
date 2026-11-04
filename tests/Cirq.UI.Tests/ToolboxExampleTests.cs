@@ -209,7 +209,7 @@ public class ToolboxExampleTests
 
         sim.Run(3e-3);
 
-        Assert.Contains("GP14=1", pico.InputSummary);
+        Assert.Contains("GP20=1", pico.InputSummary);
         Assert.Contains("GP26=0.75V", pico.InputSummary);
 
         pico.CheckLimits(sim.System);
@@ -217,7 +217,7 @@ public class ToolboxExampleTests
 
         vm.Circuit.Components.OfType<PushButton>().Single().Interact();
         sim.Run(1e-3);
-        Assert.Contains("GP14=0", pico.InputSummary);
+        Assert.Contains("GP20=0", pico.InputSummary);
     }
 
     [Fact]
@@ -229,9 +229,9 @@ public class ToolboxExampleTests
 
         sim.Run(3e-3);
 
-        // The wiper at 0.3 of 3.3 V.
-        Assert.Contains("GPIO34=0.99V", esp.InputSummary);
-        Assert.Contains("GPIO4=1", esp.InputSummary);
+        // The wiper three tenths of the way from the 3V3 end: 70 % of 3.3 V.
+        Assert.Contains("GPIO34=2.31V", esp.InputSummary);
+        Assert.Contains("GPIO17=1", esp.InputSummary);
 
         esp.CheckLimits(sim.System);
         Assert.Empty(esp.Violations);

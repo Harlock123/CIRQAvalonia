@@ -23,7 +23,32 @@ namespace Cirq.UI.Rendering;
 /// </summary>
 public static class SymbolRenderer
 {
+    /// <summary>
+    /// True while a part turned more than a quarter and less than three quarters is being drawn,
+    /// so the text on it can be turned back the right way up. Thread-static because the canvas,
+    /// the exporter and a headless agent can each be drawing at once.
+    /// </summary>
+    [ThreadStatic]
+    private static bool _upsideDown;
+
     public static void Draw(ISymbolCanvas context, CircuitComponent component, double zoom, bool isSelected)
+    {
+        ArgumentNullException.ThrowIfNull(component);
+
+        var turned = ((component.RotationDegrees % 360) + 360) % 360;
+        _upsideDown = turned is > 90 and < 270;
+
+        try
+        {
+            DrawSymbol(context, component, zoom, isSelected);
+        }
+        finally
+        {
+            _upsideDown = false;
+        }
+    }
+
+    private static void DrawSymbol(ISymbolCanvas context, CircuitComponent component, double zoom, bool isSelected)
     {
         var stroke = isSelected ? CanvasTheme.SelectionBrush : CanvasTheme.SymbolBrush;
         var pen = CanvasTheme.Pen(stroke, 1.8, zoom);
@@ -2169,9 +2194,11 @@ public static class SymbolRenderer
                 (column - ((perRow - 1) / 2.0)) * 24.0,
                 (row - ((rows - 1) / 2.0)) * 24.0);
 
+            // Drawn at the brightness it was sent rather than at an LED's on-or-off: a strip is how
+            // fades and tails are made, and a pixel at a sixteenth has to look like one.
             var p = pixels[i];
             var peak = Math.Max(p.R, Math.Max(p.G, p.B)) / 255.0;
-            var lit = CanvasTheme.Emission(Math.Sqrt(peak));
+            var lit = peak < 0.004 ? 0.0 : Math.Clamp(0.15 + (0.85 * Math.Sqrt(peak)), 0, 1);
             var square = new Rect(centre.X - 9, centre.Y - 9, 18, 18);
 
             if (lit > 0)
@@ -2182,8 +2209,11 @@ public static class SymbolRenderer
                 var colour = CanvasTheme.Emitted(Color.FromRgb(
                     (byte)Math.Min(255, p.R * scale), (byte)Math.Min(255, p.G * scale), (byte)Math.Min(255, p.B * scale)));
 
+                // Blended up from the dark of the body, so a dim pixel reads as dim rather than pale.
+                var dark = CanvasTheme.SymbolFill is ISolidColorBrush fill ? fill.Color : Colors.Black;
+
                 context.DrawEllipse(Wash(colour, 0.3 * lit), null, centre, 14, 14);
-                context.DrawRectangle(new SolidColorBrush(Blend(SymbolColour, colour, lit)), thin, new RoundedRect(square, 3));
+                context.DrawRectangle(new SolidColorBrush(Blend(dark, colour, lit)), thin, new RoundedRect(square, 3));
             }
             else
             {
@@ -2208,14 +2238,12 @@ public static class SymbolRenderer
     /// </summary>
     private static void DrawKeypad(ISymbolCanvas context, IPen pen, double zoom, MatrixKeypad keypad)
     {
-        const double edge = 62;
-        var body = new Rect(-edge, -edge, edge * 2, edge * 2);
+        // Wider than the keys, so the ribbon's eight pins all leave from under the body.
+        const double edge = 62, side = 82, bottom = 74;
+        var body = new Rect(-side, -edge, side * 2, edge + bottom);
 
-        foreach (var row in keypad.Rows)
-            context.DrawLine(pen, new Point(row.CanvasOffset.X, row.CanvasOffset.Y), new Point(-edge, row.CanvasOffset.Y));
-
-        foreach (var column in keypad.Columns)
-            context.DrawLine(pen, new Point(column.CanvasOffset.X, column.CanvasOffset.Y), new Point(column.CanvasOffset.X, edge));
+        foreach (var pin in keypad.Terminals)
+            context.DrawLine(pen, new Point(pin.CanvasOffset.X, pin.CanvasOffset.Y), new Point(pin.CanvasOffset.X, bottom));
 
         context.DrawRectangle(CanvasTheme.SymbolFill, pen, new RoundedRect(body, 5));
 
@@ -2239,11 +2267,9 @@ public static class SymbolRenderer
 
         if (zoom <= 0.55) return;
 
-        foreach (var row in keypad.Rows)
-            DrawAlignedText(context, row.Name, new Point(-edge - 2, row.CanvasOffset.Y - 7), 7, zoom, CanvasTheme.LabelBrush, alignLeft: false);
-
-        foreach (var column in keypad.Columns)
-            DrawCenteredText(context, column.Name, new Point(column.CanvasOffset.X + 9, edge + 8), 7, zoom, CanvasTheme.LabelBrush);
+        // The pin names in the strip under the keys, each over its own lead.
+        foreach (var pin in keypad.Terminals)
+            DrawCenteredText(context, pin.Name, new Point(pin.CanvasOffset.X, 65), 6.5, zoom, CanvasTheme.LabelBrush);
     }
 
     /// <summary>A deeper shade of an emitted colour, for the edge of something lit by it.</summary>
@@ -2896,7 +2922,7 @@ public static class SymbolRenderer
         ChargePump => 52.0,
         SwitchingRegulator => 66.0,
         DipSwitch => 94.0,
-        MatrixKeypad => 96.0,
+        MatrixKeypad => 112.0,
         CharacterLcd => 72.0,
 
         // These are drawn as packages sized to their own pins, so the caption has to clear them.
@@ -2912,6 +2938,10 @@ public static class SymbolRenderer
         TransmissionLine => 62.0,
         ReedSwitch => 34.0,
         Ds18b20 or OneWireMaster or TemperatureSensorIc => 56.0,
+
+        // The lamp's glow reaches 34, and a Darlington's circle 32.
+        IncandescentLamp => 42.0,
+        DarlingtonTransistor => 46.0,
         AnalogMultiplier => 52.0,
         CommonModeChoke => 52.0,
         Rs485Transceiver => 78.0,
@@ -3012,11 +3042,13 @@ public static class SymbolRenderer
         ISymbolCanvas context, string text, Point anchor, double screenSize, double zoom,
         IBrush brush, bool alignLeft)
     {
+        // On a part turned upside down the glyphs are turned back round, and the alignment swaps
+        // with them so the text still runs from the anchor into the body rather than out of it.
         using (context.PushTransform(
-                   Matrix.CreateScale(1 / zoom, 1 / zoom) * Matrix.CreateTranslation(anchor.X, anchor.Y)))
+                   Matrix.CreateScale(1 / zoom, 1 / zoom) * Upright() * Matrix.CreateTranslation(anchor.X, anchor.Y)))
         {
             context.DrawText(text, default, screenSize, brush,
-                alignLeft ? SymbolTextAlign.Left : SymbolTextAlign.Right);
+                alignLeft != _upsideDown ? SymbolTextAlign.Left : SymbolTextAlign.Right);
         }
     }
 
@@ -3262,9 +3294,16 @@ public static class SymbolRenderer
         ISymbolCanvas context, string text, Point center, double screenSize, double zoom, IBrush brush)
     {
         using (context.PushTransform(
-                   Matrix.CreateScale(1 / zoom, 1 / zoom) * Matrix.CreateTranslation(center.X, center.Y)))
+                   Matrix.CreateScale(1 / zoom, 1 / zoom) * Upright() * Matrix.CreateTranslation(center.X, center.Y)))
         {
             context.DrawText(text, default, screenSize, brush, SymbolTextAlign.Centre);
         }
     }
+
+    /// <summary>
+    /// Half a turn for the text on an upside-down part — a net label pointing left, a toggle facing
+    /// the other way — which would otherwise be drawn on its head. A part on its side keeps its text
+    /// running up the page, as a drawing office would letter it.
+    /// </summary>
+    private static Matrix Upright() => _upsideDown ? Matrix.CreateRotation(Math.PI) : Matrix.Identity;
 }

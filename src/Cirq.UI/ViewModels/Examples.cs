@@ -930,56 +930,89 @@ public static class Examples
     }
 
     /// <summary>
-    /// A 74283 adding two four-bit numbers. The top row of toggles is A (0101, five), the bottom row
-    /// B (0110, six), and the lone one is the carry in, set — so the LEDs read 01100, twelve, with
-    /// C4 dark. Flip any toggle to add something else; set them all and C4 lights for the 31 that
-    /// four bits cannot hold.
+    /// A 74283 adding two four-bit numbers. A is 0101 (five) and B is 0110 (six), set on the toggles
+    /// beside the pins they drive, and the carry in is set — so S1 to S4 read 0011 from the bottom
+    /// up, twelve, with C4 dark. Flip any toggle to add something else; set them all and C4 lights
+    /// for the 31 that four bits cannot hold.
     /// </summary>
     public static void LoadFourBitAdder(MainWindowViewModel vm)
     {
         var circuit = vm.Circuit;
         circuit.Title = "74283 four-bit adder";
 
-        var supply = Place(circuit, new DcVoltageSource(5.0), -480, 280);
-        supply.RotationDegrees = 90;
-        var gnd = Place(circuit, new Ground(), -480, 420);
-        var ledGround = Place(circuit, new Ground(), 380, 340);
-
-        var adder = Place(circuit, new Ic74283(), 0, 0);
-
-        circuit.Connect(supply.Negative, gnd.Pin);
-        circuit.Connect(adder.Vcc, supply.Positive);
-        circuit.Connect(adder.Gnd, gnd.Pin);
-
         const int a = 5;
         const int b = 6;
 
-        for (var i = 0; i < 4; i++)
-        {
-            var toggleA = Place(circuit, new LogicToggle(((a >> i) & 1) == 1), -340, -150 + (i * 50));
-            var toggleB = Place(circuit, new LogicToggle(((b >> i) & 1) == 1), -200, -150 + (i * 50));
+        var adder = Place(circuit, new Ic74283(), 0, 0);
 
-            circuit.Connect(toggleA.Out, adder.A[i]);
-            circuit.Connect(toggleB.Out, adder.B[i]);
+        // Each toggle sits level with the pin it drives, on the side of the package that pin is on,
+        // staggered into two columns so the wires from the outer one pass between the inner ones.
+        // The ones on the right face left.
+        LogicToggle Toggle(Terminal pin, bool high, int column)
+        {
+            var at = pin.AbsolutePosition;
+            var right = at.X > 0;
+            var x = (right ? 1 : -1) * (column == 0 ? 150 : 260);
+            var toggle = Place(circuit, new LogicToggle(high), x, at.Y);
+            if (right) toggle.RotationDegrees = 180;
+            circuit.Connect(toggle.Out, pin);
+            return toggle;
         }
 
-        var carryIn = Place(circuit, new LogicToggle(true), -270, 150);
-        circuit.Connect(carryIn.Out, adder.CarryIn);
+        // Left side, top to bottom: B2, A2, A1, B1, C0. Right side: B3, A3, A4, B4.
+        Toggle(adder.B[1], ((b >> 1) & 1) == 1, 0);
+        Toggle(adder.A[1], ((a >> 1) & 1) == 1, 1);
+        Toggle(adder.A[0], ((a >> 0) & 1) == 1, 0);
+        Toggle(adder.B[0], ((b >> 0) & 1) == 1, 1);
+        Toggle(adder.CarryIn, true, 0);
+        Toggle(adder.B[2], ((b >> 2) & 1) == 1, 0);
+        Toggle(adder.A[2], ((a >> 2) & 1) == 1, 1);
+        Toggle(adder.A[3], ((a >> 3) & 1) == 1, 0);
+        Toggle(adder.B[3], ((b >> 3) & 1) == 1, 1);
 
-        // S1 to S4 and C4, least significant at the top.
-        Terminal[] outputs = [.. adder.Sum, adder.CarryOut];
-        string[] colours = ["Green", "Green", "Green", "Green", "Red"];
+        var supply = Place(circuit, new DcVoltageSource(5.0), 200, -200);
+        supply.RotationDegrees = 90;
+        var gndSupply = Place(circuit, new Ground(), 200, -100);
+        var gndIc = Place(circuit, new Ground(), -100, 130);
 
-        for (var i = 0; i < outputs.Length; i++)
+        circuit.Connect(supply.Positive, adder.Vcc);
+        circuit.Connect(supply.Negative, gndSupply.Pin);
+        circuit.Connect(adder.Gnd, gndIc.Pin);
+
+        var gndLeft = Place(circuit, new Ground(), -540, 60);
+        var gndRight = Place(circuit, new Ground(), 540, 220);
+
+        // An LED on each output, on the side the output is on: S1 and S2 to the left, the rest to
+        // the right. Where two outputs are pins next to each other, one is taken up or down a row.
+        void Lamp(Terminal output, double row, string colour)
         {
-            var y = -120 + (i * 50);
-            var resistor = Place(circuit, new Resistor(330), 180, y);
-            var led = Place(circuit, Led.OfColour(colours[i]), 300, y);
+            var at = output.AbsolutePosition;
+            var right = at.X > 0;
+            var side = right ? 1 : -1;
 
-            circuit.Connect(outputs[i], resistor.A);
-            circuit.Connect(resistor.B, led.Anode);
-            circuit.Connect(led.Cathode, ledGround.Pin);
+            var resistor = Place(circuit, new Resistor(330), side * 330, row);
+            var led = Place(circuit, Led.OfColour(colour), side * 450, row);
+            if (!right) led.RotationDegrees = 180;
+
+            var feed = circuit.Connect(output, right ? resistor.A : resistor.B);
+            if (Math.Abs(row - at.Y) > 1e-9)
+            {
+                feed.Waypoints.Add(new Cirq.Core.Primitives.Point(side * 280, at.Y));
+                feed.Waypoints.Add(new Cirq.Core.Primitives.Point(side * 280, row));
+            }
+
+            circuit.Connect(right ? resistor.B : resistor.A, led.Anode);
+
+            var ground = right ? gndRight : gndLeft;
+            var back = circuit.Connect(led.Cathode, ground.Pin);
+            back.Waypoints.Add(new Cirq.Core.Primitives.Point(side * 540, row));
         }
+
+        Lamp(adder.Sum[0], adder.Sum[0].AbsolutePosition.Y, "Green");
+        Lamp(adder.Sum[1], -130, "Green");
+        Lamp(adder.Sum[2], adder.Sum[2].AbsolutePosition.Y, "Green");
+        Lamp(adder.Sum[3], 70, "Green");
+        Lamp(adder.CarryOut, 150, "Red");
 
         vm.Scope.TimebasePerDivision = 1e-3;
         vm.Scope.VoltsPerDivision = 2.0;
@@ -1358,7 +1391,9 @@ public static class Examples
                    "D6=in-pullup; D7=in-pullup; D8=in-pullup; D9=in-pullup",
         }, -340, 0);
 
-        var keypad = Place(circuit, new MatrixKeypad(), 140, -60);
+        // Above the board's pins, so each wire runs out and up into the keypad's ribbon without
+        // crossing another: D2 to R1 on the left, out to D9 and C4 on the right.
+        var keypad = Place(circuit, new MatrixKeypad(), 160, -290);
         keypad.SetPressed("5", true);
 
         var gndBoard = Place(circuit, new Ground(), -340, 380);
@@ -1379,51 +1414,57 @@ public static class Examples
     }
 
     /// <summary>
-    /// A Raspberry Pi Pico doing the three things a first program does: PWM on GP15 dims an LED, GP14
-    /// reads a button on its internal pull-up, and GP26 — ADC0 — reads a TMP36 run from the board's
-    /// own 3V3 pin. A TMP36 rather than an LM35 because it works from 3.3 V and the LM35 needs four.
-    /// The board's status line shows what GP14 and GP26 read; double-click the sensor to warm it.
+    /// A Raspberry Pi Pico doing the three things a first program does: PWM on GP16 dims an LED,
+    /// GP20 reads a button on its internal pull-up, and GP26 — ADC0 — reads a TMP36 run from the
+    /// board's own 3V3 pin. A TMP36 rather than an LM35 because it works from 3.3 V and the LM35
+    /// needs four. The board's status line shows what GP20 and GP26 read; double-click the sensor to
+    /// warm it, or the button to press it.
     /// </summary>
     public static void LoadPicoGpio(MainWindowViewModel vm)
     {
         var circuit = vm.Circuit;
         circuit.Title = "Raspberry Pi Pico GPIO";
 
-        var pico = Place(circuit, new RaspberryPiPicoBoard { Pins = "GP15=pwm@1kHz:40%; GP14=in-pullup; GP26=in" }, -300, 0);
+        var pico = Place(circuit, new RaspberryPiPicoBoard { Pins = "GP16=pwm@1kHz:40%; GP20=in-pullup; GP26=in" }, -300, 0);
+
+        // Everything on the right-hand header, each part level with the pin it hangs off.
+        var sensor = Place(circuit, new TemperatureSensorIc(TemperatureSensorModel.Tmp36) { Temperature = 25.0 }, 80, -90);
+        var button = Place(circuit, new PushButton(), -40, 90);
 
         // 3.3 V through 150 Ω and a red LED is about 10 mA, inside the 12 mA a Pico pin can be set to.
-        var resistor = Place(circuit, new Resistor(150), -60, 240);
-        var led = Place(circuit, Led.OfColour("Red"), 80, 240);
-        var button = Place(circuit, new PushButton(), -60, 160);
-        var sensor = Place(circuit, new TemperatureSensorIc(TemperatureSensorModel.Tmp36) { Temperature = 25.0 }, 60, -60);
+        var resistor = Place(circuit, new Resistor(150), -40, 190);
+        var led = Place(circuit, Led.OfColour("Red"), 100, 190);
 
         var gndBoard = Place(circuit, new Ground(), -300, 340);
-        var gnd = Place(circuit, new Ground(), 200, 320);
+        var gndSensor = Place(circuit, new Ground(), -30, -20);
+        var gndButton = Place(circuit, new Ground(), 60, 140);
+        var gndLed = Place(circuit, new Ground(), 220, 250);
 
         circuit.Connect(pico.GroundPins[0], gndBoard.Pin);
 
-        circuit.Connect(pico.Pin("GP15"), resistor.A);
-        circuit.Connect(resistor.B, led.Anode);
-        circuit.Connect(led.Cathode, gnd.Pin);
-
-        circuit.Connect(pico.Pin("GP14"), button.A);
-        circuit.Connect(button.B, gnd.Pin);
-
         circuit.Connect(pico.Pin("3V3"), sensor.Supply);
-        circuit.Connect(sensor.Ground, gnd.Pin);
-        circuit.Connect(sensor.Output, pico.Pin("GP26"));
+        circuit.Connect(pico.Pin("GP26"), sensor.Output);
+        var sensorGround = circuit.Connect(sensor.Ground, gndSensor.Pin);
+        sensorGround.Waypoints.Add(new Cirq.Core.Primitives.Point(-30, -70));
+
+        circuit.Connect(pico.Pin("GP20"), button.A);
+        circuit.Connect(button.B, gndButton.Pin);
+
+        circuit.Connect(pico.Pin("GP16"), resistor.A);
+        circuit.Connect(resistor.B, led.Anode);
+        circuit.Connect(led.Cathode, gndLed.Pin);
 
         vm.Scope.TimebasePerDivision = 1e-3;
         vm.Scope.VoltsPerDivision = 1.0;
         vm.Scope.Layout = ScopeLayout.Tiled;
-        vm.Scope.AddProbe(pico.Pin("GP15"), "PWM");
-        vm.Scope.AddProbe(pico.Pin("GP14"), "Button");
+        vm.Scope.AddProbe(pico.Pin("GP16"), "PWM");
+        vm.Scope.AddProbe(pico.Pin("GP20"), "Button");
         vm.Scope.AddProbe(pico.Pin("GP26"), "TMP36");
     }
 
     /// <summary>
     /// An ESP32 DevKit: GPIO2 clocks an LED, GPIO34 reads a potentiometer across the 3V3 rail, and
-    /// GPIO4 reads a button on its pull-up. GPIO34 is one of the six pins with no output driver at
+    /// GPIO17 reads a button on its pull-up. GPIO34 is one of the six pins with no output driver at
     /// all — they can only be read, which makes them the natural place for an analog input. Move the
     /// knob in the CONTROLS panel and watch the board's status line follow it.
     /// </summary>
@@ -1432,35 +1473,41 @@ public static class Examples
         var circuit = vm.Circuit;
         circuit.Title = "ESP32 GPIO";
 
-        var esp = Place(circuit, new Esp32DevKitBoard { Pins = "GPIO2=clock@500Hz; GPIO34=in; GPIO4=in-pullup" }, -300, 0);
+        var esp = Place(circuit, new Esp32DevKitBoard { Pins = "GPIO2=clock@500Hz; GPIO34=in; GPIO17=in-pullup" }, -300, 0);
 
-        var resistor = Place(circuit, new Resistor(220), -40, 120);
-        var led = Place(circuit, Led.OfColour("Blue"), 100, 120);
-        var button = Place(circuit, new PushButton(), -40, 200);
-        var knob = Place(circuit, new Potentiometer(10e3, 0.3), 60, -160);
+        // GPIO34 and 3V3 are on the left-hand header, so the knob is on the left, turned so its
+        // wiper faces the pin.
+        var knob = Place(circuit, new Potentiometer(10e3, 0.3), -520, -100);
+        knob.RotationDegrees = 90;
+
+        var button = Place(circuit, new PushButton(), -40, 20);
+        var resistor = Place(circuit, new Resistor(220), -40, 100);
+        var led = Place(circuit, Led.OfColour("Blue"), 100, 100);
 
         var gndBoard = Place(circuit, new Ground(), -300, 320);
-        var gnd = Place(circuit, new Ground(), 220, 300);
+        var gndKnob = Place(circuit, new Ground(), -540, 0);
+        var gndButton = Place(circuit, new Ground(), 300, 80);
+        var gndLed = Place(circuit, new Ground(), 220, 160);
 
         circuit.Connect(esp.GroundPins[0], gndBoard.Pin);
 
+        circuit.Connect(esp.Pin("3V3"), knob.A);
+        circuit.Connect(knob.B, gndKnob.Pin);
+        circuit.Connect(esp.Pin("GPIO34"), knob.Wiper);
+
+        circuit.Connect(esp.Pin("GPIO17"), button.A);
+        circuit.Connect(button.B, gndButton.Pin);
+
         circuit.Connect(esp.Pin("GPIO2"), resistor.A);
         circuit.Connect(resistor.B, led.Anode);
-        circuit.Connect(led.Cathode, gnd.Pin);
-
-        circuit.Connect(esp.Pin("GPIO4"), button.A);
-        circuit.Connect(button.B, gnd.Pin);
-
-        circuit.Connect(esp.Pin("3V3"), knob.B);
-        circuit.Connect(knob.A, gnd.Pin);
-        circuit.Connect(knob.Wiper, esp.Pin("GPIO34"));
+        circuit.Connect(led.Cathode, gndLed.Pin);
 
         vm.Scope.TimebasePerDivision = 1e-3;
         vm.Scope.VoltsPerDivision = 1.0;
         vm.Scope.Layout = ScopeLayout.Tiled;
         vm.Scope.AddProbe(esp.Pin("GPIO2"), "LED");
         vm.Scope.AddProbe(esp.Pin("GPIO34"), "Knob");
-        vm.Scope.AddProbe(esp.Pin("GPIO4"), "Button");
+        vm.Scope.AddProbe(esp.Pin("GPIO17"), "Button");
     }
 
     /// <summary>
@@ -5579,22 +5626,34 @@ public static class Examples
         circuit.Title = "Analog thermometer";
 
         var uno = Place(circuit, new ArduinoUnoBoard { Pins = "A0=in; A1=in" }, -340, 0);
-        var lm35 = Place(circuit, new TemperatureSensorIc(TemperatureSensorModel.Lm35) { Temperature = 25.0 }, 60, -120);
-        var tmp36 = Place(circuit, new TemperatureSensorIc(TemperatureSensorModel.Tmp36) { Temperature = 25.0 }, 60, 100);
+
+        // To the left of the board, because that is the side its analog header is on: each output
+        // faces its pin, and the 5 V rail comes round the outside of both sensors.
+        var lm35 = Place(circuit, new TemperatureSensorIc(TemperatureSensorModel.Lm35) { Temperature = 25.0 }, -565, -10);
+        var tmp36 = Place(circuit, new TemperatureSensorIc(TemperatureSensorModel.Tmp36) { Temperature = 25.0 }, -565, 170);
 
         var gndBoard = Place(circuit, new Ground(), -340, 360);
-        var gnd = Place(circuit, new Ground(), -100, 240);
+        var gndLm35 = Place(circuit, new Ground(), -635, 50);
+        var gndTmp36 = Place(circuit, new Ground(), -635, 230);
 
         circuit.Connect(uno.GroundPins[0], gndBoard.Pin);
 
-        foreach (var sensor in new[] { lm35, tmp36 })
-        {
-            circuit.Connect(uno.Pin("5V"), sensor.Supply);
-            circuit.Connect(sensor.Ground, gnd.Pin);
-        }
+        var rail = circuit.Connect(uno.Pin("5V"), lm35.Supply);
+        rail.Waypoints.Add(new Cirq.Core.Primitives.Point(-700, -90));
+        rail.Waypoints.Add(new Cirq.Core.Primitives.Point(-700, -30));
+
+        var onward = circuit.Connect(lm35.Supply, tmp36.Supply);
+        onward.Waypoints.Add(new Cirq.Core.Primitives.Point(-700, -30));
+        onward.Waypoints.Add(new Cirq.Core.Primitives.Point(-700, 150));
+
+        circuit.Connect(lm35.Ground, gndLm35.Pin);
+        circuit.Connect(tmp36.Ground, gndTmp36.Pin);
 
         circuit.Connect(lm35.Output, uno.Pin("A0"));
-        circuit.Connect(tmp36.Output, uno.Pin("A1"));
+
+        var second = circuit.Connect(uno.Pin("A1"), tmp36.Output);
+        second.Waypoints.Add(new Cirq.Core.Primitives.Point(-470, 10));
+        second.Waypoints.Add(new Cirq.Core.Primitives.Point(-470, 170));
 
         vm.Scope.TimebasePerDivision = 1e-3;
         vm.Scope.VoltsPerDivision = 0.2;
@@ -5641,18 +5700,19 @@ public static class Examples
             frames.Add(frame);
         }
 
+        // The generator's first line sits level with DIN, so the data runs straight across.
         var generator = Place(circuit, new PatternGenerator
         {
             Pattern = NeoPixelStrip.PatternFor(frames),
             StepRate = NeoPixelStrip.PatternStepRate,
             Levels = LogicLevels.Cmos5V,
-        }, -320, 0);
+        }, -360, 30);
 
-        var supply = Place(circuit, new DcVoltageSource(5.0), -320, 220);
+        var supply = Place(circuit, new DcVoltageSource(5.0), -240, -170);
         supply.RotationDegrees = 90;
         var strip = Place(circuit, new NeoPixelStrip { PixelCount = pixels }, 80, 0);
 
-        var gnd = Place(circuit, new Ground(), -320, 360);
+        var gnd = Place(circuit, new Ground(), -240, -70);
         var gnd2 = Place(circuit, new Ground(), -60, 120);
 
         circuit.Connect(supply.Negative, gnd.Pin);
