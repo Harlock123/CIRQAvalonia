@@ -170,7 +170,7 @@ Three of those are worth separating, because they are easy to confuse:
 
 Click a palette entry, then click the canvas. The part lands where you click, snapped to the grid.
 
-The palette holds **211 components in 16 categories**:
+The palette holds **223 components in 17 categories**:
 
 | Category | Count | Contents |
 | --- | --- | --- |
@@ -183,10 +183,11 @@ The palette holds **211 components in 16 categories**:
 | Power | 10 | Fixed and adjustable regulators, TL431 shunt reference, ICL7660 charge pump, MC34063 switching controller, **TP4056 lithium charger** — see [below](#charging-a-lithium-cell) |
 | Analog ICs | 13 | LM741, TL081, LM358, MCP6002 rail-to-rail, the **LM324 quad**, NE555, LM311, LM339, LM386 audio amp, INA126 instrumentation amp and an **AD633 analog multiplier** — see [below](#four-in-one-package) |
 | Logic Gates | 14 | AND, OR, NAND, NOR, XOR, XNOR, NOT, buffer and **tri-state buffer**, and the generic **D, JK and T flip-flops** and **SR and D latches** |
-| 74xx Series | 25 | Counters (including the synchronous **74161** and the **74192 / 74193 up/down counters**), the **7483 and 74283 adders**, decoders, flip-flops, shift registers, the **74245 bus transceiver** and **74373 latch**, multiplexers, Schmitt inverter — see [below](#sharing-a-bus) |
+| 74xx Series | 30 | Counters (including the synchronous **74161** and the **74192 / 74193 up/down counters**), the **7483 and 74283 adders**, decoders including the **74139**, flip-flops, shift registers, the **74245 bus transceiver**, **74244 buffer**, **74373 and 74573 latches** and **74374 and 74574 registers**, multiplexers, Schmitt inverter — see [below](#sharing-a-bus) |
 | 40xx Series | 15 | CMOS gates, counters, flip-flops, analog switches and a **4046 phase-locked loop** — see [below](#phase-locked-loops) |
 | Buses | 19 | **Bus tap** and **bus line**, I2C master, EEPROM, port expander, DS1307 clock, ADS1115 ADC, MCP4725 DAC and INA219 current sensor, SPI master and **MCP3008 ADC**, 1-Wire master and DS18B20 thermometer, serial terminal and device, **RS-485**, **CAN** and **RS-232 (MAX232)** transceivers, level shifter — see [below](#making-its-own-rails) |
 | Digital I/O | 9 | Logic toggle, clock, **pattern generator**, rotary encoder, oscillator module, ADC and DAC bridges, and a **2K × 8 SRAM and ROM** — see [below](#something-worth-addressing) |
+| Memory & CPUs | 7 | The **2716, 2732, 2764 and 27C256 EPROMs**, the **28C256 EEPROM**, and the **6116 and 62256 static RAMs**, each loadable from a binary or Intel HEX file — see [below](#memories-by-their-part-numbers) |
 | Sensors & Actuators | 20 | DC motor, LDR, thermistors, **LM35 and TMP36** analog thermometers, buzzers, speaker, microphone, servo, stepper in **unipolar and bipolar** wirings, thermocouple, load cell, HC-SR04 ranger, Hall switch, phototransistor, **reed switch** and **PIR motion sensor** — see [below](#sensors-and-actuators) |
 | Switching & Isolation | 11 | Relay, fuses and a **resettable PPTC**, optocouplers, ULN2003, H-bridge, **A4988 microstepping driver**, **solid-state relay**, **MOSFET gate driver** — see [below](#regulating-a-current-instead-of-applying-a-voltage) |
 | Dev Boards | 6 | Raspberry Pi, Arduino Uno / Nano / Mega, **Raspberry Pi Pico** and **ESP32 DevKit** — see [below](#development-boards) |
@@ -1777,6 +1778,88 @@ Its two enables are deliberately asymmetric: `CET` gates the carry out as well a
 `CEP` only the counting. That is what lets several be chained — carry into the next stage's CET —
 without the carry itself rippling. Master reset is the one thing on the part that is *not*
 synchronous: it clears the moment it is taken low, without waiting for a clock.
+
+### Memories by their part numbers
+
+The 2K SRAM and ROM are a generic part. **Memory & CPUs** has the chips people actually wire up,
+each on its datasheet's pinout and with its datasheet's speed:
+
+| Part | Size | Access | What it is |
+| --- | --- | --- | --- |
+| **2716** | 2K × 8 | 450 ns | EPROM. VPP (pin 21) to VCC to read |
+| **2732** | 4K × 8 | 450 ns | EPROM. The 2716's socket with A11 on pin 21; VPP moves onto /OE |
+| **2764** | 8K × 8 | 250 ns | EPROM, 28 pins. VPP (pin 1) to VCC and /PGM (pin 27) high to read |
+| **27C256** | 32K × 8 | 150 ns | EPROM. VPP (pin 1) to VCC |
+| **28C256** | 32K × 8 | 150 ns | Parallel EEPROM: a ROM a circuit can write, slowly |
+| **6116** | 2K × 8 | 150 ns | Static RAM. The SRAM 2Kx8 under its part number |
+| **62256** | 32K × 8 | 70 ns | Static RAM |
+
+They all work alike from outside. `/CE` low selects the chip — high, and it ignores everything and
+lets go of the bus — `/OE` low lets it drive the data lines, and on the RAMs and the EEPROM `/WE`
+low takes the bus into the addressed byte. The data lines follow the address one access time later,
+and let go a little sooner than that when the chip is deselected (the datasheet's t<sub>DF</sub>),
+which is what keeps a well-timed bus from ever having two drivers. The symbol prints every pin's
+name, with a slash on the active-low ones. On a RAM a write is **level-sensitive**, as it is on the
+silicon: while `/CE` and `/WE` are both low the byte follows the bus, and what it holds afterwards is
+whatever was there when one of them went back up. The data pins are called D0–D7 on every part,
+where the datasheets say O0–O7 or I/O0–I/O7.
+
+An EPROM's contents come from the part, not from the circuit: programming one with VPP and /PGM is
+not simulated, so those pins only need wiring as the datasheet asks for reading. An erased EPROM
+reads $FF; here an unloaded one reads zeros.
+
+**The 28C256 writes like an EEPROM, not like a RAM.** A pulse on `/WE` (with `/CE` low and `/OE`
+high) only *loads* a byte — the address is taken as `/WE` falls and the data as it rises — and the
+chip goes on taking bytes into a 64-byte page as long as each follows the last within 150 µs. When
+that window closes the page goes into the cells, which takes **Write Cycle Time** (10 ms, the
+datasheet maximum, unless you set it shorter), and all that time a read answers with **data
+polling**: bit 7 the complement of the last byte written, and bit 6 toggling from one read to the
+next. Software waits for bit 7 to come back true; anything written meanwhile is ignored. Bytes for a
+different page in the same load are ignored, and the software data protection sequence is not
+modelled, so the chip is always writable.
+
+#### Loading a file into one
+
+Typing a program into `Contents` byte by byte is fine for eight bytes and hopeless for a ROM. Select
+the part and choose **Edit > Load Memory Image...** to read a file into it instead:
+
+- **Binary** (`.bin`, `.rom` or anything else) is the bytes and nothing more, so it is asked where
+  its first byte goes — the **load offset**, 0 for an image made for the chip, which is what an
+  assembler for a ROM writes. Type it in decimal or as `$700` or `0x700`.
+- **Intel HEX** (`.hex`, `.ihx`) carries its addresses with it. Data, end-of-file and both kinds of
+  extended address record are read; the start-address records are accepted and ignored. Every
+  checksum is checked, and a bad file is refused with the line that is wrong — "Line 12: the
+  checksum is 3F, and the record adds up to 3E".
+
+An address past the end of the chip **wraps round into it**, as it would with the chip's upper
+address lines not wired — so a 6502 program assembled at `$8000` lands at the start of a 32K ROM,
+which is exactly where a ROM decoded at `$8000` has it. An image bigger than the chip is refused
+rather than folded over itself.
+
+The image becomes the part's preset, the same as text typed into `Contents`: it is **saved inside
+the circuit file**, so a circuit opens complete with no image file to keep beside it, every run
+starts from it, and a reset puts it back however much the circuit wrote. Loading is one undo step.
+An agent does the same with the `load_memory` tool, and reads a memory back with `read_memory`.
+
+### Bus glue
+
+Five more 74 series parts are the glue a small computer is made of:
+
+- **74139** — two independent 2-to-4 decoders, each with an active-low enable and four active-low
+  outputs: two address lines and an enable split a memory map into four, twice.
+- **74244** — eight tri-state buffers in two groups of four, `/1G` and `/2G` enabling each. It only
+  goes one way, A to Y, which is the difference from the 74245, and it is how a set of switches or
+  an address is put on a bus only when asked.
+- **74374** and **74574** — eight D flip-flops taking their inputs on the rising edge of `CLK`, with
+  tri-state outputs. The 374 is on the 373's interleaved pinout; the 574 is **flow-through**, inputs
+  down one side and outputs up the other, which is what makes it easy to lay out between a bus and
+  what it feeds.
+- **74573** — the 74373's transparent latch on the flow-through pinout.
+
+`/OE` on all three registers releases the outputs without disturbing what is held, which is how a
+register is put onto a bus and taken off it again. Their tri-state outputs, like the 74244's, are
+marked as bus pins, so the rule check does not object to two of them sharing a net — whether they
+fight is a question about the running circuit, and they will if two are enabled at once.
 
 ### Drawing one
 

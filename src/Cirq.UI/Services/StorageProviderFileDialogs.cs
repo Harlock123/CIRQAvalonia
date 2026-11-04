@@ -64,6 +64,114 @@ public sealed class StorageProviderFileDialogs : ICircuitFileDialogs
         return files.Count > 0 ? files[0].TryGetLocalPath() : null;
     }
 
+    public async Task<MemoryImageRequest?> PickMemoryImageAsync(string partName)
+    {
+        var storage = TopLevel.GetTopLevel(_owner)?.StorageProvider;
+        if (storage is null) return null;
+
+        var files = await storage.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = $"Load an image into {partName}",
+            AllowMultiple = false,
+            FileTypeFilter =
+            [
+                new FilePickerFileType("ROM images") { Patterns = ["*.bin", "*.rom", "*.hex", "*.ihx"] },
+                FilePickerFileTypes.All,
+            ],
+        });
+
+        var path = files.Count > 0 ? files[0].TryGetLocalPath() : null;
+        if (path is null) return null;
+
+        // Intel HEX carries its own addresses; a binary is just bytes, so ask where they start.
+        if (Cirq.Components.Digital.MemoryImage.IsHex(path)) return new MemoryImageRequest(path, 0);
+
+        var offset = await AskOffsetAsync(Path.GetFileName(path));
+        return offset is null ? null : new MemoryImageRequest(path, offset.Value);
+    }
+
+    /// <summary>
+    /// Where in the chip a binary's first byte goes: zero for a file made for the chip, which is
+    /// almost always the answer. Hexadecimal is accepted as $700 or 0x700.
+    /// </summary>
+    private async Task<int?> AskOffsetAsync(string file)
+    {
+        int? chosen = null;
+
+        var box = new TextBox { Text = "0", HorizontalAlignment = HorizontalAlignment.Stretch };
+        var problem = new TextBlock { Foreground = Brushes.IndianRed, FontSize = 12, IsVisible = false };
+
+        var dialog = new Window
+        {
+            Title = "Load offset",
+            Width = 420,
+            SizeToContent = SizeToContent.Height,
+            CanResize = false,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            ShowInTaskbar = false,
+        };
+
+        dialog[!Window.BackgroundProperty] = new DynamicResourceExtension("PanelBackground");
+
+        var ok = new Button { Content = "Load", MinWidth = 88, HorizontalContentAlignment = HorizontalAlignment.Center, IsDefault = true };
+        var cancel = new Button { Content = "Cancel", MinWidth = 88, HorizontalContentAlignment = HorizontalAlignment.Center, IsCancel = true };
+
+        ok.Click += (_, _) =>
+        {
+            if (ParseOffset(box.Text) is { } value)
+            {
+                chosen = value;
+                dialog.Close();
+                return;
+            }
+
+            problem.Text = "A whole number of bytes, 0 or more: 1792, $700 or 0x700.";
+            problem.IsVisible = true;
+        };
+
+        cancel.Click += (_, _) => dialog.Close();
+
+        dialog.Content = new StackPanel
+        {
+            Margin = new Avalonia.Thickness(20),
+            Spacing = 12,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = $"{file} is a binary, so it says nothing about where its bytes go. The first one goes to this address in the chip — 0 for an image made for the chip itself.",
+                    TextWrapping = TextWrapping.Wrap,
+                    FontSize = 13,
+                },
+                Caption("Offset (decimal, or hex as $700 or 0x700)"),
+                box,
+                problem,
+                new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    Spacing = 8,
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    Children = { cancel, ok },
+                },
+            },
+        };
+
+        await dialog.ShowModal(_owner);
+        return chosen;
+    }
+
+    /// <summary>An offset as typed: decimal, or hexadecimal with a $ or 0x in front. Null if it is neither.</summary>
+    internal static int? ParseOffset(string? text)
+    {
+        var t = text?.Trim() ?? string.Empty;
+        var hex = t.StartsWith('$') ? t[1..] : t.StartsWith("0x", StringComparison.OrdinalIgnoreCase) ? t[2..] : null;
+
+        if (hex is not null)
+            return int.TryParse(hex, System.Globalization.NumberStyles.HexNumber, System.Globalization.CultureInfo.InvariantCulture, out var h) && h >= 0 ? h : null;
+
+        return int.TryParse(t, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var d) ? d : null;
+    }
+
     public async Task<string?> PickSavePathAsync(string suggestedFileName)
     {
         var storage = TopLevel.GetTopLevel(_owner)?.StorageProvider;

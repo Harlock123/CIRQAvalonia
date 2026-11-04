@@ -40,6 +40,11 @@ internal sealed class FakeFileDialogs : ICircuitFileDialogs
 
     public Task<string?> PickWaveformPathAsync() => Task.FromResult(WaveformPath);
 
+    /// <summary>The image a memory load should read, or null to stand in for a cancelled picker.</summary>
+    public MemoryImageRequest? MemoryImage { get; set; }
+
+    public Task<MemoryImageRequest?> PickMemoryImageAsync(string partName) => Task.FromResult(MemoryImage);
+
     public Task<string?> PickSavePathAsync(string suggestedFileName)
     {
         LastSuggestedName = suggestedFileName;

@@ -3,6 +3,7 @@ using System.Collections.Specialized;
 using Cirq.Core.Probing;
 using Cirq.Core.Simulation;
 using Cirq.Core.Topology;
+using Cirq.Components.Digital;
 using Cirq.Components.Hierarchy;
 using Cirq.Components.Passive;
 using Cirq.Components.Serialization;
@@ -1850,6 +1851,46 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
                                       or UnauthorizedAccessException or FormatException)
         {
             await FileDialogs.ReportAsync("Could not import that waveform", ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Reads a ROM or RAM image — a raw binary or Intel HEX — into the selected memory part. The
+    /// image becomes the part's preset, so it is saved inside the circuit and the file is not
+    /// needed again. A command rather than a button beside the property, for the reason the
+    /// waveform import is.
+    /// </summary>
+    [RelayCommand]
+    private async Task LoadMemoryImageAsync()
+    {
+        if (FileDialogs is null) return;
+
+        if (SelectedComponent is not ParallelMemory memory)
+        {
+            StatusMessage = "Select a memory part first — a ROM, an EEPROM or a RAM. This loads a file into one.";
+            return;
+        }
+
+        var request = await FileDialogs.PickMemoryImageAsync(memory.Name);
+        if (request is null) return;
+
+        try
+        {
+            var image = MemoryImage.Read(request.Path, request.Offset);
+            string note;
+
+            using (History.Gesture(Circuit, $"Load {Path.GetFileName(request.Path)} into {memory.Name}"))
+                note = memory.Load(image);
+
+            StatusMessage = $"Loaded {Path.GetFileName(request.Path)} ({image.Format}) into {memory.Name}: {note}";
+
+            IsModified = true;
+            Simulation.InvalidateTopology();
+        }
+        catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException
+                                      or ArgumentException)
+        {
+            await FileDialogs.ReportAsync("Could not load that image", ex.Message);
         }
     }
 

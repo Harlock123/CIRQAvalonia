@@ -153,7 +153,7 @@ public static class SymbolRenderer
             case OperationalAmplifier: DrawOpAmp(context, pen, zoom); break;
             case Ne555: DrawDip(context, pen, zoom, 8, "NE555"); break;
             case NeoPixelStrip strip: DrawNeoPixelStrip(context, pen, zoom, strip); break;
-            case DigitalIc ic: DrawDip(context, pen, zoom, ic.PinCount, ic.PartNumber); break;
+            case DigitalIc ic: DrawDip(context, pen, zoom, ic.PinCount, ic.PartNumber, ic.LabelsPins ? ic : null); break;
             case LogicGate gate: DrawLogicGate(context, pen, gate); break;
             case FlipFlopBlock block: DrawFlipFlop(context, pen, zoom, block); break;
             case TriStateBuffer buffer: DrawTriStateBuffer(context, pen, buffer); break;
@@ -2863,7 +2863,8 @@ public static class SymbolRenderer
 
     // ---- packages --------------------------------------------------------
 
-    private static void DrawDip(ISymbolCanvas context, IPen pen, double zoom, int pinCount, string partNumber)
+    private static void DrawDip(
+        ISymbolCanvas context, IPen pen, double zoom, int pinCount, string partNumber, DigitalIc? labelled = null)
     {
         var height = DipPackage.BodyHeight(pinCount);
         var body = new Rect(-DipPackage.HalfWidth + 10, -height / 2, (DipPackage.HalfWidth - 10) * 2, height);
@@ -2887,7 +2888,27 @@ public static class SymbolRenderer
             context.DrawLine(pen, new Point(offset.X, offset.Y), new Point(inner, offset.Y));
         }
 
-        DrawCenteredText(context, partNumber, new Point(0, 0), 10, zoom, CanvasTheme.LabelBrush);
+        if (labelled is null)
+        {
+            DrawCenteredText(context, partNumber, new Point(0, 0), 10, zoom, CanvasTheme.LabelBrush);
+            return;
+        }
+
+        // A memory or a processor: each pin's name just inside its leg, and the part number small
+        // between the middle two rows, where no name is.
+        if (zoom > 0.45)
+        {
+            foreach (var terminal in labelled.Terminals)
+            {
+                var at = terminal.CanvasOffset;
+                var left = at.X < 0;
+                DrawAlignedText(context, labelled.PinLabel(terminal),
+                    new Point(left ? body.Left + 3 : body.Right - 3, at.Y - 1), 6.5, zoom,
+                    CanvasTheme.LabelBrush, alignLeft: left);
+            }
+        }
+
+        DrawCenteredText(context, partNumber, new Point(0, 0), 8, zoom, CanvasTheme.SymbolBrush);
     }
 
     /// <summary>

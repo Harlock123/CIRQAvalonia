@@ -93,6 +93,8 @@
         <MenuItem Header="Import SPICE _Model..." Command="{Binding ShowSpiceImportCommand}" />
         <MenuItem Header="Import _Waveform..." Command="{Binding ImportWaveformCommand}"
                   ToolTip.Tip="Read a CSV or a WAV into the selected Waveform Source" />
+        <MenuItem Header="Load _Memory Image..." Command="{Binding LoadMemoryImageCommand}"
+                  ToolTip.Tip="Read a binary or Intel HEX file into the selected ROM, EEPROM or RAM — it is saved inside the circuit" />
         <Separator />
         <MenuItem Header="_Rotate" InputGesture="R" Command="{Binding RotateSelectionCommand}" />
         <MenuItem Header="_Delete" InputGesture="Delete" Command="{Binding DeleteSelectionCommand}" />

@@ -15,6 +15,13 @@ public interface ICircuitFileDialogs
     /// </summary>
     Task<string?> PickWaveformPathAsync();
 
+    /// <summary>
+    /// A ROM or RAM image to load into a memory part — a raw binary or an Intel HEX file — and, for
+    /// a binary, the address in the chip its first byte goes to. Null when the picker was cancelled.
+    /// </summary>
+    /// <param name="partName">The part it is for, for the dialog's title.</param>
+    Task<MemoryImageRequest?> PickMemoryImageAsync(string partName);
+
     /// <summary>Asks where to save; null when the user cancels.</summary>
     Task<string?> PickSavePathAsync(string suggestedFileName);
 
@@ -47,3 +54,6 @@ public interface ICircuitFileDialogs
     /// </param>
     Task<ExportRequest?> PickExportAsync(string suggestedFileName, bool hasTraces, bool hasSheets);
 }
+
+/// <summary>A memory image file to load, and where in the chip a binary's first byte goes.</summary>
+public sealed record MemoryImageRequest(string Path, int Offset);
