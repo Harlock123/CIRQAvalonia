@@ -8,6 +8,13 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+## [0.41.1] - 2026-11-04
+
+A documentation release: nothing in the simulator changed.
+
+- The user guide's picture of the component palette is retaken, so it shows today's 211 parts in
+  16 groups instead of the 186 it had before 0.41.0. The PDF guide in this release has it.
+
 ## [0.41.0] - 2026-11-04
 
 A bigger toolbox: twenty new parts for the circuits people actually build first — a lamp that
@@ -2407,7 +2414,9 @@ First public build of CirqAvalonia — an electronic circuit analyzer and mixed-
 
 **501 tests** measure the solver against closed-form answers rather than recorded output.
 
-[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.40.0...HEAD
+[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.41.1...HEAD
+[0.41.1]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.41.0...v0.41.1
+[0.41.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.40.0...v0.41.0
 [0.40.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.39.0...v0.40.0
 [0.39.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.38.0...v0.39.0
 [0.38.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.37.0...v0.38.0
