@@ -52,7 +52,7 @@ Core ← Engine ← Components ← UI, which keeps the whole engine headless-tes
 ```bash
 dotnet run --project src/Cirq.UI     # the editor
 dotnet run --project src/Cirq.Cli    # the same engine, no window
-dotnet test                          # 3752 tests
+dotnet test                          # 3983 tests
 ./scripts/build-guide.sh             # the user guide as a PDF
 ```
 
@@ -651,6 +651,15 @@ one passes against a button that would never have fired.
 | Battery | Sag against the internal resistance, a coin cell sagging where a lead-acid does not, coulomb counting against the rating, a discharge curve that is flat and then is not |
 | Surge parts | A TVS invisible below its standoff and clamping either polarity above it; a varistor's power law, and wearing out on the energy it absorbs |
 | ULN2003 | Sinking the load current, the Darlington's saturation voltage, a released channel passing nothing, and a load wired to ground doing nothing at all |
+| Incandescent lamp | Hot resistance V²/P and a cold one a tenth of it, the rated current at the rated voltage, an inrush of ten times the running current switched on cold and settled within a few time constants, a tenth of the light at half voltage (the V^3.4 law), a filament that averages 200 Hz but follows 2 Hz, and a lamp over-run being called out |
+| Flip-flops and latches | D, JK and T flip-flops against their characteristic tables on the rising edge and the falling one, a D latch transparent then holding, an SR latch setting, resetting, both outputs low with both inputs high and unknown when both are let go together, and four T flip-flops counting 0 to 15 and round again |
+| Tri-state buffer | Passing its input only while enabled, the active-low option, two buffers taking turns on a wire, two disagreeing meeting at the 1.8 V divider of their output resistances with 64 mA between them and both reporting it, and a wire nobody drives still solving |
+| TIP120 Darlington | A gain over a thousand at amps, about 1.4 V from base to emitter, a volt across it saturated from a logic pin's 3.6 mA, off with its base open, and the emitter-collector diode conducting when the collector goes below the emitter |
+| LM35 and TMP36 | Ten millivolts a degree from 0 V and from 500 mV across each one's range, the LM35 flooring at zero below freezing where the TMP36 still reads, nothing below the minimum supply, an over-voltage TMP36 called out, an output that does not move under an ADC's load, and following the circuit's ambient when asked |
+| NeoPixel strip | A frame shown only after the 50 µs reset, green-red-blue order on the wire, a bit decided by its high time either side of 0.6 µs, a 30 µs gap not latching, a second strip on DOUT getting the rest of the frame, frames following one another, a 3.4 V drive not seen by a 5 V strip, and the supply current of lit pixels |
+| Matrix keypad | A pressed key joining its row to its column and nothing else, the ghost on the fourth corner of three pressed keys, double-clicks landing on the key under the pointer and nowhere between keys — on a rotated keypad too — and the pressed keys surviving a save |
+| Pico and ESP32 | Pinouts against the boards' own cards, the Pico's ADC pins reading volts, the ESP32 refusing to drive an input-only pin or touch a flash pin, both driving 3.3 V and both flagging 5 V on a pin |
+| 74283, 7483, 74192, 74193 | All 512 sums of the 74283 on its pins, the 7483 the same with its own pinout, two adders cascaded to eight bits, the counters up and down and wrapping in binary and BCD, counting only with the other clock high, asynchronous load and clear with clear winning, CO and BO low only at the end of the count with their clock low, and two 74192s cascaded counting to 99 and back |
 | Amplifiers | LM386 idling at half supply, its stated gain, clipping at the rails; INA126 rejecting four volts of common mode; the speaker's average power |
 | 40xx series | Gate truth tables on the CMOS pinout, and that it is *not* the 74xx one; 4093 hysteresis and its relaxation-oscillator period against the closed form; 4013 toggling and its active-high set and reset; 4040 stage-by-stage division and falling-edge clocking; 4017 one-hot walk, reset and carry; 4511 glyph table, active-high drive, lamp test and blanking priority; 4066 and 4051 analog pass-through, switch resistance and off-state leakage; 4060 oscillating from its own Rt and Ct at the datasheet's 1/(2.3·Rt·Ct), and the frequency tracking a changed capacitor |
 | Comparator | Open-collector pull-down and release, driving a higher rail through a pull-up, edge timing |
@@ -661,13 +670,13 @@ one passes against a button that would never have fired.
 | Files | Every component type round-trips with its parameters, pins, wires, waypoints and probes; a reloaded circuit solves to the same answer; damaged, unknown and newer-format files are handled without losing the open circuit |
 | Settings | Theme round-trips across a restart, corrupt and newer-format preference files fall back to defaults, opening the dialog writes nothing, choosing a theme saves immediately |
 | UI | Background transport, probe decimation, reflection-built inspector, dirty tracking, every example compiles, runs, saves and reopens, and both grouped lists opening one group at a time — starting closed, the open one closing as the next opens, bulk toggles exempt, and a search opening everything it matched and restoring the open group when cleared |
-| Copy and paste | A duplicate carrying every parameter including the model on an op-amp and the input count on a gate, its own designator and identity, a clipboard that survives the original being edited or deleted, repeated pastes cascading rather than stacking, an undoable paste, and every one of the 183 palette parts surviving the round trip |
-| Hover cards | A part described where it sits — designator, type, value, settings in operable-first order, a long list cut with a count, an oversized value shortened, the violations behind a red ring carried as words, and every one of the 183 palette parts describable without throwing |
+| Copy and paste | A duplicate carrying every parameter including the model on an op-amp and the input count on a gate, its own designator and identity, a clipboard that survives the original being edited or deleted, repeated pastes cascading rather than stacking, an undoable paste, and every one of the 211 palette parts surviving the round trip |
+| Hover cards | A part described where it sits — designator, type, value, settings in operable-first order, a long list cut with a count, an oversized value shortened, the violations behind a red ring carried as words, and every one of the 211 palette parts describable without throwing |
 | Convergence | A failure naming the net that was still moving and what is attached to it, the parts that say they have not settled listed separately from that — and a part that did not complain never blamed, because a branch current is a current inside a part rather than a place and is left unnamed rather than called a row number |
 | Arrange | Aligning left, right, top and bottom by the parts' edges and the two centre lines by their middles, a centre being the average so a selection does not drift, distributing leaving the two outermost exactly where they were with equal gaps between the rest, parts already in line left alone so nothing lands in the undo history for a move that did not happen, and everything rounded back onto the grid when snapping is on |
 | Find on sheet | An exact designator beating one that merely starts with the term, values and kinds and net names after that, case never mattering, a named net being one row however many parts are on it, blocks searched inside, and nothing matching nothing |
 | Compare | Two copies of one circuit differing in nothing, a changed value read as one line, parts matched by identity so a renamed and moved part is two changes rather than a removal and an addition, a wire being the pair of pins it joins so redrawing it through a corner or the other way round is not a change, rounding through a save not counting as an edit, probes and requirements and conditions compared, and a summary that counts moves without leading with them |
-| Explain | A divider's tap in volts and a loaded one refused, a low-pass told from a high-pass with the corner, a tuned circuit peaking or dipping, decoupling, pull-ups, an LED's current, an op-amp's gain inverting and non-inverting and as a follower, emitter followers and common-emitter stages, a flyback diode that is not an LED, a 555's frequency and duty — and silence on anything it does not recognise, proved across all 87 shipped examples |
+| Explain | A divider's tap in volts and a loaded one refused, a low-pass told from a high-pass with the corner, a tuned circuit peaking or dipping, decoupling, pull-ups, an LED's current, an op-amp's gain inverting and non-inverting and as a follower, emitter followers and common-emitter stages, a flyback diode that is not an LED, a 555's frequency and duty — and silence on anything it does not recognise, proved across all 98 shipped examples |
 | Design report | A whole HTML document with nothing fetched from anywhere, the verdict before everything else, the schematic as selectable SVG with no stray declaration, requirements coloured by met and not met and not measurable, one row per part and value, the conditions always stated, everything a person typed escaped, and a report without a drawing still a report |
 | Windows | A second editor with its own circuit, simulation, scope and history; a clipboard shared between them because carrying a block across is what they are for; a recovery snapshot each so two cannot overwrite each other's work; and every abandoned snapshot offered back in a window of its own |
 | Colour codes | The value as it is written on the part, drawn beside the numbers — four bands at five percent and five at one, because you cannot promise one percent on a value you only spelled to two figures; gold and silver multipliers that divide, so a 4R7 is yellow-violet-gold; the wider gap that says which end to read from; a ceramic's three digits counted in picofarads and an inductor's bands in microhenries; the tolerance band rounded to the tighter promise rather than the looser one; a value the code cannot spell saying so and saying what it does spell; every marking also read out in words; and an electrolytic given none, because its value is printed on the can in plain microfarads |
@@ -747,7 +756,7 @@ one passes against a button that would never have fired.
 
 ## Development boards
 
-Raspberry Pi and Arduino boards sit on the schematic as ordinary logic devices, either sourcing
+Raspberry Pi, Arduino, Raspberry Pi Pico and ESP32 boards sit on the schematic as ordinary logic devices, either sourcing
 signals or reading them. Electrically a board is a pin map plus a per-pin mode, and the existing
 machinery covers all of it: `LogicState.HighImpedance` — built for the 7447's open-collector
 outputs — is exactly a GPIO configured as an input, which is what lets a pin change direction
@@ -765,6 +774,10 @@ GPIO23=seq@1kHz:1101_0010; GPIO24=once@1kHz:001
 a one-shot usable as a reset pulse rather than something that yanks the line back down every few
 milliseconds. A `z` step releases the pin for that step, so an open-drain line or a shared bus
 handed over mid-pattern both fall out of the same mechanism.
+
+The Pico's header is drawn as the board is laid out, with GP26 to GP28 reading as voltages because
+they are its ADC inputs; the ESP32 DevKit's input-only GPIO34 to GPIO39 can be read and never driven,
+and its flash pins are reserved, as they are on the module.
 
 Boards are then checked against their datasheet limits as the simulation runs — a Pi GPIO above
 3.3V (it is not 5V tolerant), a pin over its current rating, the total GPIO budget — and a
@@ -876,7 +889,11 @@ attached to it, and any part that said it had not settled — all of which name 
 drawing to go and look, which "try a smaller time step" does not.
 
 The palette holds 211 components in 16 collapsible categories, with a **Find a part** box
-(`Ctrl+F`) over them:
+(`Ctrl+F`) over them. Among the newest: an incandescent lamp with the inrush of a cold filament,
+generic D, JK and T flip-flops, SR and D latches and a tri-state buffer, a TIP120 Darlington, LM35
+and TMP36 thermometers, a WS2812B NeoPixel strip decoded by its real bit timing, a 4×4 matrix
+keypad you press by double-clicking a key, Raspberry Pi Pico and ESP32 boards, and the 7483 / 74283
+adders and 74192 / 74193 up/down counters.
 
 ![The component palette: a Find a part box at the top, "186 parts in 16 groups" under it, and the sixteen categories with their counts — passive 11, switches 4, sources 14, semiconductors 13, transistors 11, LEDs and displays 9, power 10, analog ICs 13, logic gates 7, 74xx series 21, 40xx series 15, buses 17, digital I/O 8, sensors and actuators 18, switching and isolation 11, dev boards 4 — every group closed, so all sixteen headings fit on screen at once](docs/images/02-palette.png)
 
@@ -913,9 +930,9 @@ forty-four thousand samples a second on time for ever, and a file makes the same
 and assertable. The WAV reader and writer are a couple of hundred lines here rather than a
 dependency shipped for six runtime identifiers.
 
-Seventy-four worked circuits ship with it, grouped and searchable in **File > Examples...** rather
+Ninety-eight worked circuits ship with it, grouped and searchable in **File > Examples...** rather
 than piled into a submenu — Fundamentals, Analog, Power Supplies, Switching & Motors, Digital
-Logic, Timers & Oscillators, Buses & Interfaces, Sensors, Signal Integrity & RF, Audio, Displays
+Logic, Counting & Arithmetic, Timers & Oscillators, Buses & Interfaces, Sensors, Signal Integrity & RF, Audio, Displays
 and Development Boards. Each one is run by the test suite and asserted against the thing it exists to show, so a
 broken example fails a build rather than a user.
 
@@ -963,7 +980,7 @@ counted as two lines, because they are two things to order.
 | About | `Help > About` reports the version and the libraries it is built on, read from the loaded assemblies rather than a hand-kept list, with a button that copies the lot for a bug report |
 | Transport | `F5` run/pause, `F6` single step, `F8` reset |
 | Controls | Every switch, potentiometer, light level, temperature and magnet — and every supply voltage, generator frequency and amplitude — is gathered into a **CONTROLS** panel under the properties panel, and can be worked while the simulation runs. Sweep a frequency with the scope running and watch a filter turn over. A part declares a control by marking the property `[Operable]`, so a new component gets one without the UI being edited |
-| Interactive | Switches, buttons, logic toggles, LDRs and thermistors are operated by double-clicking them. They are ringed with a small dot so you can tell which parts those are; **View > Mark Interactive Parts** turns the rings off |
+| Interactive | Switches, buttons, logic toggles, LDRs, thermistors and the temperature sensors are operated by double-clicking them, and a keypad by double-clicking the key. They are ringed with a small dot so you can tell which parts those are; **View > Mark Interactive Parts** turns the rings off |
 | Panels | `F9` collapses the palette to the left, `F10` the properties panel to the right — or click the chevron in either panel's header. A collapsed panel leaves a labelled rail at the edge; click it to bring the panel back. Palette groups also collapse individually (`All` toggles every group) |
 
 The toolbar wraps onto extra rows rather than overflowing, and `MinWidth` is deliberately small, so

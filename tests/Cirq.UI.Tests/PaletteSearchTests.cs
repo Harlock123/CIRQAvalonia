@@ -3,7 +3,7 @@ using Cirq.UI.ViewModels;
 namespace Cirq.UI.Tests;
 
 /// <summary>
-/// Finding a part among 183 of them.
+/// Finding a part among two hundred-odd of them.
 /// <para>
 /// The palette is sixteen collapsible groups, and browsing only works if you already know which
 /// one a part lives in — that a 4017 is under "40xx Series", an optocoupler under "Switching &amp;

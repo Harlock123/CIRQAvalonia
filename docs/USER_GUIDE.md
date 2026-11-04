@@ -871,10 +871,10 @@ gets roughly two-thirds of the way each time.
 
 ### The example browser
 
-Everything above is also in **File > Examples...** (`Ctrl+Shift+E`), along with eighty-three others.
+Everything above is also in **File > Examples...** (`Ctrl+Shift+E`), along with ninety-seven others.
 
 They are grouped the way the component palette is — Fundamentals, Analog, Power Supplies, Switching
-& Motors, Digital Logic, Timers & Oscillators, Buses & Interfaces, Sensors, **Measurement**, Signal
+& Motors, Digital Logic, Counting & Arithmetic, Timers & Oscillators, Buses & Interfaces, Sensors, **Measurement**, Signal
 Integrity & RF, Audio, Displays, Development Boards — with a description of whichever one is selected beside the list, and a search
 box across all three of the name, the description and the group. So looking for `I2C` finds the
 four bus examples, and looking for `hysteresis` finds the comparator circuit whose name you have
@@ -922,6 +922,99 @@ transition, so edges are not smeared across a step.
 
 Useful examples to start from: **NAND Latch**, **Decade Counter**, **Ring Oscillator**,
 **Digit Counter**, **Running Light**.
+
+### Flip-flops, latches and tri-state buffers
+
+The **Logic Gates** group has the textbook storage blocks as well as the gates, for drawing a
+design the way it is taught — one box per bit — before choosing a package for it. Like the gates
+they have no supply pins and drive at their logic family's levels, and every one powers up with Q
+low and Q' high:
+
+| Block | What it does |
+| --- | --- |
+| **D Flip-Flop** | On the clock edge, Q takes whatever D is |
+| **JK Flip-Flop** | On the edge: J sets, K resets, both toggle, neither holds |
+| **T Flip-Flop** | On the edge, toggles while T is high — a divide-by-two |
+| **SR Latch** | S sets and R resets, active high like a pair of NOR gates; both low holds |
+| **D Latch** | Transparent while EN is high, holding what it last saw once EN falls |
+
+The edge-triggered three sample on the **rising** edge of CLK, drawn with the triangle; tick
+**Triggers On Falling Edge** and they sample on the falling one instead, drawn with a bubble in
+front of the triangle, as a 7476 does. On the D latch the same setting makes it transparent while
+EN is low.
+
+The SR latch's forbidden state is modelled the way the NOR pair behaves rather than left out: with
+S and R both high, Q and Q' are both low. Let go of both **at the same moment** and the two gates
+race — which one wins is decided by the silicon — so Q goes to **X**, unknown, rather than a
+guess. Let go of one first and the other decides.
+
+**File > Examples > Ripple Counter** chains four T flip-flops, each clocked by the Q' of the one
+before, into a binary counter on four LEDs. Every stage halves the frequency; the carry ripples down
+the chain a gate delay at a time, which is exactly the glitch a synchronous counter exists to
+avoid.
+
+![Four T flip-flops in a row, T tied high, each clocked by the previous one's Q-bar output and the first by a 1 kHz clock, with their Q outputs lighting four LEDs that read eleven in binary](images/39-ripple-counter.png)
+
+The **Buffer** passes its input straight through. The **Tri-State Buffer** adds an enable: driven
+while EN is high (or low, with **Enable Active Low**), and released to **high impedance** while it
+is not. That release is what lets several share one wire, as long as only one is enabled at a time
+— **File > Examples > Tri-State Bus** hands a wire between two of them, with a pull-down holding it
+low in the gap when it is nobody's.
+
+Enable two that disagree and nothing in the logic decides between them. Each output is a source
+behind its output resistance, so the solver puts the wire wherever those two resistances divide it —
+for two TTL outputs, 1.8 V, which every input reading it calls unknown — and sixty-odd milliamps
+flows from one output into the other. Both buffers report the fight in their hover card and ring
+themselves in red, because on a board that is the current that kills one of them. Their output pins
+are bidirectional, so the rule check does not object to two of them sharing a net.
+
+### Adding, and counting both ways
+
+Four more DIP parts in the **74xx Series**:
+
+- **74283** and **7483** — 4-bit binary full adders: A1–A4 plus B1–B4 plus carry in C0 gives
+  S1–S4 and carry out C4. They are the same adder; the 7483 is the original with its supply on pins
+  5 and 12 instead of the corners, so a 7483 wired as if it were a 74283 is powered backwards. Chain
+  C4 into the next one's C0 for eight bits.
+- **74192** and **74193** — synchronous up/down counters, BCD and binary. There is a clock for each
+  direction rather than one clock and a direction pin: a rising edge on UP counts up while DOWN is
+  held high, and the other way round. CLR clears at once (active high), LOAD copies A–D to the
+  outputs at once (active low), and CO and BO go low at the top or bottom of the count while the
+  matching clock is low — so wired to the next stage's UP and DOWN they cascade with no gates, two
+  74192s counting 00 to 99 and back.
+
+**File > Examples > 4-Bit Adder** sets two nibbles on toggles beside the pins they drive — five and
+six, with the carry in set — and the LEDs show twelve. **Up/Down Counter** counts a 74192 up twelve
+and down six from a pattern generator, into a 7447 and a display, wrapping through zero each way.
+Both are in the **Counting & Arithmetic** group with the ripple counter.
+
+![A 74283 adder with toggles beside its input pins set to five plus six plus a carry, and five LEDs on its sum and carry outputs, the S3 and S4 LEDs lit for twelve](images/44-four-bit-adder.png)
+
+### NeoPixels
+
+The **NeoPixel Strip** (LEDs & Displays) is a strip of WS2812B addressable RGB LEDs, eight by
+default and up to 64 on one part, drawn as the strip with each pixel in the colour it was sent.
+Its one data wire is decoded the way the chip decodes it, so the timing has to be right:
+
+- a bit is one high pulse in a 1.25 µs slot, and only **how long it stays high** says what it is —
+  about 0.4 µs is a 0 and 0.8 µs a 1, split at **Bit Threshold** (0.6 µs);
+- twenty-four bits make a pixel, sent **green, red, blue**, most significant bit first;
+- the first pixel keeps the first twenty-four bits it sees and sends the rest out of **DOUT**, so
+  a second strip wired to DOUT picks up where the first left off, with no addresses anywhere;
+- nothing shows until the line is held low for the **Reset Time** (50 µs), and then every pixel
+  shows what it was sent.
+
+A 5 V strip needs 0.7 of its supply to see a high, so a 3.3 V drive — or a TTL-level 3.4 V one —
+is not seen at all and the strip stays dark. That is the commonest reason a strip on a 3.3 V board
+does nothing, and the reason for the level shifter in front of so many of them. The supply pin draws
+what the lit pixels would, about 20 mA a channel at full brightness.
+
+Something has to play the waveform. A **pattern generator** at **2.5 MHz** makes it exactly —
+`100` is a 0 and `110` a 1, three 0.4 µs steps a bit — and **File > Examples > NeoPixel Chaser**
+plays eight frames of a light running along the strip with a fading tail, its pattern written out
+by `NeoPixelStrip.PatternFor`. Zoom the scope right in on DIN to see the long and short pulses.
+
+![A pattern generator at 2.5 MHz driving the data input of an eight-pixel WS2812B strip powered from 5 volts, with three pixels lit cyan at full, a quarter and a sixteenth brightness](images/40-neopixel-chaser.png)
 
 ### Building a power supply
 
@@ -1019,6 +1112,44 @@ Load the shaft and it slows until torque balances, so the current a motor draws 
 is driving rather than by the supply. Load it past what it can turn and it sits stalled with
 nothing but armature resistance limiting the current — the motor is ringed in red and the fault
 named, because that is how they burn out.
+
+**Incandescent Lamp** (LEDs & Displays) is a tungsten filament, rated the way a bulb is, by its
+voltage and wattage — 12 V 5 W by default, which is 28.8 Ω hot. Cold it is about a tenth of that
+(**Cold Resistance Ratio**), because tungsten's resistance rises with its absolute temperature and
+the filament runs at some 2700 K. So for the first few milliseconds a lamp draws about ten times its
+running current. The filament is solved as a heat balance — power in, radiation out as T⁴, and a
+heat capacity set by **Thermal Time Constant** — so the inrush is in the current trace and the light
+follows the filament up. Run one at half voltage and it gives about a tenth of the light and glows
+orange, and the symbol shows that, dull red through to white.
+
+**File > Examples > Lamp Inrush** switches one on cold: over four amps for a moment, settling to
+0.42 A. Open SW1, let it cool, close it again, and the spike comes back.
+
+![Two plots of a 12 volt 5 watt lamp switched on cold: the current spiking to over 4 amps at switch-on and decaying to its rated 0.42 amps over about a hundred milliseconds, and the light output rising slowly from zero towards full as the filament heats](images/37-lamp-inrush.png)
+
+**LM35** and **TMP36** are analog temperature sensor ICs: three pins, and an output that is the
+temperature at ten millivolts a degree. The LM35 reads 0 V at 0 °C and runs from 4 to 30 V; on a
+single supply it cannot go below ground, so below freezing it reads zero. The TMP36 adds 500 mV —
+750 mV at 25 °C — so it can say how far below freezing it is, and it runs from 2.7 to 5.5 V, which
+makes it the one for a 3.3 V board. Like the thermistor and the DS18B20, each has its own
+**Temperature**, moved in the CONTROLS panel, and double-clicking one swaps to an **Alternate
+Temperature** — a hand round it. Tick **Follows Ambient** and it reads the circuit's temperature
+instead, so a DC sweep over temperature draws its straight line. Below its minimum supply it puts
+out nothing, and says so. **File > Examples > Analog Thermometer** reads one of each on an Arduino's
+A0 and A1.
+
+![An LM35 and a TMP36 to the left of an Arduino Uno, powered from its 5 V pin with their outputs on A0 and A1, both at 25 degrees](images/45-analog-thermometer.png)
+
+**Keypad 4x4** (Switches) is the membrane keypad with 1–9, 0, *, # and A–D, and the eight pins it
+has instead of seventeen: R1–R4 and C1–C4 along the bottom, in the order the module's ribbon has
+them. Every key is a contact between one row and one column and that is all, so whatever reads it
+has to scan — drive one row at a time and see which column follows. **Double-click a key** on the
+canvas to press it, and again to let it go; each key is also a toggle in the CONTROLS panel. The
+faults of a real matrix come with it: hold three keys on the corners of a rectangle and the fourth
+reads as pressed too. **File > Examples > Keypad Scanner** has an Arduino scanning it, a row low at a
+time with the columns on pull-ups, and the 5 held down.
+
+![A 4 by 4 matrix keypad above an Arduino Uno, its eight ribbon pins wired to D2 to D9, with the 5 key held down and highlighted](images/41-keypad-scanner.png)
 
 **LDR** is a cadmium-sulphide cell whose resistance follows a power law, roughly
 `R = R₁₀·(10/E)^γ` with γ near 0.8. A decade of light is a fixed ratio of resistance — about 6.3×
@@ -1489,6 +1620,28 @@ they are modelled, so leaving that pin off has the consequence it has on a bread
 none. Note also that there is genuinely no supply pin on a ULN2003 — the part runs on whatever it
 is sinking from — so the Vcc terminal on the symbol is the ground pin under another name, and
 connecting it to a rail shorts the ground pin to that rail.
+
+**TIP120** (Transistors) — the single-channel version, and the part every Arduino motor or lamp
+tutorial reaches for: an NPN power Darlington good for 5 A, with a gain of a thousand or more. It is
+modelled as what is in the package — a driver transistor whose emitter feeds the output transistor's
+base, the 8 kΩ and 120 Ω resistors across the two base-emitter junctions, and a diode from emitter
+to collector — rather than as one transistor with a big β, because that is where its behaviour
+comes from. Two junctions in series means about **1.4 V** from base to emitter to turn it on. The
+output transistor can never be pulled below its own base by the driver feeding it, so saturated it
+still drops **about a volt** — a 12 V load sees 11 V, and the package dissipates a watt at an amp.
+With its base left open the resistors hold it off. The built-in diode is antiparallel, emitter to
+collector: it catches the collector being driven *below* the emitter, not the positive kick of a
+coil being switched off, so an inductive load still wants its own flyback diode across it. The
+transistors are Ebers-Moll without ohmic resistances or junction capacitance, like the plain
+bipolars, so this is a DC and low-frequency model. **2N2222** is beside it as the classic small
+switching NPN.
+
+**File > Examples > Darlington Lamp Dimmer** has an Arduino's D9 running PWM at 500 Hz and 30 % into
+a TIP120 through 1 kΩ, switching a 12 V lamp. The lamp current is a train of pulses, but the
+filament's thermal mass averages them into a steady, dimmer glow, and the collector sits about a
+volt above ground in every on-pulse.
+
+![An Arduino Uno's D9 driving a TIP120 Darlington's base through one kilohm, the Darlington switching a 12 volt 5 watt lamp from a 12 volt supply, the lamp glowing partly lit](images/38-lamp-dimmer.png)
 
 **Optocoupler** — an infrared LED facing a phototransistor with no conductive path between them, so
 the output side can sit at a completely different potential. This is the honest answer to "how do I
@@ -5154,10 +5307,38 @@ A Raspberry Pi or Arduino can sit on the schematic as either the **source** of s
 | Arduino Uno R3 | 5V | 14 digital (6 PWM), 6 analog |
 | Arduino Nano | 5V | 14 digital (6 PWM), 8 analog |
 | Arduino Mega 2560 | 5V | 54 digital (15 PWM), 16 analog |
+| Raspberry Pi Pico | 3.3V, **not 5V tolerant** | 26 GPIO, all PWM, 3 of them ADC (GP26–GP28) |
+| ESP32 DevKit (38-pin) | 3.3V, **not 5V tolerant** | 22 GPIO, 4 input-only analog (GPIO34–39), flash pins reserved |
 
 One Pi component covers the Pi 2, 3, 4, 5 and Zero — they all share the same header. Pins are laid
 out as they are on the hardware, odd numbers down one side and even down the other, so counting
 pins on screen matches counting them on the board.
+
+### The Pico and the ESP32
+
+The two microcontroller boards everybody reaches for after an Arduino are here as well, and they
+take the same **Pins** line — every mode below works on them. Both are **3.3 V boards that are not
+5 V tolerant**, so the same warning a Pi gives fires on them.
+
+The **Raspberry Pi Pico** is drawn the way the board is laid out: GP0 is pin 1 at the top left by
+the USB socket, the left side counts down to 20, and the right side counts back up from 21 at the
+bottom to VBUS at the top. Every GPIO can do PWM, and **GP26, GP27 and GP28 are also the three ADC
+inputs** — read one and the status line gives a voltage (`GP26=0.75V`) rather than a level. A pin
+can be set to drive up to 12 mA, so that is the figure it is checked against.
+
+![A Raspberry Pi Pico dimming a red LED through 150 ohms on GP16 by PWM, reading a push button on GP20 with its internal pull-up, and reading a TMP36 temperature sensor powered from its 3V3 pin on GP26, the ADC0 input](images/42-pico-gpio.png)
+
+The **ESP32 DevKit** is the 38-pin ESP32-WROOM-32 DevKitC, numbered 1 to 19 down the left header
+and 20 to 38 down the right. It has the three kinds of awkward pin that catch everybody, and all
+three are modelled: **GPIO34 to GPIO39 are input only** — no output driver at all, so they are
+analog inputs that can be read and never driven, and the Pins line says so if you try; **GPIO6 to
+GPIO11 belong to the flash chip** and are reserved; and GPIO0, 2, 12 and 15 are strapping pins,
+ordinary GPIO here but worth keeping free of anything that holds them at reset. GPIO32 and GPIO33
+read as voltages too, being on the first ADC.
+
+![An ESP32 DevKit blinking a blue LED on GPIO2, reading a ten kilohm potentiometer across its 3V3 rail on the input-only pin GPIO34, and reading a push button on GPIO17 with its internal pull-up](images/43-esp32-gpio.png)
+
+**File > Examples > Pico GPIO** and **ESP32 GPIO** build those two.
 
 ### Setting pins up
 

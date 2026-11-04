@@ -85,10 +85,16 @@ dotnet run --project src/Cirq.UI -- --mcp      # the MCP server on stdio, headle
 - **Settings and saves.** The app keeps `settings.json`, autosave recovery files, the block library and user
   models under the `CirqAvalonia` folder in `SpecialFolder.ApplicationData`. Tests that touch files use a temp
   folder.
-- **Tests redraw the guide's pictures.** Some `Cirq.UI.Tests` (`GuidePlotTests`, `SymbolFigureTests` and others)
-  write PNGs into `docs/images/` through `DocPlot`. Expect those files to change after a test run, and commit them
-  only when the change is intended.
+- **Tests redraw the guide's pictures.** Some `Cirq.UI.Tests` (`GuidePlotTests`, `SymbolFigureTests`,
+  `ToolboxFigureTests` and others) write PNGs into `docs/images/` through `DocPlot`. Expect those files to change
+  after a test run, and commit them only when the change is intended.
 - **Warnings.** `TreatWarningsAsErrors` is off, but nullable reference types are on in every project.
+- **Operating a part.** Double-clicking a part calls `IInteractiveComponent.Interact`. A part with several things
+  to operate (the keypad's keys) implements `IPointInteractive` instead, and the canvas hands it the point in its
+  own unrotated drawing space (`CircuitCanvas.ToLocal`). Text drawn on a part turned half round is turned back
+  upright by `SymbolRenderer`, so a part facing left is no reason to avoid rotating it.
+- **Waveforms for a NeoPixel.** Nothing in the library runs code, so a WS2812 strip is driven by a pattern
+  generator at 2.5 MHz; `NeoPixelStrip.PatternFor` writes that pattern from a list of frames.
 - **Agent tools.** Every change an agent makes goes through `CircuitTools.Edit`: one undo step, rolled back whole
   if any part of it fails. Runs solve a serialised copy of the circuit on a worker thread, never the editor's own
   simulator, then write a transient's samples back into the probes. A new tool needs a `[Description]` on it and

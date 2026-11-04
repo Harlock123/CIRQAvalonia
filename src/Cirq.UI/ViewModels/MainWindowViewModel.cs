@@ -98,7 +98,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     /// <summary>
     /// What is typed in the palette's search box. Empty shows everything.
     /// <para>
-    /// There are 183 parts in sixteen groups, and browsing only works if you already know which
+    /// There are over two hundred parts in sixteen groups, and browsing only works if you already know which
     /// group a part lives in — that a 4017 is under "40xx Series" and an optocoupler under
     /// "Switching &amp; Isolation". Somebody who knows they want a 555 should not have to guess.
     /// </para>
