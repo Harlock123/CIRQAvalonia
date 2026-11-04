@@ -6,8 +6,11 @@ using System.Text.RegularExpressions;
 using Anthropic;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Headless;
 using Avalonia.LogicalTree;
+using Avalonia.Media.Imaging;
+using Avalonia.VisualTree;
 using Avalonia.Threading;
 using Cirq.Mcp;
 using Cirq.UI;
@@ -15,7 +18,7 @@ using Cirq.UI.Services;
 using Cirq.UI.ViewModels;
 using Cirq.UI.Views;
 
-// Draws the guide's screenshots of the AI Chat: the real editor, in a headless window rendered by Skia, with Claude's
+// Draws the guide's palette picture (02-palette.png) and its screenshots of the AI Chat: the real editor, in a headless window rendered by Skia, with Claude's
 // side of the conversation replayed from a script. The tool calls are real (they run through the app's own MCP
 // server against the window's circuit) and so are the numbers Claude quotes at the end: they are read from the
 // results. Usage: dotnet run --project tools/Cirq.Shots -- <folder>
@@ -37,6 +40,21 @@ var editor = new MainWindowViewModel { Autosave = new AutosaveStore(Path.Combine
 var window = new MainWindow { DataContext = editor, Width = 1680, Height = 1000, ChatRoot = scratch };
 window.Show();
 Pump();
+
+// ── The palette, every group closed so all its headings fit ──
+foreach (var group in editor.Palette) group.IsExpanded = false;
+for (var i = 0; i < 40; i++) Pump();
+var search = window.GetLogicalDescendants().OfType<TextBox>().First(t => t.Name == "PaletteSearchBox");
+var palette = search.GetLogicalAncestors().OfType<Border>().First(b => b.Classes.Contains("panel"));
+var lastHeading = palette.GetVisualDescendants().OfType<TextBlock>().Last(t => t.Text == editor.Palette[^1].Name);
+var lastGroup = lastHeading.GetVisualAncestors().OfType<ToggleButton>().First();
+var bottom = Math.Ceiling(lastGroup.TranslatePoint(new Point(0, lastGroup.Bounds.Height), palette)!.Value.Y) + 1;
+using (var picture = new RenderTargetBitmap(new PixelSize((int)(palette.Bounds.Width * 2), (int)(bottom * 2)), new Vector(192, 192)))
+{
+    picture.Render(palette);
+    picture.Save(Path.Combine(folder, "02-palette.png"), PngBitmapEncoderOptions.Default);
+    Console.WriteLine($"Wrote {Path.Combine(folder, "02-palette.png")}");
+}
 
 var claude = new Replay();
 editor.IsChatOpen = true;
