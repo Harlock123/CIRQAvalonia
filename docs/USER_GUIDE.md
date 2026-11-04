@@ -184,8 +184,8 @@ The palette holds **308 components in 17 categories**:
 | Power | 10 | Fixed and adjustable regulators, TL431 shunt reference, ICL7660 charge pump, MC34063 switching controller, **TP4056 lithium charger** — see [below](#charging-a-lithium-cell) |
 | Analog ICs | 13 | LM741, TL081, LM358, MCP6002 rail-to-rail, the **LM324 quad**, NE555, LM311, LM339, LM386 audio amp, INA126 instrumentation amp and an **AD633 analog multiplier** — see [below](#four-in-one-package) |
 | Logic Gates | 14 | AND, OR, NAND, NOR, XOR, XNOR, NOT, buffer and **tri-state buffer**, and the generic **D, JK and T flip-flops** and **SR and D latches** |
-| 74xx Series | 79 | Counters (including the synchronous **74161** and the **74192 / 74193 up/down counters**), the **7483 and 74283 adders**, decoders including the **74139**, flip-flops, shift registers, the **74245 bus transceiver**, **74244 buffer**, **74373 and 74573 latches** and **74374 and 74574 registers**, multiplexers, Schmitt inverter — see [below](#sharing-a-bus) |
-| 40xx Series | 47 | CMOS gates, counters, flip-flops, analog switches and a **4046 phase-locked loop** — see [below](#phase-locked-loops) |
+| 74xx Series | 79 | Gates including the **open-collector 7403, 7406 and 7407**, the **74132 Schmitt NAND** and the **74125 / 74126 tri-state buffers**; JK and D flip-flops, latches and registers; ripple and synchronous counters (**7490, 7493, 74160-74163, 74192 / 74193, 74390, 74393**); decoders and multiplexers including the **74154** and the tri-state **74251 and 74257**; the **74181 ALU**, **74182 look-ahead**, **7485 comparator**, **7483 / 74283 adders** and **74280 parity**; shift registers to the **74299**; bus buffers and registers; the **74121, 74123 and 74221 one-shots**; **7447, 7448 and 74247** display drivers; the **74189 RAM** and **74670 register file** — see [below](#the-rest-of-the-74-series) |
+| 40xx Series | 47 | CMOS gates and the **4049 / 4050 level converters**; flip-flops and latches; counters including the **4026 and 4033 with their own display drivers**, the **4029, 4510 and 4516 up/down counters** and the **4518 / 4520**; the **4028** and **4543 LCD driver**; shift registers to the **4094**; the **4051, 4052, 4053 and 4067 analog multiplexers**; the **4047, 4528 and 4538** timers; a **4046 phase-locked loop** — see [below](#the-40xx-series) |
 | Buses | 19 | **Bus tap** and **bus line**, I2C master, EEPROM, port expander, DS1307 clock, ADS1115 ADC, MCP4725 DAC and INA219 current sensor, SPI master and **MCP3008 ADC**, 1-Wire master and DS18B20 thermometer, serial terminal and device, **RS-485**, **CAN** and **RS-232 (MAX232)** transceivers, level shifter — see [below](#making-its-own-rails) |
 | Digital I/O | 9 | Logic toggle, clock, **pattern generator**, rotary encoder, oscillator module, ADC and DAC bridges, and a **2K × 8 SRAM and ROM** — see [below](#something-worth-addressing) |
 | Memory & CPUs | 11 | The **2716, 2732, 2764 and 27C256 EPROMs**, the **28C256 EEPROM**, the **6116 and 62256 static RAMs** — each loadable from a binary or Intel HEX file — and the **65C02** and **6502** processors, **6522 VIA** and **6551 ACIA** — see [below](#memories-by-their-part-numbers) and [the 6502 computer](#a-6502-computer) |
@@ -873,7 +873,7 @@ gets roughly two-thirds of the way each time.
 
 ### The example browser
 
-Everything above is also in **File > Examples...** (`Ctrl+Shift+E`), along with ninety-seven others.
+Everything above is also in **File > Examples...** (`Ctrl+Shift+E`), along with a hundred and three others.
 
 They are grouped the way the component palette is — Fundamentals, Analog, Power Supplies, Switching
 & Motors, Digital Logic, Counting & Arithmetic, Timers & Oscillators, Buses & Interfaces, Sensors, **Measurement**, Signal
@@ -991,6 +991,129 @@ and down six from a pattern generator, into a 7447 and a display, wrapping throu
 Both are in the **Counting & Arithmetic** group with the ripple counter.
 
 ![A 74283 adder with toggles beside its input pins set to five plus six plus a carry, and five LEDs on its sum and carry outputs, the S3 and S4 LEDs lit for twelve](images/44-four-bit-adder.png)
+
+### The rest of the 74 series
+
+The **74xx Series** group has the parts a TTL board is usually made of, each on its datasheet pinout,
+pin for pin — including the ones whose supply is not on the corners, which are the ones that bite:
+the **7473** has VCC on pin 4 and GND on 11, the **7475** and **7476** VCC on 5 and GND on 12, and
+the **7493** VCC on 5 and GND on 10. Wired as if they were a 7400 they are not powered at all.
+
+- **Gates.** The **7403** is a 7400 with **open-collector** outputs, and the **7406** and **7407** are
+  hex inverters and buffers with open-collector outputs that stand off 30 V: an output pulls down or
+  lets go, never drives high, so it needs a pull-up — to 5 V, or to a relay's or a lamp's own rail.
+  Tie several to one pull-up and any one of them pulling wins, a wired-AND with no gate. Their
+  outputs are bus pins, so the rule check does not object. The **7411** and **7427** are three-input
+  AND and NOR on the 7410's pinout, the **7430** an eight-input NAND, the **74132** the 7400 with
+  Schmitt inputs at TTL thresholds (about 1.7 V rising, 0.9 V falling), and the **74125** and
+  **74126** four tri-state buffers with an enable each, active low and active high.
+- **Flip-flops, latches and registers.** The dual JKs are one model with four choices — the edge,
+  whether there is a preset and a clear, their polarity, and whether K is inverted: the **7473** and
+  **74107** (clear only), **74112** and **7476** (preset and clear) on the falling edge, and the
+  **74109**, whose J and K̄ tied together make a D flip-flop, on the rising one. The **7475** is
+  four transparent latches in two pairs; the **74174**, **74175** and **74273** are six, four and
+  eight D flip-flops on one clock with an asynchronous clear — the 74273 is the 74374 without
+  tri-state.
+- **Counters.** The **7493** is the 7490's arrangement counting to sixteen; the **74390** and
+  **74393** are two of each in one package, the 74393 with the ÷2 already chained to the ÷8 inside.
+  The **74160**, **74162** and **74163** share the 74161's logic: the 160 and 162 count in decade,
+  and the 162 and 163 clear **synchronously** — MR low clears on the next clock, so a gate decoding
+  a count into MR truncates the sequence without the glitch an asynchronous clear makes.
+- **Decoders and multiplexers.** The **7442** (BCD to one of ten) and **74154** (one of sixteen,
+  24 pins, two enables) have active-low outputs; the **74153** is a dual 4-to-1, the **74157**,
+  **74158** and **74257** quad 2-to-1s (true, inverted, tri-state), and the **74251** is the 74151
+  with outputs that let go while OE is high, so several share one bus line.
+- **Arithmetic.** The **7485** compares two nibbles and cascades: when A and B are equal its three
+  cascade inputs decide, so a chain of them compares a word. The **74280** says whether nine inputs
+  have an odd or even number of ones. The **74181** and **74182** have their own paragraph below.
+- **Shift registers.** The **74166** is a parallel-in, serial-out register like the 74165 with a
+  synchronous load and a clear; the **74194** and **74299** are universal registers (hold, shift
+  left, shift right, load), the 299's eight data pins tri-state and shared between loading and
+  driving; the **74195** has a J-K̄ serial input. The **74165** now shifts towards QH as its
+  datasheet has it — H comes out first and A last, then SER — where before SER went straight to QH.
+- **Bus buffers.** The **74240** is the 74244 inverting, the **74241** has its second group
+  enabled by a high (tie pins 1 and 19 together and one signal puts either group on the bus), and
+  the **74540** and **74541** are flow-through, inverting and not, enabled while both their enables
+  are low.
+- **Display drivers.** The **7448** is the 7447's decoder with active-high outputs, each with a
+  2 kΩ pull-up inside; the **74247** is the 7447 with **tails** — a 6 with its top bar and a 9 with
+  its bottom one. The 7447 and 7448 draw those two digits without, as their datasheets do (the 7447
+  here used to draw them with tails). The seven-segment display reads either.
+- **Memory.** The **74189** is sixteen words of four bits whose outputs read back **inverted** and
+  let go while it is written or deselected; the **74670** is four words with separate read and write
+  addresses, so one word is read while another is written. Their `Contents` is the preset in hex
+  digits, one a word, saved in the file and put back by a reset, like the bigger memories'.
+
+#### An ALU in one package
+
+The **74181** does sixteen logic functions of A and B with M high and sixteen arithmetic ones with M
+low, chosen by S3-S0, in the datasheet's **active-high data** convention: a 1 is a high pin. In that
+convention the carries are **active low** — Cn high is no carry in, and Cn+4 goes low on a carry
+out — so A plus B (S = 1001, M low) with Cn high is A + B, and with Cn low A + B + 1; A minus B
+minus 1 (S = 0110) with Cn low is A − B. The arithmetic list reads strangely (A plus AB̄, (A + B̄)
+plus AB) because every function is the same adder: each bit forms two terms from A, B and S, and
+the result is their sum plus the carry; the logic functions are that sum with every internal carry
+forced. **A=B** is open collector and lets go while all four F outputs are high — subtracting with no
+carry in, exactly when A equals B — so give it a pull-up.
+
+**G** and **P** are the look-ahead outputs as the silicon has them (in the active-low convention, G
+low when the four bits generate a carry, P low when they propagate one). Wire four 74181s' G and P
+straight to a **74182**, its Cn+x, Cn+y and Cn+z to the second, third and fourth ALU's Cn and the
+first one's Cn to its Cn too, and sixteen bits add in about three gate delays rather than rippling
+through four ALUs — the tests do exactly that, with no inverters anywhere.
+
+**File > Examples > 4-Bit ALU** sets A = 9 and B = 5 on toggles with the function select at A plus
+B: the LEDs read fourteen, and Cn+4 stays lit because there is no carry out. Set M high and the same
+S is A XNOR B; set S to 0110 and the A=B light comes on when the two numbers match. **Magnitude
+Comparator** puts the same two nibbles into a 7485 and lights one of A>B, A=B and A<B.
+
+![A 74181 with net labels on all 24 pins, fourteen toggles in two columns setting A, B, S, M and Cn, and six LEDs on F0 to F3, Cn+4 and the pulled-up A=B output, the three middle F lights and Cn+4 lit for fourteen with no carry](images/49-alu.png)
+
+### One-shots: timing from a real R and C
+
+The **74121**, **74123** and **74221**, and the CMOS **4528** and **4538**, are **monostables**:
+triggered, Q goes high for a set time and then falls by itself. The time is set the way the silicon
+sets it, by a resistor and a capacitor you wire to the part — the capacitor from CEXT (CX on the
+4538) to the REXT/CEXT pin, the resistor from that pin to VCC — and those are real components on
+the canvas, not settings, as they are on the 555 and the 4060.
+
+On a trigger the chip discharges the capacitor in a few microseconds and lets it charge back
+through R; the pulse ends when the capacitor crosses a threshold. A capacitor charging towards the
+supply through R crosses V·(1 − e<sup>−K</sup>) after exactly K·R·C, so the threshold is put there
+and the pulse is the datasheet's **t<sub>w</sub> = K·R·C**: double the capacitor on the canvas and
+the pulse doubles. **Timing Constant** is K, from the datasheet and editable for another family's
+part:
+
+| Part | t<sub>w</sub> | Retriggerable | Triggers |
+| --- | --- | --- | --- |
+| **74121** | 0.7·R·C (ln 2); RINT to VCC uses the internal 2 kΩ | no | B rising with an A low, or an A falling with B high |
+| **74123** | 0.45·R·C (the 74LS123, C over 1 nF) | yes | A falling with B high, B rising with A low, or CLR rising with A low and B high |
+| **74221** | 0.7·R·C | no | A falling with B high, or B rising with A low |
+| **4538** | R·C | yes | +TR rising with −TR high, or −TR falling with +TR low |
+| **4528** | 0.2·R·C·ln(VDD), 0.32·R·C at 5 V | yes | as the 4538 |
+
+**Retriggerable** means a trigger during a pulse restarts the timing, so triggers closer together
+than t<sub>w</sub> hold Q high throughout and Q falls t<sub>w</sub> after the last — a missing-pulse
+detector, or a light that stays on while there is movement. A non-retriggerable one ignores triggers
+until its pulse is over, so it turns a ragged train into pulses of exactly t<sub>w</sub>. A clear or
+reset ends a pulse at once and holds triggers off while it is asserted. Because the discharge takes
+real time through the chip's few ohms, a capacitor of tens of microfarads on a small resistor shows
+the recovery time a datasheet warns about.
+
+The CMOS **4047** is the same idea with its timing parts the other way round: the capacitor from C
+(pin 1) to RC COMMON (pin 3) and the resistor from R (pin 2) to RC COMMON. Pins 1 and 2 are the
+outputs of two inverters around the timing node, so run **astable** (pin 4 high or pin 5 low) it is
+the 4060's oscillator — OSC at a period of 2.2·R·C, and Q and Q̄ that divided by two, 4.4·R·C with a
+duty cycle of exactly half. Run **monostable** it gives a pulse of 2.48·R·C from +TRIGGER rising (with
+−TRIGGER low) or −TRIGGER falling (with +TRIGGER high); RETRIGGER starts it again and EXTERNAL RESET
+ends it.
+
+**File > Examples > Pulse Stretcher** sends a 4538 a pattern of 100 µs triggers every 10 ms: a lone
+one, a burst of five 300 µs apart, and another lone one. With 10 kΩ and 100 nF each lone trigger
+becomes a millisecond on the LED, and the burst one 2.2 ms pulse; the scope shows the trigger, the
+capacitor dropping to nothing and climbing back, and Q.
+
+![A 4538 with a 10 kΩ resistor and 100 nF capacitor on its timing pins, a pattern generator on +TR through a net label, and an LED on Q lit, part way through the burst of triggers](images/50-pulse-stretcher.png)
 
 ### NeoPixels
 
@@ -2006,6 +2129,64 @@ ground; and the common pin therefore climbs in eight even steps of about 0.61 V 
 made of one counter, one switch and some resistors, and a good picture of what "bilateral" buys
 you — the signal path here runs from the ladder *into* the common pin, the opposite direction to
 the one the part is usually drawn doing.
+
+**More gates.** The **4002** and **4012** are dual four-input NOR and NAND, the **4023** and
+**4025** triple three-input NAND and NOR on a pinout of their own (gate one on 1, 2 and 8 into 9).
+The **4049** and **4050** are hex inverting and non-inverting buffers for changing levels, and their
+package is the trap: **VDD is pin 1**, not 16, VSS is 8, and pins 13 and 16 are not connected. Their
+inputs have no diode to VDD, so they take a 15 V signal while running on 5 V and put out 5 V logic.
+No logic input in this simulator is clamped to its rail, so that works here on any CMOS part; on a
+real one other than these it would be pushing current through its protection diode.
+
+**Flip-flops.** The **4027** is a dual JK on the rising edge with set and reset that are, as on the
+4013, active high. The **4042** is four transparent latches with a POLARITY pin: they follow while
+CLOCK equals POLARITY and hold from the moment it differs.
+
+**Counters.** The **4020** (fourteen stages, Q2 and Q3 not brought out) and **4024** (seven) are the
+4040's ripple counter in other sizes. The **4022** is the 4017 cut to eight, its pins moved round. The
+**4029**, **4510** and **4516** are presettable up/down counters with one clock and a direction pin,
+counting while CARRY IN is low, CARRY OUT low at the end of the count — wire one's CO to the next CI
+with the clocks in common and they count together; the 4029 picks binary or decade by a pin, the 4510
+is decade and the 4516 binary, both with a reset. The **4518** and **4520** are two decade or binary
+up counters each, clocked by a rising CLOCK with ENABLE high or a falling ENABLE with CLOCK low, which
+is how the halves cascade.
+
+**A digit in a package.** The **4026** and **4033** are a decade counter, a decoder and seven
+segment drivers in one: a digit of a counter is the chip and a common-cathode display, wired straight
+to it — their outputs are a few hundred ohms, as a 4000-series output is, so no resistors. CARRY OUT
+clocks the next digit. The 4026 has a display enable and an ungated c segment; the 4033 has ripple
+blanking, so a chain of them shows "7" rather than "007", and a lamp test. Both draw 6 and 9 without
+tails. **File > Examples > Two-Digit Counter** counts a 1 kHz clock — a count a second at the editor's
+usual speed — on two of them.
+
+![Two 4026s and two common-cathode displays, every segment joined by net labels, a 1 kHz clock into the units and its carry into the tens, the displays reading 42](images/51-two-digit-counter.png)
+
+**Decoders.** The **4028** is BCD to one of ten, active high. The **4543** is a BCD to seven-segment
+latch and driver for liquid-crystal displays: every segment output is the decoded segment
+exclusive-ORed with its PHASE pin, so driving PH and the LCD's backplane with the same square wave
+puts each lit segment out of phase with the backplane and the display never sees DC. Tie PH low for a
+common-cathode LED display, high for common-anode.
+
+**Shift registers.** The **4014** and **4021** are eight-stage parallel-in registers with stages 6, 7
+and 8 brought out, the 4014 loading on the clock and the 4021 at once (it is the register in a NES
+controller); the **4015** is two four-stage serial-in registers; the **4035** a four-bit
+parallel-access register with a J-K̄ input and outputs that invert while TRUE/COMPLEMENT is low; and
+the **4094** a shift-and-store register, the CMOS 74595 — bits shift in while the outputs hold,
+STROBE copies them across, and OUTPUT ENABLE low lets go of all eight. **Serial Display** sends it
+bytes from a pattern generator over three wires.
+
+**More analog multiplexers.** The **4052** is two four-way multiplexers on one address, X and Y, the
+**4053** three changeover switches with a control pin each, and the **4067** sixteen channels in 24
+pins with no VEE. They are the 4051's model — real switch resistances in the solve, bilateral,
+inhibit opening everything. **File > Examples > Stereo Selector** has a 4052 switching the left and
+right channels of two sources together: flip A and both outputs change source at once, which two
+single multiplexers could not promise.
+
+![A 4052 with four sine generators labelled 1L, 1R, 2L and 2R on its X0, Y0, X1 and Y1 channels, the unused channels tied to a 2.5 V midpoint, two address toggles, and LEFT and RIGHT outputs into 100 kΩ loads with scope probes](images/52-stereo-selector.png)
+
+**Timers and an adder.** The **4047**, **4528** and **4538** are covered with the TTL one-shots in
+[One-shots](#one-shots-timing-from-a-real-r-and-c). The **4008** is a four-bit full adder, the
+74283's job with the carry rippling, about 400 ns at 5 V.
 
 ### Mixing CMOS with TTL
 

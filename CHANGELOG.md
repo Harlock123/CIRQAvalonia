@@ -8,6 +8,71 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+## [0.43.0] - 2026-11-04
+
+The rest of the 74 and 4000 series. Eighty-one more logic chips on their datasheet pinouts — the
+gates, flip-flops, counters, decoders, shift registers and buffers a real board is made of, a 74181
+ALU, one-shots timed by the resistor and capacitor you wire to them, counters with their own display
+drivers, and three more analog multiplexers — with six examples to show them off. 308 components in
+17 categories, 106 worked examples, 4517 tests.
+
+### Added
+
+**Gates.** The 7403, 7406 and 7407 with open-collector outputs (the 7406 and 7407 standing off 30 V
+for relays and lamps), the 7411, 7427 and 7430, the 74132 Schmitt NAND, the 74125 and 74126 quad
+tri-state buffers, and the CMOS 4002, 4012, 4023, 4025 and the 4049 and 4050 level converters —
+whose VDD is on pin 1.
+
+**Flip-flops, latches and registers.** The 7473, 74107, 74109 and 74112 JK pairs and the CMOS
+4027; the 7475 and 4042 quad latches; the 74174, 74175 and 74273 registers.
+
+**Counters.** The 7493, 74390 and 74393 ripple counters; the 74160, 74162 and 74163 beside the 74161,
+the last two clearing on the clock so a decoded count truncates cleanly; the CMOS 4020 and 4024,
+the 4022, the 4029, 4510 and 4516 up/down counters and the 4518 and 4520 dual counters.
+
+**A digit in a package.** The 4026 and 4033 are a decade counter, a decoder and seven segment
+drivers in one, the 4026 with a display enable and the 4033 with ripple blanking to hide leading
+zeros. The 4543 drives an LCD through its phase input, or an LED display either way up. The 7448
+has active-high outputs with pull-ups, and the 74247 is the 7447 with tails on its 6 and 9.
+
+**Decoders and multiplexers.** The 7442, 74154 and 4028 decoders; the 74153, 74157, 74158, and the
+tri-state 74251 and 74257 multiplexers.
+
+**Arithmetic.** The 74181 ALU — all sixteen logic and sixteen arithmetic functions in the
+active-high data convention, with its carry, G, P and open-collector A=B outputs — and the 74182
+look-ahead carry generator, so four ALUs wired straight to one add sixteen bits at once. The 7485
+magnitude comparator, cascadable; the 74280 parity tree; the 4008 adder.
+
+**Shift registers.** The 74166, 74194, 74195 and the 74299 with its tri-state I/O pins; the CMOS
+4014, 4015, 4021, 4035 and the 4094 shift-and-store register.
+
+**Bus buffers.** The 74240, 74241, 74540 and 74541.
+
+**One-shots and timers.** The 74121, 74123 and 74221, and the CMOS 4528 and 4538 monostables, and
+the 4047 multivibrator. Their timing comes from a real resistor and capacitor wired to their pins:
+triggered, the chip discharges the capacitor and lets it charge back, and the pulse is the
+datasheet's K·R·C — change the capacitor on the canvas and the pulse follows. Retriggerable and
+non-retriggerable behave as they should; the 4047 runs astable at 4.4·R·C or gives a 2.48·R·C
+pulse.
+
+**Memory.** The 74189 16 × 4 RAM, which reads back inverted, and the 74670 4 × 4 register file
+that reads one word while writing another.
+
+**Analog multiplexers.** The 4052 (two four-way, one address), 4053 (three changeovers) and the
+24-pin 4067 (sixteen channels), all real switch resistances in the analog solve like the 4051.
+
+**Six examples.** *4-Bit ALU*, *Magnitude Comparator* and *Two-Digit Counter* in Counting &
+Arithmetic, *Pulse Stretcher* in Timers & Oscillators, *Serial Display* in Displays and *Stereo
+Selector* in Analog.
+
+### Fixed
+
+**The 74165 shifted the wrong way.** Its serial input went straight onto QH; now the register shifts
+towards QH as the datasheet has it, H out first and A last, then SER.
+
+**The 7447 drew its 6 and 9 with tails**, which is the 74247's glyph; it now draws them without, as
+its datasheet does. The seven-segment display reads a digit either way.
+
 ## [0.42.0] - 2026-11-04
 
 A computer you can build. A 65C02 and an NMOS 6502 that run their instruction sets cycle by cycle
@@ -2483,7 +2548,8 @@ First public build of CirqAvalonia — an electronic circuit analyzer and mixed-
 
 **501 tests** measure the solver against closed-form answers rather than recorded output.
 
-[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.42.0...HEAD
+[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.43.0...HEAD
+[0.43.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.42.0...v0.43.0
 [0.42.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.41.1...v0.42.0
 [0.41.1]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.41.0...v0.41.1
 [0.41.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.40.0...v0.41.0

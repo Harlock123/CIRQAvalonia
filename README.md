@@ -52,7 +52,7 @@ Core ← Engine ← Components ← UI, which keeps the whole engine headless-tes
 ```bash
 dotnet run --project src/Cirq.UI     # the editor
 dotnet run --project src/Cirq.Cli    # the same engine, no window
-dotnet test                          # 4123 tests
+dotnet test                          # 4517 tests
 ./scripts/build-guide.sh             # the user guide as a PDF
 ```
 
@@ -609,6 +609,8 @@ one passes against a button that would never have fired.
 | LM741 | Closed-loop gain, virtual ground, rail saturation, open-loop gain, slew-rate limiting, −3 dB corner at GBW/gain |
 | NE555 | Astable frequency vs `1.44/((R1+2R2)C)` across four R/C combinations, duty cycle, supply independence |
 | 74xx | Truth tables end-to-end through the analog domain, 7474/7476 edge triggering and async clear, 7490 BCD sequence, 74138 one-hot decode, 74151 addressing, shift register load and clock inhibit |
+| 74xx families | Every row of every gate package through the analog solve with the gates fed different rows at once, open-collector outputs wired-ANDing on one pull-up and a 7406 pulled up to 12 V, the 74132's thresholds, tri-state buffers fighting when two disagree; the JK table on each part's own edge, asynchronous preset and clear, a 74109 made a D flip-flop; ripple, decade and synchronous-clear counters to their moduli, a 74163 truncated to six with no glimpse of the seventh count; every code of the 7442, 74154 and 4028; all 16,384 rows of the 74181 against the datasheet's function list, a 74182 adding sixteen bits with four ALUs wired straight to it, the 7485's cascade rows; the 74165 shifting H out first; the 74299 loading and driving through the same pins; the 74189 reading back inverted — each on its datasheet pinout, pin by pin |
+| One-shots | Pulse widths of K·R·C from a real resistor and capacitor on the 74121 (and its internal 2 kΩ), 74123, 74221, 4528 and 4538 within a few percent, doubling with the capacitor; the retriggerable parts restarting from a trigger mid-pulse and the others ignoring it; a train of triggers holding a 4538 high; clears ending a pulse; the 74123 alone triggering on releasing clear; the 4047's 2.48·R·C one-shot and its astable at 4.4·R·C with an even duty cycle |
 | Bus glue | The 74139's eight rows per half with the other half undisturbed, the 74244's two groups driving and letting go independently, the 74374 and 74574 taking their inputs only on the rising edge, and the 74573 following while LE is high and holding after — each on its datasheet pinout, pin by pin |
 | Memories | Every EPROM, EEPROM and RAM on its JEDEC pinout pin by pin, data an access time after the address and released when deselected, a RAM written and read back through a tri-state buffer, a 28C256 write that is only loaded, polled through bit 7 inverted and bit 6 toggling, then in the cells a write cycle later; Intel HEX with segment and linear records, every malformed line refused with its number and reason, a binary at an offset, an image wrapped into the chip and one too big for it refused, a 32K image surviving the circuit file, and the original 2K part's file form unchanged |
 | 6502 core | Binary and decimal ADC/SBC with each part's flags, the dummy cycles of indexed and read-modify-write instructions differing between the NMOS part and the 65C02 exactly as the silicon's do, the NMOS JMP ($xxFF) bug and the 65C02's extra cycle fixing it, JSR/RTS/BRK bus sequences, the 65C02's additions and the NMOS undocumented opcodes, reset, IRQ latency after CLI, NMI once per edge, WAI — and a self-checking program, assembled from source in the test, passing on both parts in an array and on a schematic. Locally the core also passes every case of the published per-cycle suites (2,560,000 NMOS, 2,540,000 65C02) and Klaus Dormann's functional and extended-opcode tests; those are not in the repository |
@@ -675,7 +677,7 @@ one passes against a button that would never have fired.
 | Pico and ESP32 | Pinouts against the boards' own cards, the Pico's ADC pins reading volts, the ESP32 refusing to drive an input-only pin or touch a flash pin, both driving 3.3 V and both flagging 5 V on a pin |
 | 74283, 7483, 74192, 74193 | All 512 sums of the 74283 on its pins, the 7483 the same with its own pinout, two adders cascaded to eight bits, the counters up and down and wrapping in binary and BCD, counting only with the other clock high, asynchronous load and clear with clear winning, CO and BO low only at the end of the count with their clock low, and two 74192s cascaded counting to 99 and back |
 | Amplifiers | LM386 idling at half supply, its stated gain, clipping at the rails; INA126 rejecting four volts of common mode; the speaker's average power |
-| 40xx series | Gate truth tables on the CMOS pinout, and that it is *not* the 74xx one; 4093 hysteresis and its relaxation-oscillator period against the closed form; 4013 toggling and its active-high set and reset; 4040 stage-by-stage division and falling-edge clocking; 4017 one-hot walk, reset and carry; 4511 glyph table, active-high drive, lamp test and blanking priority; 4066 and 4051 analog pass-through, switch resistance and off-state leakage; 4060 oscillating from its own Rt and Ct at the datasheet's 1/(2.3·Rt·Ct), and the frequency tracking a changed capacitor |
+| 40xx series | Gate truth tables on the CMOS pinout, and that it is *not* the 74xx one; 4093 hysteresis and its relaxation-oscillator period against the closed form; 4013 toggling and its active-high set and reset; 4040 stage-by-stage division and falling-edge clocking; 4017 one-hot walk, reset and carry; 4511 glyph table, active-high drive, lamp test and blanking priority; 4066 and 4051 analog pass-through, switch resistance and off-state leakage; 4060 oscillating from its own Rt and Ct at the datasheet's 1/(2.3·Rt·Ct), and the frequency tracking a changed capacitor; and the newer ones — the 4049 and 4050 with VDD on pin 1, the 4029, 4510 and 4516 cascading on carry to 99, the 4518 and 4520 chained through ENABLE, two 4026s counting and displaying to 99, 4033s blanking a leading zero, the 4543 inverting by PHASE, the 4094 holding its outputs until strobed, and the 4052, 4053 and 4067 passing every channel to its common |
 | Comparator | Open-collector pull-down and release, driving a higher rail through a pull-up, edge timing |
 | Displays | 7447 glyph table, open-collector drive, lamp test and blanking priority, counter walking 0-9 on the display |
 | About | Every library reporting a version that matches the assembly actually loaded, an unstamped build saying so rather than claiming 1.0.0, the palette counts being counted, and the copied text carrying everything a bug report needs |
@@ -690,7 +692,7 @@ one passes against a button that would never have fired.
 | Arrange | Aligning left, right, top and bottom by the parts' edges and the two centre lines by their middles, a centre being the average so a selection does not drift, distributing leaving the two outermost exactly where they were with equal gaps between the rest, parts already in line left alone so nothing lands in the undo history for a move that did not happen, and everything rounded back onto the grid when snapping is on |
 | Find on sheet | An exact designator beating one that merely starts with the term, values and kinds and net names after that, case never mattering, a named net being one row however many parts are on it, blocks searched inside, and nothing matching nothing |
 | Compare | Two copies of one circuit differing in nothing, a changed value read as one line, parts matched by identity so a renamed and moved part is two changes rather than a removal and an addition, a wire being the pair of pins it joins so redrawing it through a corner or the other way round is not a change, rounding through a save not counting as an edit, probes and requirements and conditions compared, and a summary that counts moves without leading with them |
-| Explain | A divider's tap in volts and a loaded one refused, a low-pass told from a high-pass with the corner, a tuned circuit peaking or dipping, decoupling, pull-ups, an LED's current, an op-amp's gain inverting and non-inverting and as a follower, emitter followers and common-emitter stages, a flyback diode that is not an LED, a 555's frequency and duty — and silence on anything it does not recognise, proved across all 100 shipped examples |
+| Explain | A divider's tap in volts and a loaded one refused, a low-pass told from a high-pass with the corner, a tuned circuit peaking or dipping, decoupling, pull-ups, an LED's current, an op-amp's gain inverting and non-inverting and as a follower, emitter followers and common-emitter stages, a flyback diode that is not an LED, a 555's frequency and duty — and silence on anything it does not recognise, proved across all 106 shipped examples |
 | Design report | A whole HTML document with nothing fetched from anywhere, the verdict before everything else, the schematic as selectable SVG with no stray declaration, requirements coloured by met and not met and not measurable, one row per part and value, the conditions always stated, everything a person typed escaped, and a report without a drawing still a report |
 | Windows | A second editor with its own circuit, simulation, scope and history; a clipboard shared between them because carrying a block across is what they are for; a recovery snapshot each so two cannot overwrite each other's work; and every abandoned snapshot offered back in a window of its own |
 | Colour codes | The value as it is written on the part, drawn beside the numbers — four bands at five percent and five at one, because you cannot promise one percent on a value you only spelled to two figures; gold and silver multipliers that divide, so a 4R7 is yellow-violet-gold; the wider gap that says which end to read from; a ceramic's three digits counted in picofarads and an inductor's bands in microhenries; the tolerance band rounded to the tighter promise rather than the looser one; a value the code cannot spell saying so and saying what it does spell; every marking also read out in words; and an electrolytic given none, because its value is printed on the can in plain microfarads |
@@ -903,11 +905,17 @@ attached to it, and any part that said it had not settled — all of which name 
 drawing to go and look, which "try a smaller time step" does not.
 
 The palette holds 308 components in 17 collapsible categories, with a **Find a part** box
-(`Ctrl+F`) over them. Among the newest: **a 6502 you can build a computer with** — a W65C02S and an
+(`Ctrl+F`) over them. Among the newest: **eighty-one more 74 and 4000 series chips** — open-collector
+and tri-state gates, every common JK and D package, ripple, synchronous and up/down counters, the
+74181 ALU with its 74182 look-ahead, the 7485 comparator, universal shift registers, octal buffers,
+the 74121, 74123, 74221, 4528, 4538 and 4047 one-shots and timers timed by a real R and C, the 4026
+and 4033 counters with their own display drivers, the 4543 LCD driver, the 74189 and 74670
+memories and the 4052, 4053 and 4067 analog multiplexers, each on its datasheet pinout. Before that:
+**a 6502 you can build a computer with** — a W65C02S and an
 NMOS 6502 that run their instruction sets cycle by cycle on their pins, a 6522 VIA and a 6551 ACIA,
 the 2716/2732/2764/27C256 EPROMs, a 28C256 EEPROM with page writes and data polling, 6116 and
 62256 RAMs that load binary or Intel HEX images, and the 74139, 74244, 74374, 74573 and 74574 bus
-glue — with Ben Eater's breadboard computer as an example, saying hello on an HD44780. Before that:
+glue — with Ben Eater's breadboard computer as an example, saying hello on an HD44780. And before that:
 an incandescent lamp with the inrush of a cold filament, generic flip-flops and latches and a
 tri-state buffer, a TIP120 Darlington, LM35 and TMP36 thermometers, a WS2812B NeoPixel strip, a 4×4
 matrix keypad, Raspberry Pi Pico and ESP32 boards, and the 7483 / 74283 adders and 74192 / 74193
@@ -948,7 +956,7 @@ forty-four thousand samples a second on time for ever, and a file makes the same
 and assertable. The WAV reader and writer are a couple of hundred lines here rather than a
 dependency shipped for six runtime identifiers.
 
-Ninety-eight worked circuits ship with it, grouped and searchable in **File > Examples...** rather
+A hundred and six worked circuits ship with it, grouped and searchable in **File > Examples...** rather
 than piled into a submenu — Fundamentals, Analog, Power Supplies, Switching & Motors, Digital
 Logic, Counting & Arithmetic, Timers & Oscillators, Buses & Interfaces, Sensors, Signal Integrity & RF, Audio, Displays
 and Development Boards. Each one is run by the test suite and asserted against the thing it exists to show, so a

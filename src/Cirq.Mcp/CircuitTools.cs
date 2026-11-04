@@ -28,7 +28,7 @@ public sealed partial class CircuitTools(ICircuitHost host)
     // ───────────────────────────── the library ─────────────────────────────
 
     [McpServerTool(Name = "list_parts", ReadOnly = true, Idempotent = true)]
-    [Description("Lists the parts the palette offers, by group: each one's name (what add_parts takes as kind) and what it is. Over 200 parts, so narrow it with search (matched against names, descriptions and groups, e.g. \"555\", \"op-amp\", \"LED\", \"shift register\") or category. describe_part gives a part's pins and settings.")]
+    [Description("Lists the parts the palette offers, by group: each one's name (what add_parts takes as kind) and what it is. Over 300 parts, so narrow it with search (matched against names, descriptions and groups, e.g. \"555\", \"op-amp\", \"LED\", \"shift register\") or category. describe_part gives a part's pins and settings.")]
     public Task<string> ListParts(
         [Description("Words to look for in a part's name, description or group, e.g. \"timer\" or \"74HC\". Optional.")] string? search = null,
         [Description("Only this group, e.g. \"Passive\", \"Sources\", \"Semiconductors\". Optional.")] string? category = null,

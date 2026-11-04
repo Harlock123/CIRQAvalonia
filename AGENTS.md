@@ -117,6 +117,20 @@ dotnet run --project src/Cirq.UI -- --mcp      # the MCP server on stdio, headle
   and Klaus Dormann's functional tests, downloaded outside the repository — neither is committed, and
   no test may need the network. Example ROMs are byte arrays in `Examples.cs`; a UI test assembles the
   source the guide prints and checks the bytes match, so change both together.
+- **Logic families are bases with pin tables.** A 74/4000 part is usually a few lines on a shared base in
+  `Digital/` — `MultiGateIc` (with an open-collector option), `DualJkFlipFlopIc`, `ClockedRegisterIc`,
+  `SynchronousCounterIc`, `CmosRippleCounterIc`, `DecodedCounterIc`, `ParallelInSerialOutIc`,
+  `UniversalShiftRegisterIc`, `OctalBufferIc`, `TtlSevenSegmentDecoderIc`, `AnalogMultiplexerIc` and more:
+  add a part by giving its pinout and options, not by copying a class. Open-collector and tri-state outputs
+  are `HighImpedance` on `Bidirectional` pins, which the rule check lets share a net. Seven-segment
+  patterns live in `SevenSegmentGlyphs`, with and without tails.
+- **One-shots time from the real R and C.** `MonostableTimer` (in `Monostables.cs`) discharges the
+  capacitor through a stamped resistor, then ends the pulse where an RC charge crosses after K·R·C, so
+  the part's `TimingConstant` is the datasheet's K and the resistor and capacitor are components on the
+  canvas, as on the 555 and 4060. Judge it across the capacitor, not from the timing pin.
+- **Constructor arguments are not saved.** Only public settable properties round-trip, so a part built
+  with `new PatternGenerator(3)` reopens with the default four lines; examples must use what a file can
+  rebuild (`EveryExampleSurvivesASaveAndReopen` catches it).
 - **Runs hand back their end state.** A part implementing `IRunState` (processors, memories, the LCD) has
   the state its copy ended in written back after an agent's `run_transient`.
 - **Logic speed.** The simulator reuses an LU factorisation while the stamped matrix is unchanged, so a
