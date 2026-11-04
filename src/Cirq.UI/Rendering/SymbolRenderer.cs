@@ -115,6 +115,7 @@ public static class SymbolRenderer
             case Diode: DrawDiode(context, pen); break;
             case SevenSegmentDisplay display: DrawSevenSegment(context, pen, zoom, display); break;
             case BipolarTransistor bjt: DrawBipolar(context, pen, bjt); break;
+            case DarlingtonTransistor: DrawDarlington(context, pen); break;
             case Mosfet mosfet: DrawMosfet(context, pen, mosfet); break;
             case ToggleSwitch toggleSwitch: DrawToggleSwitch(context, pen, toggleSwitch); break;
             case PushButton button: DrawPushButton(context, pen, button); break;
@@ -2432,6 +2433,46 @@ public static class SymbolRenderer
         DrawArrowHead(context, pen,
             from: bjt.IsNpn ? new Point(-8, 10) : new Point(16, 26),
             to: bjt.IsNpn ? new Point(16, 26) : new Point(-8, 10));
+    }
+
+    /// <summary>
+    /// A Darlington: the driver transistor's emitter landing on the output transistor's base, both
+    /// collectors joined, and the diode the real part carries from emitter to collector drawn on the
+    /// right. Two arrows, because there are two junctions in the base-emitter path — which is the
+    /// 1.4 V it takes to turn one on.
+    /// </summary>
+    private static void DrawDarlington(ISymbolCanvas context, IPen pen)
+    {
+        context.DrawEllipse(CanvasTheme.SymbolFill, pen, new Point(2, 0), 32, 32);
+
+        // Driver: base lead to its plate, collector up to the common rail, emitter down on to
+        // the output transistor's plate.
+        context.DrawLine(pen, new Point(-40, 0), new Point(-18, 0));
+        context.DrawLine(pen, new Point(-18, -14), new Point(-18, 10));
+        context.DrawLine(pen, new Point(-18, -8), new Point(-4, -20));
+        context.DrawLine(pen, new Point(-18, 4), new Point(-4, 12));
+        DrawArrowHead(context, pen, from: new Point(-18, 4), to: new Point(-4, 12));
+
+        // Output: its plate, collector up to the rail, emitter down to the pin.
+        context.DrawLine(pen, new Point(-4, 4), new Point(-4, 24));
+        context.DrawLine(pen, new Point(-4, 10), new Point(12, -2));
+        context.DrawLine(pen, new Point(12, -2), new Point(12, -20));
+        context.DrawLine(pen, new Point(-4, 18), new Point(14, 28));
+        DrawArrowHead(context, pen, from: new Point(-4, 18), to: new Point(14, 28));
+
+        // The collector rail, out to the pin.
+        context.DrawLine(pen, new Point(-4, -20), new Point(24, -20));
+        context.DrawLine(pen, new Point(20, -20), new Point(20, -40));
+        context.DrawLine(pen, new Point(14, 28), new Point(20, 28));
+        context.DrawLine(pen, new Point(20, 28), new Point(20, 40));
+
+        // The protection diode, emitter to collector: cathode up.
+        context.DrawLine(pen, new Point(24, -20), new Point(24, -7));
+        context.DrawLine(pen, new Point(24, 5), new Point(24, 28));
+        context.DrawLine(pen, new Point(20, 28), new Point(24, 28));
+        context.DrawGeometry(pen.Brush, pen,
+            SymbolPath.Polyline([new Point(19, 5), new Point(29, 5), new Point(24, -5)], true));
+        context.DrawLine(pen, new Point(19, -5), new Point(29, -5));
     }
 
     private static void DrawMosfet(ISymbolCanvas context, IPen pen, Mosfet mosfet)

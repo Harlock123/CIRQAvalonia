@@ -41,7 +41,7 @@ public class ToolboxExampleTests
             peak = Math.Max(peak, lamp.Current);
         }
 
-        sim.Run(0.3);
+        sim.Run(0.25);
 
         Assert.True(peak > 3.5, $"the inrush peaked at only {peak:0.00} A");
         Assert.Equal(5.0 / 12.0, lamp.Current, 0.02);
@@ -83,5 +83,38 @@ public class ToolboxExampleTests
         Assert.False(buffers[0].IsEnabled || buffers[1].IsEnabled);
         Assert.True(sim.NodeVoltage(buffers[1].Out) < 0.1);
         Assert.DoesNotContain(buffers, b => b.IsContending);
+    }
+
+    /// <summary>
+    /// The board's PWM through the Darlington: the collector sits about a volt up in every
+    /// on-pulse, and the filament averages the pulses into a steady, partial glow.
+    /// </summary>
+    [Fact]
+    public void TheDarlingtonDimsTheLampFromAPwmPin()
+    {
+        using var vm = Load("Darlington Lamp Dimmer");
+        var sim = vm.Simulation.Simulator!;
+        var q = vm.Circuit.Components.OfType<DarlingtonTransistor>().Single();
+        var lamp = vm.Circuit.Components.OfType<IncandescentLamp>().Single();
+
+        sim.Run(0.2);
+
+        var lowest = double.MaxValue;
+        var dimmest = double.MaxValue;
+        var brightest = 0.0;
+        var end = sim.Time + 4e-3;
+
+        while (sim.Time < end)
+        {
+            sim.Step();
+            lowest = Math.Min(lowest, q.Vce);
+            dimmest = Math.Min(dimmest, lamp.Brightness);
+            brightest = Math.Max(brightest, lamp.Brightness);
+        }
+
+        Assert.InRange(lowest, 0.6, 1.5);
+        Assert.InRange(dimmest, 0.05, 0.9);
+        Assert.True(brightest - dimmest < 0.15, $"the glow swung from {dimmest:0.00} to {brightest:0.00}");
+        Assert.Empty(vm.Circuit.Components.OfType<Cirq.Components.Boards.DeveloperBoard>().Single().Violations);
     }
 }

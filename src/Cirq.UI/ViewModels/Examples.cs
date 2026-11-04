@@ -110,6 +110,8 @@ public static class Examples
                 LoadLampDimmer),
             new("Lamp Inrush", "A 12 V bulb switched on cold draws ten times its running current — open SW1, let it cool, close it again",
                 LoadLampInrush),
+            new("Darlington Lamp Dimmer", "An Arduino's PWM pin dimming a 12 V lamp through a TIP120 — change the duty in the board's Pins",
+                LoadDarlingtonLampDimmer),
             new("Relay Driver", "Logic to a coil through an optocoupler and a Darlington array",
                 LoadRelayDriver),
             new("IGBT and MOSFET", "The same load switched by each — a voltage drop against a resistance",
@@ -1410,6 +1412,57 @@ public static class Examples
         vm.Scope.VoltsPerDivision = 2.0;
         vm.Scope.Layout = ScopeLayout.Tiled;
         vm.Scope.AddProbe(lamp.A, "Lamp V");
+
+        var current = vm.Scope.AddProbe(lamp.A, "Lamp I");
+        current.Kind = Cirq.Core.Probing.ProbeKind.Current;
+
+        vm.Simulation.SpeedFactor = 0.05;
+    }
+
+    /// <summary>
+    /// An Arduino dimming a 12 V lamp through a TIP120.
+    /// <para>
+    /// The pin can give twenty milliamps and the lamp wants over four on switch-on, so the gain
+    /// comes from the Darlington — a thousand or more, which is why one resistor from the pin is the
+    /// whole of the drive circuit. D9 runs PWM at 500 Hz and 30 %; the filament's thermal mass
+    /// averages that into a steady, dimmer glow, so the lamp current is a train of pulses and the
+    /// light is not. Saturated, the TIP120 still drops about a volt, which the collector trace shows
+    /// sitting above ground in every on-pulse. Change the duty in the board's Pins to dim it further.
+    /// </para>
+    /// </summary>
+    public static void LoadDarlingtonLampDimmer(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "Darlington lamp dimmer";
+
+        var uno = Place(circuit, new ArduinoUnoBoard { Pins = "D9=pwm@500Hz:30%" }, -360, 0);
+        var supply = Place(circuit, new DcVoltageSource(12.0), 360, -60);
+        supply.RotationDegrees = 90;
+
+        var drive = Place(circuit, new Resistor(1e3), -100, 160);
+        var q = Place(circuit, new DarlingtonTransistor(), 60, 160);
+        var lamp = Place(circuit, new IncandescentLamp(12.0, 5.0), 160, -60);
+        lamp.RotationDegrees = 90;
+
+        var gndBoard = Place(circuit, new Ground(), -360, 380);
+        var gnd = Place(circuit, new Ground(), 80, 300);
+        var gndSupply = Place(circuit, new Ground(), 360, 80);
+
+        circuit.Connect(uno.GroundPins[0], gndBoard.Pin);
+        circuit.Connect(supply.Negative, gndSupply.Pin);
+
+        circuit.Connect(uno.Pin("D9"), drive.A);
+        circuit.Connect(drive.B, q.Base);
+        circuit.Connect(q.Emitter, gnd.Pin);
+
+        circuit.Connect(supply.Positive, lamp.A);
+        circuit.Connect(lamp.B, q.Collector);
+
+        vm.Scope.TimebasePerDivision = 2e-3;
+        vm.Scope.VoltsPerDivision = 5.0;
+        vm.Scope.Layout = ScopeLayout.Tiled;
+        vm.Scope.AddProbe(uno.Pin("D9"), "D9");
+        vm.Scope.AddProbe(q.Collector, "Collector");
 
         var current = vm.Scope.AddProbe(lamp.A, "Lamp I");
         current.Kind = Cirq.Core.Probing.ProbeKind.Current;
