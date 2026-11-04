@@ -52,9 +52,20 @@ public record Terminal(string Id, string Name, TerminalType Type, Point CanvasOf
         }
     }
 
+    /// <summary>
+    /// The net this terminal was last found on, and in which netlist: a lookup the solver makes for
+    /// every pin of every part at every time point, answered here without a hash. One object, so a
+    /// thread reading it sees an owner and an index that belong together even if another netlist
+    /// over the same parts is being worked at the same time.
+    /// </summary>
+    internal NetCache? Cached { get; set; }
+
     public virtual bool Equals(Terminal? other) => other is not null && Uid.Equals(other.Uid);
 
     public override int GetHashCode() => Uid.GetHashCode();
 
     public override string ToString() => Owner is null ? $"{Name}" : $"{Owner.Name}.{Name}";
 }
+
+/// <summary>Where a terminal sits in one netlist.</summary>
+internal sealed record NetCache(Netlist Owner, Net Net);

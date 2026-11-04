@@ -12,7 +12,13 @@ namespace Cirq.Engine.Digital;
 public sealed class DigitalScheduler : IDigitalContext
 {
     private readonly PriorityQueue<DigitalEvent, (double Time, long Sequence)> _queue = new();
-    private readonly Dictionary<(IDigitalDevice Device, int Pin), LogicState> _pendingTarget = new();
+    /// <summary>
+    /// Where each pin with a transition queued is heading, and which scheduling put it there. Only
+    /// that scheduling is applied when it comes due: an earlier one still in the queue has been
+    /// superseded, even if it falls later — a memory asked to drive in 150 ns and then, before that,
+    /// to let go in 50 ns has been told to let go, and must not start driving at 150 ns after all.
+    /// </summary>
+    private readonly Dictionary<(IDigitalDevice Device, int Pin), (LogicState State, long Sequence)> _pendingTarget = new();
     private readonly HashSet<(IDigitalDevice Device, int Pin)> _cancelled = new();
     private readonly MnaSystem _system;
     private long _sequence;
@@ -47,15 +53,15 @@ public sealed class DigitalScheduler : IDigitalContext
         // Already at, or already heading to, this state: nothing to queue. This is what makes it
         // safe for a device to re-assert its outputs on every single evaluation.
         var currentTarget = _pendingTarget.TryGetValue(key, out var pending)
-            ? pending
+            ? pending.State
             : device.GetOutputState(outputIndex);
         if (currentTarget == newState) return;
 
-        _pendingTarget[key] = newState;
+        var seq = _sequence++;
+        _pendingTarget[key] = (newState, seq);
         _cancelled.Remove(key);
 
         var timestamp = Time + Math.Max(0, delaySeconds);
-        var seq = _sequence++;
         _queue.Enqueue(
             new DigitalEvent(timestamp, device, outputIndex, OutputTerminal(device, outputIndex), newState, seq),
             (timestamp, seq));
@@ -94,8 +100,8 @@ public sealed class DigitalScheduler : IDigitalContext
                 continue;
             }
 
-            // A later event for the same pin supersedes this one.
-            if (_pendingTarget.TryGetValue(key, out var target) && target != evt.NewState) continue;
+            // A later scheduling for the same pin supersedes this one, whenever either falls due.
+            if (!_pendingTarget.TryGetValue(key, out var target) || target.Sequence != evt.Sequence) continue;
 
             _pendingTarget.Remove(key);
             if (evt.Device.GetOutputState(evt.OutputIndex) == evt.NewState) continue;

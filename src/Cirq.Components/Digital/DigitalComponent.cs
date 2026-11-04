@@ -25,9 +25,25 @@ public abstract partial class DigitalComponent : CircuitComponent, IDigitalDevic
     [ObservableProperty]
     public partial double PropagationDelay { get; set; } = 10e-9;
 
-    public IReadOnlyList<Terminal> InputTerminals { get; protected set; } = [];
+    public IReadOnlyList<Terminal> InputTerminals
+    {
+        get;
+        protected set
+        {
+            field = value;
+            _rows = null;
+        }
+    } = [];
 
-    public IReadOnlyList<Terminal> OutputTerminals { get; protected set; } = [];
+    public IReadOnlyList<Terminal> OutputTerminals
+    {
+        get;
+        protected set
+        {
+            field = value;
+            _rows = null;
+        }
+    } = [];
 
     /// <summary>One auxiliary branch per driven output pin.</summary>
     public override int VoltageSourceCount => OutputTerminals.Count;
@@ -45,6 +61,24 @@ public abstract partial class DigitalComponent : CircuitComponent, IDigitalDevic
 
     public LogicState GetOutputState(int outputIndex) => _outputStates[outputIndex];
 
+    /// <summary>What each output was last asked to become, so asking again can be skipped.</summary>
+    private LogicState?[] _requested = [];
+
+    /// <summary>
+    /// Schedules an output as <see cref="IDigitalContext.Schedule"/> does, skipping the call when
+    /// the output was last asked for the same state — which the scheduler would ignore anyway, but
+    /// only after a dictionary lookup. For a part with dozens of pins evaluated at every time point
+    /// (a memory, an interface chip) that lookup was most of what evaluating it cost.
+    /// </summary>
+    protected void Request(IDigitalContext context, int outputIndex, LogicState state, double delaySeconds)
+    {
+        if (_requested.Length != _outputStates.Length) _requested = new LogicState?[_outputStates.Length];
+        if (_requested[outputIndex] == state) return;
+
+        _requested[outputIndex] = state;
+        context.Schedule(this, outputIndex, state, delaySeconds);
+    }
+
     public void ApplyTransition(int outputIndex, LogicState newState)
     {
         _outputStates[outputIndex] = newState;
@@ -57,6 +91,7 @@ public abstract partial class DigitalComponent : CircuitComponent, IDigitalDevic
     public virtual void ResetLogic()
     {
         Array.Fill(_outputStates, LogicState.Low);
+        Array.Clear(_requested);
         OnPropertyChanged(nameof(OutputSummary));
     }
 
@@ -67,13 +102,38 @@ public abstract partial class DigitalComponent : CircuitComponent, IDigitalDevic
 
     public abstract void EvaluateLogic(IDigitalContext context);
 
+    /// <summary>
+    /// The rows this part stamps into, worked out once per system rather than looked up for every pin
+    /// at every time point — which, on a board full of logic, was most of what stamping cost.
+    /// </summary>
+    private sealed record StampRows(MnaSystem System, int[] Inputs, int[] Outputs, int[] Branches, int Reference);
+
+    private StampRows? _rows;
+
+    private StampRows Rows(MnaSystem system)
+    {
+        if (_rows is { } rows && ReferenceEquals(rows.System, system)) return rows;
+
+        rows = new StampRows(
+            system,
+            [.. InputTerminals.Select(system.Node)],
+            [.. OutputTerminals.Select(system.Node)],
+            [.. Enumerable.Range(0, OutputTerminals.Count).Select(i => system.Branch(this, i))],
+            ReferenceNode(system));
+        _rows = rows;
+        return rows;
+    }
+
     public override void StampMatrix(MnaSystem system, SimulationState state)
     {
-        for (var i = 0; i < InputTerminals.Count; i++)
-            system.StampConductance(system.Node(InputTerminals[i]), ReferenceNode(system), 1.0 / Levels.InputResistance);
+        var rows = Rows(system);
+        var g = 1.0 / Levels.InputResistance;
 
-        for (var i = 0; i < OutputTerminals.Count; i++)
-            StampOutput(system, i);
+        for (var i = 0; i < rows.Inputs.Length; i++)
+            system.StampConductance(rows.Inputs[i], rows.Reference, g);
+
+        for (var i = 0; i < rows.Outputs.Length; i++)
+            StampOutput(system, rows, i);
     }
 
     /// <summary>
@@ -82,11 +142,11 @@ public abstract partial class DigitalComponent : CircuitComponent, IDigitalDevic
     /// </summary>
     protected virtual int ReferenceNode(MnaSystem system) => Netlist.GroundIndex;
 
-    private void StampOutput(MnaSystem system, int index)
+    private void StampOutput(MnaSystem system, StampRows rows, int index)
     {
-        var branch = system.Branch(this, index);
-        var node = system.Node(OutputTerminals[index]);
-        var reference = ReferenceNode(system);
+        var branch = rows.Branches[index];
+        var node = rows.Outputs[index];
+        var reference = rows.Reference;
         var state = _outputStates[index];
 
         if (state is LogicState.HighImpedance)

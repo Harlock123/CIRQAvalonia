@@ -116,6 +116,7 @@ public sealed class CircuitSimulator
 
         System = new MnaSystem(Netlist, Netlist.NodeCount, branches);
         _lu = new LuSolver(System.Size);
+        _factorCurrent = false;
         _iterationDelta = new double[System.Size];
 
         Scheduler = new DigitalScheduler(System);
@@ -520,8 +521,21 @@ public sealed class CircuitSimulator
             foreach (var c in _components) c.StampMatrix(System, State);
             StampGmin(Settings.Gmin + gminBoost);
 
-            _lu!.Factor(System.Matrix);
-            _lu.Solve(System.Rhs, System.Solution);
+            // A matrix stamped exactly as the last one factored needs no factoring again: logic
+            // switching high and low only moves the right-hand side.
+            if (!_factorCurrent || !System.Matches(_factored))
+            {
+                _factorCurrent = false;
+                _lu!.Factor(System.Matrix);
+                System.Record(_factored);
+                _factorCurrent = true;
+            }
+            else
+            {
+                ReusedFactorisations++;
+            }
+
+            _lu!.Solve(System.Rhs, System.Solution);
 
             residual = 0;
             for (var i = 0; i < System.Size; i++)
@@ -564,10 +578,18 @@ public sealed class CircuitSimulator
     /// Shunts every node to ground with a tiny conductance. Without it, a node reachable only
     /// through an open capacitor produces an all-zero matrix row.
     /// </summary>
+    /// <summary>The matrix the solver's factorisation is of, and whether that factorisation is still good.</summary>
+    private readonly MatrixSnapshot _factored = new();
+
+    private bool _factorCurrent;
+
+    /// <summary>How many solves reused the previous factorisation because the matrix had not changed.</summary>
+    public long ReusedFactorisations { get; private set; }
+
     private void StampGmin(double gmin)
     {
         if (gmin <= 0) return;
-        for (var i = 0; i < System.NodeCount; i++) System.Matrix[i][i] += gmin;
+        for (var i = 0; i < System.NodeCount; i++) System.Add(i, i, gmin);
     }
 
     private void CommitAll()

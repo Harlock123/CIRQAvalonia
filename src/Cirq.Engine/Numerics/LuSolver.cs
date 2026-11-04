@@ -272,7 +272,11 @@ public sealed class LuSolver
         }
 
         _factored = true;
+        _sparseFactor = sparse;
     }
+
+    /// <summary>Whether the factorisation kept its column lists, so a solve can walk them too.</summary>
+    private bool _sparseFactor;
 
     /// <summary>
     /// Merges the pivot row's columns into row <paramref name="i"/>'s, keeping them ascending.
@@ -316,6 +320,12 @@ public sealed class LuSolver
         ArgumentOutOfRangeException.ThrowIfNotEqual(b.Length, _n);
         ArgumentOutOfRangeException.ThrowIfNotEqual(x.Length, _n);
 
+        if (_sparseFactor)
+        {
+            SolveSparse(b, x);
+            return;
+        }
+
         // Forward substitution, applying both permutations: the ordering chosen before the
         // elimination and the row swaps the pivoting made during it.
         for (var i = 0; i < _n; i++)
@@ -336,6 +346,53 @@ public sealed class LuSolver
         }
 
         // And back out of the ordering, so the caller gets its own unknowns in its own order.
+        for (var i = 0; i < _n; i++) x[_order[i]] = _scratch[i];
+    }
+
+    /// <summary>
+    /// The same two substitutions, over only the columns each factored row has something in.
+    /// <para>
+    /// A solve is n² multiplications done densely, and on a circuit whose matrix is factored once
+    /// and then solved at hundreds of time points running — logic, which only changes the right-hand
+    /// side — the solves become most of the work. The column lists the elimination already keeps
+    /// make them as sparse as the factorisation is.
+    /// </para>
+    /// </summary>
+    private void SolveSparse(double[] b, double[] x)
+    {
+        for (var i = 0; i < _n; i++)
+        {
+            var sum = b[_order[_pivot[i]]];
+            var row = _lu[i];
+            var columns = _columns[i];
+            var count = _counts[i];
+
+            for (var p = 0; p < count; p++)
+            {
+                var j = columns[p];
+                if (j >= i) break;
+                sum -= row[j] * _scratch[j];
+            }
+
+            _scratch[i] = sum;
+        }
+
+        for (var i = _n - 1; i >= 0; i--)
+        {
+            var sum = _scratch[i];
+            var row = _lu[i];
+            var columns = _columns[i];
+
+            for (var p = _counts[i] - 1; p >= 0; p--)
+            {
+                var j = columns[p];
+                if (j <= i) break;
+                sum -= row[j] * _scratch[j];
+            }
+
+            _scratch[i] = sum / row[i];
+        }
+
         for (var i = 0; i < _n; i++) x[_order[i]] = _scratch[i];
     }
 

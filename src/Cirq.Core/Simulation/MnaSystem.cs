@@ -26,6 +26,7 @@ public sealed class MnaSystem
 
         Matrix = new double[Size][];
         for (var i = 0; i < Size; i++) Matrix[i] = new double[Size];
+        _touched = new bool[Size * Size];
         Rhs = new double[Size];
         Solution = new double[Size];
         PreviousSolution = new double[Size];
@@ -53,11 +54,67 @@ public sealed class MnaSystem
     /// <summary>Solution of the previous Newton iteration, which non-linear stampers linearise about.</summary>
     public double[] PreviousSolution { get; }
 
+    /// <summary>
+    /// Which entries of the matrix have been stamped since it was last cleared, in the order they
+    /// were first touched, with a flag per entry so each is listed once.
+    /// <para>
+    /// A circuit matrix is a fraction of a percent full, and zeroing all n² entries before every
+    /// stamping pass came to most of the time a logic-heavy circuit spends per time point — a
+    /// 6502 computer of 151 unknowns clears 182 KB to re-stamp a few hundred numbers. Every write
+    /// goes through <see cref="Add"/>, so remembering where it wrote is enough to clear only that.
+    /// </para>
+    /// </summary>
+    private readonly bool[] _touched;
+
+    private readonly List<int> _touchedList = [];
+
+    /// <summary>The row and column of each entry in <see cref="_touchedList"/>, so nothing has to divide to find them.</summary>
+    private readonly List<(int Row, int Col)> _touchedCells = [];
+
     /// <summary>Zeroes the matrix and right-hand side ahead of a fresh stamping pass.</summary>
     public void Clear()
     {
-        for (var i = 0; i < Size; i++) Array.Clear(Matrix[i]);
+        foreach (var index in _touchedList) _touched[index] = false;
+        foreach (var (row, col) in _touchedCells) Matrix[row][col] = 0;
+
+        _touchedList.Clear();
+        _touchedCells.Clear();
         Array.Clear(Rhs);
+    }
+
+    /// <summary>
+    /// True when the matrix is exactly the one <paramref name="snapshot"/> recorded: the same
+    /// entries stamped, in the same order, to the same values. A matrix stamped identically to the
+    /// one last factored can reuse that factorisation.
+    /// </summary>
+    public bool Matches(MatrixSnapshot snapshot)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        if (snapshot.Indices.Count != _touchedList.Count) return false;
+
+        for (var k = 0; k < _touchedList.Count; k++)
+        {
+            if (snapshot.Indices[k] != _touchedList[k]) return false;
+            var (row, col) = _touchedCells[k];
+            if (!snapshot.Values[k].Equals(Matrix[row][col])) return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>Records the matrix as it stands into <paramref name="snapshot"/>.</summary>
+    public void Record(MatrixSnapshot snapshot)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        snapshot.Indices.Clear();
+        snapshot.Values.Clear();
+
+        for (var k = 0; k < _touchedList.Count; k++)
+        {
+            snapshot.Indices.Add(_touchedList[k]);
+            var (row, col) = _touchedCells[k];
+            snapshot.Values.Add(Matrix[row][col]);
+        }
     }
 
     // ---- index helpers -------------------------------------------------
@@ -85,6 +142,15 @@ public sealed class MnaSystem
     public void Add(int row, int col, double value)
     {
         if (row < 0 || col < 0) return;
+
+        var index = (row * Size) + col;
+        if (!_touched[index])
+        {
+            _touched[index] = true;
+            _touchedList.Add(index);
+            _touchedCells.Add((row, col));
+        }
+
         Matrix[row][col] += value;
     }
 
@@ -230,4 +296,12 @@ public sealed class MnaSystem
         Array.Clear(Solution);
         Array.Clear(PreviousSolution);
     }
+}
+
+/// <summary>A matrix's stamped entries and their values, to tell whether a later stamping produced the same one.</summary>
+public sealed class MatrixSnapshot
+{
+    public List<int> Indices { get; } = [];
+
+    public List<double> Values { get; } = [];
 }

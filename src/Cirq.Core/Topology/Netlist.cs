@@ -24,10 +24,16 @@ public sealed class Netlist
     /// <summary>Number of non-ground nodes, i.e. the size of the MNA conductance block.</summary>
     public int NodeCount => Nets.Count(n => !n.IsGround);
 
-    public Net NetOf(Terminal terminal) =>
-        _terminalToNet.TryGetValue(terminal, out var net)
-            ? net
-            : throw new CircuitTopologyException($"Terminal '{terminal}' is not part of this netlist.");
+    public Net NetOf(Terminal terminal)
+    {
+        if (terminal.Cached is { } cached && ReferenceEquals(cached.Owner, this)) return cached.Net;
+
+        if (!_terminalToNet.TryGetValue(terminal, out var net))
+            throw new CircuitTopologyException($"Terminal '{terminal}' is not part of this netlist.");
+
+        terminal.Cached = new NetCache(this, net);
+        return net;
+    }
 
     /// <summary>Node index for a terminal; <see cref="GroundIndex"/> when it sits on ground.</summary>
     public int IndexOf(Terminal terminal) => NetOf(terminal).Index;

@@ -59,7 +59,7 @@ public abstract partial class DigitalIc : DigitalComponent
     protected void ReleaseAllOutputs(IDigitalContext context)
     {
         for (var i = 0; i < OutputTerminals.Count; i++)
-            context.Schedule(this, i, LogicState.HighImpedance, DelayFor(context));
+            Request(context, i, LogicState.HighImpedance, DelayFor(context));
     }
 
     public sealed override void EvaluateLogic(IDigitalContext context)

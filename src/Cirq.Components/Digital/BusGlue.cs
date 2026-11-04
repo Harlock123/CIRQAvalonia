@@ -83,7 +83,7 @@ public sealed class Ic74139 : DigitalIc
             chosen[half] = enabled ? select : -1;
 
             for (var i = 0; i < 4; i++)
-                context.Schedule(this, (half * 4) + i, enabled && i == select ? LogicState.Low : LogicState.High, delay);
+                Request(context, (half * 4) + i, enabled && i == select ? LogicState.Low : LogicState.High, delay);
         }
 
         var before = Selected;
@@ -181,7 +181,7 @@ public sealed class Ic74244 : DigitalIc
         {
             var on = i < 4 ? first : second;
             var input = context.ReadInput(_a[i], Levels);
-            context.Schedule(this, i, !on ? LogicState.HighImpedance : input.IsDriven() ? input : LogicState.Unknown, delay);
+            Request(context, i, !on ? LogicState.HighImpedance : input.IsDriven() ? input : LogicState.Unknown, delay);
         }
 
         var before = GroupEnabled;
@@ -307,7 +307,7 @@ public abstract class OctalRegister : DigitalIc
         for (var i = 0; i < Width; i++)
         {
             var bit = (_held & (1 << i)) != 0;
-            context.Schedule(this, i, IsReleased ? LogicState.HighImpedance : bit ? LogicState.High : LogicState.Low, delay);
+            Request(context, i, IsReleased ? LogicState.HighImpedance : bit ? LogicState.High : LogicState.Low, delay);
         }
 
         if (before != _held || wasReleased != IsReleased) NotifyValueChanged();

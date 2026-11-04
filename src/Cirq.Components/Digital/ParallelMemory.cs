@@ -291,7 +291,7 @@ public abstract partial class ParallelMemory : DigitalIc
         for (var i = 0; i < Width; i++)
         {
             var bit = (value & (1 << i)) != 0;
-            context.Schedule(this, i, bit ? LogicState.High : LogicState.Low, delay);
+            Request(context, i, bit ? LogicState.High : LogicState.Low, delay);
         }
     }
 
@@ -301,7 +301,7 @@ public abstract partial class ParallelMemory : DigitalIc
         var delay = context.IsInitializing ? 0.0 : Math.Min(OutputDisableTime, PropagationDelay);
 
         for (var i = 0; i < Width; i++)
-            context.Schedule(this, i, LogicState.HighImpedance, delay);
+            Request(context, i, LogicState.HighImpedance, delay);
     }
 
     /// <summary>Records what the bus is doing, for the value label and the tests.</summary>
