@@ -16,6 +16,9 @@ public enum BusProtocol
     Uart,
     OneWire,
     Can,
+
+    /// <summary>A 6502's bus, cycle by cycle, from the processor's own record of it.</summary>
+    Cpu6502,
 }
 
 /// <summary>One decoded element, dressed for the list.</summary>
@@ -105,6 +108,7 @@ public sealed partial class BusDecodeViewModel : ObservableObject
     /// <summary>What the four channel pickers are called for the chosen protocol.</summary>
     public string LabelA => Protocol switch
     {
+        BusProtocol.Cpu6502 => "CPU",
         BusProtocol.I2c => "SDA",
         BusProtocol.Spi => "SCLK",
         BusProtocol.Can => "Bus",
@@ -132,6 +136,9 @@ public sealed partial class BusDecodeViewModel : ObservableObject
     public bool NeedsBitRate => Protocol is BusProtocol.Uart or BusProtocol.Can;
 
     public bool NeedsMode => Protocol == BusProtocol.Spi;
+
+    /// <summary>The most bus cycles a 6502 decode lists: the latest ones, which is what a logic analyser shows.</summary>
+    public const int MaxCpuCycles = 4000;
 
     partial void OnProtocolChanged(BusProtocol value)
     {
@@ -171,6 +178,8 @@ public sealed partial class BusDecodeViewModel : ObservableObject
         LogicTrace? Of(SignalProbe? probe) =>
             probe is null ? null : LogicTrace.From(probe.HistoryBuffer.ToArray());
 
+        if (Protocol == BusProtocol.Cpu6502) return DecodeProcessor();
+
         var a = Of(ChannelA);
 
         if (a is null || a.IsEmpty)
@@ -195,6 +204,30 @@ public sealed partial class BusDecodeViewModel : ObservableObject
     }
 
     /// <summary>
+    /// A 6502's bus. The processor records every cycle it performs — address, data, which way and
+    /// whether it was an opcode fetch — exactly as a logic analyser on its pins would see them, so
+    /// this reads that record rather than asking for twenty-six probed traces. The processor is the
+    /// one channel A's probe is on, or the circuit's only one.
+    /// </summary>
+    private DecodeResult DecodeProcessor()
+    {
+        var cpu = ChannelA?.TargetTerminal?.Owner as Cirq.Components.Processors.Processor6502
+                  ?? _circuit.Components.OfType<Cirq.Components.Processors.Processor6502>().FirstOrDefault();
+
+        if (cpu is null)
+            return DecodeResult.Nothing(Cirq.Components.Processors.Cpu6502BusDecoder.Protocol,
+                "There is no 6502 in the circuit to decode the bus of.");
+
+        var log = cpu.BusLog;
+        var recent = log.Count > MaxCpuCycles ? log.Skip(log.Count - MaxCpuCycles).ToList() : log;
+        var result = Cirq.Components.Processors.Cpu6502BusDecoder.Decode(cpu.Variant, recent);
+
+        return log.Count > MaxCpuCycles
+            ? result with { Summary = $"{result.Summary} — the last {MaxCpuCycles} of {log.Count} recorded" }
+            : result;
+    }
+
+    /// <summary>
     /// A first guess at the protocol from what the probes are called. Every shipped example names
     /// its probes after the signals, so this lands on the right answer for all of them — and where
     /// it does not, the pickers are right there.
@@ -209,6 +242,8 @@ public sealed partial class BusDecodeViewModel : ObservableObject
         if (names.Any(n => n.Contains("MOSI") || n.Contains("MISO"))) return BusProtocol.Spi;
         if (names.Any(n => n.Contains("CAN"))) return BusProtocol.Can;
         if (names.Any(n => n.Contains("DQ") || n.Contains("1-WIRE"))) return BusProtocol.OneWire;
+        if (names.Any(n => n.Contains("TX") || n.Contains("RX"))) return BusProtocol.Uart;
+        if (_circuit.Components.OfType<Cirq.Components.Processors.Processor6502>().Any()) return BusProtocol.Cpu6502;
 
         return BusProtocol.Uart;
     }
@@ -236,6 +271,11 @@ public sealed partial class BusDecodeViewModel : ObservableObject
 
             case BusProtocol.OneWire:
                 ChannelA = Named("DQ") ?? Traces.FirstOrDefault();
+                break;
+
+            case BusProtocol.Cpu6502:
+                ChannelA = Traces.FirstOrDefault(p => p.TargetTerminal?.Owner is Cirq.Components.Processors.Processor6502)
+                           ?? Traces.FirstOrDefault();
                 break;
 
             case BusProtocol.Can:

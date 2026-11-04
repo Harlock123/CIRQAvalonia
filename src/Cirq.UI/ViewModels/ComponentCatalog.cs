@@ -7,6 +7,7 @@ using Cirq.Components.Digital;
 using Cirq.Components.Ics;
 using Cirq.Components.Nonlinear;
 using Cirq.Components.Passive;
+using Cirq.Components.Processors;
 using Cirq.Components.Sources;
 using Cirq.Core.Topology;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -420,6 +421,14 @@ public static class ComponentCatalog
                 () => new Sram6116()),
             new("62256", "32K × 8 static RAM, 70 ns — the RAM in Ben Eater's 6502 computer",
                 () => new Sram62256()),
+            new("65C02", "W65C02S processor, cycle by cycle on its pins — the CPU in Ben Eater's computer. The full CMOS instruction set",
+                () => new Cpu65C02()),
+            new("6502", "MOS 6502 processor, the NMOS original — decimal-mode quirks, the JMP ($xxFF) bug and the undocumented opcodes",
+                () => new Cpu6502()),
+            new("6522 VIA", "Versatile interface adapter: two 8-bit ports, handshake lines, two timers and interrupts on a 6502's bus",
+                () => new Via6522()),
+            new("6551 ACIA", "Serial port for a 6502's bus, 50 to 19,200 baud from a 1.8432 MHz crystal — talks to the Serial Terminal",
+                () => new Acia6551()),
         ]),
 
         new("Sensors & Actuators",

@@ -50,16 +50,17 @@ the [README](../README.md), and what changed between releases is in the
 38. [What is this circuit?](#what-is-this-circuit)
 39. [Checking the circuit](#checking-the-circuit)
 40. [Development boards](#development-boards)
-41. [Saving and loading](#saving-and-loading)
-42. [Printing](#printing)
-43. [Exporting](#exporting)
-44. [The command line](#the-command-line)
-45. [AI: the chat and agents](#ai-the-chat-and-agents)
-46. [Appearance](#appearance)
-47. [What version is this](#what-version-is-this)
-48. [Closing a dialog](#closing-a-dialog)
-49. [Keyboard reference](#keyboard-reference)
-50. [When a circuit will not simulate](#when-a-circuit-will-not-simulate)
+41. [A 6502 computer](#a-6502-computer)
+42. [Saving and loading](#saving-and-loading)
+43. [Printing](#printing)
+44. [Exporting](#exporting)
+45. [The command line](#the-command-line)
+46. [AI: the chat and agents](#ai-the-chat-and-agents)
+47. [Appearance](#appearance)
+48. [What version is this](#what-version-is-this)
+49. [Closing a dialog](#closing-a-dialog)
+50. [Keyboard reference](#keyboard-reference)
+51. [When a circuit will not simulate](#when-a-circuit-will-not-simulate)
 
 This guide is also attached to every [release](../../releases) as a PDF, with a contents page and
 the screenshots in place — the same document, laid out for reading away from the machine. Build it
@@ -170,7 +171,7 @@ Three of those are worth separating, because they are easy to confuse:
 
 Click a palette entry, then click the canvas. The part lands where you click, snapped to the grid.
 
-The palette holds **223 components in 17 categories**:
+The palette holds **227 components in 17 categories**:
 
 | Category | Count | Contents |
 | --- | --- | --- |
@@ -187,7 +188,7 @@ The palette holds **223 components in 17 categories**:
 | 40xx Series | 15 | CMOS gates, counters, flip-flops, analog switches and a **4046 phase-locked loop** — see [below](#phase-locked-loops) |
 | Buses | 19 | **Bus tap** and **bus line**, I2C master, EEPROM, port expander, DS1307 clock, ADS1115 ADC, MCP4725 DAC and INA219 current sensor, SPI master and **MCP3008 ADC**, 1-Wire master and DS18B20 thermometer, serial terminal and device, **RS-485**, **CAN** and **RS-232 (MAX232)** transceivers, level shifter — see [below](#making-its-own-rails) |
 | Digital I/O | 9 | Logic toggle, clock, **pattern generator**, rotary encoder, oscillator module, ADC and DAC bridges, and a **2K × 8 SRAM and ROM** — see [below](#something-worth-addressing) |
-| Memory & CPUs | 7 | The **2716, 2732, 2764 and 27C256 EPROMs**, the **28C256 EEPROM**, and the **6116 and 62256 static RAMs**, each loadable from a binary or Intel HEX file — see [below](#memories-by-their-part-numbers) |
+| Memory & CPUs | 11 | The **2716, 2732, 2764 and 27C256 EPROMs**, the **28C256 EEPROM**, the **6116 and 62256 static RAMs** — each loadable from a binary or Intel HEX file — and the **65C02** and **6502** processors, **6522 VIA** and **6551 ACIA** — see [below](#memories-by-their-part-numbers) and [the 6502 computer](#a-6502-computer) |
 | Sensors & Actuators | 20 | DC motor, LDR, thermistors, **LM35 and TMP36** analog thermometers, buzzers, speaker, microphone, servo, stepper in **unipolar and bipolar** wirings, thermocouple, load cell, HC-SR04 ranger, Hall switch, phototransistor, **reed switch** and **PIR motion sensor** — see [below](#sensors-and-actuators) |
 | Switching & Isolation | 11 | Relay, fuses and a **resettable PPTC**, optocouplers, ULN2003, H-bridge, **A4988 microstepping driver**, **solid-state relay**, **MOSFET gate driver** — see [below](#regulating-a-current-instead-of-applying-a-voltage) |
 | Dev Boards | 6 | Raspberry Pi, Arduino Uno / Nano / Mega, **Raspberry Pi Pico** and **ESP32 DevKit** — see [below](#development-boards) |
@@ -5501,6 +5502,279 @@ Boards use real thresholds, so real interfacing problems show up. A 74xx TTL out
 3.4V and a 5V CMOS input wants 3.5V to call it high — so an Arduino reads a bare TTL gate as
 undefined rather than as a one. That is not a modelling artefact; it is the reason level shifters
 exist.
+
+---
+
+## A 6502 computer
+
+The **Memory & CPUs** group has what a small 8-bit computer is built from: the **W65C02S** — the
+CMOS 6502 in Ben Eater's breadboard computer — and the original NMOS **6502**, the **6522 VIA**,
+the **6551 ACIA**, and the ROMs and RAMs to go with them. **File > Examples > Computers** has two
+complete machines that run a program out of ROM.
+
+![Ben Eater's 6502 computer on the canvas: a W65C02S, a 28C256 ROM, a 62256 RAM, a 7400 decoding the addresses and a 6522 VIA, every bus pin named with a net label, a 1 MHz oscillator, a reset button and pull-ups on the left, and an HD44780 module along the bottom showing "Hello, world!"](images/46-ben-eater-6502.png)
+
+### How it is modelled
+
+**Cycle by cycle, on the pins.** A 6502 does exactly one thing per clock: it puts an address on the
+bus and either reads a byte there or writes one. Every instruction is a fixed sequence of those
+cycles, including the "dummy" reads and writes the silicon does while it is busy with something
+else — real bus cycles that a memory-mapped chip sees and can be upset by. The processor here is
+written as exactly that sequence, and each cycle appears on the package's pins with the datasheet's
+timing against the clock:
+
+- a cycle **ends as PHI2 falls**. The address, R/W and SYNC change about 30 ns later;
+- on a write the data goes onto the bus 25 ns after PHI2 rises and is held until 30 ns after it
+  falls;
+- on a read the data bus is **sampled at the instant PHI2 falls**, so a memory too slow for the
+  clock really does hand the processor the wrong byte — run the example's ROM at 6 MHz and see.
+
+So the address decoding, the chip selects and the memories' access times all matter, as they do on
+a breadboard. What is not modelled is anything inside a cycle that does not reach a pin.
+
+**How fast it runs.** Every one of those edges is a time point the solver lands on, and the whole
+board — about 150 unknowns — is solved at each, so this is not an emulator and does not run at one.
+Measured on the machine it was developed on (an 8-core ARM virtual machine), the Ben Eater computer
+runs at **about 5 to 10 ms of simulated time per second** in a release build, which at 1 MHz is
+5,000 to 10,000 instructions' worth of cycles a second; a debug build is two to three times slower.
+The hello world needs about 3.3 ms, so the text appears in under a second of solving. That is why
+the examples run from the oscillator at **1 MHz**: a slower clock costs the same per cycle and only
+adds time steps between them, while a 1 MHz clock is the speed Ben Eater's machine famously also
+runs at. Logic-heavy circuits like this one got about four times faster in this release: the
+solver now reuses its factorisation while only the logic levels change, and clears and solves only
+what the matrix actually holds.
+
+**Instruction sets.** The 65C02 has the full WDC instruction set — the 6502's plus (zp)
+addressing, BRA, PHX/PHY/PLX/PLY, STZ, TSB, TRB, INC A, DEC A, BIT immediate and indexed, JMP
+(abs,X), RMB/SMB/BBR/BBS, WAI and STP — with decimal mode setting N and Z correctly (and taking the
+extra cycle it costs), interrupts and BRK clearing D, and JMP ($xxFF) reading its pointer properly.
+The NMOS part has the original's decimal-mode flags, the JMP ($xxFF) page-wrap bug, and the
+**undocumented opcodes**: SLO, RLA, SRE, RRA, SAX, LAX, DCP, ISC, ANC, ALR, ARR, SBX, the extra
+NOPs, JAM (which locks it up until reset), and the unstable ANE, LXA, LAS, TAS, SHA, SHX and SHY as
+commonly characterised.
+
+Both were checked against the published per-cycle test suites — every instruction, ten thousand
+random cases each, every bus cycle and the resulting registers and memory — and pass all of them:
+2,560,000 cases for the NMOS 6502 and 2,540,000 for the 65C02 (the suite has no cases for WAI and
+STP, which have their own tests here).
+
+**Control pins.** RESB low holds the processor; let it go and it runs the seven-cycle reset sequence
+and starts at the address in $FFFC/$FFFD. Power-on does the same, so a circuit starts without the
+reset button being pressed. IRQB is a level, masked by the I flag; NMIB is taken on its falling edge;
+both are sampled as PHI2 falls and acted on at the end of the instruction. RDY low stops the
+processor at the end of the cycle, holding the bus (on the NMOS part only during reads, as the
+original ignored it on writes); SOB falling sets V; on the 65C02, BE low lets go of the address
+and data buses and R/W. None of them is pulled up inside, so tie the unused ones high. Not
+modelled: the 6502's exact interrupt latency around taken branches, the NMOS BRK/NMI collision, and
+the 65C02's RDY being pulled low during WAI (it is an input here).
+
+**The chips around it.** The 6522's two ports, direction registers, CA1/CA2/CB1/CB2 handshakes,
+both timers — Timer 1 one-shot or free-running with a square wave on PB7, Timer 2 one-shot or
+counting pulses on PB6 — and its interrupt flags and enables are all modelled, to the whole cycle;
+its shift register is not (the register can be read and written, but nothing shifts). IRQB on both
+the VIA and the ACIA is open-drain and needs a pull-up. The 6551 runs its baud-rate generator from
+the crystal frequency in **Crystal Frequency** (1.8432 MHz, giving 50 to 19,200 baud), with word
+length, stop bits, parity and echo from its registers; the crystal itself is not simulated, and
+baud select 0000 — a 16× clock on RxC — is taken as the crystal, which is 115,200 baud. It behaves
+as an R6551: the W65C51N's transmitter-empty bug is not reproduced.
+
+### The Ben Eater computer
+
+**File > Examples > Computers > Ben Eater 6502 Computer** is the machine from Ben Eater's video
+series, built the way he builds it:
+
+| Address | What | Selected by |
+| --- | --- | --- |
+| $0000-$3FFF | 62256 RAM (32K chip, 16K used) | /CE = NAND(PHI2, NOT A15), /OE = A14 |
+| $6000-$7FFF | 6522 VIA, registers at $6000-$600F | CS1 = A13, CS2B = NAND(NOT A15, A14) |
+| $8000-$FFFF | 28C256 ROM | /CE = NOT A15 |
+
+One 7400 does all of it, and it is worth seeing why. The ROM's chip enable is A15 inverted — a NAND
+with both inputs tied together — so the top half of memory is ROM. The RAM is selected only while
+PHI2 is high *and* A15 is low, so a write lands in the second half of the cycle when the address
+and data are steady; its /OE is A14, so it only answers below $4000. The third gate combines NOT A15
+with A14 into the I/O select for $4000-$7FFF, and A13 narrows that to the VIA. The VIA's port B is
+the LCD's data bus, and PA5, PA6 and PA7 are its RS, RW and E.
+
+Every bus pin is named with a **compact net label** — the label's flag alone, without its
+designator or the name repeated under it (the **Compact** setting) — because forty-odd wires
+between four 28- and 40-pin packages would be unreadable. Pins with the same name are the same net.
+
+The ROM holds this program — assembled, in the example, and loaded into the 28C256 as an image:
+
+```asm
+; Hello world for the 6502 computer: a 65C02, a 28C256 at $8000-$FFFF,
+; a 62256 at $0000-$3FFF, and a 6522 at $6000 driving an HD44780 in
+; eight-bit mode: data on port B, E, RW and RS on PA7, PA6 and PA5.
+
+PORTB   = $6000         ; the 6522's registers
+PORTA   = $6001
+DDRB    = $6002
+DDRA    = $6003
+
+E       = %10000000     ; the LCD's control lines, on port A
+RW      = %01000000
+RS      = %00100000
+
+        .org $8000
+reset:  ldx #$FF        ; the stack at the top of page one
+        txs
+        lda #%11100000  ; PA5-PA7 drive the LCD's control lines
+        sta DDRA
+        ldx #0
+setup:  lda init,x      ; the set-up commands, in order
+        beq hello
+        jsr command
+        inx
+        bne setup
+hello:  ldx #0
+next:   lda text,x      ; then the text, a character at a time
+        beq idle
+        jsr write
+        inx
+        bne next
+idle:   jmp idle
+
+; Sends A to the LCD as a command (RS low) or a character (RS high).
+command: ldy #0
+        beq send
+write:  ldy #RS
+send:   jsr wait
+        sta PORTB       ; the byte onto the LCD's data lines
+        sty PORTA       ; RS as wanted, E low
+        tya
+        ora #E
+        sta PORTA       ; E high...
+        sty PORTA       ; ...and low: the LCD takes the byte as E falls
+        rts
+
+; Waits while the LCD is busy, reading its busy flag through port B.
+wait:   pha
+        stz DDRB        ; port B in
+busy:   lda #RW
+        sta PORTA       ; RW high, E low
+        lda #RW+E
+        sta PORTA       ; E high: the LCD drives its busy flag onto D7
+        bit PORTB       ; N = the busy flag
+        bmi busy        ; still busy: drop E and ask again
+        lda #RW
+        sta PORTA
+        lda #$FF
+        sta DDRB        ; port B out again
+        pla
+        rts
+
+init:   .byte %00111000 ; eight bits, two lines, 5x8 font
+        .byte %00001110 ; display on, cursor on
+        .byte %00000110 ; move the cursor right after each character
+        .byte %00000001 ; clear
+        .byte 0
+text:   .asciiz "Hello, world!"
+
+        .org $FFFC
+        .word reset     ; the reset vector
+        .word reset     ; IRQ/BRK, unused
+```
+
+It sets the display up and writes the message, and before every byte it **reads the busy flag**:
+port B is switched to an input, RW and E are raised, and the LCD drives D7 high until it has finished
+the last command. Polling like that is what the HD44780 model's read support exists for — the
+busy time is the datasheet's 37 µs, or 1.52 ms after a clear. The scope shows the three control
+lines, E pulsing for each read and each write.
+
+Press Run and "Hello, world!" appears after about 3.3 ms of simulated time. Hover over the
+processor to see where it is — its value is the address of the instruction it is executing — or
+**Simulate > Decode Bus...**, which offers a **Cpu6502** decode: every cycle as an address, a byte and
+a direction, with the instruction disassembled on each opcode fetch. The processor records the
+cycles itself, the last 65,536 of them, so no probes are needed:
+
+```
+$8000 LDX #$FF   R $8001 FF   $8002 TXS   R $8003 A9   $8003 LDA #$E0   R $8004 E0
+$8005 STA $6003   R $8006 03   R $8007 60   W $6003 E0   $8008 LDX #$00 ...
+```
+
+#### Single-stepping
+
+Ben Eater runs his computer from a single-step clock as often as from the oscillator, and the same
+works here. Delete the oscillator and put a **Logic Toggle** on the PHI2 net (a net label called
+PHI2 does it), then double-click the toggle: every high-and-low again is one bus cycle, and the
+processor's value and the decoder show what it did. A **Clock** at a few hertz with the run speed
+at 1× steps it on its own. **F6** advances a single time point, which at 1 MHz is a fraction of a
+cycle.
+
+### On a serial line
+
+**File > Examples > Computers > 6502 Serial Terminal** is the same computer with a 6551 at $5000
+(CS0 = A12, CS1B the I/O select) in place of the VIA, connected to the **Serial Terminal** at 19,200
+baud. The terminal shows the last two lines it has received on its screen.
+
+![The 6502 computer with a 6551 ACIA in place of the VIA, its TxD and RxD named TXD and RXD and joined to a serial terminal whose screen reads "Hello, 6502!" and "hi there"](images/47-serial-6502.png)
+
+```asm
+; Serial hello and echo for the 6502 computer: a 6551 at $5000 at 19,200
+; baud, eight bits, no parity, polled rather than interrupt-driven.
+
+DATA    = $5000         ; the 6551's registers
+STATUS  = $5001
+COMMAND = $5002
+CONTROL = $5003
+
+        .org $8000
+reset:  ldx #$FF
+        txs
+        sta STATUS      ; a programmed reset
+        lda #%00011111  ; 19,200 baud from the crystal, eight bits, one stop bit
+        sta CONTROL
+        lda #%00001011  ; no parity, no echo, no interrupts, receiver on
+        sta COMMAND
+        ldx #0
+greet:  lda text,x      ; the greeting, a character at a time
+        beq echo
+        jsr send
+        inx
+        bne greet
+echo:   lda STATUS      ; then wait for a character...
+        and #%00001000
+        beq echo
+        lda DATA
+        jsr send        ; ...and send it straight back
+        jmp echo
+
+; Sends A when the transmitter has room for it.
+send:   pha
+wait:   lda STATUS
+        and #%00010000
+        beq wait
+        pla
+        sta DATA
+        rts
+
+text:   .byte "Hello, 6502!", 13, 10, 0
+
+        .org $FFFC
+        .word reset
+        .word reset
+```
+
+The greeting takes about 7 ms at 19,200 baud. The terminal sends "hi there" at 8 ms, and the 6502
+sends each character back as it arrives. Polling the status register like this is the simplest way
+to drive a 6551; set bit 1 of the command register clear and it interrupts on every byte instead.
+
+### Loading your own program
+
+Assemble to a raw binary for a ROM at $8000 — a 32K file whose first byte is the byte for $8000 —
+or to Intel HEX, select the 28C256, and **Edit > Load Memory Image...** it in (see
+[loading a file](#loading-a-file-into-one)). Addresses wrap into the chip, so a HEX file assembled
+at $8000-$FFFF lands where the decoding puts it. Reset the simulation and the new program runs.
+
+### Limits
+
+- It is a circuit simulator: a few thousand cycles a second, not megahertz. A program that loops
+  for a second of real time will take minutes; keep delays short, or poll status bits as the
+  examples do.
+- Only what reaches the pins is timed; the cycle-level model has no notion of internal gate delays.
+- The interrupt subtleties named above, the VIA's shift register and the ACIA's crystal and break are
+  not modelled.
 
 ---
 

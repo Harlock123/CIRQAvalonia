@@ -7,6 +7,7 @@ using Cirq.Components.Electromechanical;
 using Cirq.Components.Nonlinear;
 using Cirq.Components.Ics;
 using Cirq.Components.Passive;
+using Cirq.Components.Processors;
 using Cirq.Components.Sources;
 using Cirq.Core.Digital;
 using Cirq.Core.Topology;
@@ -278,6 +279,14 @@ public static class Examples
                 LoadPicoGpio),
             new("ESP32 GPIO", "An ESP32 blinking an LED, reading a knob on an input-only pin, and a button on a pull-up",
                 LoadEsp32Gpio),
+        ]),
+
+        new("Computers",
+        [
+            new("Ben Eater 6502 Computer", "A 65C02, a 28C256 ROM, a 62256 RAM and a 6522 driving an LCD — the hello world in ROM, run cycle by cycle",
+                LoadBenEater6502),
+            new("6502 Serial Terminal", "The same 6502 with a 6551 ACIA at 19,200 baud: a greeting, then an echo of what the terminal types",
+                LoadSerial6502),
         ]),
     ];
 
@@ -5768,6 +5777,288 @@ public static class Examples
         vm.Scope.TimebasePerDivision = 1e-3;
         vm.Scope.VoltsPerDivision = 0.2;
         vm.Scope.AddProbe(sensor.Anode, "Vf");
+    }
+
+    // ---- the 6502 computer ------------------------------------------------------------
+
+    /// <summary>
+    /// The hello-world the Ben Eater example runs, assembled. The source is in the user guide
+    /// (and a test assembles it and checks these are its bytes): it sets up the HD44780 through the
+    /// 6522 — eight bits, two lines, display on, entry mode, clear — polling the busy flag before
+    /// each byte, then writes the message a character at a time.
+    /// </summary>
+    internal static readonly byte[] HelloWorldProgram =
+    [
+        0xA2, 0xFF, 0x9A, 0xA9, 0xE0, 0x8D, 0x03, 0x60, 0xA2, 0x00, 0xBD, 0x5D, 0x80, 0xF0, 0x06, 0x20,
+        0x25, 0x80, 0xE8, 0xD0, 0xF5, 0xA2, 0x00, 0xBD, 0x62, 0x80, 0xF0, 0x06, 0x20, 0x29, 0x80, 0xE8,
+        0xD0, 0xF5, 0x4C, 0x22, 0x80, 0xA0, 0x00, 0xF0, 0x02, 0xA0, 0x20, 0x20, 0x3E, 0x80, 0x8D, 0x00,
+        0x60, 0x8C, 0x01, 0x60, 0x98, 0x09, 0x80, 0x8D, 0x01, 0x60, 0x8C, 0x01, 0x60, 0x60, 0x48, 0x9C,
+        0x02, 0x60, 0xA9, 0x40, 0x8D, 0x01, 0x60, 0xA9, 0xC0, 0x8D, 0x01, 0x60, 0x2C, 0x00, 0x60, 0x30,
+        0xF1, 0xA9, 0x40, 0x8D, 0x01, 0x60, 0xA9, 0xFF, 0x8D, 0x02, 0x60, 0x68, 0x60, 0x38, 0x0E, 0x06,
+        0x01, 0x00, 0x48, 0x65, 0x6C, 0x6C, 0x6F, 0x2C, 0x20, 0x77, 0x6F, 0x72, 0x6C, 0x64, 0x21, 0x00,
+    ];
+
+    /// <summary>
+    /// The serial example's program, assembled from the source in the guide: a 6551 at $5000 set to
+    /// 19,200 baud, a greeting, then every character received sent straight back.
+    /// </summary>
+    internal static readonly byte[] SerialEchoProgram =
+    [
+        0xA2, 0xFF, 0x9A, 0x8D, 0x01, 0x50, 0xA9, 0x1F, 0x8D, 0x03, 0x50, 0xA9, 0x0B, 0x8D, 0x02, 0x50,
+        0xA2, 0x00, 0xBD, 0x3A, 0x80, 0xF0, 0x06, 0x20, 0x2D, 0x80, 0xE8, 0xD0, 0xF5, 0xAD, 0x01, 0x50,
+        0x29, 0x08, 0xF0, 0xF9, 0xAD, 0x00, 0x50, 0x20, 0x2D, 0x80, 0x4C, 0x1D, 0x80, 0x48, 0xAD, 0x01,
+        0x50, 0x29, 0x10, 0xF0, 0xF9, 0x68, 0x8D, 0x00, 0x50, 0x60, 0x48, 0x65, 0x6C, 0x6C, 0x6F, 0x2C,
+        0x20, 0x36, 0x35, 0x30, 0x32, 0x21, 0x0D, 0x0A, 0x00,
+    ];
+
+    /// <summary>A program for a 32K ROM at $8000: the bytes at its start, and the reset vector pointing at them.</summary>
+    internal static byte[] RomImage(byte[] program)
+    {
+        var image = new byte[0x8000];
+        program.CopyTo(image, 0);
+
+        // $FFFC/$FFFD, the reset vector, at the top of the chip: $8000. And the IRQ vector the same.
+        image[0x7FFC] = 0x00;
+        image[0x7FFD] = 0x80;
+        image[0x7FFE] = 0x00;
+        image[0x7FFF] = 0x80;
+        return image;
+    }
+
+    /// <summary>The parts every 6502 example shares, and the net labels its buses are drawn with.</summary>
+    private sealed record Computer6502(Circuit Circuit, Cpu65C02 Cpu, Eeprom28C256 Rom, Sram62256 Ram, Ic7400 Decoder, OscillatorModule Clock);
+
+    /// <summary>
+    /// A compact net label on a pin: ten units out from it, pointing away from the part, so a bus of
+    /// them on adjacent pins reads as a column of names rather than as a hundred wires.
+    /// </summary>
+    private static NetLabel Tag(Circuit circuit, Terminal pin, string name, int direction = 0)
+    {
+        var at = pin.AbsolutePosition;
+
+        // Which way the pin faces, unless told: out of whichever side of the part it is on.
+        if (direction == 0) direction = pin.RotatedOffset.X < 0 ? 180 : 360;
+        var rotation = direction % 360;
+
+        var label = new NetLabel(name) { Compact = true, RotationDegrees = rotation };
+        var offset = label.Pin.CanvasOffset.Rotate(rotation);
+        var step = new Cirq.Core.Primitives.Point(10, 0).Rotate(rotation);
+
+        label.X = Math.Round(at.X + step.X - offset.X);
+        label.Y = Math.Round(at.Y + step.Y - offset.Y);
+        circuit.Add(label);
+        circuit.Connect(pin, label.Pin);
+        return label;
+    }
+
+    /// <summary>
+    /// A 65C02 with a 28C256 at $8000-$FFFF and a 62256 at $0000-$3FFF, decoded by a 7400 as Ben
+    /// Eater decodes them: ROM /CE = NOT A15, RAM /CE = NAND(PHI2, NOT A15), RAM /OE = A14, and a
+    /// third gate, NAND(NOT A15, A14), selecting $4000-$7FFF for the I/O chip — the net IO_SEL. A
+    /// 1 MHz can clocks it and a button resets it.
+    /// </summary>
+    private static Computer6502 BuildComputer(MainWindowViewModel vm, byte[] program)
+    {
+        var circuit = vm.Circuit;
+
+        var supply = Place(circuit, new DcVoltageSource(5.0), -560, 440);
+        var ground = Place(circuit, new Ground(), -560, 560);
+        supply.RotationDegrees = 90;
+        circuit.Connect(supply.Negative, ground.Pin);
+        Tag(circuit, supply.Positive, "VCC", 270);
+        Tag(circuit, ground.Pin, "GND", 180);
+
+        var clock = Place(circuit, new OscillatorModule(1e6), -560, -170);
+        Tag(circuit, clock.Vcc, "VCC", 270);
+        Tag(circuit, clock.Gnd, "GND");
+        Tag(circuit, clock.Output, "PHI2");
+
+        // The reset button pulls RESB low against a pull-up, as on the board.
+        var pullUp = Place(circuit, new Resistor(1e3), -560, -20);
+        var reset = Place(circuit, new PushButton(), -560, 100);
+        pullUp.RotationDegrees = 90;
+        reset.RotationDegrees = 90;
+        Tag(circuit, pullUp.A, "VCC", 270);
+        circuit.Connect(pullUp.B, reset.A);
+        Tag(circuit, pullUp.B, "RESB", 360);
+        Tag(circuit, reset.B, "GND", 90);
+
+        // IRQB pulled up, so whatever drives it (the I/O chip's open-drain IRQB) only has to pull down.
+        var irqPullUp = Place(circuit, new Resistor(1e3), -560, 280);
+        irqPullUp.RotationDegrees = 90;
+        Tag(circuit, irqPullUp.A, "VCC", 270);
+        Tag(circuit, irqPullUp.B, "IRQB", 360);
+
+        var cpu = Place(circuit, new Cpu65C02(), -200, 0);
+        for (var i = 0; i < 16; i++) Tag(circuit, cpu.Address[i], $"A{i}");
+        for (var i = 0; i < 8; i++) Tag(circuit, cpu.Data[i], $"D{i}");
+        Tag(circuit, cpu.ReadWrite, "RW");
+        Tag(circuit, cpu.Clock, "PHI2");
+        Tag(circuit, cpu.Reset, "RESB");
+        Tag(circuit, cpu.Irq, "IRQB");
+        foreach (var pin in new[] { cpu.Ready, cpu.Nmi, cpu.BusEnable!, cpu.SetOverflow }) Tag(circuit, pin, "VCC");
+        Tag(circuit, cpu.Vcc, "VCC");
+        Tag(circuit, cpu.Gnd, "GND");
+        Tag(circuit, cpu.SyncPin, "SYNC");
+
+        var rom = Place(circuit, new Eeprom28C256(), 180, -60);
+        rom.Load(MemoryImage.FromBinary(RomImage(program)));
+        var ram = Place(circuit, new Sram62256(), 520, -60);
+
+        foreach (var memory in new ParallelMemory[] { rom, ram })
+        {
+            for (var i = 0; i < 15; i++) Tag(circuit, memory.Address[i], $"A{i}");
+            for (var i = 0; i < 8; i++) Tag(circuit, memory.Data[i], $"D{i}");
+            Tag(circuit, memory.Vcc, "VCC");
+            Tag(circuit, memory.Gnd, "GND");
+        }
+
+        Tag(circuit, rom.ChipEnable, "ROM_CE");
+        Tag(circuit, rom.OutputEnable, "GND");
+        Tag(circuit, rom.WriteEnable, "VCC");
+        Tag(circuit, ram.ChipEnable, "RAM_CE");
+        Tag(circuit, ram.OutputEnable, "A14");
+        Tag(circuit, ram.WriteEnable, "RW");
+
+        var nand = Place(circuit, new Ic7400(), 180, 300);
+        Tag(circuit, nand.Vcc, "VCC");
+        Tag(circuit, nand.Gnd, "GND");
+
+        var (a0, b0, y0) = nand.Gate(0);
+        Tag(circuit, a0, "A15");
+        Tag(circuit, b0, "A15");
+        Tag(circuit, y0, "ROM_CE");
+
+        var (a1, b1, y1) = nand.Gate(1);
+        Tag(circuit, a1, "PHI2");
+        Tag(circuit, b1, "ROM_CE");
+        Tag(circuit, y1, "RAM_CE");
+
+        var (a2, b2, y2) = nand.Gate(2);
+        Tag(circuit, a2, "ROM_CE");
+        Tag(circuit, b2, "A14");
+        Tag(circuit, y2, "IO_SEL");
+
+        var (a3, b3, _) = nand.Gate(3);
+        Tag(circuit, a3, "GND");
+        Tag(circuit, b3, "GND");
+
+        return new Computer6502(circuit, cpu, rom, ram, nand, clock);
+    }
+
+    /// <summary>
+    /// Ben Eater's 6502 computer: a 65C02, a 28C256 ROM, a 62256 RAM and a 6522 VIA driving an
+    /// HD44780 in eight-bit mode, with a 7400 doing the address decoding — running a hello world
+    /// that polls the display's busy flag.
+    /// </summary>
+    public static void LoadBenEater6502(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "Ben Eater's 6502 computer";
+
+        var computer = BuildComputer(vm, HelloWorldProgram);
+
+        // The VIA at $6000: CS1 is A13 and CS2B the I/O select, so $6000-$7FFF; RS0-RS3 are A0-A3.
+        var via = Place(circuit, new Via6522(), 880, -10);
+        for (var i = 0; i < 8; i++) Tag(circuit, via.Data[i], $"D{i}");
+        for (var i = 0; i < 4; i++) Tag(circuit, via.RegisterSelect[i], $"A{i}");
+        Tag(circuit, via.ChipSelect1, "A13");
+        Tag(circuit, via.ChipSelect2, "IO_SEL");
+        Tag(circuit, via.Clock, "PHI2");
+        Tag(circuit, via.ReadWrite, "RW");
+        Tag(circuit, via.Reset, "RESB");
+        Tag(circuit, via.Irq, "IRQB");
+        Tag(circuit, via.Vcc, "VCC");
+        Tag(circuit, via.Gnd, "GND");
+        Tag(circuit, via.Ca1, "GND");
+        Tag(circuit, via.Cb1, "GND");
+
+        // Port B is the LCD's data bus; PA5, PA6 and PA7 its RS, RW and E.
+        for (var i = 0; i < 8; i++) Tag(circuit, via.PortB[i], $"PB{i}");
+        Tag(circuit, via.PortA[5], "LCD_RS");
+        Tag(circuit, via.PortA[6], "LCD_RW");
+        Tag(circuit, via.PortA[7], "LCD_E");
+
+        var lcd = Place(circuit, new CharacterLcd(), 880, 440);
+        // Its header is along the top, so the labels stand up from it.
+        Tag(circuit, lcd.Gnd, "GND", 270);
+        Tag(circuit, lcd.Vcc, "VCC", 270);
+        Tag(circuit, lcd.RegisterSelect, "LCD_RS", 270);
+        Tag(circuit, lcd.ReadWrite, "LCD_RW", 270);
+        Tag(circuit, lcd.Enable, "LCD_E", 270);
+        for (var i = 0; i < 8; i++) Tag(circuit, lcd.Data[i], $"PB{i}", 270);
+
+        // The contrast divider and the backlight's resistor, as on the module's own board.
+        var contrast = Place(circuit, new Potentiometer(10e3, 0.3), 560, 500);
+        Tag(circuit, contrast.A, "GND", 180);
+        Tag(circuit, contrast.B, "VCC");
+        Tag(circuit, contrast.Wiper, "LCD_V0", 270);
+        Tag(circuit, lcd.Contrast, "LCD_V0", 270);
+
+        var backlight = Place(circuit, new Resistor(220), 1220, 440);
+        backlight.RotationDegrees = 90;
+        Tag(circuit, backlight.A, "VCC", 270);
+        Tag(circuit, backlight.B, "LCD_A", 90);
+        Tag(circuit, lcd.Backlight, "LCD_A", 270);
+        Tag(circuit, lcd.BacklightCathode, "GND", 270);
+
+        // The display's three control lines: every byte is E high and low again, and before each
+        // one the busy flag is read with RW high.
+        vm.Scope.TimebasePerDivision = 0.5e-3;
+        vm.Scope.VoltsPerDivision = 2.0;
+        vm.Scope.Layout = ScopeLayout.Tiled;
+        vm.Scope.AddProbe(via.PortA[7], "LCD E");
+        vm.Scope.AddProbe(via.PortA[6], "LCD RW");
+        vm.Scope.AddProbe(via.PortA[5], "LCD RS");
+    }
+
+    /// <summary>
+    /// The same computer with a 6551 ACIA in place of the VIA, talking to the serial terminal at
+    /// 19,200 baud: a greeting, then an echo of whatever the terminal sends.
+    /// </summary>
+    public static void LoadSerial6502(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "A 6502 on a serial line";
+
+        var computer = BuildComputer(vm, SerialEchoProgram);
+
+        // The ACIA at $5000: CS0 is A12 and CS1B the I/O select; RS0 and RS1 are A0 and A1.
+        var acia = Place(circuit, new Acia6551(), 880, -60);
+        for (var i = 0; i < 8; i++) Tag(circuit, acia.Data[i], $"D{i}");
+        Tag(circuit, acia.RegisterSelect[0], "A0");
+        Tag(circuit, acia.RegisterSelect[1], "A1");
+        Tag(circuit, acia.ChipSelect0, "A12");
+        Tag(circuit, acia.ChipSelect1, "IO_SEL");
+        Tag(circuit, acia.Clock, "PHI2");
+        Tag(circuit, acia.ReadWrite, "RW");
+        Tag(circuit, acia.Reset, "RESB");
+        Tag(circuit, acia.Irq, "IRQB");
+        Tag(circuit, acia.Vcc, "VCC");
+        Tag(circuit, acia.Gnd, "GND");
+        foreach (var pin in new[] { acia.ClearToSend, acia.CarrierDetect, acia.DataSetReady }) Tag(circuit, pin, "GND");
+
+        var terminal = Place(circuit, new SerialTerminal
+        {
+            BaudRate = 19200,
+            Message = "hi there",
+            StartDelay = 8e-3,
+        }, 1220, -60);
+
+        // Crossed over, each end's transmit to the other's receive — named rather than drawn,
+        // because the 6551's serial pins are on the far side of the package from the terminal.
+        Tag(circuit, acia.Transmit, "TXD");
+        Tag(circuit, terminal.Receive, "TXD");
+        Tag(circuit, acia.Receive, "RXD");
+        Tag(circuit, terminal.Transmit, "RXD");
+        Tag(circuit, terminal.Vcc, "VCC");
+        Tag(circuit, terminal.Gnd, "GND");
+
+        vm.Scope.TimebasePerDivision = 1e-3;
+        vm.Scope.VoltsPerDivision = 2.0;
+        vm.Scope.Layout = ScopeLayout.Tiled;
+        vm.Scope.AddProbe(acia.Transmit, "TxD");
+        vm.Scope.AddProbe(acia.Receive, "RxD");
     }
 
     private static T Place<T>(Circuit circuit, T component, double x, double y) where T : CircuitComponent
