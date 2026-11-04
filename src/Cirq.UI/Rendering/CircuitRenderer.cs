@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Media;
+using Cirq.Components.Sources;
 using Cirq.Core.Topology;
 using Cirq.UI.Services;
 using CorePoint = Cirq.Core.Primitives.Point;
@@ -182,7 +183,9 @@ public static class CircuitRenderer
 
             // An annotation says what it says; a designator and a value caption under it would be
             // repeating its own text back at it under a name nobody chose.
-            if (component is not IAnnotation) DrawComponentLabels(canvas, component, options);
+            // A compact net label is its flag and nothing else, which is what lets a bus of them sit
+            // on adjacent pins.
+            if (component is not IAnnotation and not NetLabel { Compact: true }) DrawComponentLabels(canvas, component, options);
 
             if (component is INetNaming) DrawCrossing(canvas, circuit, component, options);
 

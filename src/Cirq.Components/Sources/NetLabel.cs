@@ -51,6 +51,14 @@ public sealed partial class NetLabel : CircuitComponent, INetNaming
     [ObservableProperty]
     public partial string NetName { get; set; } = "NET";
 
+    /// <summary>
+    /// Draw the flag alone, without the designator above it or the name repeated below — for the
+    /// dozens of labels a bus or a processor's pins are drawn with, where the captions would run
+    /// into each other at every pin.
+    /// </summary>
+    [ObservableProperty]
+    public partial bool Compact { get; set; }
+
     public override string ComponentType => "Net Label";
 
     public override string DesignatorPrefix => "L";

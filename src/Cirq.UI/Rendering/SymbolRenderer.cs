@@ -61,6 +61,7 @@ public static class SymbolRenderer
             case Crystal: DrawCrystal(context, pen); break;
             case CharacterLcd lcd: DrawCharacterLcd(context, pen, zoom, lcd); break;
             case I2cDevice bus: DrawPackage(context, pen, zoom, bus, bus.ComponentType); break;
+            case SerialTerminal terminal: DrawSerialTerminal(context, pen, zoom, terminal); break;
             case UartPort uart: DrawPackage(context, pen, zoom, uart, uart.ComponentType); break;
             case HallSensor hall: DrawHallSensor(context, pen, zoom, hall); break;
             case ReedSwitch reed: DrawReedSwitch(context, pen, zoom, reed); break;
@@ -1315,6 +1316,54 @@ public static class SymbolRenderer
     }
 
     /// <summary>
+    /// A serial terminal: the port, and under it the screen, showing the last two lines that came
+    /// in — because a terminal is something you read, and a box saying "Serial Terminal" is not.
+    /// </summary>
+    private static void DrawSerialTerminal(ISymbolCanvas context, IPen pen, double zoom, SerialTerminal terminal)
+    {
+        DrawPackage(context, pen, zoom, terminal, terminal.ComponentType);
+
+        var screen = new Rect(-90, 40, 180, 50);
+        context.DrawRectangle(CanvasTheme.SymbolFill, CanvasTheme.Pen(CanvasTheme.LabelBrush, 1.0, zoom), screen);
+
+        if (zoom <= 0.35) return;
+
+        var (first, second) = TerminalLines(terminal);
+        DrawCenteredText(context, first, new Point(0, 54), 10, zoom, CanvasTheme.ValueBrush);
+        DrawCenteredText(context, second, new Point(0, 76), 10, zoom, CanvasTheme.ValueBrush);
+    }
+
+    /// <summary>The last two lines a terminal has received, each cut to what fits on its screen.</summary>
+    internal static (string First, string Second) TerminalLines(SerialTerminal terminal)
+    {
+        const int width = 24;
+        int[] bytes;
+
+        // Read while the simulation may be appending to it: a copy that fails is simply retried
+        // on the next repaint.
+        try
+        {
+            bytes = [.. terminal.ReceivedBytes];
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
+        {
+            return (string.Empty, string.Empty);
+        }
+
+        List<string> lines = [string.Empty];
+        foreach (var b in bytes)
+        {
+            if (b == '\n') lines.Add(string.Empty);
+            else if (b == '\r') continue;
+            else lines[^1] += b is >= 0x20 and < 0x7F ? (char)b : '.';
+        }
+
+        string Fit(string line) => line.Length <= width ? line : line[^width..];
+
+        return lines.Count == 1 ? (Fit(lines[0]), string.Empty) : (Fit(lines[^2]), Fit(lines[^1]));
+    }
+
+    /// <summary>
     /// The level shifter: a package with a dashed line down the middle, because the whole point of
     /// the part is that the two sides are different voltage domains.
     /// </summary>
@@ -1471,24 +1520,27 @@ public static class SymbolRenderer
     private static void DrawCharacterLcd(
         ISymbolCanvas context, IPen pen, double zoom, CharacterLcd lcd)
     {
-        var body = new Rect(-110, -46, 220, 92);
+        var body = new Rect(-170, -50, 340, 110);
         context.DrawRectangle(CanvasTheme.SymbolFill, pen, new RoundedRect(body, 4));
 
-        // The pin header along the top, as a real module has.
-        for (var i = 0; i < 16; i++)
+        // The pin header along the top, as a real module has, each pin named just inside the edge.
+        foreach (var terminal in lcd.Terminals)
         {
-            var x = -100 + (i * 13.3);
-            context.DrawLine(pen, new Point(x, -46), new Point(x, -56));
+            var at = terminal.CanvasOffset;
+            context.DrawLine(pen, new Point(at.X, at.Y), new Point(at.X, body.Top));
+
+            if (zoom > 0.45)
+                DrawCenteredText(context, terminal.Name, new Point(at.X, body.Top + 8), 6.5, zoom, CanvasTheme.LabelBrush);
         }
 
-        var glass = new Rect(-92, -30, 184, 60);
+        var glass = new Rect(-140, -26, 280, 72);
         context.DrawRectangle(CanvasTheme.SymbolFill, CanvasTheme.Pen(CanvasTheme.LabelBrush, 1.0, zoom), glass);
 
         if (zoom <= 0.35) return;
 
         if (!lcd.DisplayOn)
         {
-            DrawCenteredText(context, "HD44780", new Point(0, 0), 10, zoom, CanvasTheme.LabelBrush);
+            DrawCenteredText(context, "HD44780", new Point(0, 10), 10, zoom, CanvasTheme.LabelBrush);
             return;
         }
 
@@ -1496,7 +1548,7 @@ public static class SymbolRenderer
         // glass rather than shuffling about as it is written.
         for (var line = 0; line < 2; line++)
         {
-            DrawCenteredText(context, lcd.Line(line), new Point(0, -13 + (line * 22)), 13, zoom,
+            DrawCenteredText(context, lcd.Line(line), new Point(0, -3 + (line * 26)), 16, zoom,
                 CanvasTheme.ValueBrush);
         }
     }
@@ -2944,7 +2996,7 @@ public static class SymbolRenderer
         SwitchingRegulator => 66.0,
         DipSwitch => 94.0,
         MatrixKeypad => 112.0,
-        CharacterLcd => 72.0,
+        CharacterLcd => 84.0,
 
         // These are drawn as packages sized to their own pins, so the caption has to clear them.
         Pcf8574 => 98.0,
@@ -2969,6 +3021,7 @@ public static class SymbolRenderer
 
         // The leads reach 30, so the default offset puts the caption on top of one.
         Phototransistor => 44.0,
+        SerialTerminal => 104.0,
         I2cDevice or SpiMaster or UartPort => 56.0,
 
         // Eleven pins reaching 52 either side of centre.

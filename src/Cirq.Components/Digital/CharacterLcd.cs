@@ -64,8 +64,10 @@ public sealed partial class CharacterLcd : DigitalIc
 
         var pins = new Terminal[17];
 
+        // The module's single row of sixteen pins along the top edge, pin 1 at the left, as the
+        // header on a real one is — on the drawing's 20-unit pitch, so every wire lands on the grid.
         Terminal Pin(int number, string name, TerminalType type) =>
-            pins[number] = new Terminal($"p{number}", name, type, DipPackage.PinOffset(number, 16));
+            pins[number] = new Terminal($"p{number}", name, type, PinOffset(number));
 
         Gnd = Pin(1, "VSS", TerminalType.Ground);
         Vcc = Pin(2, "VDD", TerminalType.Power);
@@ -83,6 +85,9 @@ public sealed partial class CharacterLcd : DigitalIc
         // The data pins are outputs too, for reading the busy flag and the display memory.
         ConfigurePins([RegisterSelect, ReadWrite, Enable, .. _data], _data);
     }
+
+    /// <summary>Where pin <paramref name="number"/> (1-16) sits: along the top edge, 20 apart.</summary>
+    public static Cirq.Core.Primitives.Point PinOffset(int number) => new(-150 + ((number - 1) * 20), -70);
 
     /// <summary>Pin 3: contrast. Not modelled electrically, but a real one needs it set.</summary>
     public Terminal Contrast { get; }
