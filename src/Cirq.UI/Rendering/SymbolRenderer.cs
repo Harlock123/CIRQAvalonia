@@ -126,6 +126,8 @@ public static class SymbolRenderer
             case Ne555: DrawDip(context, pen, zoom, 8, "NE555"); break;
             case DigitalIc ic: DrawDip(context, pen, zoom, ic.PinCount, ic.PartNumber); break;
             case LogicGate gate: DrawLogicGate(context, pen, gate); break;
+            case FlipFlopBlock block: DrawFlipFlop(context, pen, zoom, block); break;
+            case TriStateBuffer buffer: DrawTriStateBuffer(context, pen, buffer); break;
             case LogicToggle toggle: DrawToggle(context, pen, zoom, toggle); break;
             case ClockSource: DrawClock(context, pen); break;
             case PatternGenerator generator: DrawPatternGenerator(context, pen, zoom, generator); break;
@@ -2780,6 +2782,8 @@ public static class SymbolRenderer
         StepperDriver => 106.0,
         SolidStateRelay => 46.0,
         DigitalIc ic => DipPackage.BodyHeight(ic.PinCount) / 2 + 16,
+        FlipFlopBlock block => block.HalfHeight + 14,
+        TriStateBuffer => 44.0,
         _ => 30.0,
     };
 
@@ -2893,6 +2897,76 @@ public static class SymbolRenderer
 
         if (hasBubble)
             context.DrawEllipse(CanvasTheme.SymbolFill, pen, new Point(bodyRight + 4, 0), 4, 4);
+    }
+
+    /// <summary>
+    /// A flip-flop or latch as the textbooks draw one: a box with its inputs down the left, Q and Q'
+    /// down the right, and the clock marked with the triangle that means "edge" — and a bubble in
+    /// front of it when the edge is the falling one.
+    /// </summary>
+    private static void DrawFlipFlop(ISymbolCanvas context, IPen pen, double zoom, FlipFlopBlock block)
+    {
+        var half = block.HalfHeight;
+        var body = new Rect(-24, -half, 48, half * 2);
+
+        foreach (var terminal in block.Terminals)
+        {
+            var y = terminal.CanvasOffset.Y;
+            var edge = terminal.CanvasOffset.X < 0 ? body.Left : body.Right;
+            var bubble = block.TriggersOnFallingEdge && terminal.Name == block.ClockPin;
+
+            context.DrawLine(pen, new Point(terminal.CanvasOffset.X, y), new Point(bubble ? edge - 8 : edge, y));
+
+            if (bubble) context.DrawEllipse(CanvasTheme.SymbolFill, pen, new Point(edge - 4, y), 4, 4);
+        }
+
+        context.DrawRectangle(CanvasTheme.SymbolFill, pen, new RoundedRect(body, 2));
+
+        foreach (var terminal in block.Terminals)
+        {
+            var y = terminal.CanvasOffset.Y;
+            var left = terminal.CanvasOffset.X < 0;
+            var isClock = block.IsEdgeTriggered && terminal.Name == block.ClockPin;
+
+            if (isClock)
+            {
+                context.DrawGeometry(null, pen, SymbolPath.Polyline(
+                    [new Point(body.Left, y - 5), new Point(body.Left + 7, y), new Point(body.Left, y + 5)], false));
+            }
+
+            if (zoom <= 0.5) continue;
+
+            // The clock's name is left off: the triangle already says what the pin is.
+            var label = isClock ? string.Empty : terminal.Name;
+            if (label.Length == 0) continue;
+
+            DrawAlignedText(context, label, new Point(left ? body.Left + 4 : body.Right - 4, y), 8, zoom,
+                CanvasTheme.LabelBrush, alignLeft: left);
+        }
+    }
+
+    /// <summary>
+    /// A tri-state buffer: the buffer's triangle with its enable coming in from below, bubbled when
+    /// it is active low.
+    /// </summary>
+    private static void DrawTriStateBuffer(ISymbolCanvas context, IPen pen, TriStateBuffer buffer)
+    {
+        context.DrawLine(pen, new Point(-40, 0), new Point(-20, 0));
+        context.DrawLine(pen, new Point(28, 0), new Point(40, 0));
+
+        context.DrawGeometry(CanvasTheme.SymbolFill, pen,
+            SymbolPath.Polyline([new Point(-20, -18), new Point(28, 0), new Point(-20, 18)], true));
+
+        // The triangle's lower edge crosses x = 0 at y = 10.5.
+        if (buffer.EnableActiveLow)
+        {
+            context.DrawLine(pen, new Point(0, 30), new Point(0, 18.5));
+            context.DrawEllipse(CanvasTheme.SymbolFill, pen, new Point(0, 14.5), 4, 4);
+        }
+        else
+        {
+            context.DrawLine(pen, new Point(0, 30), new Point(0, 10.5));
+        }
     }
 
     private static void DrawAndBody(ISymbolCanvas context, IPen pen, double right)

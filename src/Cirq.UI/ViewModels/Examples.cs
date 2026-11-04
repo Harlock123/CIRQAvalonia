@@ -139,9 +139,13 @@ public static class Examples
                 LoadStaircase),
             new("Addressed Memory", "A counter walking a ROM, and a latch holding what came back",
                 LoadAddressedMemory),
-            new("Shared Bus", "Two transceivers taking turns on eight wires — the only tri-state in here",
+            new("Shared Bus", "Two 74245 transceivers taking turns on eight wires",
                 LoadSharedBus),
             new("Ring Oscillator", "Three inverters with unequal delays", LoadRingOscillator),
+            new("Ripple Counter", "Four T flip-flops, each clocked by the last — a binary counter, and the glitch a ripple carry makes",
+                LoadRippleCounter),
+            new("Tri-State Bus", "Two tri-state buffers taking turns on one wire, with a pull-down for when neither drives it",
+                LoadTriStateBus),
         ]),
 
         new("Timers & Oscillators",
@@ -903,6 +907,93 @@ public static class Examples
         vm.Scope.AddProbe(register.Outputs[0], "QA");
         vm.Scope.AddProbe(register.Outputs[3], "QD");
         vm.Scope.AddProbe(register.Outputs[7], "QH");
+    }
+
+    /// <summary>
+    /// The ripple counter: four T flip-flops with T tied high, the first clocked by the clock and
+    /// each of the others by the one before's Q'. Every stage halves the frequency, so the four Qs
+    /// count up in binary. The carry walks down the chain a propagation delay at a time, so for a
+    /// few tens of nanoseconds after each clock the outputs show a number that was never counted —
+    /// zoom right in on the 0111 to 1000 step to catch it.
+    /// </summary>
+    public static void LoadRippleCounter(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "T flip-flop ripple counter";
+
+        var clock = Place(circuit, new ClockSource(1e3), -380, 0);
+        var high = Place(circuit, new LogicToggle(true), -380, -120);
+        var ledGround = Place(circuit, new Ground(), 420, 320);
+
+        string[] colours = ["Red", "Amber", "Yellow", "Green"];
+        var stages = new TFlipFlop[4];
+
+        for (var i = 0; i < stages.Length; i++)
+        {
+            var x = -200 + (i * 160);
+            stages[i] = Place(circuit, new TFlipFlop(), x, 0);
+
+            circuit.Connect(high.Out, stages[i].T);
+            circuit.Connect(i == 0 ? clock.Out : stages[i - 1].QNot, stages[i].Clock);
+
+            // Each Q lights its own LED, Q0 on the left, so the row reads as a binary number
+            // backwards — the least significant bit is the one that flickers fastest.
+            var resistor = Place(circuit, new Resistor(330), x + 40, 120);
+            resistor.RotationDegrees = 90;
+            var led = Place(circuit, Led.OfColour(colours[i]), x + 40, 220);
+            led.RotationDegrees = 90;
+
+            circuit.Connect(stages[i].Q, resistor.A);
+            circuit.Connect(resistor.B, led.Anode);
+            circuit.Connect(led.Cathode, ledGround.Pin);
+        }
+
+        vm.Scope.TimebasePerDivision = 2e-3;
+        vm.Scope.VoltsPerDivision = 2.0;
+        vm.Scope.Layout = ScopeLayout.Tiled;
+        vm.Scope.AddProbe(clock.Out, "Clock");
+        for (var i = 0; i < stages.Length; i++) vm.Scope.AddProbe(stages[i].Q, $"Q{i}");
+    }
+
+    /// <summary>
+    /// Two tri-state buffers on one wire. A pattern generator hands the bus to one, then — after a
+    /// step with neither enabled — to the other. Buffer A passes a fast clock, buffer B a steady
+    /// high, and the 10 kΩ pull-down holds the wire low in the gaps when it is nobody's. Turn both
+    /// enables on at once (change the pattern to 1111 on both rows) and the wire sits at the
+    /// mid-rail level two disagreeing outputs divide it to, and both buffers report the fight.
+    /// </summary>
+    public static void LoadTriStateBus(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "Tri-state bus";
+
+        var enables = Place(circuit, new PatternGenerator { Pattern = "110000\n000110", StepRate = 1e3 }, -380, 200);
+        var data = Place(circuit, new ClockSource(5e3), -380, -120);
+        var high = Place(circuit, new LogicToggle(true), -380, 40);
+
+        var a = Place(circuit, new TriStateBuffer(), -120, -120);
+        var b = Place(circuit, new TriStateBuffer(), -120, 40);
+        var pullDown = Place(circuit, new Resistor(10e3), 120, 120);
+        pullDown.RotationDegrees = 90;
+        var gnd = Place(circuit, new Ground(), 120, 240);
+        var bus = Place(circuit, new NetLabel("BUS"), 200, -120);
+
+        circuit.Connect(data.Out, a.In);
+        circuit.Connect(high.Out, b.In);
+        circuit.Connect(enables.Terminals[0], a.Enable);
+        circuit.Connect(enables.Terminals[1], b.Enable);
+
+        circuit.Connect(a.Out, b.Out);
+        circuit.Connect(a.Out, pullDown.A);
+        circuit.Connect(pullDown.B, gnd.Pin);
+        circuit.Connect(a.Out, bus.Pin);
+
+        vm.Scope.TimebasePerDivision = 1e-3;
+        vm.Scope.VoltsPerDivision = 2.0;
+        vm.Scope.Layout = ScopeLayout.Tiled;
+        vm.Scope.AddProbe(enables.Terminals[0], "EN A");
+        vm.Scope.AddProbe(enables.Terminals[1], "EN B");
+        vm.Scope.AddProbe(a.Out, "Bus");
     }
 
     public static void LoadWindowDetector(MainWindowViewModel vm)
