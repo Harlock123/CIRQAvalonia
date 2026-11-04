@@ -14,7 +14,7 @@ A computer you can build. A 65C02 and an NMOS 6502 that run their instruction se
 on their pins, a 6522 VIA and a 6551 ACIA, the EPROMs, EEPROM and RAMs they sit beside — loadable
 from binary and Intel HEX files — and the 74 series glue between them. Ben Eater's breadboard
 computer is an example, saying hello on its LCD. 227 components in 17 categories, 100 worked
-examples, 4122 tests.
+examples, 4123 tests.
 
 ### Added
 
