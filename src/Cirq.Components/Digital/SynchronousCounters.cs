@@ -4,7 +4,9 @@ using Cirq.Core.Topology;
 namespace Cirq.Components.Digital;
 
 /// <summary>
-/// 74161 four-bit synchronous binary counter, with parallel load and carry.
+/// Base for the 74160 to 74163 four-bit synchronous counters, with parallel load and carry: the
+/// 74161 and 74163 count in binary, the 74160 and 74162 in decade, and the 74160 and 74161 clear the
+/// moment MR goes low where the 74162 and 74163 clear on the next clock. One pinout for all four.
 /// <para>
 /// The word that matters is <b>synchronous</b>, and it is the whole reason to have this next to
 /// the 4040 and the 7490. Those are ripple counters: the first flip-flop clocks the second, the
@@ -26,12 +28,18 @@ namespace Cirq.Components.Digital;
 /// </para>
 /// <para>
 /// Pinout: 1=MR, 2=CP, 3-6=D0-D3, 7=CEP, 8=GND, 9=PE, 10=CET, 11-14=Q3-Q0, 15=TC, 16=VCC.
-/// Master reset is <b>asynchronous</b> and active low — it clears the moment it is taken low,
-/// without waiting for a clock, which is the one thing on this part that is not synchronous. Its
-/// 74163 cousin makes that synchronous too.
+/// On the 74160 and 74161 master reset is <b>asynchronous</b> and active low — it clears the moment
+/// it is taken low, without waiting for a clock, which is the one thing on those parts that is not
+/// synchronous. The 74162 and 74163 make that synchronous too: MR low clears on the next rising edge,
+/// so a gate decoding a count into MR truncates the sequence cleanly, with no glitch of the count
+/// it decoded.
+/// </para>
+/// <para>
+/// The decade parts count 0 to 9 and carry at 9. Loaded with 10 to 15 they count on up to 15 and
+/// wrap to 0; the datasheets' exact recovery sequence through those codes is not modelled.
 /// </para>
 /// </summary>
-public sealed class Ic74161 : DigitalIc
+public abstract class SynchronousCounterIc : DigitalIc
 {
     private const int Width = 4;
 
@@ -41,8 +49,10 @@ public sealed class Ic74161 : DigitalIc
     private bool _lastClock;
     private int _count;
 
-    public Ic74161() : base(16)
+    protected SynchronousCounterIc(bool decade, bool synchronousReset) : base(16)
     {
+        IsDecade = decade;
+        HasSynchronousReset = synchronousReset;
         PropagationDelay = 14e-9;
 
         var pins = new Terminal[17];
@@ -72,8 +82,20 @@ public sealed class Ic74161 : DigitalIc
             _outputs);
     }
 
-    /// <summary>Asynchronous clear, active low — the one thing here that does not wait for a clock.</summary>
+    /// <summary>
+    /// Clear, active low: at once on the 74160 and 74161, on the next rising edge on the 74162 and
+    /// 74163.
+    /// </summary>
     public Terminal MasterReset { get; }
+
+    /// <summary>True for the 74160 and 74162, which count 0 to 9.</summary>
+    public bool IsDecade { get; }
+
+    /// <summary>True for the 74162 and 74163, whose reset waits for the clock.</summary>
+    public bool HasSynchronousReset { get; }
+
+    /// <summary>The top of the count: 9 or 15.</summary>
+    public int Maximum => IsDecade ? 9 : 15;
 
     public Terminal Clock { get; }
 
@@ -92,10 +114,8 @@ public sealed class Ic74161 : DigitalIc
     /// <summary>Q0 through Q3.</summary>
     public IReadOnlyList<Terminal> Outputs => [.. _outputs.Take(Width)];
 
-    /// <summary>Terminal count: high at fifteen, with CET high. Feeds the next stage's CET.</summary>
+    /// <summary>Terminal count: high at the top of the count, with CET high. Feeds the next stage's CET.</summary>
     public Terminal TerminalCount => _outputs[Width];
-
-    public override string PartNumber => "74161";
 
     public override string ValueLabel => $"{_count}";
 
@@ -107,14 +127,22 @@ public sealed class Ic74161 : DigitalIc
         var delay = DelayFor(context);
         var clock = context.ReadInput(Clock, Levels).IsHigh();
 
-        if (!context.ReadInput(MasterReset, Levels).IsHigh())
+        var reset = !context.ReadInput(MasterReset, Levels).IsHigh();
+        var edge = clock && !_lastClock;
+
+        if (reset && !HasSynchronousReset)
         {
             // Asynchronous: it does not wait to be asked twice, or at all.
             _count = 0;
         }
-        else if (clock && !_lastClock)
+        else if (edge)
         {
-            if (!context.ReadInput(ParallelEnable, Levels).IsHigh())
+            if (reset)
+            {
+                // The 74162 and 74163: a clear is just another thing the clock edge does.
+                _count = 0;
+            }
+            else if (!context.ReadInput(ParallelEnable, Levels).IsHigh())
             {
                 var loaded = 0;
                 for (var i = 0; i < Width; i++)
@@ -125,7 +153,7 @@ public sealed class Ic74161 : DigitalIc
             else if (context.ReadInput(CountEnableP, Levels).IsHigh()
                      && context.ReadInput(CountEnableT, Levels).IsHigh())
             {
-                _count = (_count + 1) & 0x0F;
+                _count = IsDecade && _count == 9 ? 0 : (_count + 1) & 0x0F;
             }
         }
 
@@ -139,7 +167,7 @@ public sealed class Ic74161 : DigitalIc
             context.Schedule(this, i, bit ? LogicState.High : LogicState.Low, delay);
         }
 
-        var carry = _count == 0x0F && context.ReadInput(CountEnableT, Levels).IsHigh();
+        var carry = _count == Maximum && context.ReadInput(CountEnableT, Levels).IsHigh();
         context.Schedule(this, Width, carry ? LogicState.High : LogicState.Low, delay);
 
         NotifyValueChanged();
@@ -152,4 +180,28 @@ public sealed class Ic74161 : DigitalIc
         _count = 0;
         _lastClock = false;
     }
+}
+
+/// <summary>74160 synchronous decade counter, asynchronous clear.</summary>
+public sealed class Ic74160() : SynchronousCounterIc(decade: true, synchronousReset: false)
+{
+    public override string PartNumber => "74160";
+}
+
+/// <summary>74161 synchronous binary counter, asynchronous clear.</summary>
+public sealed class Ic74161() : SynchronousCounterIc(decade: false, synchronousReset: false)
+{
+    public override string PartNumber => "74161";
+}
+
+/// <summary>74162 synchronous decade counter, synchronous clear.</summary>
+public sealed class Ic74162() : SynchronousCounterIc(decade: true, synchronousReset: true)
+{
+    public override string PartNumber => "74162";
+}
+
+/// <summary>74163 synchronous binary counter, synchronous clear — the one to truncate a count with.</summary>
+public sealed class Ic74163() : SynchronousCounterIc(decade: false, synchronousReset: true)
+{
+    public override string PartNumber => "74163";
 }
