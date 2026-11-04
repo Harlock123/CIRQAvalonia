@@ -108,6 +108,8 @@ public static class Examples
                 LoadScrLatch),
             new("Lamp Dimmer", "Triac and diac phase control — move the firing angle and the lamp dims",
                 LoadLampDimmer),
+            new("Lamp Inrush", "A 12 V bulb switched on cold draws ten times its running current — open SW1, let it cool, close it again",
+                LoadLampInrush),
             new("Relay Driver", "Logic to a coil through an optocoupler and a Darlington array",
                 LoadRelayDriver),
             new("IGBT and MOSFET", "The same load switched by each — a voltage drop against a resistance",
@@ -1281,6 +1283,47 @@ public static class Examples
 
         var current = vm.Scope.AddProbe(coil.A, "Coil I");
         current.Kind = Cirq.Core.Probing.ProbeKind.Current;
+    }
+
+    /// <summary>
+    /// A filament lamp switched on, and the current it takes to get going.
+    /// <para>
+    /// A 12 V 5 W bulb is 28.8 Ω hot and about 2.9 Ω cold, so for the first few milliseconds it
+    /// pulls over four amps from a supply it will settle at well under half an amp on. The current
+    /// probe shows the spike and the long tail as the filament warms. It is why a lamp fails at the
+    /// moment it is switched on, and why the fuse in front of one is a slow-blow.
+    /// </para>
+    /// </summary>
+    public static void LoadLampInrush(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "Lamp inrush";
+
+        var supply = Place(circuit, new DcVoltageSource(12.0), -300, 60);
+        supply.RotationDegrees = 90;
+
+        // Closed, so the run starts at the instant of switch-on with a cold filament. Open it, let
+        // the filament cool for a few tenths of a second, and close it again to see the spike twice.
+        var sw = Place(circuit, new ToggleSwitch(closed: true), -140, -40);
+        var lamp = Place(circuit, new IncandescentLamp(12.0, 5.0), 60, -40);
+
+        var gnd = Place(circuit, new Ground(), -300, 200);
+        var gnd2 = Place(circuit, new Ground(), 200, 200);
+
+        circuit.Connect(supply.Negative, gnd.Pin);
+        circuit.Connect(supply.Positive, sw.A);
+        circuit.Connect(sw.B, lamp.A);
+        circuit.Connect(lamp.B, gnd2.Pin);
+
+        vm.Scope.TimebasePerDivision = 10e-3;
+        vm.Scope.VoltsPerDivision = 2.0;
+        vm.Scope.Layout = ScopeLayout.Tiled;
+        vm.Scope.AddProbe(lamp.A, "Lamp V");
+
+        var current = vm.Scope.AddProbe(lamp.A, "Lamp I");
+        current.Kind = Cirq.Core.Probing.ProbeKind.Current;
+
+        vm.Simulation.SpeedFactor = 0.05;
     }
 
     /// <summary>

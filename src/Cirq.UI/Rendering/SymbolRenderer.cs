@@ -98,6 +98,7 @@ public static class SymbolRenderer
             case FunctionGenerator fg: DrawFunctionGenerator(context, pen, fg); break;
             case WaveformSource: DrawWaveformSource(context, pen); break;
             case Led led: DrawLed(context, pen, led); break;
+            case IncandescentLamp lamp: DrawLamp(context, pen, lamp); break;
             case DcMotor motor: DrawMotor(context, pen, zoom, motor); break;
             case LightDependentResistor ldr: DrawLdr(context, pen, zoom, ldr); break;
             case Thermistor thermistor: DrawThermistor(context, pen, zoom, thermistor); break;
@@ -2089,6 +2090,40 @@ public static class SymbolRenderer
         // can usefully show.
         if (multiplier.IsClipping)
             context.DrawEllipse(CanvasTheme.ErrorBrush, null, new Point(-12, 22), 3.5, 3.5);
+    }
+
+    /// <summary>
+    /// An incandescent lamp: the circle with a cross through it, glowing the colour its filament
+    /// is. A lamp well under its rating is orange rather than dim white, and the symbol says so —
+    /// it is the first thing anybody notices about a bulb on a sagging supply.
+    /// </summary>
+    private static void DrawLamp(ISymbolCanvas context, IPen pen, IncandescentLamp lamp)
+    {
+        var lit = CanvasTheme.Emission(lamp.Brightness);
+
+        // Dull red at the first visible glow, through orange, to the warm white of a filament at
+        // its rated temperature.
+        var warmth = Math.Clamp((lamp.FilamentKelvin - 1000.0) / (IncandescentLamp.RatedFilamentKelvin - 1000.0), 0, 1);
+        var colour = CanvasTheme.Emitted(Color.FromRgb(
+            255, (byte)(60 + (175 * warmth)), (byte)(20 + (150 * warmth * warmth))));
+
+        if (lit > 0)
+        {
+            context.DrawEllipse(Wash(colour, 0.18 * lit), null, new Point(0, 0), 34, 34);
+            context.DrawEllipse(Wash(colour, 0.34 * lit), null, new Point(0, 0), 23, 23);
+        }
+
+        context.DrawLine(pen, new Point(-30, 0), new Point(-14, 0));
+        context.DrawLine(pen, new Point(14, 0), new Point(30, 0));
+
+        var body = lit > 0 ? new SolidColorBrush(Blend(SymbolColour, colour, 0.6 * lit)) : CanvasTheme.SymbolFill;
+        context.DrawEllipse(body, pen, new Point(0, 0), 14, 14);
+
+        // The cross is the filament, so it takes the light in a deeper shade when the lamp is on.
+        var filament = lit > 0 ? new Pen(new SolidColorBrush(Deepen(colour)), pen.Thickness) : pen;
+        var d = 14 / Math.Sqrt(2);
+        context.DrawLine(filament, new Point(-d, -d), new Point(d, d));
+        context.DrawLine(filament, new Point(-d, d), new Point(d, -d));
     }
 
     /// <summary>A deeper shade of an emitted colour, for the edge of something lit by it.</summary>

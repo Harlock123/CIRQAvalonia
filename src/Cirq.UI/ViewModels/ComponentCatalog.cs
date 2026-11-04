@@ -183,6 +183,8 @@ public static class ComponentCatalog
             new("LED Green", "Around 2.0 V forward drop", () => Led.OfColour("Green")),
             new("LED Blue", "Around 3.0 V forward drop", () => Led.OfColour("Blue")),
             new("LED White", "Blue die plus phosphor, around 3.1 V", () => Led.OfColour("White")),
+            new("Incandescent Lamp", "Tungsten filament bulb, 12 V 5 W — cold it is a tenth of its hot resistance, so it draws an inrush at switch-on. Light bulb, globe, filament, dimmer",
+                () => new IncandescentLamp()),
             new("Character LCD", "HD44780 16x2 — the display on the front of everything",
                 () => new CharacterLcd()),
             new("7-Segment (CA)", "Common-anode display, driven by pulling segments low",
