@@ -99,8 +99,10 @@ public sealed partial class OscillatorModule : DigitalIc, IBreakpointSource
 
     private LogicState LevelAt(double time)
     {
+        // The same tolerance as the Clock's, for the same reason: a time point landed exactly on an
+        // edge must see the edge, which a plain floor of the phase does not always do.
         var period = 1.0 / Math.Max(Frequency, 1e-9);
-        var phase = time / period;
+        var phase = (time / period) + ClockSource.EdgeTolerance;
         phase -= Math.Floor(phase);
 
         return phase < Math.Clamp(DutyCycle, 1e-6, 1 - 1e-6) ? LogicState.High : LogicState.Low;

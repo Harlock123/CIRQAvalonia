@@ -72,11 +72,17 @@ public partial class ClockSource : DigitalComponent, IBreakpointSource
 
     public double Period => Frequency > 0 ? 1.0 / Frequency : double.PositiveInfinity;
 
+    /// <summary>The fraction of a period either side of an edge that counts as the edge.</summary>
+    internal const double EdgeTolerance = 1e-6;
+
     /// <summary>Logic level the clock should be driving at <paramref name="time"/>.</summary>
     public LogicState StateAt(double time)
     {
         if (!IsEnabled || Frequency <= 0) return LogicState.Low;
-        var phase = time * Frequency;
+        // A millionth of a period of tolerance, so a time point placed exactly on an edge counts as
+        // after it: (n + duty) × period ÷ period is not always n + duty in floating point, and a
+        // plain floor puts the edge a whole time point late — or, at megahertz rates, loses it.
+        var phase = (time * Frequency) + EdgeTolerance;
         phase -= Math.Floor(phase);
         return phase < Math.Clamp(DutyCycle, 1e-6, 1 - 1e-6) ? LogicState.High : LogicState.Low;
     }
