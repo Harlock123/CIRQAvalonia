@@ -33,8 +33,14 @@ public partial class ElectrolyticCapacitor : Capacitor, IVoltageRated
     public partial double EquivalentSeriesResistance { get; set; } = 0.15;
 
     /// <summary>Working voltage printed on the can, in volts.</summary>
+    /// <remarks>
+    /// Hides the plain capacitor's rating on purpose: an electrolytic is sold at a lower working
+    /// voltage than a ceramic, and the default has to say so.
+    /// </remarks>
+#pragma warning disable CS0108
     [ObservableProperty]
     public partial double VoltageRating { get; set; } = 25.0;
+#pragma warning restore CS0108
 
     public override string ComponentType => "Electrolytic Capacitor";
 

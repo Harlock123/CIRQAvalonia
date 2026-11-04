@@ -128,7 +128,7 @@ public class ThemedDialogTests(WindowSession session)
     /// whatever renders next, which is a coupling between tests and not a thing worth having.
     /// </para>
     /// </summary>
-    private static void Wear(Application application, ThemeVariant variant)
+    private static void Wear(Application application, ThemeVariant? variant)
     {
         application.RequestedThemeVariant = variant;
 

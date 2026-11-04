@@ -207,7 +207,7 @@ public class DerivedProbeTests
 
         probe.ReferenceTerminal = top.B;
 
-        Assert.Equal(0, probe.HistoryBuffer.Count);
+        Assert.Empty(probe.HistoryBuffer);
         Assert.Equal(top.B.ToString(), probe.ReferenceLabel);
     }
 
