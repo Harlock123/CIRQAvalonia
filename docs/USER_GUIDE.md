@@ -171,7 +171,7 @@ Three of those are worth separating, because they are easy to confuse:
 
 Click a palette entry, then click the canvas. The part lands where you click, snapped to the grid.
 
-The palette holds **311 components in 17 categories**:
+The palette holds **313 components in 17 categories**:
 
 | Category | Count | Contents |
 | --- | --- | --- |
@@ -188,7 +188,7 @@ The palette holds **311 components in 17 categories**:
 | 40xx Series | 47 | CMOS gates and the **4049 / 4050 level converters**; flip-flops and latches; counters including the **4026 and 4033 with their own display drivers**, the **4029, 4510 and 4516 up/down counters** and the **4518 / 4520**; the **4028** and **4543 LCD driver**; shift registers to the **4094**; the **4051, 4052, 4053 and 4067 analog multiplexers**; the **4047, 4528 and 4538** timers; a **4046 phase-locked loop** — see [below](#the-40xx-series) |
 | Buses | 19 | **Bus tap** and **bus line**, I2C master, EEPROM, port expander, DS1307 clock, ADS1115 ADC, MCP4725 DAC and INA219 current sensor, SPI master and **MCP3008 ADC**, 1-Wire master and DS18B20 thermometer, serial terminal and device, **RS-485**, **CAN** and **RS-232 (MAX232)** transceivers, level shifter — see [below](#making-its-own-rails) |
 | Digital I/O | 9 | Logic toggle, clock, **pattern generator**, rotary encoder, oscillator module, ADC and DAC bridges, and a **2K × 8 SRAM and ROM** — see [below](#something-worth-addressing) |
-| Memory & CPUs | 14 | The **2716, 2732, 2764 and 27C256 EPROMs**, the **28C256 EEPROM**, the **6116 and 62256 static RAMs** — each loadable from a binary or Intel HEX file — and the **65C02**, **6502**, **6510** and **8500** processors, **6522 VIA**, **6551 ACIA** and **6526 CIA** — see [below](#memories-by-their-part-numbers) and [the 6502 computer](#a-6502-computer) |
+| Memory & CPUs | 16 | The **2716, 2732, 2764 and 27C256 EPROMs**, the **28C256 EEPROM**, the **6116 and 62256 static RAMs** — each loadable from a binary or Intel HEX file — and the **65C02**, **6502**, **6510** and **8500** processors, **6522 VIA**, **6551 ACIA**, **6526 CIA** and the **6581 and 8580 SIDs** — see [below](#memories-by-their-part-numbers) and [the 6502 computer](#a-6502-computer) |
 | Sensors & Actuators | 20 | DC motor, LDR, thermistors, **LM35 and TMP36** analog thermometers, buzzers, speaker, microphone, servo, stepper in **unipolar and bipolar** wirings, thermocouple, load cell, HC-SR04 ranger, Hall switch, phototransistor, **reed switch** and **PIR motion sensor** — see [below](#sensors-and-actuators) |
 | Switching & Isolation | 11 | Relay, fuses and a **resettable PPTC**, optocouplers, ULN2003, H-bridge, **A4988 microstepping driver**, **solid-state relay**, **MOSFET gate driver** — see [below](#regulating-a-current-instead-of-applying-a-voltage) |
 | Dev Boards | 6 | Raspberry Pi, Arduino Uno / Nano / Mega, **Raspberry Pi Pico** and **ESP32 DevKit** — see [below](#development-boards) |

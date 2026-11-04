@@ -547,6 +547,10 @@ public static class ComponentCatalog
                 () => new Acia6551()),
             new("6526 CIA", "Complex interface adapter, two in every C64: two ports with pull-ups, two timers, a time-of-day clock, a serial port and interrupts",
                 () => new Cia6526()),
+            new("6581 SID", "The C64's sound chip: three voices with ADSR envelopes, a filter on the capacitors at its CAP pins, and AUDIO OUT into the circuit",
+                () => new Sid6581()),
+            new("8580 SID", "The C64C's SID: the same voices, 9 V on VDD, a near-linear filter on 22 nF capacitors",
+                () => new Sid8580()),
         ]),
 
         new("Sensors & Actuators",
