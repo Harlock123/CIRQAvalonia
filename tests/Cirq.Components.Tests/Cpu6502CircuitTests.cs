@@ -130,6 +130,7 @@ public class Cpu6502CircuitTests
     [Theory]
     [InlineData(typeof(Cpu65C02))]
     [InlineData(typeof(Cpu6502))]
+    [InlineData(typeof(Cpu6510))]
     public void TheSelfCheckRunsFromRomInACircuit(Type type)
     {
         var cpu = (Processor6502)Activator.CreateInstance(type)!;

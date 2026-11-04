@@ -13,6 +13,19 @@ namespace Cirq.Components.Processors;
 /// <param name="Sync">True for an opcode fetch.</param>
 public readonly record struct BusCycle(double Time, ushort Address, byte Data, bool IsRead, bool Sync);
 
+/// <summary>Which 40-pin package a <see cref="Processor6502"/> comes in: the pins differ, the core does not.</summary>
+public enum ProcessorPackage
+{
+    /// <summary>The WDC W65C02S: VPB, MLB, BE, SYNC, SOB.</summary>
+    W65C02S,
+
+    /// <summary>The MOS 6502: Φ0 in, Φ1 and Φ2 out, SYNC and SO.</summary>
+    Mos6502,
+
+    /// <summary>The MOS 6510 and 8500: the 6502 with AEC and a six-bit I/O port, and no SYNC, SO or Φ1.</summary>
+    Mos6510,
+}
+
 /// <summary>
 /// A 6502 as a 40-pin package on the schematic, driven by its clock pin one bus cycle at a time.
 /// <para>
@@ -48,7 +61,8 @@ public abstract partial class Processor6502 : DigitalIc, IRunState
     private int _logCount;
 
     private readonly int _rwIndex;
-    private readonly int _syncIndex;
+    private readonly int _syncIndex = -1;
+    private readonly Terminal[] _port = [];
     private readonly List<(int Index, Func<LogicState> Level)> _statusOutputs = [];
     private readonly List<(int Index, bool Inverted)> _clockOutputs = [];
 
@@ -56,9 +70,15 @@ public abstract partial class Processor6502 : DigitalIc, IRunState
     private bool _lastSo = true;
     private bool _driving;
 
-    protected Processor6502(Cpu6502Variant variant) : base(40)
+    protected Processor6502(Cpu6502Variant variant)
+        : this(variant, variant == Cpu6502Variant.Wdc65C02 ? ProcessorPackage.W65C02S : ProcessorPackage.Mos6502)
+    {
+    }
+
+    private protected Processor6502(Cpu6502Variant variant, ProcessorPackage package) : base(40)
     {
         Variant = variant;
+        Package = package;
         Core = new Mos6502Core(variant);
         PropagationDelay = 30e-9;
 
@@ -67,9 +87,18 @@ public abstract partial class Processor6502 : DigitalIc, IRunState
         Terminal Pin(int number, string name, TerminalType type) =>
             pins[number] = new Terminal($"p{number}", name, type, DipPackage.PinOffset(number, 40));
 
-        for (var i = 0; i < 12; i++) _address[i] = Pin(9 + i, $"A{i}", TerminalType.Output);
-        for (var i = 12; i < 16; i++) _address[i] = Pin(10 + i, $"A{i}", TerminalType.Output);
-        for (var i = 0; i < 8; i++) _data[i] = Pin(33 - i, $"D{i}", TerminalType.Bidirectional);
+        if (package == ProcessorPackage.Mos6510)
+        {
+            for (var i = 0; i < 14; i++) _address[i] = Pin(7 + i, $"A{i}", TerminalType.Output);
+            for (var i = 14; i < 16; i++) _address[i] = Pin(8 + i, $"A{i}", TerminalType.Output);
+            for (var i = 0; i < 8; i++) _data[i] = Pin(37 - i, $"D{i}", TerminalType.Bidirectional);
+        }
+        else
+        {
+            for (var i = 0; i < 12; i++) _address[i] = Pin(9 + i, $"A{i}", TerminalType.Output);
+            for (var i = 12; i < 16; i++) _address[i] = Pin(10 + i, $"A{i}", TerminalType.Output);
+            for (var i = 0; i < 8; i++) _data[i] = Pin(33 - i, $"D{i}", TerminalType.Bidirectional);
+        }
 
         List<Terminal> inputs = [];
         List<Terminal> outputs = [.. _address, .. _data];
@@ -88,7 +117,33 @@ public abstract partial class Processor6502 : DigitalIc, IRunState
             return t;
         }
 
-        if (variant == Cpu6502Variant.Wdc65C02)
+        if (package == ProcessorPackage.Mos6510)
+        {
+            // The MOS 6510: Φ0 in on 1, AEC on 5, the address bus moved up to pins 7-23 round the
+            // supply pins, the port P5-P0 on 24-29 and the data bus on 30-37. No SYNC, SO or Φ1.
+            Clock = Input(1, "PHI0");
+            Ready = Input(2, "RDY");
+            Irq = Input(3, "IRQ");
+            Nmi = Input(4, "NMI");
+            BusEnable = Input(5, "AEC");
+            Vcc = Pin(6, "VCC", TerminalType.Power);
+            Gnd = Pin(21, "VSS", TerminalType.Ground);
+            Output(38, "RW");
+            _rwIndex = outputs.Count - 1;
+            Output(39, "PHI2");
+            _clockOutputs.Add((outputs.Count - 1, false));
+            Reset = Input(40, "RES");
+
+            _port = new Terminal[6];
+            PortOutputIndex = outputs.Count;
+            for (var i = 0; i < 6; i++)
+            {
+                _port[i] = Pin(29 - i, $"P{i}", TerminalType.Bidirectional);
+                outputs.Add(_port[i]);
+                inputs.Add(_port[i]);
+            }
+        }
+        else if (variant == Cpu6502Variant.Wdc65C02)
         {
             // The W65C02S: VPB on pin 1 where the NMOS part had a ground, BE on 36, PHI2 in on 37.
             Output(1, "VPB");
@@ -141,6 +196,15 @@ public abstract partial class Processor6502 : DigitalIc, IRunState
 
     public Cpu6502Variant Variant { get; }
 
+    /// <summary>Which package: the 65C02's, the 6502's or the 6510's pinout.</summary>
+    public ProcessorPackage Package { get; }
+
+    /// <summary>The 6510's I/O port, P0-P5. Empty on the other packages.</summary>
+    public IReadOnlyList<Terminal> Port => _port;
+
+    /// <summary>Where P0 is among the output pins, on a part with a port.</summary>
+    private protected int PortOutputIndex { get; } = -1;
+
     /// <summary>The processor inside: registers, flags and the cycle in progress.</summary>
     public Mos6502Core Core { get; private set; }
 
@@ -165,17 +229,20 @@ public abstract partial class Processor6502 : DigitalIc, IRunState
     /// <summary>Ready: low stops the processor at the end of the cycle.</summary>
     public Terminal Ready { get; }
 
-    /// <summary>Set overflow, active low: a falling edge sets V.</summary>
-    public Terminal SetOverflow { get; }
+    /// <summary>Set overflow, active low: a falling edge sets V. Null on the 6510, which has no SO pin.</summary>
+    public Terminal? SetOverflow { get; }
 
-    /// <summary>The 65C02's bus enable: low releases the address and data buses and R/W. Null on the NMOS part.</summary>
+    /// <summary>
+    /// The bus enable — the 65C02's BE or the 6510's AEC: low releases the address and data buses and
+    /// R/W. Null on the 6502, which has neither.
+    /// </summary>
     public Terminal? BusEnable { get; }
 
     /// <summary>R/W: high to read, low to write.</summary>
     public Terminal ReadWrite => OutputTerminals[_rwIndex];
 
-    /// <summary>SYNC: high during an opcode fetch.</summary>
-    public Terminal SyncPin => OutputTerminals[_syncIndex];
+    /// <summary>SYNC: high during an opcode fetch. Null on the 6510, which has no SYNC pin.</summary>
+    public Terminal? SyncPin => _syncIndex < 0 ? null : OutputTerminals[_syncIndex];
 
     /// <summary>After this much of PHI2 falling, the address, R/W and SYNC have changed.</summary>
     public double AddressSetupTime => PropagationDelay;
@@ -257,7 +324,7 @@ public abstract partial class Processor6502 : DigitalIc, IRunState
         var busOn = BusEnable is null || !context.ReadInput(BusEnable, Levels).IsLow();
 
         // SO is an edge, and so is NMI, but NMI's edge is the core's business.
-        var so = !context.ReadInput(SetOverflow, Levels).IsLow();
+        var so = SetOverflow is null || !context.ReadInput(SetOverflow, Levels).IsLow();
         if (_lastSo && !so) Core.P |= Mos6502Core.FlagV;
         _lastSo = so;
 
@@ -299,9 +366,20 @@ public abstract partial class Processor6502 : DigitalIc, IRunState
         var ready = !context.ReadInput(Ready, Levels).IsLow();
         var holds = !ready && (Variant == Cpu6502Variant.Wdc65C02 || Core.IsRead);
 
+        if (Core.ResetAsserted) ResetPort(context);
+        EndCycle(context);
+
         if (!holds)
         {
-            var value = Core.IsRead ? SampleData(context) : Core.DataOut;
+            // The 6510's port is inside the processor: a read of $0000 or $0001 takes the port's
+            // register whatever the bus says, and a write lands in it as well as going out on the bus.
+            byte value;
+            if (Core.IsRead) value = ReadInternal(context, Core.Address) ?? SampleData(context);
+            else
+            {
+                value = Core.DataOut;
+                WriteInternal(context, Core.Address, value);
+            }
 
             Record(new BusCycle(context.Time, Core.Address, value, Core.IsRead, Core.Sync));
             var instructionsBefore = Core.Instructions;
@@ -351,7 +429,8 @@ public abstract partial class Processor6502 : DigitalIc, IRunState
             Request(context, i, !busOn ? LogicState.HighImpedance : (address & (1 << i)) != 0 ? LogicState.High : LogicState.Low, delay);
 
         Request(context, _rwIndex, !busOn ? LogicState.HighImpedance : Core.IsRead ? LogicState.High : LogicState.Low, delay);
-        Request(context, _syncIndex, Core.Sync ? LogicState.High : LogicState.Low, delay);
+        if (_syncIndex >= 0) Request(context, _syncIndex, Core.Sync ? LogicState.High : LogicState.Low, delay);
+        if (context.IsInitializing) PresentPort(context);
 
         foreach (var (index, level) in _statusOutputs) Request(context, index, level(), delay);
 
@@ -359,6 +438,39 @@ public abstract partial class Processor6502 : DigitalIc, IRunState
         {
             for (var i = 0; i < 8; i++) Request(context, 16 + i, LogicState.HighImpedance, delay);
         }
+    }
+
+    /// <summary>
+    /// The byte a read of <paramref name="address"/> takes from inside the processor rather than from
+    /// the bus — the 6510's port registers — or null to read the bus.
+    /// </summary>
+    private protected virtual byte? ReadInternal(IDigitalContext context, ushort address) => null;
+
+    /// <summary>A write the processor also keeps for itself (the 6510's port registers). It still goes out on the bus.</summary>
+    private protected virtual void WriteInternal(IDigitalContext context, ushort address, byte value)
+    {
+    }
+
+    /// <summary>Drives a port's pins as its registers say, at power-on.</summary>
+    private protected virtual void PresentPort(IDigitalContext context)
+    {
+    }
+
+    /// <summary>Called as every cycle ends, before it is completed: where a port looks at its pins.</summary>
+    private protected virtual void EndCycle(IDigitalContext context)
+    {
+    }
+
+    /// <summary>What /RES does to a port: every pin an input.</summary>
+    private protected virtual void ResetPort(IDigitalContext? context)
+    {
+    }
+
+    /// <summary>A port's registers, for a run to hand back; null without one.</summary>
+    private protected virtual object? CapturePort() => null;
+
+    private protected virtual void AdoptPort(object? state)
+    {
     }
 
     private void ApplyBusEnable(IDigitalContext context, bool busOn)
@@ -405,12 +517,13 @@ public abstract partial class Processor6502 : DigitalIc, IRunState
         _logCount = 0;
         UndefinedReads = 0;
         FirstUndefinedRead = -1;
+        ResetPort(null);
     }
 
-    private sealed record RunState(Mos6502Core Core, BusCycle[] Log, int Start, int Count, int UndefinedReads, int FirstUndefinedRead);
+    private sealed record RunState(Mos6502Core Core, BusCycle[] Log, int Start, int Count, int UndefinedReads, int FirstUndefinedRead, object? Port);
 
     public object CaptureRunState() =>
-        new RunState(Core, (BusCycle[])_log.Clone(), _logStart, _logCount, UndefinedReads, FirstUndefinedRead);
+        new RunState(Core, (BusCycle[])_log.Clone(), _logStart, _logCount, UndefinedReads, FirstUndefinedRead, CapturePort());
 
     public void AdoptRunState(object state)
     {
@@ -422,6 +535,7 @@ public abstract partial class Processor6502 : DigitalIc, IRunState
         _logCount = run.Count;
         UndefinedReads = run.UndefinedReads;
         FirstUndefinedRead = run.FirstUndefinedRead;
+        AdoptPort(run.Port);
         NotifyValueChanged();
     }
 

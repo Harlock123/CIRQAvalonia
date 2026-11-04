@@ -5908,10 +5908,10 @@ public static partial class Examples
         Tag(circuit, cpu.Clock, "PHI2");
         Tag(circuit, cpu.Reset, "RESB");
         Tag(circuit, cpu.Irq, "IRQB");
-        foreach (var pin in new[] { cpu.Ready, cpu.Nmi, cpu.BusEnable!, cpu.SetOverflow }) Tag(circuit, pin, "VCC");
+        foreach (var pin in new[] { cpu.Ready, cpu.Nmi, cpu.BusEnable!, cpu.SetOverflow! }) Tag(circuit, pin, "VCC");
         Tag(circuit, cpu.Vcc, "VCC");
         Tag(circuit, cpu.Gnd, "GND");
-        Tag(circuit, cpu.SyncPin, "SYNC");
+        Tag(circuit, cpu.SyncPin!, "SYNC");
 
         var rom = Place(circuit, new Eeprom28C256(), 180, -60);
         rom.Load(MemoryImage.FromBinary(RomImage(program)));
