@@ -97,6 +97,8 @@ public static class ComponentCatalog
                 () => new DipSwitch()),
             new("Switch (SPDT)", "Changeover contact, common plus two throws",
                 () => new SpdtSwitch()),
+            new("Keypad 4x4", "Matrix keypad, 16 keys on 4 row and 4 column wires — scan it. Double-click a key to press it; keyboard, keys, membrane, door lock",
+                () => new MatrixKeypad()),
         ]),
 
         new("Sources",

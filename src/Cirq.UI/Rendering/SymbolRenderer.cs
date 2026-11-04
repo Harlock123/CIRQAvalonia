@@ -59,6 +59,7 @@ public static class SymbolRenderer
             case LevelShifter shifter: DrawLevelShifter(context, pen, zoom, shifter); break;
             case SpiMaster spi: DrawPackage(context, pen, zoom, spi, spi.ComponentType); break;
             case DipSwitch dip: DrawDipSwitch(context, pen, zoom, dip); break;
+            case MatrixKeypad keypad: DrawKeypad(context, pen, zoom, keypad); break;
             case SolarCell pv: DrawSolarCell(context, pen, zoom, pv); break;
             case OscillatorModule osc: DrawOscillatorModule(context, pen, zoom, osc); break;
             case Thermocouple tc: DrawThermocouple(context, pen, zoom, tc); break;
@@ -2201,6 +2202,50 @@ public static class SymbolRenderer
         }
     }
 
+    /// <summary>
+    /// A 4×4 keypad: the sixteen keys with their legends, rows coming in from the left and columns
+    /// from below, and a key that is held down drawn in the colour of a live wire.
+    /// </summary>
+    private static void DrawKeypad(ISymbolCanvas context, IPen pen, double zoom, MatrixKeypad keypad)
+    {
+        const double edge = 62;
+        var body = new Rect(-edge, -edge, edge * 2, edge * 2);
+
+        foreach (var row in keypad.Rows)
+            context.DrawLine(pen, new Point(row.CanvasOffset.X, row.CanvasOffset.Y), new Point(-edge, row.CanvasOffset.Y));
+
+        foreach (var column in keypad.Columns)
+            context.DrawLine(pen, new Point(column.CanvasOffset.X, column.CanvasOffset.Y), new Point(column.CanvasOffset.X, edge));
+
+        context.DrawRectangle(CanvasTheme.SymbolFill, pen, new RoundedRect(body, 5));
+
+        var thin = new Pen(pen.Brush, pen.Thickness * 0.6);
+
+        for (var r = 0; r < 4; r++)
+        {
+            for (var c = 0; c < 4; c++)
+            {
+                var centre = new Point(MatrixKeypad.KeyCentre(c), MatrixKeypad.KeyCentre(r));
+                var half = MatrixKeypad.KeyHalfSize;
+                var pressed = keypad.IsPressed(r, c);
+
+                context.DrawRectangle(pressed ? CanvasTheme.WireBrush : CanvasTheme.SymbolFill, thin,
+                    new RoundedRect(new Rect(centre.X - half, centre.Y - half, half * 2, half * 2), 3));
+
+                if (zoom > 0.45)
+                    DrawCenteredText(context, MatrixKeypad.Legends[r, c], centre, 9, zoom, CanvasTheme.LabelBrush);
+            }
+        }
+
+        if (zoom <= 0.55) return;
+
+        foreach (var row in keypad.Rows)
+            DrawAlignedText(context, row.Name, new Point(-edge - 2, row.CanvasOffset.Y - 7), 7, zoom, CanvasTheme.LabelBrush, alignLeft: false);
+
+        foreach (var column in keypad.Columns)
+            DrawCenteredText(context, column.Name, new Point(column.CanvasOffset.X + 9, edge + 8), 7, zoom, CanvasTheme.LabelBrush);
+    }
+
     /// <summary>A deeper shade of an emitted colour, for the edge of something lit by it.</summary>
     private static Color Deepen(Color colour) =>
         Color.FromRgb((byte)(colour.R * 0.55), (byte)(colour.G * 0.55), (byte)(colour.B * 0.55));
@@ -2851,6 +2896,7 @@ public static class SymbolRenderer
         ChargePump => 52.0,
         SwitchingRegulator => 66.0,
         DipSwitch => 94.0,
+        MatrixKeypad => 96.0,
         CharacterLcd => 72.0,
 
         // These are drawn as packages sized to their own pins, so the caption has to clear them.

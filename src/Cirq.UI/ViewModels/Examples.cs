@@ -264,6 +264,8 @@ public static class Examples
         [
             new("Raspberry Pi GPIO", "Pi driving two LEDs and reading a button on an internal pull-up",
                 LoadRaspberryPiGpio),
+            new("Keypad Scanner", "An Arduino scanning a 4x4 keypad: one row low at a time, the columns on pull-ups — double-click a key",
+                LoadKeypadScanner),
         ]),
     ];
 
@@ -1189,6 +1191,49 @@ public static class Examples
         vm.Scope.AddProbe(pi.Pin("GPIO18"), "Clock");
         vm.Scope.AddProbe(pi.Pin("GPIO23"), "Pattern");
         vm.Scope.AddProbe(pi.Pin("GPIO25"), "Button");
+    }
+
+    /// <summary>
+    /// A 4×4 keypad scanned by an Arduino, the way every keypad library does it.
+    /// <para>
+    /// D2 to D5 drive the four rows, and take it in turns to be the one pulled low — a millisecond
+    /// each, written as four staggered sequences. D6 to D9 read the columns on their internal
+    /// pull-ups. A column reads low only while the row of a pressed key is the low one, so which
+    /// step it happens in says which row, and which column says the rest. The 5 is held down to
+    /// start: C2 dips while R2 is scanned. Double-click other keys on the canvas to press them, and
+    /// press two in the same column to see what two push-pull rows fighting through a keypad does to
+    /// the board's pin currents — which is why real scanners drive the rows open-drain.
+    /// </para>
+    /// </summary>
+    public static void LoadKeypadScanner(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "Keypad scanner";
+
+        var uno = Place(circuit, new ArduinoUnoBoard
+        {
+            Pins = "D2=seq@1kHz:0111; D3=seq@1kHz:1011; D4=seq@1kHz:1101; D5=seq@1kHz:1110; " +
+                   "D6=in-pullup; D7=in-pullup; D8=in-pullup; D9=in-pullup",
+        }, -340, 0);
+
+        var keypad = Place(circuit, new MatrixKeypad(), 140, -60);
+        keypad.SetPressed("5", true);
+
+        var gndBoard = Place(circuit, new Ground(), -340, 380);
+        circuit.Connect(uno.GroundPins[0], gndBoard.Pin);
+
+        for (var i = 0; i < 4; i++)
+        {
+            circuit.Connect(uno.Pin($"D{2 + i}"), keypad.Rows[i]);
+            circuit.Connect(uno.Pin($"D{6 + i}"), keypad.Columns[i]);
+        }
+
+        vm.Scope.TimebasePerDivision = 1e-3;
+        vm.Scope.VoltsPerDivision = 2.0;
+        vm.Scope.Layout = ScopeLayout.Tiled;
+        vm.Scope.AddProbe(keypad.Rows[1], "R2");
+        vm.Scope.AddProbe(keypad.Columns[0], "C1");
+        vm.Scope.AddProbe(keypad.Columns[1], "C2");
     }
 
     /// <summary>

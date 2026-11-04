@@ -745,6 +745,17 @@ public class CircuitCanvas : Control
     }
 
     /// <summary>
+    /// A point on the sheet in a part's own drawing space — relative to where it was placed, and
+    /// with its rotation undone — which is the space its pins and its symbol are given in.
+    /// </summary>
+    public static CorePoint ToLocal(CircuitComponent component, CorePoint world)
+    {
+        ArgumentNullException.ThrowIfNull(component);
+
+        return new CorePoint(world.X - component.X, world.Y - component.Y).Rotate(-component.RotationDegrees);
+    }
+
+    /// <summary>
     /// Everything a component puts on the canvas: its symbol and both captions. The designator and
     /// value sit a component-dependent distance above and below the centre — on a board that is
     /// most of the symbol's height away from it — so they are part of the extents, not decoration
@@ -1058,6 +1069,22 @@ public class CircuitCanvas : Control
                 StatusChanged?.Invoke(this, $"{((INetNaming)component).NetName} continues on {sheet}");
                 return;
             }
+        }
+
+        // A part with several things on it to operate — a keypad's keys — is operated where it was
+        // clicked, in its own unrotated drawing space. Between the keys, a double-click does nothing
+        // rather than guessing.
+        if (component is IPointInteractive keyed && e.ClickCount >= 2)
+        {
+            SelectedComponent = component;
+
+            if (keyed.InteractAt(ToLocal(component, world)))
+            {
+                StatusChanged?.Invoke(this, $"{component.Name}: {component.ValueLabel}");
+                InvalidateVisual();
+            }
+
+            return;
         }
 
         // Double-clicking an operable device flips it, so a switch behaves like a switch instead

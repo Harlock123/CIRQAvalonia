@@ -161,4 +161,42 @@ public class ToolboxExampleTests
 
         static int Brightest(Cirq.Core.Primitives.Color c) => Math.Max(c.R, Math.Max(c.G, c.B));
     }
+
+    /// <summary>With the 5 held down, column 2 reads low in the step that scans row 2, and only then.</summary>
+    [Fact]
+    public void TheScannerFindsTheFiveInRowTwoColumnTwo()
+    {
+        using var vm = Load("Keypad Scanner");
+        var sim = vm.Simulation.Simulator!;
+        var board = vm.Circuit.Components.OfType<DeveloperBoard>().Single();
+
+        sim.Run(0.5e-3);                // step 0: R1 low
+        Assert.Contains("D7=1", board.InputSummary);
+
+        sim.Run(1.0e-3);                // step 1: R2 low
+        Assert.Contains("D6=1", board.InputSummary);
+        Assert.Contains("D7=0", board.InputSummary);
+
+        sim.Run(1.0e-3);                // step 2: R3 low
+        Assert.Contains("D7=1", board.InputSummary);
+        Assert.Empty(board.Violations);
+    }
+
+    /// <summary>
+    /// The canvas operates a keypad where it was double-clicked, with the part's rotation undone
+    /// first — so a keypad turned on its side still presses the key under the pointer.
+    /// </summary>
+    [Fact]
+    public void APointOnTheSheetIsFoundOnARotatedKeypad()
+    {
+        var keypad = new MatrixKeypad { X = 100, Y = 200, RotationDegrees = 90 };
+
+        // The 1 is at (-42, -42) in the keypad's own space; turned a quarter clockwise it is drawn
+        // at (42, -42) from the centre.
+        var local = Cirq.UI.Controls.CircuitCanvas.ToLocal(keypad, new Cirq.Core.Primitives.Point(142, 158));
+
+        Assert.Equal((0, 0), MatrixKeypad.KeyAt(local));
+        Assert.True(keypad.InteractAt(local));
+        Assert.True(keypad.Key1);
+    }
 }

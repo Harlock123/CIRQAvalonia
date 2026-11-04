@@ -402,7 +402,7 @@ and placed again, here or in another circuit — as a copy
 rather than a reference, which the docs say plainly rather than implying a link that is not there.
 **Notes, headings and boxes** can be put on the drawing too, and exports carry them.
 
-The palette has a **Find a part** box (`Ctrl+F`): 204 components in 16 groups is more than anybody
+The palette has a **Find a part** box (`Ctrl+F`): 205 components in 16 groups is more than anybody
 browses, and it matches on the name, on what the part does — `shift register` finds the 74164 — and
 on the group. Enter arms the first match, so a part can be found and placed without the mouse.
 
@@ -875,7 +875,7 @@ When the solver cannot find an answer it now says **where**: the net that was st
 attached to it, and any part that said it had not settled — all of which name somewhere on the
 drawing to go and look, which "try a smaller time step" does not.
 
-The palette holds 204 components in 16 collapsible categories, with a **Find a part** box
+The palette holds 205 components in 16 collapsible categories, with a **Find a part** box
 (`Ctrl+F`) over them:
 
 ![The component palette: a Find a part box at the top, "186 parts in 16 groups" under it, and the sixteen categories with their counts — passive 11, switches 4, sources 14, semiconductors 13, transistors 11, LEDs and displays 9, power 10, analog ICs 13, logic gates 7, 74xx series 21, 40xx series 15, buses 17, digital I/O 8, sensors and actuators 18, switching and isolation 11, dev boards 4 — every group closed, so all sixteen headings fit on screen at once](docs/images/02-palette.png)

@@ -170,12 +170,12 @@ Three of those are worth separating, because they are easy to confuse:
 
 Click a palette entry, then click the canvas. The part lands where you click, snapped to the grid.
 
-The palette holds **204 components in 16 categories**:
+The palette holds **205 components in 16 categories**:
 
 | Category | Count | Contents |
 | --- | --- | --- |
 | Passive | 11 | Resistor, capacitor, electrolytic capacitor, inductor, transformer, centre-tapped transformer, potentiometer, crystal, ferrite bead, **common-mode choke** and transmission line — see [below](#common-mode-chokes) |
-| Switches | 4 | SPST, SPDT, push button, **8-way DIP switch** |
+| Switches | 5 | SPST, SPDT, push button, **8-way DIP switch**, **4×4 matrix keypad** |
 | Sources | 16 | Ground, **net label**, **loop probe**, DC voltage, DC current, **voltage- and current-controlled sources**, the **behavioural source** whose output is a formula, function generator, **waveform source**, battery, solar cell, **noise source**, and the three **annotations** — note, heading and area — see [below](#feeding-it-a-real-waveform) |
 | Semiconductors | 13 | 1N4148, 1N4001, Schottky, zeners, **varactor**, **photodiode**, bridge rectifier, SCR, triac, diac, TVS and varistor — see [below](#three-ways-to-measure-light) |
 | Transistors | 13 | NPN and PNP bipolars including the **2N2222**, a **TIP120 Darlington**, N- and P-channel MOSFETs, three JFETs and an **IGBT** — see [below](#the-igbt) |
