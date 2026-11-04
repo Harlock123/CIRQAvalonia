@@ -49,6 +49,8 @@ public static class Examples
             new("Analog and Logic", "The two parts that live on the boundary, and why one has two thresholds",
                 LoadAnalogBoundary),
             new("MOSFET Driver", "Logic-level MOSFET switching an inductive load", LoadMosfetDriver),
+            new("Lamp Inrush", "A 12 V bulb switched on cold draws ten times its running current — open SW1, let it cool, close it again",
+                LoadLampInrush),
         ]),
 
         new("Analog",
@@ -108,8 +110,6 @@ public static class Examples
                 LoadScrLatch),
             new("Lamp Dimmer", "Triac and diac phase control — move the firing angle and the lamp dims",
                 LoadLampDimmer),
-            new("Lamp Inrush", "A 12 V bulb switched on cold draws ten times its running current — open SW1, let it cool, close it again",
-                LoadLampInrush),
             new("Darlington Lamp Dimmer", "An Arduino's PWM pin dimming a 12 V lamp through a TIP120 — change the duty in the board's Pins",
                 LoadDarlingtonLampDimmer),
             new("Relay Driver", "Logic to a coil through an optocoupler and a Darlington array",
@@ -256,6 +256,8 @@ public static class Examples
                 LoadCharacterLcd),
             new("I2C LCD", "The same display on a PCF8574 backpack — two wires instead of six",
                 LoadI2cLcd),
+            new("NeoPixel Chaser", "A WS2812B strip of eight, sent a colour per pixel over one wire at 800 kHz — a pattern generator plays the bit timing",
+                LoadNeoPixelChaser),
         ]),
 
         new("Development Boards",
@@ -5327,6 +5329,86 @@ public static class Examples
         vm.Scope.Layout = ScopeLayout.Tiled;
         vm.Scope.AddProbe(lm35.Output, "LM35");
         vm.Scope.AddProbe(tmp36.Output, "TMP36");
+    }
+
+    /// <summary>
+    /// Eight NeoPixels and a light running along them, with a fading tail and a colour that turns as
+    /// it goes.
+    /// <para>
+    /// There is no microcontroller here, which is the point: the strip only ever sees a waveform,
+    /// and the pattern generator plays the waveform a microcontroller library would, at 2.5 MHz so
+    /// that each bit is three steps — <c>110</c> for a 1, <c>100</c> for a 0 — followed by 60 µs of
+    /// low that tells the strip to show what it has been sent. Zoom the scope right in on DIN to see
+    /// the long and short pulses. The pattern is written by <c>NeoPixelStrip.PatternFor</c>; the
+    /// generator's output is set to 5 V CMOS levels, because a WS2812B on 5 V wants 3.5 V to call
+    /// a high, and a TTL-level 3.4 V would leave it dark.
+    /// </para>
+    /// </summary>
+    public static void LoadNeoPixelChaser(MainWindowViewModel vm)
+    {
+        var circuit = vm.Circuit;
+        circuit.Title = "NeoPixel chaser";
+
+        const int pixels = 8;
+        List<IReadOnlyList<Cirq.Core.Primitives.Color>> frames = [];
+
+        for (var head = 0; head < pixels; head++)
+        {
+            var frame = new Cirq.Core.Primitives.Color[pixels];
+            var (r, g, b) = Hue(head * 360.0 / pixels);
+
+            for (var i = 0; i < pixels; i++)
+            {
+                // The head at full brightness, and two pixels of tail behind it at a quarter and a
+                // sixteenth — which is all a "comet" effect is.
+                var behind = (head - i + pixels) % pixels;
+                var level = behind switch { 0 => 1.0, 1 => 0.25, 2 => 0.0625, _ => 0.0 };
+                frame[i] = new Cirq.Core.Primitives.Color((byte)(r * level), (byte)(g * level), (byte)(b * level));
+            }
+
+            frames.Add(frame);
+        }
+
+        var generator = Place(circuit, new PatternGenerator
+        {
+            Pattern = NeoPixelStrip.PatternFor(frames),
+            StepRate = NeoPixelStrip.PatternStepRate,
+            Levels = LogicLevels.Cmos5V,
+        }, -320, 0);
+
+        var supply = Place(circuit, new DcVoltageSource(5.0), -320, 220);
+        supply.RotationDegrees = 90;
+        var strip = Place(circuit, new NeoPixelStrip { PixelCount = pixels }, 80, 0);
+
+        var gnd = Place(circuit, new Ground(), -320, 360);
+        var gnd2 = Place(circuit, new Ground(), -60, 120);
+
+        circuit.Connect(supply.Negative, gnd.Pin);
+        circuit.Connect(supply.Positive, strip.Vcc);
+        circuit.Connect(strip.Gnd, gnd2.Pin);
+        circuit.Connect(generator.Terminals[0], strip.DataIn);
+
+        vm.Scope.TimebasePerDivision = 50e-6;
+        vm.Scope.VoltsPerDivision = 2.0;
+        vm.Scope.AddProbe(strip.DataIn, "DIN");
+
+        static (double R, double G, double B) Hue(double degrees)
+        {
+            var h = degrees / 60.0;
+            var x = 1 - Math.Abs((h % 2) - 1);
+
+            var (r, g, b) = (int)h switch
+            {
+                0 => (1.0, x, 0.0),
+                1 => (x, 1.0, 0.0),
+                2 => (0.0, 1.0, x),
+                3 => (0.0, x, 1.0),
+                4 => (x, 0.0, 1.0),
+                _ => (1.0, 0.0, x),
+            };
+
+            return (r * 255, g * 255, b * 255);
+        }
     }
 
     /// <summary>

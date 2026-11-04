@@ -109,6 +109,14 @@ public partial class PatternGenerator : DigitalComponent, IBreakpointSource
         }
     }
 
+    /// <summary>
+    /// How near a step boundary, as a fraction of a step, counts as on it. The solver lands on the
+    /// boundary it was asked for, but <c>3 × 0.4 µs ÷ 0.4 µs</c> is 2.9999999 in floating point; read
+    /// with a plain floor, the step would change one time point late — harmless at a kilohertz,
+    /// and at the 2.5 MHz a WS2812 waveform needs, a pulse of the wrong width.
+    /// </summary>
+    private const double StepTolerance = 1e-6;
+
     /// <summary>How long one step lasts.</summary>
     public double StepPeriod => StepRate > 0 ? 1.0 / StepRate : double.PositiveInfinity;
 
@@ -133,7 +141,7 @@ public partial class PatternGenerator : DigitalComponent, IBreakpointSource
         var elapsed = time - StartDelay;
         if (elapsed < 0) return -1;
 
-        var index = (int)Math.Floor(elapsed / StepPeriod);
+        var index = (int)Math.Floor((elapsed / StepPeriod) + StepTolerance);
 
         if (index < _steps.Length) return index;
 
@@ -177,7 +185,7 @@ public partial class PatternGenerator : DigitalComponent, IBreakpointSource
 
         if (elapsed < 0) return StartDelay;
 
-        var index = Math.Floor(elapsed / period);
+        var index = Math.Floor((elapsed / period) + StepTolerance);
 
         // One past the end is where a pattern that does not repeat finally stops moving.
         if (!Repeats && index >= _steps.Length - 1) return null;

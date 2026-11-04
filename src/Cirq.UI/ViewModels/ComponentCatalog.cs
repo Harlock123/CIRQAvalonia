@@ -189,6 +189,8 @@ public static class ComponentCatalog
             new("LED White", "Blue die plus phosphor, around 3.1 V", () => Led.OfColour("White")),
             new("Incandescent Lamp", "Tungsten filament bulb, 12 V 5 W — cold it is a tenth of its hot resistance, so it draws an inrush at switch-on. Light bulb, globe, filament, dimmer",
                 () => new IncandescentLamp()),
+            new("NeoPixel Strip", "WS2812B addressable RGB LEDs, eight to a strip — 800 kHz one-wire data decoded by pulse width, latched by a 50 µs low, DOUT to chain the next",
+                () => new NeoPixelStrip()),
             new("Character LCD", "HD44780 16x2 — the display on the front of everything",
                 () => new CharacterLcd()),
             new("7-Segment (CA)", "Common-anode display, driven by pulling segments low",

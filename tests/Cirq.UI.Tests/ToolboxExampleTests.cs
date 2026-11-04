@@ -137,4 +137,28 @@ public class ToolboxExampleTests
         sim.Run(1e-3);
         Assert.Contains("A0=0.36V", board.InputSummary);
     }
+
+    /// <summary>
+    /// A frame every 290 µs: by the time eight have been sent the head has run the length of the
+    /// strip, with its tail behind it.
+    /// </summary>
+    [Fact]
+    public void TheNeoPixelChaserRunsItsHeadAlongTheStrip()
+    {
+        using var vm = Load("NeoPixel Chaser");
+        var sim = vm.Simulation.Simulator!;
+        var strip = vm.Circuit.Components.OfType<NeoPixelStrip>().Single();
+
+        sim.Run(0.35e-3);
+        Assert.Equal(1, strip.FramesShown);
+        Assert.Equal(255, Brightest(strip.Pixels[0]));
+
+        sim.Run(2.0e-3);
+        Assert.Equal(8, strip.FramesShown);
+        Assert.Equal(255, Brightest(strip.Pixels[7]));
+        Assert.Equal(63, Brightest(strip.Pixels[6]));
+        Assert.Equal(0, Brightest(strip.Pixels[0]));
+
+        static int Brightest(Cirq.Core.Primitives.Color c) => Math.Max(c.R, Math.Max(c.G, c.B));
+    }
 }

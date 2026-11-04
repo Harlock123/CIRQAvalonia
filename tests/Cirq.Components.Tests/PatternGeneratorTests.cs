@@ -159,4 +159,22 @@ public class PatternGeneratorTests
         Assert.Null(pattern.NextBreakpointAfter(0));
         Assert.Equal("empty", pattern.ValueLabel);
     }
+
+    /// <summary>
+    /// At a boundary the solver landed on, the new step is already playing — even where the
+    /// division that finds the step comes out a hair under a whole number, as 3 × 0.4 µs does.
+    /// </summary>
+    [Fact]
+    public void AStepBoundaryIsTheStartOfTheNextStepEvenAtMegahertzRates()
+    {
+        var pattern = new PatternGenerator { Pattern = "0101010101", StepRate = 2.5e6, Repeats = false };
+
+        for (var step = 1; step < 9; step++)
+        {
+            var at = step * pattern.StepPeriod;
+
+            Assert.Equal(step, pattern.StepAt(at));
+            Assert.Equal((step + 1) * pattern.StepPeriod, pattern.NextBreakpointAfter(at)!.Value, 1e-15);
+        }
+    }
 }

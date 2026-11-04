@@ -170,7 +170,7 @@ Three of those are worth separating, because they are easy to confuse:
 
 Click a palette entry, then click the canvas. The part lands where you click, snapped to the grid.
 
-The palette holds **203 components in 16 categories**:
+The palette holds **204 components in 16 categories**:
 
 | Category | Count | Contents |
 | --- | --- | --- |
@@ -179,7 +179,7 @@ The palette holds **203 components in 16 categories**:
 | Sources | 16 | Ground, **net label**, **loop probe**, DC voltage, DC current, **voltage- and current-controlled sources**, the **behavioural source** whose output is a formula, function generator, **waveform source**, battery, solar cell, **noise source**, and the three **annotations** — note, heading and area — see [below](#feeding-it-a-real-waveform) |
 | Semiconductors | 13 | 1N4148, 1N4001, Schottky, zeners, **varactor**, **photodiode**, bridge rectifier, SCR, triac, diac, TVS and varistor — see [below](#three-ways-to-measure-light) |
 | Transistors | 13 | NPN and PNP bipolars including the **2N2222**, a **TIP120 Darlington**, N- and P-channel MOSFETs, three JFETs and an **IGBT** — see [below](#the-igbt) |
-| LEDs & Displays | 10 | Six LED colours, an **incandescent lamp**, seven-segment displays, **HD44780 character LCD** — see [below](#the-character-lcd) |
+| LEDs & Displays | 11 | Six LED colours, an **incandescent lamp**, a **WS2812B NeoPixel strip**, seven-segment displays, **HD44780 character LCD** — see [below](#the-character-lcd) |
 | Power | 10 | Fixed and adjustable regulators, TL431 shunt reference, ICL7660 charge pump, MC34063 switching controller, **TP4056 lithium charger** — see [below](#charging-a-lithium-cell) |
 | Analog ICs | 13 | LM741, TL081, LM358, MCP6002 rail-to-rail, the **LM324 quad**, NE555, LM311, LM339, LM386 audio amp, INA126 instrumentation amp and an **AD633 analog multiplier** — see [below](#four-in-one-package) |
 | Logic Gates | 14 | AND, OR, NAND, NOR, XOR, XNOR, NOT, buffer and **tri-state buffer**, and the generic **D, JK and T flip-flops** and **SR and D latches** |

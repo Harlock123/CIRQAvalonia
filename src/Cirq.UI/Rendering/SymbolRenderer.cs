@@ -126,6 +126,7 @@ public static class SymbolRenderer
             case QuadOpAmp: DrawDip(context, pen, zoom, 14, "LM324"); break;
             case OperationalAmplifier: DrawOpAmp(context, pen, zoom); break;
             case Ne555: DrawDip(context, pen, zoom, 8, "NE555"); break;
+            case NeoPixelStrip strip: DrawNeoPixelStrip(context, pen, zoom, strip); break;
             case DigitalIc ic: DrawDip(context, pen, zoom, ic.PinCount, ic.PartNumber); break;
             case LogicGate gate: DrawLogicGate(context, pen, gate); break;
             case FlipFlopBlock block: DrawFlipFlop(context, pen, zoom, block); break;
@@ -2130,6 +2131,76 @@ public static class SymbolRenderer
         context.DrawLine(filament, new Point(-d, d), new Point(d, -d));
     }
 
+    /// <summary>Half the height of a pixel strip's body: a row of eight pixels for every eight it has.</summary>
+    private static double NeoPixelHalfHeight(NeoPixelStrip strip)
+    {
+        var rows = (strip.Count + NeoPixelStrip.PixelsPerRow - 1) / NeoPixelStrip.PixelsPerRow;
+        return Math.Max(30.0, (rows * 24.0 / 2) + 8);
+    }
+
+    /// <summary>
+    /// A NeoPixel strip, drawn as the strip: a row of pixels, each lit the colour it was last sent,
+    /// eight to a row. Dark until the first reset, exactly as a real one is.
+    /// </summary>
+    private static void DrawNeoPixelStrip(ISymbolCanvas context, IPen pen, double zoom, NeoPixelStrip strip)
+    {
+        var half = NeoPixelHalfHeight(strip);
+        var body = new Rect(-104, -half, 208, half * 2);
+
+        foreach (var terminal in strip.Terminals)
+        {
+            var at = terminal.CanvasOffset;
+            context.DrawLine(pen, new Point(at.X, at.Y), new Point(at.X < 0 ? body.Left : body.Right, at.Y));
+        }
+
+        context.DrawRectangle(CanvasTheme.SymbolFill, pen, new RoundedRect(body, 4));
+
+        var pixels = strip.Pixels;
+        var perRow = Math.Min(strip.Count, NeoPixelStrip.PixelsPerRow);
+        var rows = (strip.Count + NeoPixelStrip.PixelsPerRow - 1) / NeoPixelStrip.PixelsPerRow;
+        var thin = new Pen(pen.Brush, pen.Thickness * 0.6);
+
+        for (var i = 0; i < pixels.Count; i++)
+        {
+            var row = i / NeoPixelStrip.PixelsPerRow;
+            var column = i % NeoPixelStrip.PixelsPerRow;
+            var centre = new Point(
+                (column - ((perRow - 1) / 2.0)) * 24.0,
+                (row - ((rows - 1) / 2.0)) * 24.0);
+
+            var p = pixels[i];
+            var peak = Math.Max(p.R, Math.Max(p.G, p.B)) / 255.0;
+            var lit = CanvasTheme.Emission(Math.Sqrt(peak));
+            var square = new Rect(centre.X - 9, centre.Y - 9, 18, 18);
+
+            if (lit > 0)
+            {
+                // Scaled up to full strength for the hue, with how bright it is carried by the blend:
+                // a pixel sent (40, 0, 0) is a dim red, not a dark brown.
+                var scale = 255.0 / Math.Max((int)Math.Max(p.R, Math.Max(p.G, p.B)), 1);
+                var colour = CanvasTheme.Emitted(Color.FromRgb(
+                    (byte)Math.Min(255, p.R * scale), (byte)Math.Min(255, p.G * scale), (byte)Math.Min(255, p.B * scale)));
+
+                context.DrawEllipse(Wash(colour, 0.3 * lit), null, centre, 14, 14);
+                context.DrawRectangle(new SolidColorBrush(Blend(SymbolColour, colour, lit)), thin, new RoundedRect(square, 3));
+            }
+            else
+            {
+                context.DrawRectangle(CanvasTheme.SymbolFill, thin, new RoundedRect(square, 3));
+            }
+        }
+
+        if (zoom <= 0.55) return;
+
+        foreach (var terminal in strip.Terminals)
+        {
+            var at = terminal.CanvasOffset;
+            var left = at.X < 0;
+            DrawAlignedText(context, terminal.Name, new Point(left ? body.Left - 2 : body.Right + 2, at.Y - 7), 7, zoom,
+                CanvasTheme.LabelBrush, alignLeft: !left);
+        }
+    }
+
     /// <summary>A deeper shade of an emitted colour, for the edge of something lit by it.</summary>
     private static Color Deepen(Color colour) =>
         Color.FromRgb((byte)(colour.R * 0.55), (byte)(colour.G * 0.55), (byte)(colour.B * 0.55));
@@ -2823,6 +2894,7 @@ public static class SymbolRenderer
         // The driver module reaches 92 below centre; the relay's case 32.
         StepperDriver => 106.0,
         SolidStateRelay => 46.0,
+        NeoPixelStrip strip => NeoPixelHalfHeight(strip) + 14,
         DigitalIc ic => DipPackage.BodyHeight(ic.PinCount) / 2 + 16,
         FlipFlopBlock block => block.HalfHeight + 14,
         TriStateBuffer => 44.0,
