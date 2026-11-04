@@ -31,10 +31,12 @@ public abstract class MultiGateIc : DigitalIc
         int vccPin,
         int gndPin,
         IReadOnlyList<GateDefinition> gates,
-        IReadOnlyList<int>? unconnectedPins = null)
+        IReadOnlyList<int>? unconnectedPins = null,
+        bool openCollector = false)
         : base(pinCount)
     {
         Function = function;
+        IsOpenCollector = openCollector;
         _gates = [.. gates];
         _gateInputs = new Terminal[_gates.Length][];
         _gateOutputs = new Terminal[_gates.Length];
@@ -57,7 +59,10 @@ public abstract class MultiGateIc : DigitalIc
                 _gateInputs[g][i] = Pin(definition.InputPins[i], label, TerminalType.Input);
             }
 
-            _gateOutputs[g] = Pin(definition.OutputPin, $"{g + 1}Y", TerminalType.Output);
+            // An open-collector output is built to share a wire, and says so to the rule check the
+            // way a tri-state one does.
+            _gateOutputs[g] = Pin(definition.OutputPin, $"{g + 1}Y",
+                openCollector ? TerminalType.Bidirectional : TerminalType.Output);
         }
 
         foreach (var gate in _gateInputs) _widestGate = Math.Max(_widestGate, gate.Length);
@@ -73,6 +78,13 @@ public abstract class MultiGateIc : DigitalIc
     }
 
     public GateFunction Function { get; }
+
+    /// <summary>
+    /// True for the open-collector packages (7403, 7406, 7407): an output pulls down or lets go,
+    /// never drives high, so it needs a pull-up — and several can be tied together, any one of
+    /// them pulling the wire low.
+    /// </summary>
+    public bool IsOpenCollector { get; }
 
     /// <summary>Number of independent gates in the package.</summary>
     public int GateCount => _gates.Length;
@@ -103,7 +115,14 @@ public abstract class MultiGateIc : DigitalIc
             for (var i = 0; i < inputs.Length; i++)
                 states[i] = context.ReadInput(inputs[i], Levels);
 
-            context.Schedule(this, g, LogicGate.Evaluate(Function, states), delay);
+            context.Schedule(this, g, Drive(LogicGate.Evaluate(Function, states)), delay);
         }
     }
+
+    /// <summary>
+    /// What the output stage does with a gate's answer: a push-pull stage drives it, an open
+    /// collector releases a high rather than driving it.
+    /// </summary>
+    protected LogicState Drive(LogicState state) =>
+        IsOpenCollector && state == LogicState.High ? LogicState.HighImpedance : state;
 }

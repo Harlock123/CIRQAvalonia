@@ -36,10 +36,16 @@ internal sealed class LogicBench
         return part;
     }
 
+    /// <summary>
+    /// The family the toggles drive at. TTL by default; a CMOS part wants <see cref="LogicLevels.Cmos5V"/>,
+    /// since a TTL high of 3.4 V is below its 3.5 V threshold.
+    /// </summary>
+    public LogicLevels ToggleLevels { get; set; } = LogicLevels.Ttl;
+
     /// <summary>A toggle wired to a pin, starting at <paramref name="high"/>.</summary>
     public LogicToggle Toggle(Terminal pin, bool high = false)
     {
-        var toggle = Circuit.Add(new LogicToggle { State = high });
+        var toggle = Circuit.Add(new LogicToggle { State = high, Levels = ToggleLevels });
         Circuit.Connect(toggle.Out, pin);
         return toggle;
     }
