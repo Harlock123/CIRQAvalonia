@@ -99,26 +99,32 @@ public sealed class Ic74139 : DigitalIc
 }
 
 /// <summary>
-/// 74244 octal buffer with tri-state outputs, in two groups of four with an enable each — the part
-/// that puts a set of switches, or an address, onto a shared bus only when asked.
+/// Base for the octal tri-state buffers and line drivers: the 74244 and its inverting twin the 74240,
+/// the 74241 whose second group is enabled by a high, and the flow-through 74540 and 74541. They only
+/// go one way, A to Y, which is the difference from the 74245, and they are how a set of switches or an
+/// address is put on a bus only when asked.
 /// <para>
-/// It only goes one way, A to Y, which is the difference from the 74245. With /1G low, 1A1-1A4
-/// appear on 1Y1-1Y4; with it high those four outputs let go of the bus. The second group is the
-/// same with /2G. Enable a 244 onto a bus somebody else is driving and the two fight; the outputs
-/// are marked as bus pins so the rule check does not object to the sharing itself.
-/// </para>
-/// <para>
-/// Pinout: 1=/1G, 2=1A1, 3=2Y4, 4=1A2, 5=2Y3, 6=1A3, 7=2Y2, 8=1A4, 9=2Y1, 10=GND, 11=2A1,
-/// 12=1Y4, 13=2A2, 14=1Y3, 15=2A3, 16=1Y2, 17=2A4, 18=1Y1, 19=/2G, 20=VCC.
+/// The 244 family splits the eight into two groups of four with an enable each, on an interleaved
+/// pinout; the 540 and 541 have all eight inputs down one side and the outputs up the other, and two
+/// enables that must <i>both</i> be low. Enable one onto a bus somebody else is driving and the two
+/// fight; the outputs are marked as bus pins so the rule check does not object to the sharing itself.
 /// </para>
 /// </summary>
-public sealed class Ic74244 : DigitalIc
+public abstract class OctalBufferIc : DigitalIc
 {
     private readonly Terminal[] _a = new Terminal[8];
     private readonly Terminal[] _y = new Terminal[8];
+    private readonly bool _flowThrough;
+    private readonly bool _secondActiveHigh;
 
-    public Ic74244() : base(20)
+    /// <param name="flowThrough">The 540/541 pinout, with both enables applying to all eight.</param>
+    /// <param name="inverting">The 74240 and 74540, whose outputs are the inputs inverted.</param>
+    /// <param name="secondActiveHigh">The 74241, whose /2G is a 2G.</param>
+    protected OctalBufferIc(bool flowThrough, bool inverting, bool secondActiveHigh = false) : base(20)
     {
+        _flowThrough = flowThrough;
+        _secondActiveHigh = secondActiveHigh;
+        IsInverting = inverting;
         PropagationDelay = 12e-9;
 
         var pins = new Terminal[21];
@@ -126,62 +132,89 @@ public sealed class Ic74244 : DigitalIc
         Terminal Pin(int number, string name, TerminalType type) =>
             pins[number] = new Terminal($"p{number}", name, type, DipPackage.PinOffset(number, 20));
 
-        // Index 0-3 is the first group (1A1-1A4), 4-7 the second (2A1-2A4).
-        Enable1 = Pin(1, "1G", TerminalType.Input);
-        _a[0] = Pin(2, "1A1", TerminalType.Input);
-        _y[7] = Pin(3, "2Y4", TerminalType.Bidirectional);
-        _a[1] = Pin(4, "1A2", TerminalType.Input);
-        _y[6] = Pin(5, "2Y3", TerminalType.Bidirectional);
-        _a[2] = Pin(6, "1A3", TerminalType.Input);
-        _y[5] = Pin(7, "2Y2", TerminalType.Bidirectional);
-        _a[3] = Pin(8, "1A4", TerminalType.Input);
-        _y[4] = Pin(9, "2Y1", TerminalType.Bidirectional);
+        if (flowThrough)
+        {
+            Enable1 = Pin(1, "G1", TerminalType.Input);
+            for (var i = 0; i < 8; i++)
+            {
+                _a[i] = Pin(2 + i, $"A{i + 1}", TerminalType.Input);
+                _y[i] = Pin(18 - i, $"Y{i + 1}", TerminalType.Bidirectional);
+            }
+
+            Enable2 = Pin(19, "G2", TerminalType.Input);
+        }
+        else
+        {
+            // Index 0-3 is the first group (1A1-1A4), 4-7 the second (2A1-2A4).
+            Enable1 = Pin(1, "1G", TerminalType.Input);
+            _a[0] = Pin(2, "1A1", TerminalType.Input);
+            _y[7] = Pin(3, "2Y4", TerminalType.Bidirectional);
+            _a[1] = Pin(4, "1A2", TerminalType.Input);
+            _y[6] = Pin(5, "2Y3", TerminalType.Bidirectional);
+            _a[2] = Pin(6, "1A3", TerminalType.Input);
+            _y[5] = Pin(7, "2Y2", TerminalType.Bidirectional);
+            _a[3] = Pin(8, "1A4", TerminalType.Input);
+            _y[4] = Pin(9, "2Y1", TerminalType.Bidirectional);
+            _a[4] = Pin(11, "2A1", TerminalType.Input);
+            _y[3] = Pin(12, "1Y4", TerminalType.Bidirectional);
+            _a[5] = Pin(13, "2A2", TerminalType.Input);
+            _y[2] = Pin(14, "1Y3", TerminalType.Bidirectional);
+            _a[6] = Pin(15, "2A3", TerminalType.Input);
+            _y[1] = Pin(16, "1Y2", TerminalType.Bidirectional);
+            _a[7] = Pin(17, "2A4", TerminalType.Input);
+            _y[0] = Pin(18, "1Y1", TerminalType.Bidirectional);
+            Enable2 = Pin(19, "2G", TerminalType.Input);
+        }
+
         Gnd = Pin(10, "GND", TerminalType.Ground);
-        _a[4] = Pin(11, "2A1", TerminalType.Input);
-        _y[3] = Pin(12, "1Y4", TerminalType.Bidirectional);
-        _a[5] = Pin(13, "2A2", TerminalType.Input);
-        _y[2] = Pin(14, "1Y3", TerminalType.Bidirectional);
-        _a[6] = Pin(15, "2A3", TerminalType.Input);
-        _y[1] = Pin(16, "1Y2", TerminalType.Bidirectional);
-        _a[7] = Pin(17, "2A4", TerminalType.Input);
-        _y[0] = Pin(18, "1Y1", TerminalType.Bidirectional);
-        Enable2 = Pin(19, "2G", TerminalType.Input);
         Vcc = Pin(20, "VCC", TerminalType.Power);
 
         Terminals = [.. pins.Skip(1)];
         ConfigurePins([Enable1, Enable2, .. _a], _y);
     }
 
-    public override string PartNumber => "74244";
-
-    /// <summary>/1G, active low: enables 1Y1-1Y4.</summary>
+    /// <summary>
+    /// Pin 1: /1G, enabling the first group (the 244 family), or /G1 (the 540 and 541), active low.
+    /// </summary>
     public Terminal Enable1 { get; }
 
-    /// <summary>/2G, active low: enables 2Y1-2Y4.</summary>
+    /// <summary>
+    /// Pin 19: /2G for the second group (active high on the 74241), or /G2 on the 540 and 541.
+    /// </summary>
     public Terminal Enable2 { get; }
 
-    /// <summary>The inputs: 1A1-1A4 then 2A1-2A4.</summary>
+    /// <summary>The inputs: 1A1-1A4 then 2A1-2A4, or A1-A8.</summary>
     public IReadOnlyList<Terminal> Inputs => _a;
 
     /// <summary>The outputs, in the same order as the inputs.</summary>
     public IReadOnlyList<Terminal> Outputs => _y;
 
-    public override string ValueLabel => $"{(GroupEnabled.First ? "on" : "off")} / {(GroupEnabled.Second ? "on" : "off")}";
+    /// <summary>True for the 74240 and 74540.</summary>
+    public bool IsInverting { get; }
 
-    /// <summary>Whether each group is driving its outputs.</summary>
+    public override string ValueLabel => _flowThrough
+        ? GroupEnabled.First ? "on" : "off"
+        : $"{(GroupEnabled.First ? "on" : "off")} / {(GroupEnabled.Second ? "on" : "off")}";
+
+    /// <summary>Whether each group is driving its outputs (both the same on the 540 and 541).</summary>
     public (bool First, bool Second) GroupEnabled { get; private set; }
 
     protected override void EvaluatePoweredLogic(IDigitalContext context)
     {
         var delay = DelayFor(context);
-        var first = context.ReadInput(Enable1, Levels).IsLow();
-        var second = context.ReadInput(Enable2, Levels).IsLow();
+        var g1 = context.ReadInput(Enable1, Levels).IsLow();
+        var g2 = _secondActiveHigh
+            ? context.ReadInput(Enable2, Levels).IsHigh()
+            : context.ReadInput(Enable2, Levels).IsLow();
+
+        var (first, second) = _flowThrough ? (g1 && g2, g1 && g2) : (g1, g2);
 
         for (var i = 0; i < 8; i++)
         {
             var on = i < 4 ? first : second;
             var input = context.ReadInput(_a[i], Levels);
-            Request(context, i, !on ? LogicState.HighImpedance : input.IsDriven() ? input : LogicState.Unknown, delay);
+            var driven = input.IsDriven() ? IsInverting ? input.Invert() : input : LogicState.Unknown;
+            Request(context, i, on ? driven : LogicState.HighImpedance, delay);
         }
 
         var before = GroupEnabled;
@@ -194,6 +227,49 @@ public sealed class Ic74244 : DigitalIc
         base.ResetLogic();
         GroupEnabled = (false, false);
     }
+}
+
+/// <summary>
+/// 74244 octal buffer with tri-state outputs, in two groups of four with an active-low enable each.
+/// <para>
+/// Pinout: 1=/1G, 2=1A1, 3=2Y4, 4=1A2, 5=2Y3, 6=1A3, 7=2Y2, 8=1A4, 9=2Y1, 10=GND, 11=2A1,
+/// 12=1Y4, 13=2A2, 14=1Y3, 15=2A3, 16=1Y2, 17=2A4, 18=1Y1, 19=/2G, 20=VCC.
+/// </para>
+/// </summary>
+public sealed class Ic74244() : OctalBufferIc(flowThrough: false, inverting: false)
+{
+    public override string PartNumber => "74244";
+}
+
+/// <summary>74240 octal inverting buffer, tri-state: the 74244's pinout with each output the inverse of its input.</summary>
+public sealed class Ic74240() : OctalBufferIc(flowThrough: false, inverting: true)
+{
+    public override string PartNumber => "74240";
+}
+
+/// <summary>
+/// 74241 octal buffer, tri-state, with complementary enables: the 74244's pinout, but the second group
+/// is enabled by a <b>high</b> on pin 19. Tie pins 1 and 19 together and one signal puts either group on
+/// the bus and takes the other off.
+/// </summary>
+public sealed class Ic74241() : OctalBufferIc(flowThrough: false, inverting: false, secondActiveHigh: true)
+{
+    public override string PartNumber => "74241";
+}
+
+/// <summary>
+/// 74540 octal inverting buffer, tri-state, flow-through: inputs on 2-9, outputs on 18-11, enabled while
+/// /G1 and /G2 are both low. Pinout: 1=/G1, 2-9=A1-A8, 10=GND, 11-18=Y8-Y1, 19=/G2, 20=VCC.
+/// </summary>
+public sealed class Ic74540() : OctalBufferIc(flowThrough: true, inverting: true)
+{
+    public override string PartNumber => "74540";
+}
+
+/// <summary>74541 octal buffer, tri-state, flow-through: the 74540 without the inversion.</summary>
+public sealed class Ic74541() : OctalBufferIc(flowThrough: true, inverting: false)
+{
+    public override string PartNumber => "74541";
 }
 
 /// <summary>
