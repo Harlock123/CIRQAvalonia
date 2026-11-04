@@ -159,6 +159,9 @@ public sealed class Ic74165() : ParallelInSerialOutIc(
 {
     public override string PartNumber => "74165";
 
+    /// <summary>Active high: blocks the clock.</summary>
+    public new Terminal ClockInhibit => base.ClockInhibit!;
+
     /// <summary>QH, the last stage.</summary>
     public Terminal Output => SerialOutputs[0];
 
@@ -181,6 +184,12 @@ public sealed class Ic74166() : ParallelInSerialOutIc(
     asyncLoad: false, loadActiveHigh: false, cmos: false)
 {
     public override string PartNumber => "74166";
+
+    /// <summary>Active high: blocks the clock, for loading as well as shifting.</summary>
+    public new Terminal ClockInhibit => base.ClockInhibit!;
+
+    /// <summary>Asynchronous clear, active low.</summary>
+    public new Terminal Clear => base.Clear!;
 
     /// <summary>QH, the last stage.</summary>
     public Terminal Output => SerialOutputs[0];

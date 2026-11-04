@@ -102,8 +102,8 @@ public class ShiftRegisterFamilyTests
         bench.Tie(ic.ShiftLoad, false);
         bench.Toggles(ic.ParallelInputs, 0xFF);
         bench.Tie(ic.SerialInput, false);
-        var inhibit = bench.Toggle(ic.ClockInhibit!, true);
-        var clear = bench.Toggle(ic.Clear!, true);
+        var inhibit = bench.Toggle(ic.ClockInhibit, true);
+        var clear = bench.Toggle(ic.Clear, true);
 
         bench.Run();
         Pulse(bench, clock);
