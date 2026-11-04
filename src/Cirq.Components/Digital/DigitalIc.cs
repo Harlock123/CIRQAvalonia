@@ -34,6 +34,16 @@ public abstract partial class DigitalIc : DigitalComponent
 
     public override string ValueLabel => PartNumber;
 
+    /// <summary>
+    /// Whether the symbol prints each pin's name inside the package. Off for the small logic parts,
+    /// whose pins everyone wires from the datasheet; on for memories and processors, where forty
+    /// unlabelled legs would make the drawing unreadable.
+    /// </summary>
+    public virtual bool LabelsPins => false;
+
+    /// <summary>How a pin is labelled on the symbol: its name, with a slash in front of an active-low one.</summary>
+    public virtual string PinLabel(Terminal pin) => pin.Name;
+
     protected override int ReferenceNode(MnaSystem system) => system.Node(Gnd);
 
     /// <summary>Supply voltage across the package's own power pins.</summary>
