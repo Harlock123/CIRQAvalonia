@@ -11,7 +11,7 @@ namespace Cirq.Mcp;
 public sealed partial class CircuitTools
 {
     [McpServerTool(Name = "cpu_state", ReadOnly = true, Idempotent = true)]
-    [Description("A 6502, 65C02, 6510 or 8500's state: its registers (A, X, Y, S, PC), its flags (NV-BDIZC, capitals set), the instruction it is executing (disassembled from its bus), how many cycles and instructions it has run, whether it is running, waiting (WAI) or stopped (STP/JAM), any reads that found the data bus at no logic level, its last bus cycles, and on a 6510 or 8500 its I/O port ($0000 direction, $0001 data, and the P0-P5 pins). In the app this is the live simulation; otherwise where the last run_transient left it.")]
+    [Description("A processor's state. A 6502, 65C02, 6510 or 8500: its registers (A, X, Y, S, PC), its flags (NV-BDIZC, capitals set), the instruction it is executing (disassembled from its bus), how many cycles and instructions it has run, whether it is running, waiting (WAI) or stopped (STP/JAM), any reads that found the data bus at no logic level, its last bus cycles, and on a 6510 or 8500 its I/O port ($0000 direction, $0001 data, and the P0-P5 pins). A 68000: D0-D7, A0-A7, USP and SSP, PC, SR and its flags (T, S, the interrupt mask, XNZVC), the last instruction it finished, its clocks, bus cycles and wait states, the last exception, whether it is running, stopped (STOP), halted (double bus fault) or held in reset, and its last bus cycles with size, function code and wait states. In the app this is the live simulation; otherwise where the last run_transient left it.")]
     public Task<string> CpuState(
         [Description("The processor's designator, e.g. \"U2\". Optional when the circuit has only one.")] string? part = null,
         [Description("How many of its most recent bus cycles to list, from 0 to 64. Default 16.")] int cycles = 16,
@@ -19,6 +19,7 @@ public sealed partial class CircuitTools
         Read("cpu_state", s =>
         {
             if (cycles is < 0 or > 64) throw new ArgumentException("cycles must be from 0 to 64.");
+            if (AnyProcessor(s.Circuit, part) is Cpu68000 m68k) return State68000(m68k, cycles);
             var cpu = Processor(s.Circuit, part);
             var core = cpu.Core;
             var log = cpu.BusLog;
@@ -58,16 +59,18 @@ public sealed partial class CircuitTools
         }, cancel);
 
     [McpServerTool(Name = "disassemble", ReadOnly = true, Idempotent = true)]
-    [Description("Disassembles 6502 code held in a memory part (a ROM or RAM), as the processor would see it: give the address in the processor's memory map and where the chip starts in it (origin; a ROM decoded at $8000 has origin 32768). Lists each instruction's address, bytes and text; undocumented NMOS opcodes are marked *. With origin set and the chip holding $FFFA-$FFFF, the NMI, reset and IRQ vectors are given too.")]
+    [Description("Disassembles code held in a memory part (a ROM or RAM), as the processor would see it: give the address in the processor's memory map and where the chip starts in it (origin; a ROM decoded at $8000 has origin 32768). Lists each instruction's address, bytes and text. For a 6502 (variant 65C02 or 6502) undocumented NMOS opcodes are marked *, and with the chip holding $FFFA-$FFFF the NMI, reset and IRQ vectors are given too. For a 68000 (variant 68000) give the pair of byte-wide chips its 16-bit memory is made of: part the even bytes (D8-D15) and odd_part the odd ones (D0-D7); origin is then where the pair starts, and with origin 0 the reset vectors (the stack pointer and PC) are given.")]
     public Task<string> Disassemble(
         [Description("The memory part's designator, e.g. \"U3\".")] string part,
         [Description("Where to start, in the processor's address space, e.g. 32768 for $8000. Default: the origin.")] int? address = null,
         [Description("The processor address of the chip's first byte, e.g. 32768 for a ROM at $8000. Default 0.")] int origin = 0,
         [Description("How many instructions, from 1 to 200. Default 24.")] int count = 24,
-        [Description("\"65C02\" (default) or \"6502\" for the NMOS part's opcodes.")] string variant = "65C02",
+        [Description("\"65C02\" (default), \"6502\" for the NMOS part's opcodes, or \"68000\".")] string variant = "65C02",
+        [Description("For a 68000: the chip holding the odd bytes (D0-D7, /LDS), part being the even one. Optional; without it part is read as holding every byte.")] string? odd_part = null,
         CancellationToken cancel = default) =>
         Read("disassemble", s =>
         {
+            if (variant?.Trim() is "68000" or "68k" or "MC68000") return Disassemble68000(s.Circuit, part, odd_part, address, origin, count);
             if (count is < 1 or > 200) throw new ArgumentException("count must be from 1 to 200.");
             if (origin is < 0 or > 0xFFFF) throw new ArgumentException("origin must be from 0 to 65535.");
             var kind = variant?.Trim().ToUpperInvariant() switch
@@ -182,6 +185,263 @@ public sealed partial class CircuitTools
             if (core.Cycles == 0) result["note"] = "It hasn't been clocked yet: run_transient runs the circuit (or transport run, in the app).";
             return result;
         }, cancel);
+
+    [McpServerTool(Name = "peripheral_state", ReadOnly = true, Idempotent = true)]
+    [Description("A 68000 peripheral chip's state. A 68681 DUART: each channel's MR1, MR2, clock select and baud rate, status (RxRDY, FFULL, TxRDY, TxEMT, OE, PE, FE, RB), whether its transmitter and receiver are on, the FIFO depth, its mode (normal, echo, loopbacks) and what it has sent and received; ISR, IMR, IVR, ACR, the output port and OPCR, and the counter/timer's preload, count, output and whether it runs. A 68230 PI/T: PGCR, PSRR, each port's control, direction and output registers, PSR, the port and timer vectors, the timer's control, preload, count and ZDS. A 68901 MFP: GPIP data, edges and directions, the interrupt enable, pending, in-service and mask registers (channel 15 in bit 15), VR, each timer's control, count, reload and time-outs, and the USART's control, status and what it has sent. In the app this is the live simulation; otherwise where the last run_transient left it.")]
+    public Task<string> PeripheralState(
+        [Description("The chip's designator, e.g. \"U13\". Optional when the circuit has only one 68681, 68230 or 68901.")] string? part = null,
+        CancellationToken cancel = default) =>
+        Read("peripheral_state", s =>
+        {
+            var all = s.Circuit.Components.Where(c => c is Duart68681 or Pit68230 or Mfp68901).ToList();
+            CircuitComponent chip;
+            if (string.IsNullOrWhiteSpace(part))
+            {
+                chip = all.Count switch
+                {
+                    1 => all[0],
+                    0 => throw new ArgumentException("The circuit has no 68681, 68230 or 68901."),
+                    _ => throw new ArgumentException($"The circuit has {all.Count} of them ({string.Join(", ", all.Select(c => c.Name))}): say which with part."),
+                };
+            }
+            else
+            {
+                var c = Pins.Part(s.Circuit, part);
+                chip = c is Duart68681 or Pit68230 or Mfp68901 ? c : throw new ArgumentException($"{c.Name} is a {c.ComponentType}, not a 68681, 68230 or 68901.");
+            }
+
+            static string Hex(int value, int digits = 2) => "$" + value.ToString(digits == 2 ? "X2" : digits == 4 ? "X4" : "X6", CultureInfo.InvariantCulture);
+
+            switch (chip)
+            {
+                case Duart68681 duart:
+                {
+                    JsonObject Channel(bool b)
+                    {
+                        var c = duart.Describe(b);
+                        var status = c.Status;
+                        string[] names = ["RxRDY", "FFULL", "TxRDY", "TxEMT", "OE", "PE", "FE", "RB"];
+                        var bits = names.Where((_, i) => (status & (1 << i)) != 0).Select(n => (JsonNode)n).ToArray();
+                        var sent = b ? duart.TransmittedTextB : duart.TransmittedTextA;
+                        var received = string.Concat((b ? duart.ReceivedB : duart.ReceivedA).Select(x => x is >= 0x20 and < 0x7F ? (char)x : '.'));
+                        return new JsonObject
+                        {
+                            ["mr1"] = Hex(c.Mr1),
+                            ["mr2"] = Hex(c.Mr2),
+                            ["csr"] = Hex(c.Csr),
+                            ["baud"] = Math.Round(b ? duart.BaudRateB : duart.BaudRateA, 1),
+                            ["status"] = Hex(status),
+                            ["status_bits"] = new JsonArray(bits),
+                            ["transmitter_on"] = c.Tx,
+                            ["receiver_on"] = c.Rx,
+                            ["fifo"] = c.Fifo,
+                            ["mode"] = c.Mode,
+                            ["sent"] = sent,
+                            ["received"] = received,
+                        };
+                    }
+
+                    return new JsonObject
+                    {
+                        ["part"] = duart.Name,
+                        ["chip"] = duart.PartNumber,
+                        ["channel_a"] = Channel(false),
+                        ["channel_b"] = Channel(true),
+                        ["isr"] = Hex(duart.InterruptStatus),
+                        ["imr"] = Hex(duart.InterruptMask),
+                        ["ivr"] = Hex(duart.InterruptVector),
+                        ["acr"] = Hex(duart.AuxiliaryControl),
+                        ["output_port"] = Hex(duart.OutputPortRegister),
+                        ["opcr"] = Hex(duart.OutputPortConfiguration),
+                        ["counter"] = new JsonObject
+                        {
+                            ["preload"] = duart.CounterPreload,
+                            ["count"] = duart.CounterValue,
+                            ["running"] = duart.CounterRunning,
+                            ["output"] = duart.CounterOutput,
+                        },
+                    };
+                }
+
+                case Pit68230 pit:
+                {
+                    JsonObject Port((byte Control, byte Direction, byte Output) p) => new()
+                    {
+                        ["control"] = Hex(p.Control),
+                        ["submode"] = p.Control >> 6,
+                        ["direction"] = Hex(p.Direction),
+                        ["output"] = Hex(p.Output),
+                    };
+
+                    return new JsonObject
+                    {
+                        ["part"] = pit.Name,
+                        ["chip"] = pit.PartNumber,
+                        ["pgcr"] = Hex(pit.GeneralControl),
+                        ["mode"] = pit.GeneralControl >> 6,
+                        ["psrr"] = Hex(pit.ServiceRequest),
+                        ["port_a"] = Port(pit.PortARegisters),
+                        ["port_b"] = Port(pit.PortBRegisters),
+                        ["port_c"] = new JsonObject { ["direction"] = Hex(pit.PortCDirection), ["output"] = Hex(pit.PortCOutput) },
+                        ["psr"] = Hex(pit.PortStatus),
+                        ["pivr"] = Hex(pit.PortVector),
+                        ["timer"] = new JsonObject
+                        {
+                            ["tcr"] = Hex(pit.TimerControl),
+                            ["tivr"] = Hex(pit.TimerVector),
+                            ["preload"] = Hex(pit.TimerPreload, 6),
+                            ["count"] = Hex(pit.TimerCount, 6),
+                            ["zero_detected"] = pit.ZeroDetected,
+                        },
+                    };
+                }
+
+                default:
+                {
+                    var mfp = (Mfp68901)chip;
+                    var timers = new JsonArray();
+                    for (var i = 0; i < 4; i++)
+                    {
+                        var t = mfp.TimerState(i);
+                        timers.Add(new JsonObject
+                        {
+                            ["timer"] = ((char)('A' + i)).ToString(),
+                            ["control"] = Hex(t.Control),
+                            ["count"] = t.Count,
+                            ["reload"] = t.Reload,
+                            ["timeouts"] = t.Timeouts,
+                        });
+                    }
+
+                    return new JsonObject
+                    {
+                        ["part"] = mfp.Name,
+                        ["chip"] = mfp.PartNumber,
+                        ["gpdr"] = Hex(mfp.GpipData),
+                        ["aer"] = Hex(mfp.ActiveEdges),
+                        ["ddr"] = Hex(mfp.Direction),
+                        ["ier"] = Hex(mfp.InterruptEnable, 4),
+                        ["ipr"] = Hex(mfp.InterruptPending, 4),
+                        ["isr"] = Hex(mfp.InterruptInService, 4),
+                        ["imr"] = Hex(mfp.InterruptMask, 4),
+                        ["vr"] = Hex(mfp.VectorRegister),
+                        ["timers"] = timers,
+                        ["ucr"] = Hex(mfp.UsartControl),
+                        ["rsr"] = Hex(mfp.ReceiverStatus),
+                        ["tsr"] = Hex(mfp.TransmitterStatus),
+                        ["sent"] = mfp.TransmittedText,
+                    };
+                }
+            }
+        }, cancel);
+
+    /// <summary>A 68000's registers, flags, state and latest bus cycles, for cpu_state.</summary>
+    private static JsonObject State68000(Cpu68000 cpu, int cycles)
+    {
+        var core = cpu.Core;
+        var d = new JsonObject();
+        var a = new JsonObject();
+        for (var i = 0; i < 8; i++)
+        {
+            d[$"d{i}"] = $"${core.GetD(i):X8}";
+            a[$"a{i}"] = $"${core.GetA(i):X8}";
+        }
+
+        var log = cpu.BusLog.Where(c => c.Kind != M68000CycleKind.Instruction).ToList();
+        var recent = log.Skip(Math.Max(0, log.Count - cycles)).Select(c => (JsonNode)string.Create(CultureInfo.InvariantCulture,
+            $"{c.Kind switch { M68000CycleKind.Write => "write", M68000CycleKind.InterruptAcknowledge => "iack", _ => "read" }}.{(c.IsWord ? 'w' : 'b')} ${c.Address:X6} {(c.IsWord ? c.Data.ToString("X4", CultureInfo.InvariantCulture) : c.Data.ToString("X2", CultureInfo.InvariantCulture))} {Cpu68000BusDecoder.Space(c.FunctionCode)}{(c.WaitStates > 0 ? $" +{c.WaitStates}w" : "")}")).ToArray();
+
+        var result = new JsonObject
+        {
+            ["part"] = cpu.Name,
+            ["chip"] = cpu.PartNumber,
+            ["pc"] = $"${core.PC & 0xFFFFFF:X6}",
+            ["sr"] = $"${core.SR:X4}",
+            ["flags"] = Cpu68000.Flags(core.SR),
+            ["data"] = d,
+            ["address"] = a,
+            ["usp"] = $"${core.Usp:X8}",
+            ["ssp"] = $"${core.Ssp:X8}",
+            ["instruction"] = cpu.CurrentInstruction,
+            ["clocks"] = cpu.ClockCycles,
+            ["bus_cycles"] = cpu.BusCycles,
+            ["wait_states"] = cpu.WaitStates,
+            ["instructions"] = core.Instructions,
+            ["last_exception"] = core.LastException,
+            ["state"] = core.IsHalted ? "halted" : core.IsStopped ? "stopped" : core.ResetAsserted ? "held in reset" : "running",
+            ["recent_cycles"] = new JsonArray(recent),
+        };
+        if (cpu.UndefinedReads > 0) result["undefined_reads"] = $"{cpu.UndefinedReads}, first at ${cpu.FirstUndefinedRead:X6}";
+        if (cpu.ClockCycles == 0) result["note"] = "It hasn't run yet: run_transient runs the circuit (or transport run, in the app).";
+        return result;
+    }
+
+    /// <summary>68000 code in a memory part, or across a pair of them, for disassemble.</summary>
+    private static JsonObject Disassemble68000(Circuit circuit, string part, string? oddPart, int? address, int origin, int count)
+    {
+        if (count is < 1 or > 200) throw new ArgumentException("count must be from 1 to 200.");
+        if (origin < 0) throw new ArgumentException("origin can't be negative.");
+        var even = Memory(circuit, part);
+        var odd = string.IsNullOrWhiteSpace(oddPart) ? null : Memory(circuit, oddPart);
+        if (odd is not null && odd.Size != even.Size) throw new ArgumentException($"{even.Name} and {odd.Name} are different sizes: a pair is two of the same chip.");
+        var size = odd is null ? even.Size : even.Size * 2;
+        var start = address ?? origin;
+        if (start < origin || start >= origin + size)
+            throw new ArgumentException($"The memory holds ${origin:X6}-${origin + size - 1:X6} with origin ${origin:X6}; ${start:X6} isn't in it.");
+        if ((start & 1) != 0) throw new ArgumentException("A 68000 instruction starts at an even address.");
+
+        byte Byte(long at)
+        {
+            var offset = at - origin;
+            if (offset < 0 || offset >= size) return 0;
+            if (odd is null) return even.ReadByte((int)offset);
+            return (offset & 1) == 0 ? even.ReadByte((int)(offset >> 1)) : odd.ReadByte((int)(offset >> 1));
+        }
+
+        ushort Word(uint at) => (ushort)((Byte(at) << 8) | Byte(at + 1));
+
+        var lines = new JsonArray();
+        var pc = (uint)start;
+        for (var i = 0; i < count && pc < origin + size; i++)
+        {
+            var (text, length) = M68000Disassembler.Disassemble(pc, Word);
+            var words = string.Join(" ", Enumerable.Range(0, length / 2).Select(k => Word(pc + (uint)(k * 2)).ToString("X4", CultureInfo.InvariantCulture)));
+            lines.Add(string.Create(CultureInfo.InvariantCulture, $"${pc:X6}  {words,-24}  {text}"));
+            pc += (uint)length;
+        }
+
+        var result = new JsonObject
+        {
+            ["part"] = odd is null ? even.Name : $"{even.Name} (even) and {odd.Name} (odd)",
+            ["variant"] = "68000",
+            ["lines"] = lines,
+        };
+        if (origin == 0 && size >= 8)
+        {
+            uint Long(uint at) => (uint)((Word(at) << 16) | Word(at + 2));
+            result["vectors"] = new JsonObject { ["ssp"] = $"${Long(0):X8}", ["reset_pc"] = $"${Long(4):X8}" };
+        }
+
+        return result;
+    }
+
+    /// <summary>A 6502-family processor or a 68000: the one called <paramref name="name"/>, or the circuit's only processor.</summary>
+    private static CircuitComponent AnyProcessor(Circuit circuit, string? name)
+    {
+        var all = circuit.Components.Where(c => c is Processor6502 or Cpu68000).ToList();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return all.Count switch
+            {
+                1 => all[0],
+                0 => throw new ArgumentException("The circuit has no 6502, 65C02, 6510 or 68000."),
+                _ => throw new ArgumentException($"The circuit has {all.Count} processors ({string.Join(", ", all.Select(c => c.Name))}): say which with part."),
+            };
+        }
+
+        var c = Pins.Part(circuit, name);
+        return c is Processor6502 or Cpu68000 ? c : throw new ArgumentException($"{c.Name} is a {c.ComponentType}, not a processor.{(all.Count > 0 ? $" The processors: {string.Join(", ", all.Select(p => p.Name))}." : "")}");
+    }
 
     /// <summary>The processor called <paramref name="name"/>, or the circuit's only one.</summary>
     private static Processor6502 Processor(Circuit circuit, string? name)

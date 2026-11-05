@@ -7489,18 +7489,20 @@ it is told to.
 | Build | `add_parts`, `set_part`, `remove_parts`, `connect`, `disconnect`, `add_probe`, `remove_probe`, `set_parameter`, `set_conditions` |
 | Check | `get_circuit`, `get_part`, `check_circuit`, `explain_circuit`, `render_schematic`, `get_spice_netlist` |
 | Run | `operating_point`, `run_transient`, `ac_sweep`, `dc_sweep`, `get_trace` |
-| Memories and processors | `load_memory` (an image as Intel HEX, hex bytes, base64 or a file), `read_memory`, `cpu_state` (registers, flags, recent bus cycles, a 6510's port), `disassemble`, `sid_state` (a SID's voices, envelopes, filter and volume) |
+| Memories and processors | `load_memory` (an image as Intel HEX, S-records, hex bytes, base64 or a file, all its bytes or one lane of a 68000's pair), `read_memory`, `cpu_state` (registers, flags, recent bus cycles, a 6510's port; a 68000's D0-D7, A0-A7, USP, SSP, SR and wait states), `disassemble` (6502 code, or 68000 code across a ROM pair), `sid_state` (a SID's voices, envelopes, filter and volume), `peripheral_state` (a 68681's, 68230's or 68901's registers, channels and timers) |
 | The editor | `transport` (Run, Pause, Reset), `set_scope`, `undo`, `redo` |
 | Files | `new_circuit`, `open_circuit`, `save_circuit` |
 
 A run comes back as measurements (frequency, duty cycle, peak to peak, rise time, the −3 dB corner)
-and as a plot the agent looks at. The server also offers eight recipes, step-by-step plans with the
+and as a plot the agent looks at. The server also offers nine recipes, step-by-step plans with the
 exact calls: an RC low-pass, an LED and its resistor, a 555 astable, an inverting amplifier, a
 bridge rectifier with smoothing, a decade counter, a tour of the 6502 computer — its ROM
 disassembled, a run, and the processor, LCD and RAM read afterwards — and the SID player, its
-interrupt handler disassembled, a run, and the 6510's port and the SID's voices read afterwards. A
-transient run hands its end state back to the circuit, so a processor's registers, a memory's bytes,
-an LCD's text and a CIA's or SID's registers are where the run left them.
+interrupt handler disassembled, a run, and the 6510's port and the SID's voices read afterwards —
+and the 68000 computer, its monitor disassembled across the ROM pair, a run, and the processor's
+registers and wait states and the DUART's channel read afterwards. A transient run hands its end
+state back to the circuit, so a processor's registers, a memory's bytes, an LCD's text and a CIA's,
+SID's or 68000 peripheral's registers are where the run left them.
 
 ## Appearance
 

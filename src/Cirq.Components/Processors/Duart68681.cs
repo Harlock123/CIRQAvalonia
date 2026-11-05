@@ -274,8 +274,8 @@ public sealed partial class Duart68681 : DigitalIc, IBreakpointSource, IRunState
 
     public double BaudRateB => TransmitBaud(_b);
 
-    /// <summary>The two channels' state as the agent tool reports it.</summary>
-    internal (byte Mr1, byte Mr2, byte Csr, byte Status, bool Tx, bool Rx, int Fifo, string Mode) Describe(bool b)
+    /// <summary>Channel A's (or with <paramref name="b"/>, B's) state as the agent tool reports it.</summary>
+    public (byte Mr1, byte Mr2, byte Csr, byte Status, bool Tx, bool Rx, int Fifo, string Mode) Describe(bool b)
     {
         var c = b ? _b : _a;
         var mode = ((c.Mr2 >> 6) & 3) switch { 0 => "normal", 1 => "automatic echo", 2 => "local loopback", _ => "remote loopback" };
@@ -839,28 +839,40 @@ public sealed partial class Duart68681 : DigitalIc, IBreakpointSource, IRunState
         _ => pin.Name,
     };
 
-    private sealed record RunState(byte[] SentA, byte[] SentB, byte[] ReceivedA, byte[] ReceivedB, byte Isr, byte Imr, byte Opr, byte Acr, ushort Preload);
+    private sealed record ChannelState(byte Mr1, byte Mr2, byte Csr, bool PointerAtMr2, bool TransmitterOn, bool ReceiverOn, int? Holding,
+        bool Breaking, (byte, byte)[] Fifo, bool Overrun, byte BlockErrors, bool BreakChange, byte[] Sent, byte[] Received);
 
-    /// <summary>What an agent's run hands back: the bytes each channel moved, and the registers that matter.</summary>
+    private sealed record RunState(ChannelState A, ChannelState B, byte Acr, byte Isr, byte Imr, byte Ivr, byte Opr, byte Opcr, byte Ipcr,
+        ushort Preload, bool CtRunning, int CtCount, bool CtOutput, bool CtReady);
+
+    private static ChannelState Capture(Channel c) =>
+        new(c.Mr1, c.Mr2, c.Csr, c.PointerAtMr2, c.TransmitterOn, c.ReceiverOn, c.Holding, c.Breaking, [.. c.Fifo], c.Overrun,
+            c.BlockErrors, c.BreakChange, [.. c.Sent], [.. c.Received]);
+
+    private static void Adopt(Channel c, ChannelState s)
+    {
+        (c.Mr1, c.Mr2, c.Csr, c.PointerAtMr2, c.TransmitterOn, c.ReceiverOn, c.Holding, c.Breaking) =
+            (s.Mr1, s.Mr2, s.Csr, s.PointerAtMr2, s.TransmitterOn, s.ReceiverOn, s.Holding, s.Breaking);
+        c.Fifo.Clear();
+        foreach (var entry in s.Fifo) c.Fifo.Enqueue(entry);
+        (c.Overrun, c.BlockErrors, c.BreakChange) = (s.Overrun, s.BlockErrors, s.BreakChange);
+        c.Sent.Clear();
+        c.Sent.AddRange(s.Sent);
+        c.Received.Clear();
+        c.Received.AddRange(s.Received);
+    }
+
+    /// <summary>What an agent's run hands back: every register, both channels and what they moved, and the counter/timer.</summary>
     public object CaptureRunState() =>
-        new RunState([.. _a.Sent], [.. _b.Sent], [.. _a.Received], [.. _b.Received], _isrLatched, _imr, _opr, _acr, _preload);
+        new RunState(Capture(_a), Capture(_b), _acr, _isrLatched, _imr, _ivr, _opr, _opcr, _ipcr, _preload, _ctRunning, _ctCount, _ctOutput, _ctReady);
 
     public void AdoptRunState(object state)
     {
         if (state is not RunState run) return;
-        _a.Sent.Clear();
-        _a.Sent.AddRange(run.SentA);
-        _b.Sent.Clear();
-        _b.Sent.AddRange(run.SentB);
-        _a.Received.Clear();
-        _a.Received.AddRange(run.ReceivedA);
-        _b.Received.Clear();
-        _b.Received.AddRange(run.ReceivedB);
-        _isrLatched = run.Isr;
-        _imr = run.Imr;
-        _opr = run.Opr;
-        _acr = run.Acr;
-        _preload = run.Preload;
+        Adopt(_a, run.A);
+        Adopt(_b, run.B);
+        (_acr, _isrLatched, _imr, _ivr, _opr, _opcr, _ipcr) = (run.Acr, run.Isr, run.Imr, run.Ivr, run.Opr, run.Opcr, run.Ipcr);
+        (_preload, _ctRunning, _ctCount, _ctOutput, _ctReady) = (run.Preload, run.CtRunning, run.CtCount, run.CtOutput, run.CtReady);
         NotifyValueChanged();
     }
 

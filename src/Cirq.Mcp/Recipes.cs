@@ -276,6 +276,19 @@ public static class Recipes
         return recipe.Text("Tell the person what each voice is playing (the bass at 110 Hz is A2) and how the CIA's interrupt drives it. To hear it, give the speaker LS1 a RecordingPath with set_part, run for 400 ms (minutes of solving) and play the WAV file.");
     }
 
+    [McpServerPrompt(Name = "computer_68000", Title = "A 68000 computer")]
+    [Description("Opens the 68000 Single-Board Computer example (an MC68000 with a pair of 28C256 ROMs, a pair of 62256 RAMs, a 74138 decoding A21-A23, a 74164 DTACK generator and a 68681 DUART on a serial terminal), reads the monitor in the ROM pair, runs it, and checks the processor, its wait states and what the DUART has sent.")]
+    public static string Computer68000()
+    {
+        var recipe = new Recipe("Explore a 68000 computer: the example is an MC68000 (U2) whose 16-bit memory is two pairs of byte-wide chips — the ROM's even bytes in U3 and odd in U4 at $000000, the RAM in U5 and U6 at $200000 — with a 68681 DUART (U13) at $C00001 talking to a serial terminal (U14) at 38,400 baud. Memory answers /DTACK from a 74164 counting clocks, one wait state a cycle.");
+        recipe.Step("Open the example. If it refuses because the open circuit has unsaved changes, save that first, or ask the person whether to discard it.", "load_example", new { name = "68000 Single-Board Computer" });
+        recipe.Step("Read the monitor in the ROM pair: the reset vectors at $000000 say where the stack and the program are.", "disassemble", new { part = "U3", odd_part = "U4", origin = 0, address = 0x400, count = 16, variant = "68000" });
+        recipe.Step("Run it for 3 ms of simulated time: the DUART set up and the banner starting out at 38,400 baud. Every clock is solved on the pins, so this takes some seconds.", "run_transient", new { duration = "3m", plot = false });
+        recipe.Step("Where the 68000 got to: its registers, the wait states its memory asked for, and its last bus cycles.", "cpu_state", new { cycles = 8 });
+        recipe.Step("What the DUART is doing: channel A's rate and status, and what it has sent so far.", "peripheral_state", new { part = "U13" });
+        return recipe.Text("Tell the person what the monitor prints and how the 68000 reaches the DUART: a byte at an odd address, on D0-D7 with /LDS. The terminal sends \"D 000400\" at 8 ms and the monitor answers with a dump of its own code; run on to 20 ms (half a minute or so of solving) to see it.");
+    }
+
     private sealed class Recipe(string intro)
     {
         private readonly StringBuilder _text = new(intro + "\n\nFollow these steps in order. A line starting with \"" + CallMarker.Trim() + "\" is one tool call, with its arguments as JSON. If a step fails, read the error, fix the cause and carry on.\n");

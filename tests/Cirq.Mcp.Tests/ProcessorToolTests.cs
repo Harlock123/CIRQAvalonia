@@ -48,12 +48,61 @@ public class ProcessorToolTests
         Assert.Contains("not a processor", await Error(b.Tools.CpuState("U3")));
     }
 
+    /// <summary>The 68000 computer: its ROM pair disassembled with the reset vectors, a run, its registers and wait states, and the DUART's state.</summary>
+    [Fact]
+    public async Task The_68000_computer_disassembles_runs_and_reports()
+    {
+        using var b = new Bench();
+        await b.Tools.LoadExample("68000 Single-Board Computer");
+
+        var listing = await Parse(b.Tools.Disassemble("U3", odd_part: "U4", address: 0x400, origin: 0, count: 2, variant: "68000"));
+        Assert.Equal(["$000400  13FC 0010 00C0 0005       MOVE.B #$10,$C00005", "$000408  13FC 0013 00C0 0001       MOVE.B #$13,$C00001"],
+            listing["lines"]!.AsArray().Select(l => (string)l!));
+        Assert.Equal("$00210000", (string)listing["vectors"]!["ssp"]!);
+        Assert.Equal("$00000400", (string)listing["vectors"]!["reset_pc"]!);
+        Assert.Contains("even address", await Error(b.Tools.Disassemble("U3", odd_part: "U4", address: 0x401, variant: "68000")));
+
+        await b.Tools.RunTransient(System.Text.Json.JsonSerializer.SerializeToElement("1m"), plot: false);
+
+        var cpu = await Parse(b.Tools.CpuState(cycles: 4));
+        Assert.Equal("MC68000", (string)cpu["chip"]!);
+        Assert.Equal("running", (string)cpu["state"]!);
+        Assert.InRange(Convert.ToUInt32(((string)cpu["ssp"]!)[1..], 16), 0x20FFF0u, 0x210000u);   // the stack, a call or two deep
+        Assert.StartsWith("tS7", (string)cpu["flags"]!);
+        Assert.True((long)cpu["wait_states"]! > 100);
+        Assert.Equal(4, cpu["recent_cycles"]!.AsArray().Count);
+
+        var duart = await Parse(b.Tools.PeripheralState());
+        Assert.Equal("MC68681", (string)duart["chip"]!);
+        Assert.Equal(38400, (double)duart["channel_a"]!["baud"]!);
+        Assert.True((bool)duart["channel_a"]!["transmitter_on"]!);
+        Assert.StartsWith("CI", (string)duart["channel_a"]!["sent"]!);
+        Assert.Contains("not a 68681", await Error(b.Tools.PeripheralState("U2")));
+    }
+
+    [Fact]
+    public async Task Peripheral_state_reads_a_pit_and_an_mfp()
+    {
+        using var b = new Bench();
+        await b.Tools.AddParts([new() { Kind = "68230 PI/T" }, new() { Kind = "68901 MFP", X = 300 }]);
+        Assert.Contains("say which", await Error(b.Tools.PeripheralState()));
+
+        var pit = await Parse(b.Tools.PeripheralState("U1"));
+        Assert.Equal("$0F", (string)pit["pivr"]!);
+        Assert.Equal("$000000", (string)pit["timer"]!["preload"]!);
+
+        var mfp = await Parse(b.Tools.PeripheralState("U2"));
+        Assert.Equal(4, mfp["timers"]!.AsArray().Count);
+        Assert.Equal("$0000", (string)mfp["ipr"]!);
+    }
+
     [Fact]
     public async Task Cpu_state_needs_a_processor()
     {
         using var b = new Bench();
         await b.Tools.AddParts([new() { Kind = "Resistor" }]);
         Assert.Contains("no 6502", await Error(b.Tools.CpuState()));
+        Assert.Contains("no 68681", await Error(b.Tools.PeripheralState()));
     }
 
     /// <summary>sid_state before and after a run of the SID player, and what it says without a SID.</summary>

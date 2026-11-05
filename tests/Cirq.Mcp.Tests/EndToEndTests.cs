@@ -17,7 +17,7 @@ public class EndToEndTests
         "load_example", "undo", "redo", "add_parts", "set_part", "remove_parts", "connect", "disconnect", "add_probe",
         "remove_probe", "set_parameter", "set_conditions", "check_circuit", "explain_circuit", "render_schematic",
         "get_spice_netlist", "load_memory",
-        "read_memory", "cpu_state", "disassemble", "sid_state", "operating_point", "run_transient", "get_trace", "ac_sweep", "dc_sweep", "transport", "set_scope",
+        "read_memory", "cpu_state", "disassemble", "sid_state", "peripheral_state", "operating_point", "run_transient", "get_trace", "ac_sweep", "dc_sweep", "transport", "set_scope",
     ];
 
     [Fact]
@@ -46,7 +46,7 @@ public class EndToEndTests
         Assert.Equal(ToolNames, CircuitServer.Definitions().Select(t => t.Name));
 
         var prompts = await s.Client.ListPromptsAsync(cancellationToken: CancellationToken.None);
-        Assert.Equal(["rc_low_pass", "led_with_resistor", "astable_555", "inverting_amplifier", "bridge_rectifier", "decade_counter", "computer_6502", "sid_player"], prompts.Select(p => p.Name));
+        Assert.Equal(["rc_low_pass", "led_with_resistor", "astable_555", "inverting_amplifier", "bridge_rectifier", "decade_counter", "computer_6502", "sid_player", "computer_68000"], prompts.Select(p => p.Name));
     }
 
     [Fact]
