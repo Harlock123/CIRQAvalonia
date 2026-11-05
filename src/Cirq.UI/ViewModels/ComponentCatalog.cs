@@ -563,6 +563,10 @@ public static class ComponentCatalog
                 () => new Cpu6809()),
             new("6809E", "MC6809E: the 6809 clocked from outside on E and Q, with TSC, LIC, AVMA and BUSY for sharing the bus — the CoCo's processor",
                 () => new Cpu6809E()),
+            new("6821 PIA", "Peripheral interface adapter for a 6809 (or a 68000 on /VPA): two ports with direction registers, CA1/CA2 and CB1/CB2 handshakes and interrupts — port A pulled up, port B three-state",
+                () => new Pia6821()),
+            new("6520 PIA", "MOS 6520, the PET's and Atari 800's PIA: the 6821's registers, handshakes and pinout, Φ2 for E",
+                () => new Pia6520()),
         ]),
 
         new("Sensors & Actuators",
