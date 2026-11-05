@@ -8,7 +8,7 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
-## [0.45.0] - 2026-11-04
+## [0.45.0] - 2026-11-05
 
 The Motorola 68000 and its peripherals. An MC68000 that runs its whole instruction set bus cycle by
 bus cycle on its 64 pins — with the asynchronous bus, wait states until /DTACK, interrupts,
