@@ -39,12 +39,17 @@ dotnet run --project src/Cirq.UI -- --mcp      # the MCP server on stdio, headle
 - `src/Cirq.Components/`: the part library, one folder per family (`Passive`, `Nonlinear`, `Digital`, `Ics`,
   `Buses`, `Boards`, `Processors` and more).
   - `Digital/ParallelMemory.cs` is every byte-wide ROM and RAM, built from a pin table (`MemoryChips.cs`);
-    `MemoryImage.cs` reads binary and Intel HEX images.
+    `MemoryImage.cs` reads binary, Intel HEX and S-record images, and `Lane` splits one for a 68000's
+    pair of byte-wide chips.
   - `Processors/` is the 6502 family: `Mos6502Core` (the instruction set as bus cycles, no circuit),
     `Opcodes6502` (the opcode table the core and the disassembler share), `Processor6502` (the 40-pin
     parts, `Cpu65C02`, `Cpu6502`, and `Cpu6510`/`Cpu8500` in `Cpu6510.cs`, clocked from their PHI2 or
     Φ0 pin), the 6522, 6551 and 6526 (`Cia6526`), the SID (`SidCore`, the voices with no circuit, and
     `SidChip`, the 6581 and 8580 parts), and the bus decoder.
+  - The 68000 is there too: `M68000Core` (three partial files: the bus, the addressing, the
+    instructions), `Cpu68000` (the DIP-64 part, its S0-S7 states on CLK), `M68000Disassembler`,
+    `Cpu68000BusDecoder`, and the peripherals `Duart68681`, `Pit68230` and `Mfp68901`, the two UARTs
+    sharing `SerialLine`.
   - `Serialization/` reads and writes `.cirq` files (indented JSON).
   - `Spice/` imports and exports SPICE models and netlists.
 - `src/Cirq.UI/`: the Avalonia editor.
@@ -119,6 +124,18 @@ dotnet run --project src/Cirq.UI -- --mcp      # the MCP server on stdio, headle
   and Klaus Dormann's functional tests, downloaded outside the repository — neither is committed, and
   no test may need the network. Example ROMs are byte arrays in `Examples.cs`; a UI test assembles the
   source the guide prints and checks the bytes match, so change both together.
+- **The 68000 core is a sequence of bus cycles too.** `M68000Core` yields once per bus cycle and once
+  per run of internal clocks (`M68000BusAction.Idle` with `IdleClocks`), in the chip's order, with
+  the two-word prefetch queue (IRD, IRC) modelled; an odd word access throws inside the iterator and
+  `Advance` turns it into the address-error exception. Tests set `PauseBetweenInstructions`, which
+  yields a `Boundary` between instructions, so a test sees one instruction's effects before any of
+  the next runs; `Cpu68000` leaves it off. Test with `Cpu68000CoreTests` (the test-side
+  `Assembler68000` builds the programs), `Cpu68000CircuitTests` (a board with ROM and RAM pairs and a
+  74164 DTACK generator, which the peripheral tests reuse), and locally against Tom Harte's
+  SingleStepTests (`680x0`: `68000/v1`), downloaded outside the repository and never committed. Where
+  the suite and Motorola's manual disagree (ADDQ.L/SUBQ.L to An timing, ASR's carry past the width)
+  the core follows the manual; the guide lists the counts. The 68000 examples' ROMs are byte arrays
+  in `Examples.M68000.cs`, checked against the guide's source by a UI test.
 - **One 6502 core, several packages.** `Processor6502` builds its pins from a `ProcessorPackage`
   (65C02, 6502, 6510); the core is shared, never copied. The 6510's port lives in `Processor6510`
   through the base's hooks (`ReadInternal`, `WriteInternal`, `EndCycle`, `ResetPort`): a $0000/$0001

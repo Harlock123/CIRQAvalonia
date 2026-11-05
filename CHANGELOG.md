@@ -8,6 +8,59 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+## [0.45.0] - 2026-11-04
+
+The Motorola 68000 and its peripherals. An MC68000 that runs its whole instruction set bus cycle by
+bus cycle on its 64 pins — with the asynchronous bus, wait states until /DTACK, interrupts,
+exceptions and bus arbitration — and the 68681 DUART, the 68230 PI/T and the 68901 MFP to build a
+board with. Two 68000 computers as examples. 317 components in 17 categories, 110 worked examples,
+4780 tests.
+
+### Added
+
+**The MC68000**, written from Motorola's programmer's reference manual and user's manual: every
+instruction and addressing mode, user and supervisor modes with their own stack pointers, the
+prefetch queue, and every exception — reset, bus and address errors with their seven-word frames,
+illegal instructions, zero divide, CHK, TRAPV, privilege violations, trace, line A and F, spurious
+and autovectored interrupts, TRAP — with seven interrupt levels under the mask, STOP and RESET. Each
+bus cycle and each stretch of internal clocks comes in the chip's order and at its length, the
+data-dependent DIVU and DIVS times included. Checked against Tom Harte's published 68000 test suite
+(1,000,060 cases, every bus cycle of each): it agrees with 995,590, and the user guide lists where
+it does not and why.
+
+**The 68000's bus on the pins.** S0-S7 on the CLK edges; the processor waits, a clock at a time,
+until /DTACK — the wait states are counted and shown — or ends the cycle on /BERR (with /HALT, it
+runs it again); /VPA makes a 6800 cycle on the E clock with /VMA; an interrupt acknowledge puts the
+level on A1-A3 with FC = 111 and takes the vector, or the autovector with /VPA; /BR, /BG and /BGACK
+hand the bus over; /RESET and /HALT work both ways.
+
+**The 68681 DUART** — two serial channels to 38,400 baud with FIFOs, error and break status,
+loopback and echo modes, a counter/timer, input and output ports and a vectored interrupt. **The
+68230 PI/T** — handshaking ports with double-buffered input and output, interlocked and pulsed
+handshakes, a 16-bit mode, port C and a 24-bit timer, both with vectored interrupts. **The 68901
+MFP** — GPIP lines with edge interrupts, a sixteen-channel vectored interrupt controller with
+software or automatic end of interrupt and a daisy chain, four timers in delay, event and
+pulse-width modes, and a USART. Their serial lines talk to the Serial Terminal.
+
+**A 68000's memory from byte-wide chips.** Loading an image into a ROM or RAM now asks which bytes
+the chip takes — all, or the even or odd addresses — so one program file loads into a 68000's pair
+of chips, and Motorola **S-records** (`.s19`, `.s28`, `.s37`, `.srec`) load alongside binary and
+Intel HEX. `load_memory` takes the same choice.
+
+**Two examples in File > Examples > Computers.** *68000 Single-Board Computer*: ROM and RAM pairs, a
+74138 decoding the address, a 74164 generating /DTACK with one wait state, and a 68681 running a
+small monitor that dumps memory for the serial terminal. *68000 Timer Interrupts*: the same board
+with a 68901 whose timer A interrupts 1,600 times a second through its vector, counting on GPIP and
+printing over a USART clocked by timer D, with a button on GPIP7. The guide prints both programs; a
+test checks the ROMs hold them.
+
+**Simulate > Decode Bus** reads a 68000's bus: each cycle with its size, function code and wait
+states, and each instruction disassembled where it starts.
+
+**Agent tools.** `cpu_state` and `disassemble` work for the 68000 (the registers, SR and its flags,
+USP and SSP; the code across a pair of ROMs, with the reset vectors), `peripheral_state` reports a
+68681, 68230 or 68901, and a `computer_68000` recipe tours the example. 37 tools and nine recipes.
+
 ## [0.44.1] - 2026-11-04
 
 A test-only release: nothing in the simulator changed.
@@ -2613,7 +2666,8 @@ First public build of CirqAvalonia — an electronic circuit analyzer and mixed-
 
 **501 tests** measure the solver against closed-form answers rather than recorded output.
 
-[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.44.1...HEAD
+[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.45.0...HEAD
+[0.45.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.44.1...v0.45.0
 [0.44.1]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.44.0...v0.44.1
 [0.44.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.43.0...v0.44.0
 [0.43.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.42.0...v0.43.0
