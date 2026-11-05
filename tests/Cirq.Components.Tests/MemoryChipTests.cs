@@ -347,6 +347,90 @@ public class MemoryChipTests
         Assert.Contains(why, problem.Message);
     }
 
+    /// <summary>Motorola S-records, the 68000's own format: S1, S2 and S3 data records, the header, count and start records passed over.</summary>
+    [Fact]
+    public void SRecordsAreReadWithTheirAddresses()
+    {
+        const string text = """
+            S00600004844521B
+            S1090400303C00FF4E71C8
+            S208F0000012345678F3
+            S30700010000ABCD7F
+            S5030002FA
+            S9030400F8
+            """;
+
+        var image = MemoryImage.FromSRecords(text);
+
+        Assert.Equal("S-record", image.Format);
+        Assert.Equal([0x0400, 0xF00000, 0x10000], image.Blocks.Select(b => b.Address));
+        Assert.Equal([0x30, 0x3C, 0x00, 0xFF, 0x4E, 0x71], image.Blocks[0].Bytes);
+        Assert.Equal(12, image.ByteCount);
+    }
+
+    [Fact]
+    public void SRecordsWrittenAreReadBack()
+    {
+        var bytes = Enumerable.Range(0, 100).Select(i => (byte)(i * 7)).ToArray();
+        var image = MemoryImage.FromSRecords(MemoryImage.ToSRecords(0x123400, bytes));
+        Assert.Equal(bytes, image.Blocks.SelectMany(b => b.Bytes));
+        Assert.Equal(0x123400, image.Blocks[0].Address);
+    }
+
+    [Theory]
+    [InlineData("S1090400303C00FF4E71C9", "Line 1", "checksum")]
+    [InlineData("S10904", "Line 1", "says 9 bytes")]
+    [InlineData(":0100000055AA", "Line 1", "starts with S")]
+    [InlineData("S4030000FC", "Line 1", "S4 is not a record type")]
+    [InlineData("S1090400303C00FF4E71C8\nS9030400F8\nS1090400303C00FF4E71C8", "Line 3", "after the termination")]
+    public void ABadSRecordFileIsRefusedNamingTheLine(string text, string line, string why)
+    {
+        var problem = Assert.Throws<InvalidDataException>(() => MemoryImage.FromSRecords(text.Replace("\\n", "\n")));
+        Assert.Contains(line, problem.Message);
+        Assert.Contains(why, problem.Message);
+    }
+
+    /// <summary>
+    /// A 68000's image split for its pair of byte-wide chips: the even bytes into one, the odd into
+    /// the other, each at half its address — and an image at $F00000 wraps into the chips as an
+    /// 8-bit one does.
+    /// </summary>
+    [Fact]
+    public void AnImageSplitsIntoEvenAndOddLanes()
+    {
+        var image = MemoryImage.FromBinary([0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16], offset: 0x400);
+
+        var even = image.Lane(ByteLane.Even);
+        var odd = image.Lane(ByteLane.Odd);
+        Assert.Same(image, image.Lane(ByteLane.Both));
+        Assert.Equal([(0x200, new byte[] { 0x10, 0x12, 0x14, 0x16 })], even.Blocks.Select(b => (b.Address, b.Bytes)));
+        Assert.Equal([0x11, 0x13, 0x15], odd.Blocks.Single().Bytes);
+        Assert.Equal("binary, odd bytes", odd.Format);
+
+        var high = new Eeprom28C256();
+        var low = new Eeprom28C256();
+        var rom = MemoryImage.FromSRecords("S208F0000012345678F3");
+        high.Load(rom.Lane(ByteLane.Even));
+        low.Load(rom.Lane(ByteLane.Odd));
+        Assert.Equal([0x12, 0x56], new[] { high.ReadByte(0), high.ReadByte(1) });
+        Assert.Equal([0x34, 0x78], new[] { low.ReadByte(0), low.ReadByte(1) });
+
+        Assert.Throws<InvalidDataException>(() => MemoryImage.FromBinary([1], offset: 0).Lane(ByteLane.Odd));
+    }
+
+    [Theory]
+    [InlineData("rom.s19", true)]
+    [InlineData("rom.S28", true)]
+    [InlineData("rom.srec", true)]
+    [InlineData("rom.mot", true)]
+    [InlineData("rom.hex", false)]
+    [InlineData("rom.bin", false)]
+    public void SRecordFilesAreKnownByTheirExtension(string name, bool srecord)
+    {
+        Assert.Equal(srecord, MemoryImage.IsSRecord(name));
+        Assert.Equal(srecord || name.EndsWith(".hex", StringComparison.Ordinal), MemoryImage.HasAddresses(name));
+    }
+
     [Fact]
     public void ABinaryGoesWhereTheOffsetSays()
     {

@@ -44,6 +44,27 @@ public class MemoryToolTests
         Assert.Equal(4, b.Circuit.Components.OfType<Eprom27C256>().Single().ReadByte(19));
     }
 
+    /// <summary>A 68000's ROM pair: one S-record image, its even bytes into one chip and its odd into the other.</summary>
+    [Fact]
+    public async Task S_records_split_into_a_pair_of_chips_by_lane()
+    {
+        using var b = new Bench();
+        await b.Tools.AddParts([new() { Kind = "28C256" }, new() { Kind = "28C256", X = 200 }]);
+        var records = MemoryImage.ToSRecords(0x000400, [0x30, 0x3C, 0x00, 0xFF, 0x4E, 0x71]);
+
+        var even = await Parse(b.Tools.LoadMemory("U1", hex: records, lane: "even"));
+        await b.Tools.LoadMemory("U2", hex: records, lane: "odd");
+        Assert.Equal("S-record, even bytes", (string)even["format"]!);
+
+        var chips = b.Circuit.Components.OfType<Eeprom28C256>().ToList();
+        Assert.Equal([0x30, 0x00, 0x4E], new[] { chips[0].ReadByte(0x200), chips[0].ReadByte(0x201), chips[0].ReadByte(0x202) });
+        Assert.Equal([0x3C, 0xFF, 0x71], new[] { chips[1].ReadByte(0x200), chips[1].ReadByte(0x201), chips[1].ReadByte(0x202) });
+
+        File.WriteAllText(b.Folder.File("rom.s28"), records);
+        await b.Tools.LoadMemory("U2", path: "rom.s28", lane: "odd");
+        Assert.Contains("lane is", await Error(b.Tools.LoadMemory("U1", hex: records, lane: "middle")));
+    }
+
     [Fact]
     public async Task Mistakes_are_said_in_words()
     {

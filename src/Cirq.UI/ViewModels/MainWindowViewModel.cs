@@ -1855,7 +1855,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>
-    /// Reads a ROM or RAM image — a raw binary or Intel HEX — into the selected memory part. The
+    /// Reads a ROM or RAM image — a raw binary, Intel HEX or S-records — into the selected memory
+    /// part, all of its bytes or, for one of a 68000's pair of chips, its even or odd ones. The
     /// image becomes the part's preset, so it is saved inside the circuit and the file is not
     /// needed again. A command rather than a button beside the property, for the reason the
     /// waveform import is.
@@ -1876,7 +1877,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
         try
         {
-            var image = MemoryImage.Read(request.Path, request.Offset);
+            var image = MemoryImage.Read(request.Path, request.Offset).Lane(request.Lane);
             string note;
 
             using (History.Gesture(Circuit, $"Load {Path.GetFileName(request.Path)} into {memory.Name}"))

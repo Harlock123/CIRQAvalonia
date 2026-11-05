@@ -75,7 +75,7 @@ public sealed class StorageProviderFileDialogs : ICircuitFileDialogs
             AllowMultiple = false,
             FileTypeFilter =
             [
-                new FilePickerFileType("ROM images") { Patterns = ["*.bin", "*.rom", "*.hex", "*.ihx"] },
+                new FilePickerFileType("ROM images") { Patterns = ["*.bin", "*.rom", "*.hex", "*.ihx", "*.s19", "*.s28", "*.s37", "*.srec", "*.mot"] },
                 FilePickerFileTypes.All,
             ],
         });
@@ -83,28 +83,41 @@ public sealed class StorageProviderFileDialogs : ICircuitFileDialogs
         var path = files.Count > 0 ? files[0].TryGetLocalPath() : null;
         if (path is null) return null;
 
-        // Intel HEX carries its own addresses; a binary is just bytes, so ask where they start.
-        if (Cirq.Components.Digital.MemoryImage.IsHex(path)) return new MemoryImageRequest(path, 0);
-
-        var offset = await AskOffsetAsync(Path.GetFileName(path));
-        return offset is null ? null : new MemoryImageRequest(path, offset.Value);
+        // Intel HEX and S-records carry their own addresses; a binary is just bytes, so ask where
+        // they start. Either way, ask which bytes this chip takes.
+        var hasAddresses = Cirq.Components.Digital.MemoryImage.HasAddresses(path);
+        var options = await AskLoadOptionsAsync(Path.GetFileName(path), askOffset: !hasAddresses);
+        return options is { } o ? new MemoryImageRequest(path, o.Offset, o.Lane) : null;
     }
 
     /// <summary>
-    /// Where in the chip a binary's first byte goes: zero for a file made for the chip, which is
-    /// almost always the answer. Hexadecimal is accepted as $700 or 0x700.
+    /// Where in the chip a binary's first byte goes — zero for a file made for the chip, which is
+    /// almost always the answer; hexadecimal is accepted as $700 or 0x700 — and which of the
+    /// image's bytes the chip takes: all of them, or, for one of a 68000's two byte-wide chips, the
+    /// even or the odd ones.
     /// </summary>
-    private async Task<int?> AskOffsetAsync(string file)
+    private async Task<(int Offset, Cirq.Components.Digital.ByteLane Lane)?> AskLoadOptionsAsync(string file, bool askOffset)
     {
-        int? chosen = null;
+        (int, Cirq.Components.Digital.ByteLane)? chosen = null;
 
         var box = new TextBox { Text = "0", HorizontalAlignment = HorizontalAlignment.Stretch };
         var problem = new TextBlock { Foreground = Brushes.IndianRed, FontSize = 12, IsVisible = false };
+        var lane = new ComboBox
+        {
+            ItemsSource = new[]
+            {
+                "All of them  —  an 8-bit processor's memory",
+                "Even addresses  —  a 68000's upper byte, D8-D15 (/UDS)",
+                "Odd addresses  —  a 68000's lower byte, D0-D7 (/LDS)",
+            },
+            SelectedIndex = 0,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
 
         var dialog = new Window
         {
-            Title = "Load offset",
-            Width = 420,
+            Title = askOffset ? "Load offset" : "Load an image",
+            Width = 460,
             SizeToContent = SizeToContent.Height,
             CanResize = false,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
@@ -118,9 +131,17 @@ public sealed class StorageProviderFileDialogs : ICircuitFileDialogs
 
         ok.Click += (_, _) =>
         {
+            var which = (Cirq.Components.Digital.ByteLane)Math.Max(0, lane.SelectedIndex);
+            if (!askOffset)
+            {
+                chosen = (0, which);
+                dialog.Close();
+                return;
+            }
+
             if (ParseOffset(box.Text) is { } value)
             {
-                chosen = value;
+                chosen = (value, which);
                 dialog.Close();
                 return;
             }
@@ -131,30 +152,39 @@ public sealed class StorageProviderFileDialogs : ICircuitFileDialogs
 
         cancel.Click += (_, _) => dialog.Close();
 
-        dialog.Content = new StackPanel
+        var panel = new StackPanel { Margin = new Avalonia.Thickness(20), Spacing = 12 };
+        if (askOffset)
         {
-            Margin = new Avalonia.Thickness(20),
-            Spacing = 12,
-            Children =
+            panel.Children.Add(new TextBlock
             {
-                new TextBlock
-                {
-                    Text = $"{file} is a binary, so it says nothing about where its bytes go. The first one goes to this address in the chip — 0 for an image made for the chip itself.",
-                    TextWrapping = TextWrapping.Wrap,
-                    FontSize = 13,
-                },
-                Caption("Offset (decimal, or hex as $700 or 0x700)"),
-                box,
-                problem,
-                new StackPanel
-                {
-                    Orientation = Orientation.Horizontal,
-                    Spacing = 8,
-                    HorizontalAlignment = HorizontalAlignment.Right,
-                    Children = { cancel, ok },
-                },
-            },
-        };
+                Text = $"{file} is a binary, so it says nothing about where its bytes go. The first one goes to this address in the image — 0 for an image made for the chip itself.",
+                TextWrapping = TextWrapping.Wrap,
+                FontSize = 13,
+            });
+            panel.Children.Add(Caption("Offset (decimal, or hex as $700 or 0x700)"));
+            panel.Children.Add(box);
+            panel.Children.Add(problem);
+        }
+        else
+        {
+            panel.Children.Add(new TextBlock
+            {
+                Text = $"{file} carries its own addresses, which wrap into the chip.",
+                TextWrapping = TextWrapping.Wrap,
+                FontSize = 13,
+            });
+        }
+
+        panel.Children.Add(Caption("Bytes this chip takes"));
+        panel.Children.Add(lane);
+        panel.Children.Add(new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Children = { cancel, ok },
+        });
+        dialog.Content = panel;
 
         await dialog.ShowModal(_owner);
         return chosen;

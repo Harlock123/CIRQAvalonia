@@ -16,8 +16,10 @@ public interface ICircuitFileDialogs
     Task<string?> PickWaveformPathAsync();
 
     /// <summary>
-    /// A ROM or RAM image to load into a memory part — a raw binary or an Intel HEX file — and, for
-    /// a binary, the address in the chip its first byte goes to. Null when the picker was cancelled.
+    /// A ROM or RAM image to load into a memory part — a raw binary, an Intel HEX file or
+    /// S-records — and, for a binary, the address in the chip its first byte goes to; and which of
+    /// its bytes the chip takes, all of them or one lane of a 68000's 16-bit image. Null when the
+    /// picker was cancelled.
     /// </summary>
     /// <param name="partName">The part it is for, for the dialog's title.</param>
     Task<MemoryImageRequest?> PickMemoryImageAsync(string partName);
@@ -55,5 +57,8 @@ public interface ICircuitFileDialogs
     Task<ExportRequest?> PickExportAsync(string suggestedFileName, bool hasTraces, bool hasSheets);
 }
 
-/// <summary>A memory image file to load, and where in the chip a binary's first byte goes.</summary>
-public sealed record MemoryImageRequest(string Path, int Offset);
+/// <summary>
+/// A memory image file to load, where in the chip a binary's first byte goes, and which bytes the
+/// chip takes: all of them, or the even or odd ones for one of a 68000's pair of byte-wide chips.
+/// </summary>
+public sealed record MemoryImageRequest(string Path, int Offset, Cirq.Components.Digital.ByteLane Lane = Cirq.Components.Digital.ByteLane.Both);

@@ -42,6 +42,26 @@ public class MemoryImageCommandTests : IDisposable
         Assert.Equal(0, restored.UsedBytes);
     }
 
+    /// <summary>S-records, and one lane of a 68000's image into one of its pair of ROMs.</summary>
+    [Fact]
+    public async Task AnSRecordFileLoadsItsOddBytes()
+    {
+        using var vm = new MainWindowViewModel();
+        var rom = vm.Circuit.Add(new Eeprom28C256());
+        vm.SelectedComponent = rom;
+        var records = MemoryImage.ToSRecords(0x400, [0x30, 0x3C, 0x00, 0xFF]);
+        vm.FileDialogs = new FakeFileDialogs
+        {
+            MemoryImage = new MemoryImageRequest(File("rom.s19", System.Text.Encoding.ASCII.GetBytes(records)), 0, ByteLane.Odd),
+        };
+
+        await vm.LoadMemoryImageCommand.ExecuteAsync(null);
+
+        Assert.Equal(0x3C, rom.ReadByte(0x200));
+        Assert.Equal(0xFF, rom.ReadByte(0x201));
+        Assert.Contains("S-record, odd bytes", vm.StatusMessage);
+    }
+
     [Fact]
     public async Task ABadHexFileIsReportedWithItsLine()
     {
