@@ -579,6 +579,8 @@ public static class ComponentCatalog
                 () => new Ram8155()),
             new("8156", "Intel 8156: the 8155 with its chip enable active high, so CE can go straight to an address line",
                 () => new Ram8156()),
+            new("8255A PPI", "Intel 8255A programmable peripheral interface: three 8-bit ports in mode 0 I/O, mode 1 strobed with /STB, IBF, /OBF, /ACK and INTR on port C, or port A bidirectional in mode 2, with bit set/reset on port C",
+                () => new Ppi8255()),
             new("6821 PIA", "Peripheral interface adapter for a 6809 (or a 68000 on /VPA): two ports with direction registers, CA1/CA2 and CB1/CB2 handshakes and interrupts — port A pulled up, port B three-state",
                 () => new Pia6821()),
             new("6520 PIA", "MOS 6520, the PET's and Atari 800's PIA: the 6821's registers, handshakes and pinout, Φ2 for E",
