@@ -8,6 +8,51 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+## [0.46.0] - 2026-11-05
+
+The Motorola 6809 and its peripherals. An MC6809 that runs all three opcode pages and every indexed
+mode cycle by cycle on its 40 pins — dead cycles and all — with its own E and Q clock, and the
+6809E clocked from outside; the 6821 PIA (and the 6520) and the 6850 ACIA to build a board with,
+and to hang on a 68000. Two 6809 computers as examples. 322 components in 17 categories, 112 worked
+examples, 4928 tests.
+
+### Added
+
+**The MC6809**, written from Motorola's datasheet and programming manual: every instruction on its
+three opcode pages, every addressing mode — the indexed ones with their constant, accumulator and
+PC offsets, auto increment and decrement and every indirect form — at the manual's cycle counts,
+TFR and EXG, the two stacks, SYNC and CWAI, SWI, SWI2 and SWI3, FIRQ stacking only PC and CC where
+NMI and IRQ stack everything, and NMI held off until the program has loaded S. Every cycle is on the
+bus as the chip puts it there, the dead ($FFFF) cycles included. The opcodes Motorola left
+undefined run deterministically, as the guide lists. Checked against a published per-instruction
+6809 suite (315,000 cases, every bus cycle of each): it agrees with all of them, and the guide says
+where the suite comes from and what that means.
+
+**The 6809's pins.** EXTAL at four times the bus rate, E and Q out in quadrature; MRDY stretching a
+slow cycle a quarter at a time; BA and BS saying whether it is running, fetching a vector, in SYNC or
+halted; /HALT and /DMA/BREQ letting go of the bus; /IRQ, /FIRQ and /NMI; reset through $FFFE. **The
+6809E** takes E and Q in and adds TSC, LIC, AVMA and BUSY.
+
+**The 6821 PIA** — two ports with direction registers, CA1/CB1 interrupts on the edge you choose,
+CA2/CB2 as inputs or as handshake, pulse or manual outputs, and port A's pull-ups against port B's
+three-state drivers, as on the real part. **The 6520** is the same chip from MOS. **The 6850 ACIA** —
+every word format, ÷1, ÷16 and ÷64, the documented overrun and lost-carrier sequences, CTS and RTS,
+and its clocks taken from its own pins. Both work on a 68000 through /VPA, /VMA and E, and the 6850
+talks to the Serial Terminal.
+
+**Two examples in File > Examples > Computers.** *6809 Single-Board Computer*: an EPROM, a RAM, a
+74138 and a 7400 decoding, and a 6850 clocked from E at 115,200 baud running a small monitor that
+dumps memory for the terminal. *6809 PIA Button Counter*: the same board with a 6821 driving an
+HD44780 and counting a button's presses by interrupt from CA1. The guide prints both programs; a
+test checks the EPROMs hold them.
+
+**Simulate > Decode Bus** reads a 6809's bus: each cycle, the dead ones and the vector reads marked,
+and each instruction disassembled where it starts.
+
+**Agent tools.** `cpu_state` and `disassemble` work for the 6809 (its registers, DP and CC and its
+flags, its cycles; its code with the vectors), `peripheral_state` reports a 6821, 6520 or 6850, and a
+`computer_6809` recipe tours the example. 37 tools and ten recipes.
+
 ## [0.45.0] - 2026-11-05
 
 The Motorola 68000 and its peripherals. An MC68000 that runs its whole instruction set bus cycle by
@@ -2666,7 +2711,8 @@ First public build of CirqAvalonia — an electronic circuit analyzer and mixed-
 
 **501 tests** measure the solver against closed-form answers rather than recorded output.
 
-[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.45.0...HEAD
+[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.46.0...HEAD
+[0.46.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.45.0...v0.46.0
 [0.45.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.44.1...v0.45.0
 [0.44.1]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.44.0...v0.44.1
 [0.44.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.43.0...v0.44.0

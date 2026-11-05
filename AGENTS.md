@@ -50,6 +50,11 @@ dotnet run --project src/Cirq.UI -- --mcp      # the MCP server on stdio, headle
     instructions), `Cpu68000` (the DIP-64 part, its S0-S7 states on CLK), `M68000Disassembler`,
     `Cpu68000BusDecoder`, and the peripherals `Duart68681`, `Pit68230` and `Mfp68901`, the two UARTs
     sharing `SerialLine`.
+  - And the 6809: `M6809Core` (two partial files: the bus and interrupts, the addressing and
+    instructions), `Opcodes6809` (the three opcode pages and the disassembler), `Cpu6809.cs`
+    (`Processor6809`, with `Cpu6809` clocked from EXTAL and `Cpu6809E` from E and Q pins),
+    `Cpu6809BusDecoder`, and the 6800-family peripherals `Pia6821.cs` (`PeripheralInterfaceAdapter`,
+    the `Pia6821` and `Pia6520` parts) and `Acia6850`, which also uses `SerialLine`.
   - `Serialization/` reads and writes `.cirq` files (indented JSON).
   - `Spice/` imports and exports SPICE models and netlists.
 - `src/Cirq.UI/`: the Avalonia editor.
@@ -136,6 +141,22 @@ dotnet run --project src/Cirq.UI -- --mcp      # the MCP server on stdio, headle
   the suite and Motorola's manual disagree (ADDQ.L/SUBQ.L to An timing, ASR's carry past the width)
   the core follows the manual; the guide lists the counts. The 68000 examples' ROMs are byte arrays
   in `Examples.M68000.cs`, checked against the guide's source by a UI test.
+- **The 6809 core is a sequence of bus cycles as well.** `M6809Core` yields once per E cycle, dead
+  cycles ($FFFF reads) and don't-care reads included; `FirstCycle` marks where an instruction (or an
+  interrupt sequence) starts, and `Step` runs to the next. The 6809E's LIC and AVMA need the next
+  cycle before this one's data: `PeekNext` replays the instruction so far on a copy of the core
+  (`TracksNextCycle` keeps what it needs, on for the 6809E only), so a change to the core's cycles
+  carries into those pins by itself. Test with `Cpu6809CoreTests` (the test-side `Assembler6809`,
+  which reads back everything the disassembler prints), `Cpu6809CircuitTests` (a board with a 2764,
+  a 62256, a 74138 and a 7400, which the PIA and ACIA tests reuse; a 7474 makes a 6809E's E and Q),
+  and locally against the SingleStepTests-format suite `neetandev/m6809` (`v1`, MAME as its
+  oracle), downloaded outside the repository and never committed. The 6809 examples' EPROM images
+  are byte arrays in `Examples.M6809.cs`, checked against the guide's source by a UI test.
+- **6800-family peripherals act on E.** The 6821 and 6850 latch a write and do a read's side
+  effects as E falls, and drive a read while E is high and they are selected, so on a 68000 they
+  want /VPA from the decode and /VMA on a chip select. The 6821's port A pull-ups are stamped
+  resistors (`PeripheralInterfaceAdapter.PullUpResistance`); the 6850 times its bits from the
+  measured period of its TxCLK and RxCLK pins.
 - **One 6502 core, several packages.** `Processor6502` builds its pins from a `ProcessorPackage`
   (65C02, 6502, 6510); the core is shared, never copied. The 6510's port lives in `Processor6510`
   through the base's hooks (`ReadInternal`, `WriteInternal`, `EndCycle`, `ResetPort`): a $0000/$0001
