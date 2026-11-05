@@ -135,6 +135,26 @@ public class CpuZ80CircuitTests
             }
         }
 
+        /// <summary>
+        /// A Z80 peripheral on the bus: its data lines, /M1, /IORQ, /RD and CLK, /INT to the
+        /// processor's (pulled up), /CE on <paramref name="select"/>, and IEI on
+        /// <paramref name="enableIn"/> — the rail, for the first chip of a daisy chain. /M1 can come
+        /// from somewhere else (<paramref name="m1"/>), for a test of the PIO's reset.
+        /// </summary>
+        public T Peripheral<T>(T part, Terminal select, Terminal? enableIn = null, Terminal? m1 = null) where T : Z80Peripheral
+        {
+            Ic(part);
+            for (var i = 0; i < 8; i++) Circuit.Connect(part.Data[i], Cpu.Data[i]);
+            Circuit.Connect(part.M1, m1 ?? Cpu.M1);
+            Circuit.Connect(part.IoRequest, Cpu.IoRequest);
+            Circuit.Connect(part.ReadStrobe, Cpu.ReadStrobe);
+            Circuit.Connect(part.Clock, Clock.Output);
+            Circuit.Connect(part.Interrupt, Cpu.Int);
+            Circuit.Connect(part.ChipEnable, select);
+            Circuit.Connect(part.InterruptEnableIn, enableIn ?? Rail.Positive);
+            return part;
+        }
+
         public LogicToggle Toggle(Terminal pin, bool state)
         {
             var toggle = Circuit.Add(new LogicToggle(state));

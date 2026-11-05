@@ -565,6 +565,8 @@ public static class ComponentCatalog
                 () => new Cpu6809E()),
             new("Z80", "Zilog Z80, T-state by T-state on its pins — the alternate registers, IX and IY, three interrupt modes, /WAIT, /BUSREQ and the refresh, every documented and undocumented opcode",
                 () => new CpuZ80()),
+            new("Z80 PIO", "Zilog Z80 PIO: two 8-bit ports in output, input, bidirectional or bit-control mode, RDY and /STB handshakes, and a vector for each port in the interrupt daisy chain",
+                () => new Z80Pio()),
             new("6821 PIA", "Peripheral interface adapter for a 6809 (or a 68000 on /VPA): two ports with direction registers, CA1/CA2 and CB1/CB2 handshakes and interrupts — port A pulled up, port B three-state",
                 () => new Pia6821()),
             new("6520 PIA", "MOS 6520, the PET's and Atari 800's PIA: the 6821's registers, handshakes and pinout, Φ2 for E",
