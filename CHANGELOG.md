@@ -8,6 +8,58 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+## [0.47.0] - 2026-11-05
+
+The Zilog Z80 and its family. A Z80 that runs every opcode — the undocumented ones included —
+T-state by T-state on its 40 pins, with the refresh, /WAIT, all three interrupt modes, HALT and
+/BUSREQ; and the PIO, the CTC, the SIO/0 and the DART, joined by the interrupt daisy chain that is
+the heart of the family. Two Z80 computers as examples. 327 components in 17 categories, 114 worked
+examples, 5105 tests.
+
+### Added
+
+**The Z80**, written from Zilog's CPU user manual and datasheet, with what Zilog left out taken
+from the published characterisations: every opcode on the CB, ED, DD, FD, DDCB and FDCB pages, the
+IXH/IXL/IYH/IYL halves, SLL, the DDCB forms that also copy their result to a register, IN F,(C) and
+OUT (C),0, the ED duplicates and the ED opcodes that do nothing; the alternate registers, IX and IY,
+I and R (seven bits counting every M1); the flags exactly, the undocumented bits 3 and 5 included —
+from the internal WZ register for BIT n,(HL), from Q for SCF and CCF, from PC for a repeating block
+instruction — and DAA for every input. Interrupt modes 0, 1 and 2, NMI and RETN, EI's
+one-instruction delay, HALT running NOPs, and LD A,I and LD A,R reading IFF2 (and the NMOS part's
+fault when an interrupt follows). Checked against Tom Harte's published Z80 suite (1,604,000 cases,
+every T-state's bus of each): it agrees with all of them, and it passes ZEXDOC and ZEXALL.
+
+**The Z80's pins.** A T-state per CLK cycle: /M1, /MREQ, /RD and /WR on their half-cycles, the
+refresh address with /RFSH after every opcode fetch, I/O cycles with their automatic wait state,
+the interrupt acknowledge as /M1 with /IORQ after two, /WAIT adding wait states where the datasheet
+samples it, /HALT, /BUSREQ and /BUSACK floating the bus, /NMI, /INT and /RESET.
+
+**The Z80 PIO** — two ports in output, input, bidirectional and bit-control modes, the RDY and /STB
+handshakes, the AND/OR interrupt logic with its mask, and a vector for each port. **The Z80 CTC** —
+four channels, timers through a prescaler of 16 or 256 and counters of CLK/TRG edges, ZC/TO pulses
+to cascade them, and the channel's number in the vector. **The Z80 SIO/0** — two serial channels in
+asynchronous mode, five to eight bits, parity, x1 to x64 clocks, a three-byte receive FIFO, every
+receive interrupt mode, status affects vector, special receive conditions, breaks, the modem lines
+and /W/RDY as a wait or a ready, talking to the Serial Terminal; the synchronous modes are not
+modelled, and the guide says so. **The Z80 DART** is its asynchronous half, with /RI for /SYNC.
+**The daisy chain**: IEI and IEO on all of them, each chip handing over its own vector in the
+acknowledge, and each watching the bus for RETI to end its interrupt.
+
+**Two examples in File > Examples > Computers.** *Z80 Single-Board Computer*: an EPROM, a RAM, two
+74138s decoding memory and I/O, and a SIO clocked from the 3.6864 MHz CLK at 115,200 baud running a
+small monitor that dumps memory for the terminal. *Z80 CTC and PIO Interrupts*: the same board with a
+CTC and a PIO in a mode 2 daisy chain — the CTC interrupting a thousand times a second to count on
+eight LEDs, and a button on the PIO turning the count round. The guide prints both programs; a test
+checks the EPROMs hold them.
+
+**Simulate > Decode Bus** reads a Z80's bus: each machine cycle, the refreshes, the I/O, the
+acknowledges and the wait states, and each instruction disassembled where it starts.
+
+**Agent tools.** `cpu_state` and `disassemble` work for the Z80 (its main and alternate registers,
+IX, IY, I, R, the interrupt state and its flags; its code in Zilog's syntax), `peripheral_state`
+reports a PIO, CTC, SIO or DART with what is pending and under service in the chain, and a
+`computer_z80` recipe tours the example. 37 tools and eleven recipes.
+
 ## [0.46.0] - 2026-11-05
 
 The Motorola 6809 and its peripherals. An MC6809 that runs all three opcode pages and every indexed
@@ -2711,7 +2763,8 @@ First public build of CirqAvalonia — an electronic circuit analyzer and mixed-
 
 **501 tests** measure the solver against closed-form answers rather than recorded output.
 
-[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.46.0...HEAD
+[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.47.0...HEAD
+[0.47.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.46.0...v0.47.0
 [0.46.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.45.0...v0.46.0
 [0.45.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.44.1...v0.45.0
 [0.44.1]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.44.0...v0.44.1

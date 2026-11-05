@@ -170,7 +170,7 @@ Three of those are worth separating, because they are easy to confuse:
 
 ## Placing components
 
-![The component palette: a Find a part box at the top, "322 parts in 17 groups" under it, and the seventeen categories with their counts — passive 11, switches 5, sources 16, semiconductors 13, transistors 13, LEDs and displays 11, power 10, analog ICs 13, logic gates 14, 74xx series 79, 40xx series 47, buses 19, digital I/O 9, memory and CPUs 25, sensors and actuators 20, switching and isolation 11, dev boards 6 — every group closed, so all seventeen headings fit on screen at once](images/02-palette.png)
+![The component palette: a Find a part box at the top, "327 parts in 17 groups" under it, and the seventeen categories with their counts — passive 11, switches 5, sources 16, semiconductors 13, transistors 13, LEDs and displays 11, power 10, analog ICs 13, logic gates 14, 74xx series 79, 40xx series 47, buses 19, digital I/O 9, memory and CPUs 30, sensors and actuators 20, switching and isolation 11, dev boards 6 — every group closed, so all seventeen headings fit on screen at once](images/02-palette.png)
 
 Click a palette entry, then click the canvas. The part lands where you click, snapped to the grid.
 
@@ -7711,20 +7711,21 @@ suite draws the requests more simply than the pins do — /MREQ and /RD for one 
 holds them for two — so the comparison maps each of the core's T-states to the suite's convention; on
 the pins they are as the datasheet draws them. It has no interrupts, /WAIT, /BUSREQ, HALT's NOPs or
 reset, nor the ED opcodes outside Zilog's map; those have tests of their own written from the
-datasheet's sequences. The suite is not in the repository and no test needs the network. ZEXDOC and
-ZEXALL, the instruction exercisers, were not run: they are GPL code needing a CP/M stand-in, and
-nothing of theirs could be committed.
+datasheet's sequences. The suite is not in the repository and no test needs the network. The core
+also passes all 67 groups of **ZEXDOC** and of **ZEXALL**, Frank Cringle's instruction exercisers —
+each about 47 billion T-states, run locally on the core alone with a two-call CP/M stand-in; they
+are GPL programs, so like the suite they are not in the repository and no test runs them.
 
 **How fast it runs.** A T-state is two CLK edges, each a time point with the whole board solved —
 where a 6809's E cycle is eight. Measured on the development machine (an 8-core ARM virtual machine,
-shared and busy), in a release build, the Z80 single-board computer runs at **about 2.8 ms of
-simulated time per second — some 10,000 T-states, or 3,700 machine cycles and refreshes, a second**
-— and the CTC and PIO example, its eight LEDs making every time point a non-linear solve, at about
-1.5 ms (5,400 T-states); on the same run the 6809 single-board computer did 3.6 ms (6,600 E cycles).
-A debug build is two to three times slower. The examples run the Z80 at **3.6864 MHz**, a common Z80
-crystal: a slower clock costs the same per T-state, and 3.6864 MHz ÷ 32 is exactly 115,200 baud for
-the SIO, so a character takes 87 µs, 320 T-states, and the monitor's whole exchange about 6.5 ms —
-two or three seconds of solving.
+shared and busy), in a release build, the Z80 single-board computer runs at **about 2.3 to 2.8 ms of
+simulated time per second — some 8,500 to 10,000 T-states, or 3,000 to 3,700 machine cycles and
+refreshes, a second** — and the CTC and PIO example, its eight LEDs making every time point a
+non-linear solve, at about 1.4 to 1.5 ms (5,100 to 5,400 T-states); on the same runs the 6809
+single-board computer did 3.6 to 4.1 ms. A debug build is two to three times slower. The examples
+run the Z80 at **3.6864 MHz**, a common Z80 crystal: a slower clock costs the same per T-state, and
+3.6864 MHz ÷ 32 is exactly 115,200 baud for the SIO, so a character takes 87 µs, 320 T-states, and
+the monitor's whole exchange about 6.5 ms — two or three seconds of solving.
 
 **Simplifications.** /BUSREQ is honoured only before a bus cycle — after an internal machine cycle
 too on the chip — and the bus comes back the T-state /BUSREQ is seen high, with no extra T-state;

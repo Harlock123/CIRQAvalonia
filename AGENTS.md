@@ -55,6 +55,12 @@ dotnet run --project src/Cirq.UI -- --mcp      # the MCP server on stdio, headle
     (`Processor6809`, with `Cpu6809` clocked from EXTAL and `Cpu6809E` from E and Q pins),
     `Cpu6809BusDecoder`, and the 6800-family peripherals `Pia6821.cs` (`PeripheralInterfaceAdapter`,
     the `Pia6821` and `Pia6520` parts) and `Acia6850`, which also uses `SerialLine`.
+  - And the Z80: `Z80Core` (two partial files: the T-states, interrupts and bus request; the
+    instructions), `OpcodesZ80` (the disassembler, decoding by the opcode's bit fields, and the
+    patterns the test-side assembler is built from), `CpuZ80` (the DIP-40 part, a T-state per CLK
+    cycle), `CpuZ80BusDecoder`, and the Z80 family in `Z80Peripheral` (the bus with no /WR and the
+    interrupt daisy chain they share), `Z80Pio`, `Z80Ctc` and `Z80Sio.cs` (`Z80SerialController`,
+    the `Z80Sio` and `Z80Dart` parts, on `SerialLine`).
   - `Serialization/` reads and writes `.cirq` files (indented JSON).
   - `Spice/` imports and exports SPICE models and netlists.
 - `src/Cirq.UI/`: the Avalonia editor.
@@ -152,6 +158,26 @@ dotnet run --project src/Cirq.UI -- --mcp      # the MCP server on stdio, headle
   and locally against the SingleStepTests-format suite `neetandev/m6809` (`v1`, MAME as its
   oracle), downloaded outside the repository and never committed. The 6809 examples' EPROM images
   are byte arrays in `Examples.M6809.cs`, checked against the guide's source by a UI test.
+- **The Z80 core is a sequence of T-states.** `Z80Core` yields once per T-state, having set
+  `Kind` (the machine cycle), `State` (T1, T2, Tw, T3, T4, or Ti inside the processor), `Address`
+  and `DataOut`; the caller completes it with the data bus's byte when `SamplesData` says the
+  T-state takes one, and sets `WaitAsserted` in a T-state with `SamplesWait` to add wait states.
+  Internal T-states hold the last address, as the suite records it. `FirstCycle` marks where an
+  instruction or interrupt response starts and `Step` runs to the next; `Load` starts one with Q
+  and the EI and LD A,I/R state as the instruction before left them. `CpuZ80` turns each T-state
+  into its pins on CLK's two edges. Test with `CpuZ80CoreTests` (the test-side `AssemblerZ80`, its
+  table built from `OpcodesZ80.Pattern`), `CpuZ80CircuitTests` (a board with a 27C256, a 62256 and
+  two 74138s, which the peripheral tests reuse through `Computer.Peripheral`), and locally against
+  Tom Harte's SingleStepTests (`z80`: `v1`), downloaded outside the repository and never committed:
+  the suite draws /MREQ and /RD for one T-state, so a harness maps each T-state to its convention.
+  The Z80 examples' EPROM images are byte arrays in `Examples.Z80.cs`, checked against the guide's
+  source by a UI test.
+- **The Z80 family shares its daisy chain.** `Z80Peripheral.EvaluateBus` does the bus (a write's
+  byte and a read's side effects as /IORQ or /CE goes high), the acknowledge (decided once, as
+  /IORQ falls during /M1; the vector put on the bus and the source put under service), the opcode
+  watch for ED 4D, /INT and IEO. A chip supplies its sources' `Pending`, `VectorFor` and
+  `Acknowledged` (the PIO and CTC forget a request once acknowledged; the SIO keeps its cause until
+  it is dealt with). `Z80DaisyChainTests` runs a CTC, a SIO and a PIO in one chain.
 - **6800-family peripherals act on E.** The 6821 and 6850 latch a write and do a read's side
   effects as E falls, and drive a read while E is high and they are selected, so on a 68000 they
   want /VPA from the decode and /VMA on a chip select. The 6821's port A pull-ups are stamped
