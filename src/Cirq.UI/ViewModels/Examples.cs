@@ -303,6 +303,10 @@ public static partial class Examples
                 LoadSidPlayer),
             new("CIA Keypad", "A 6526 scanning a 4x4 keypad a row at a time, as the C64 scans its keyboard, and showing each key on a four-bit LCD",
                 LoadCiaKeypad),
+            new("68000 Single-Board Computer", "An MC68000 with a ROM pair, a RAM pair, a DTACK generator and a 68681 DUART: a monitor at 38,400 baud dumps memory for the terminal",
+                Load68000Monitor),
+            new("68000 Timer Interrupts", "The same 68000 with a 68901 MFP: timer A interrupts 1,600 times a second through its vector, counting on GPIP and printing over the USART",
+                Load68000Ticks),
         ]),
     ];
 

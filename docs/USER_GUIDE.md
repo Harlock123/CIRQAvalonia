@@ -51,16 +51,17 @@ the [README](../README.md), and what changed between releases is in the
 39. [Checking the circuit](#checking-the-circuit)
 40. [Development boards](#development-boards)
 41. [A 6502 computer](#a-6502-computer)
-42. [Saving and loading](#saving-and-loading)
-43. [Printing](#printing)
-44. [Exporting](#exporting)
-45. [The command line](#the-command-line)
-46. [AI: the chat and agents](#ai-the-chat-and-agents)
-47. [Appearance](#appearance)
-48. [What version is this](#what-version-is-this)
-49. [Closing a dialog](#closing-a-dialog)
-50. [Keyboard reference](#keyboard-reference)
-51. [When a circuit will not simulate](#when-a-circuit-will-not-simulate)
+42. [A 68000 computer](#a-68000-computer)
+43. [Saving and loading](#saving-and-loading)
+44. [Printing](#printing)
+45. [Exporting](#exporting)
+46. [The command line](#the-command-line)
+47. [AI: the chat and agents](#ai-the-chat-and-agents)
+48. [Appearance](#appearance)
+49. [What version is this](#what-version-is-this)
+50. [Closing a dialog](#closing-a-dialog)
+51. [Keyboard reference](#keyboard-reference)
+52. [When a circuit will not simulate](#when-a-circuit-will-not-simulate)
 
 This guide is also attached to every [release](../../releases) as a PDF, with a contents page and
 the screenshots in place — the same document, laid out for reading away from the machine. Build it
@@ -6558,6 +6559,482 @@ at $8000-$FFFF lands where the decoding puts it. Reset the simulation and the ne
   not modelled; neither are the CIA's timer pipeline, the SID's filter distortion or its exact
   combined waveforms.
 - Music plays at the circuit's speed: a SID's second of sound is minutes of solving.
+
+---
+
+## A 68000 computer
+
+The **Memory & CPUs** group also has what a 68000 board is built from: the **MC68000** itself —
+the processor of the first Macintosh, the Amiga and the Atari ST — and three of Motorola's
+peripheral chips for it: the **68681 DUART** (two serial ports, a counter/timer and I/O ports),
+the **68230 PI/T** (parallel ports and a 24-bit timer) and the **68901 MFP** (GPIP lines, a
+sixteen-source interrupt controller, four timers and a USART). **File > Examples > Computers** has
+two complete machines: a [single-board computer running a monitor](#the-68000-single-board-computer)
+and [timer interrupts on a 68901](#timer-interrupts-on-a-68901).
+
+![The 68000 single-board computer on the canvas: the 64-pin MC68000 on the left with its oscillator, reset button and pull-ups, two 28C256 ROMs and two 62256 RAMs beside it as even and odd bytes, a 74138, 7432, 7408, 7404 and 74164 along the bottom decoding the addresses and generating /DTACK, the 68681 DUART on the right and the serial terminal showing the monitor's dump of $000400](images/56-68000-computer.png)
+
+### The 68000 and its bus
+
+**An asynchronous bus.** A 6502 assumes its memory keeps up; a 68000 asks. Every bus cycle is eight
+half-clock states, S0 to S7. In S0 (CLK rising) the processor puts out the function code and R/W;
+in S1 the address on A1-A23; in S2 it asserts /AS, and on a read /UDS and /LDS; on a write the data
+goes out in S3 and the strobes in S4. At the end of S4 — CLK falling — it looks at **/DTACK**. If
+nothing has pulled it low, it waits, a whole clock at a time, until something does; then S5 and S6,
+and as CLK falls into S7 it takes the data and lets go of the strobes. A cycle with /DTACK in time is
+four clocks; each **wait state** is one more. So every 68000 board has a DTACK generator, and the
+wait states it asks for are on the pins here, counted by the processor (its **WaitStates**), and
+listed with each cycle by **Simulate > Decode Bus**.
+
+**Sixteen bits, two strobes.** There is no A0: the byte at an even address travels on D8-D15 with
+/UDS, and the one at the odd address after it on D0-D7 with /LDS; a word uses both. That is why a
+68000's memory is a **pair of byte-wide chips** — one holds the even bytes, one the odd — and why a
+byte-wide peripheral like the 68681 sits on one half, at odd addresses two apart. A word or long
+access at an odd address is an **address error**, exception 3.
+
+**The rest of the pins.** /BERR ends a cycle with a bus error (exception 2) — or, with /HALT, runs
+it again once /HALT goes high. /VPA instead of /DTACK makes a **6800 cycle**: the processor asserts
+/VMA while E (CLK ÷ 10: six clocks low, four high) is low, and takes the data as E falls.
+**/IPL0-/IPL2** carry the interrupt level, active low, so all three low is level 7. An interrupt
+above the mask in SR is taken between instructions with an **interrupt acknowledge** — FC = 111,
+the level on A1-A3, a byte read of the vector on D0-D7 — or /VPA during it for the level's
+**autovector**, or /BERR for the spurious interrupt. /BR asks for the bus: /BG answers between
+cycles and the processor lets go of the address, data, FC and the strobes until /BR and /BGACK are
+both high. /RESET and /HALT low together reset it; **RESET** the instruction drives /RESET low for
+124 clocks, resetting the peripherals but not the processor; a double bus fault drives /HALT low;
+/HALT alone stops it before its next cycle. /RESET and /HALT are open drain, and a board ties them
+together to a pull-up and a button. Pinout: 1-5 = D4-D0, 6 = /AS, 7 = /UDS, 8 = /LDS, 9 = R/W,
+10 = /DTACK, 11 = /BG, 12 = /BGACK, 13 = /BR, 14 = VCC, 15 = CLK, 16 = GND, 17 = /HALT, 18 = /RESET,
+19 = /VMA, 20 = E, 21 = /VPA, 22 = /BERR, 23-25 = /IPL2-/IPL0, 26-28 = FC2-FC0, 29-48 = A1-A20,
+49 = VCC, 50-52 = A21-A23, 53 = GND, 54-64 = D15-D5.
+
+**The instruction set**, written from Motorola's *M68000 Programmer's Reference Manual* and the
+*MC68000 user's manual*, not from any emulator: every instruction and addressing mode; user and
+supervisor modes with their own stack pointers (USP and SSP); the status register's trace bit,
+supervisor bit, interrupt mask and condition codes; and every exception through the vector table at
+address 0 — reset (the supervisor stack pointer from $000000 and the PC from $000004), bus and
+address errors with their seven-word frames, illegal instructions, zero divide, CHK, TRAPV,
+privilege violations, trace, line A and line F, spurious and autovectored interrupts, and TRAP #0-15.
+Like the 6502 here it is a **sequence of bus cycles**: the processor's two-word prefetch queue is
+modelled, and every read, write and run of internal clocks comes in the order and at the length the
+chip uses — DIVU and DIVS take their data-dependent times, MULU and MULS theirs, long writes go low
+word first where the chip does that.
+
+It was checked against Tom Harte's published per-instruction test suite for the 68000 — 124 files,
+1,000,060 cases, each the registers, memory, every bus cycle (address, function code, size, data)
+and the clock count of one instruction. It agrees with 995,590 of them in everything. The rest are
+deliberate or doubtful: in 731 cases (ADDQ.L and SUBQ.L to an address register) the suite gives 6
+clocks where the user's manual's timing table gives 8, and this follows the manual; in 3,736 (ASR
+by more than the operand's width) the suite clears C and X where the manual's description — the
+last bit shifted out, which is the sign — sets them, and this follows the manual; two ASL.B cases
+in the suite have a final register unrelated to the starting one; and in one zero divide the suite
+stacks the divide's own address where the manual says the next instruction's. The suite has no
+cases for interrupts, STOP, trace or the reset sequence, which have tests of their own.
+
+**How fast it runs.** Each CLK edge is a time point and so is every gate's answer, and the whole
+board is solved at each. Measured on the development machine (an 8-core ARM virtual machine,
+shared and busy) a 68000 board at 1 MHz runs at **about 3 to 4 ms of simulated time per second**
+in a release build — 3,000-4,000 clocks, or 600-900 bus cycles a second, with a wait state in each;
+a debug build is two to three times slower. A 68000 bus cycle is four or five clocks where a 6502's
+is one, so it does about a fifth of the work a second the 6502 computer does. The examples run at
+**1 MHz** for the same reason the 6502 ones do — a slower clock costs the same per edge — though
+a real 68000 wants at least 2 MHz, and the serial ports run fast (38,400 and 19,200 baud) so a line
+of text takes milliseconds rather than seconds.
+
+**Simplifications.** The address bus and FC hold their last value between cycles instead of
+floating; /IPL is acted on as soon as it is sampled, not after two matching samples; the internal
+work of an instruction also stops while the bus is granted or /HALT is low; and timing inside a
+state is one propagation delay.
+
+### The peripherals
+
+**The 68681 DUART** has two channels, A and B. Each has MR1 (bits per character, parity, RxRDY or
+FIFO-full interrupt, character or block error mode) and MR2 (stop length from 0.563 to 2 bits, CTS
+enabling the transmitter, normal, automatic echo, local or remote loopback) behind one address — a
+"reset MR pointer" command, then MR1, then MR2 — a clock select register choosing each direction's
+rate from the generator's two sets (ACR bit 7: 50 to 38,400 baud from the 3.6864 MHz crystal in
+**Crystal Frequency**, or the counter/timer as a 16× clock), a command register (receiver and
+transmitter on and off; reset the MR pointer, receiver, transmitter, error status or break
+interrupt; start and stop a break), a status register, a three-deep receive FIFO with each
+character's errors and a received break, and a transmit holding register. Its registers, at
+RS1-RS4 — A1-A4 on the odd bytes, so the chip at $C00001 has them at $C00001, $C00003 and so on:
+
+| RS | Read | Write |
+| --- | --- | --- |
+| 0, 8 | MR1A/MR2A, MR1B/MR2B | the same |
+| 1, 9 | SRA, SRB: RxRDY, FFULL, TxRDY, TxEMT, overrun, parity, framing, received break | CSRA, CSRB |
+| 2, A | — | CRA, CRB |
+| 3, B | RHRA, RHRB | THRA, THRB |
+| 4 | IPCR: IP0-IP3, and a change flag for each | ACR: baud set, counter/timer mode and source, IP0-IP3 change interrupts |
+| 5 | ISR | IMR |
+| 6, 7 | the counter, high and low | CTUR, CTLR: the preload |
+| C | IVR | IVR |
+| D | IP0-IP5 | OPCR |
+| E | start the counter | set output port bits |
+| F | stop the counter | clear output port bits |
+
+The counter/timer counts the crystal ÷ 16, the crystal, either transmitter's clock, or IP2 (÷ 1 or
+÷ 16). As a **timer** it reloads at zero — a square wave of period twice the preload, which OPCR can
+put on OP3 — and as a **counter** it counts down past zero from a start command to a stop; either
+sets the counter-ready bit in ISR, which the stop command clears. A set bit in the output port
+register drives its pin low. /INTR (open drain) is low while an unmasked ISR bit is set, and /IACK
+with it low puts IVR on the bus. /DTACK is open drain, low 150 ns after /CS. Not modelled: the
+external IP3-IP5 baud clocks, OP2's clock outputs, automatic RTS and the multidrop address filter.
+Pinout: 1 = RS1, 2 = IP3, 3 = RS2, 4 = IP1, 5 = RS3, 6 = RS4, 7 = IP0, 8 = R/W, 9 = /DTACK,
+10 = RxDB, 11 = TxDB, 12 = OP1, 13 = OP3, 14 = OP5, 15 = OP7, 16-19 = D1, D3, D5, D7, 20 = GND,
+21 = /INTR, 22-25 = D6, D4, D2, D0, 26 = OP6, 27 = OP4, 28 = OP2, 29 = OP0, 30 = TxDA, 31 = RxDA,
+32 = X1, 33 = X2, 34 = /RESET, 35 = /CS, 36 = IP2, 37 = /IACK, 38 = IP5, 39 = IP4, 40 = VCC.
+
+**The 68230 PI/T** has two 8-bit ports with handshake lines H1-H4, a third port C whose pins can
+carry the chip's interrupt and timer lines, and a 24-bit timer. It is synchronous: /DTACK goes low
+on the second CLK after /CS. In **mode 0** each of ports A and B has three submodes: double-buffered
+input, where H1 (H3 for port B) latches the pins into a two-deep buffer that reading the data
+register empties; double-buffered output, where writes queue two deep and the pins show one byte
+until H1 acknowledges it; and bit I/O. H2 (H4) is an edge-sensitive input, an output held negated
+or asserted, or the handshake — **interlocked**, asserted while the port is ready, or **pulsed**. In
+**mode 1** the two ports are one 16-bit port on port B's handshake. A port interrupt (H1-H4's
+status with its enable) is /PIRQ on PC5, answered on /PIACK (PC6) with PIVR and the source in its
+bottom bits. The timer counts CLK ÷ 32, TIN ÷ 32, TIN, or CLK ÷ 32 gated by TIN; at zero it sets
+ZDS, toggles TOUT (PC3) as a square wave or pulls it low as /TIRQ, and reloads or rolls over;
+/TIACK (PC7) reads TIVR. Registers: $00 PGCR, $01 PSRR, $02-$04 the direction registers, $05 PIVR,
+$06 PACR, $07 PBCR, $08 PADR, $09 PBDR, $0A and $0B the pins, $0C PCDR, $0D PSR, $10 TCR, $11 TIVR,
+$13-$15 the preload, $17-$19 the count, $1A TSR — at RS1-RS5. Not modelled: modes 2 and 3 (the
+bidirectional ports; they behave as mode 0), DMA requests and the H1/H3 status-control option.
+Pinout: 1-3 = D5-D7, 4-11 = PA0-PA7, 12 = VCC, 13-16 = H1-H4, 17-24 = PB0-PB7, 25-29 = RS5-RS1,
+30-37 = PC0-PC7 (PC2/TIN, PC3/TOUT, PC4/DMAREQ, PC5/PIRQ, PC6/PIACK, PC7/TIACK), 38 = GND,
+39 = /RESET, 40 = CLK, 41 = /CS, 42 = /DTACK, 43 = R/W, 44-48 = D0-D4.
+
+**The 68901 MFP** answers /CS with /DS (/LDS on a 68000) and has 24 registers at RS1-RS5:
+
+| RS | Register | |
+| --- | --- | --- |
+| 0-2 | GPDR, AER, DDR | The GPIP lines, their active edges, their directions |
+| 3-A | IERA/B, IPRA/B, ISRA/B, IMRA/B | Enable, pending, in service, mask: A for channels 15-8, B for 7-0 |
+| B | VR | The vector's top four bits, and S: software end of interrupt |
+| C-E | TACR, TBCR, TCDCR | The timers' modes |
+| F-12 | TADR-TDDR | The timers' data registers |
+| 13-17 | SCR, UCR, RSR, TSR, UDR | The USART |
+
+Its sixteen interrupt channels, 15 the highest, are GPIP7, GPIP6, timer A, receive buffer full,
+receive error, transmit buffer empty, transmit error, timer B, GPIP5, GPIP4, timer C, timer D and
+GPIP3-GPIP0. An event on an enabled channel sets it pending; a pending, unmasked channel pulls
+/IRQ low unless a channel of the same or higher priority is in service; the acknowledge (/IACK with
+/DS, and IEI low) reads VR's top four bits with the channel number, and in software end-of-interrupt
+mode sets the channel in service until the handler writes a 0 to it. With IEI high it passes the
+acknowledge on through IEO, for a daisy chain. GPIP inputs interrupt on the edge AER picks. Each
+timer counts down from its data register and at the end reloads, toggles its output (TAO-TDO) and
+makes an event: in **delay** mode the timer crystal (**Timer Clock Frequency**, 2.4576 MHz) through
+a prescaler of 4 to 200; timers A and B also in **event** mode, counting TAI or TBI edges, and
+**pulse-width** mode, counting only while TAI or TBI is active. The **USART** is clocked 16 to a
+bit by TC and RC — wire them to TDO — with 5 to 8 bits, parity and 1, 1½ or 2 stop bits. Not
+modelled: the USART's synchronous mode and ÷1 clock, the ready outputs (RR and TR stay high), and
+an AER change itself making an edge. Pinout: 1 = R/W, 2-6 = RS1-RS5, 7 = TC, 8 = SO, 9 = SI,
+10 = RC, 11 = VCC, 12 = no connection, 13-16 = TAO-TDO, 17 = XTAL1, 18 = XTAL2, 19 = TAI, 20 = TBI,
+21 = /RESET, 22-29 = I0-I7, 30 = TR, 31 = RR, 32 = /IRQ, 33 = IEO, 34 = IEI, 35 = CLK, 36 = GND,
+37-44 = D0-D7, 45 = /IACK, 46 = /DTACK, 47 = /DS, 48 = /CS.
+
+All three chips' serial and timer pins are ordinary logic outputs, so the 68681's and the 68901's
+serial lines connect straight to the **Serial Terminal** and can be read by the **UART** bus decode.
+
+### Memory for a 68000
+
+A 68000's memory is built from the same byte-wide ROMs and RAMs as a 6502's, two at a time. Each
+chip of a pair gets A1-A15 on its A0-A14; the **even** chip's data lines go to D8-D15 and the
+**odd** one's to D0-D7. Each chip's /CE is its region's select ORed with its strobe — /UDS for the
+even chip, /LDS for the odd — so a word cycle selects both and a byte cycle one. A RAM's /WE is R/W
+(the strobes arrive in S4 of a write, after the data), and /OE can be tied low.
+
+To load a program, **Edit > Load Memory Image...** asks which bytes the chip takes: all of them, as
+for an 8-bit processor, or the **even** or **odd** addresses. Load the same file into each chip of
+a pair, once as even and once as odd; each takes its half at half the address, so byte $000400 of
+the program is byte $200 of the even ROM and $000401 byte $200 of the odd one. **Motorola
+S-records** (`.s19`, `.s28`, `.s37`, `.srec`, `.mot`) — the 68000's own format — are read alongside
+binaries and Intel HEX, and the agent tool `load_memory` takes the same choice as `lane`.
+
+### The 68000 single-board computer
+
+**File > Examples > Computers > 68000 Single-Board Computer** is built as a hobby 68000 board is:
+
+| Address | What | Selected by |
+| --- | --- | --- |
+| $000000-$00FFFF | Two 28C256 ROMs, even and odd bytes | ROM_SEL (74138 Y0) ORed with /UDS or /LDS |
+| $200000-$20FFFF | Two 62256 RAMs | RAM_SEL (Y1) ORed with /UDS or /LDS |
+| $C00001-$C0001F | 68681 DUART, on the odd bytes | IO_SEL (Y6) ORed with /LDS |
+| $E00000-$FFFFFF | Nothing — but the interrupt acknowledge's address, $FFFFFx, lands here | IACK_SEL (Y7) |
+
+A **74138** under /AS splits the address space into 2 MB regions by A21-A23, and a **7432** turns
+each memory region and strobe into a chip enable. The **DTACK generator** is a 74164: while memory is
+selected (a 7408 ANDs the two selects) it shifts ones in on CLK, so its QA goes high one clock after
+/AS and QB two; QB, inverted by a 7404, is /DTACK — **one wait state** on every memory cycle, five
+clocks a cycle. Move the inverter's input to QA and the wait states go; to QC and there are two.
+The DUART drives its own /DTACK (IO_DTACK, open drain and pulled up), which the 7408 ANDs in. The
+oscillator runs the processor at 1 MHz.
+
+The ROM holds this program, a small monitor. It prints a banner and a prompt and reads a line; for
+**D** and an address it dumps the eight bytes there. The terminal types `D 000400` at 8 ms, and the
+monitor answers with its own first bytes:
+
+```asm
+; A small monitor for the 68000 computer: a banner, a prompt, and one
+; command, D followed by an address in hex, which dumps the eight bytes
+; there. The 68681 is on the odd bytes at $C00001, channel A at 38,400 baud.
+
+DUART   equ $C00001         ; the 68681's registers, two bytes apart
+MRA     equ DUART+$00       ; MR1A, then MR2A
+SRA     equ DUART+$02       ; status (read); CSRA (write)
+CSRA    equ DUART+$02
+CRA     equ DUART+$04       ; command (write)
+RBA     equ DUART+$06       ; receiver (read); transmitter (write)
+TBA     equ DUART+$06
+ACR     equ DUART+$08
+LINE    equ $200000         ; the line being typed, in RAM
+
+        org 0
+        dc.l $210000        ; the supervisor stack: the top of the RAM
+        dc.l start          ; the reset vector
+
+        org $400
+start:  move.b #$10,CRA     ; the MR pointer to MR1A
+        move.b #$13,MRA     ; MR1A: no parity, eight bits
+        move.b #$07,MRA     ; MR2A: normal, one stop bit
+        move.b #$00,ACR     ; baud-rate set 1
+        move.b #$CC,CSRA    ; 38,400 baud both ways
+        move.b #$05,CRA     ; transmitter and receiver on
+        lea banner(pc),a0
+        bsr print
+prompt: lea gt(pc),a0
+        bsr print
+        lea LINE,a1
+getc:   btst #0,SRA         ; a character waiting?
+        beq.s getc
+        move.b RBA,d0
+        bsr putc            ; echoed as it is typed
+        cmp.b #13,d0
+        beq.s enter
+        move.b d0,(a1)+
+        bra.s getc
+enter:  clr.b (a1)          ; the end of the line
+        moveq #10,d0
+        bsr putc
+        lea LINE,a2
+        cmp.b #'D',(a2)+
+        bne.s what
+        bsr hexin           ; the address, into D1
+        move.l d1,a3
+        move.l d1,d2
+        moveq #5,d3         ; six digits
+        bsr hexout
+        moveq #':',d0
+        bsr putc
+        moveq #7,d4         ; eight bytes
+dump:   moveq #' ',d0
+        bsr putc
+        moveq #0,d2
+        move.b (a3)+,d2
+        moveq #1,d3         ; two digits
+        bsr hexout
+        dbra d4,dump
+        bsr newline
+        bra.s prompt
+what:   lea huh(pc),a0
+        bsr print
+        bra.s prompt
+
+; Reads hex digits from (A2), after any spaces, into D1.
+hexin:  moveq #0,d1
+skip:   move.b (a2)+,d0
+        cmp.b #' ',d0
+        beq.s skip
+hexchr: cmp.b #'0',d0
+        blt.s hexend
+        cmp.b #'9',d0
+        ble.s number
+        cmp.b #'A',d0
+        blt.s hexend
+        cmp.b #'F',d0
+        bgt.s hexend
+        subq.b #7,d0        ; 'A' to 10
+number: sub.b #'0',d0
+        lsl.l #4,d1
+        or.b d0,d1
+        move.b (a2)+,d0
+        bra.s hexchr
+hexend: rts
+
+; Prints the low D3+1 hex digits of D2.
+hexout: move.w d3,d6
+        addq.w #1,d6
+        lsl.w #2,d6         ; four bits a digit
+        neg.w d6
+        add.w #32,d6
+        lsl.l d6,d2         ; the first digit to the top
+digits: rol.l #4,d2
+        move.b d2,d0
+        and.b #$0F,d0
+        cmp.b #10,d0
+        blt.s decimal
+        addq.b #7,d0
+decimal: add.b #'0',d0
+        bsr.s putc
+        dbra d3,digits
+        rts
+
+; Sends D0 when the transmitter has room for it.
+putc:   btst #2,SRA         ; TxRDY
+        beq.s putc
+        move.b d0,TBA
+        rts
+
+; Sends the string at A0, up to its zero.
+print:  move.b (a0)+,d0
+        beq.s printed
+        bsr.s putc
+        bra.s print
+printed: rts
+
+newline: moveq #13,d0
+        bsr.s putc
+        moveq #10,d0
+        bra.s putc
+
+banner: dc.b "CIRQ 68000 monitor",13,10,0
+gt:     dc.b "> ",0
+huh:    dc.b "?",13,10,0
+```
+
+**Simulate > Decode Bus** offers a **Cpu68000** decode: every cycle with its size, address, data
+and function code (SP and SD for supervisor program and data, UP and UD for user, IA for an
+acknowledge), its wait states in the detail, and each instruction disassembled where it starts.
+
+```
+$000400 MOVE.B #$10,$C00005   R.W $000404 00C0 (SP)   R.W $000406 0005 (SP)   W.B $C00005 10 (SD)
+```
+
+### Timer interrupts on a 68901
+
+**File > Examples > Computers > 68000 Timer Interrupts** is the same computer with a **68901 MFP** in
+place of the DUART, at $C00001 (/CS = IO_SEL, /DS = /LDS). Its /IRQ drives /IPL1 and /IPL2, so it
+interrupts at **level 6**, as on an Atari ST; its /IACK is IACK_SEL, which only the acknowledge
+reaches. Timer A, in delay mode at ÷ 16 with a count of 96, interrupts **1,600 times a second**
+through vector $4D — VR's $40 with channel 13 — and the handler counts, the count's low four bits
+on GPIP0-3. Timer D, toggling TDO at 307.2 kHz, clocks the USART at 16 clocks a bit: **19,200
+baud**. The main loop prints the count every eighth tick, and the button on GPIP7 interrupts on its
+falling edge to set it back to zero.
+
+![The 68000 with a 68901 MFP: the same ROMs, RAMs and decoding, the MFP's /IRQ on /IPL1 and /IPL2, TDO wired to TC and RC as the baud clock, GPIP7 on a button with a pull-up, and the serial terminal showing the tick counts](images/57-68000-mfp.png)
+
+```asm
+; Timer interrupts on the 68000 computer, with a 68901 MFP on the odd bytes
+; at $C00001. Timer A interrupts 1,600 times a second; its handler counts
+; and shows the count on GPIP0-3, and the main loop prints it every eighth
+; tick. The button on GPIP7 interrupts too, and sets the count back to
+; zero. The USART runs at 19,200 baud, clocked by timer D.
+
+MFP     equ $C00001         ; the 68901's registers, two bytes apart
+GPDR    equ MFP+$00
+AER     equ MFP+$02
+DDR     equ MFP+$04
+IERA    equ MFP+$06
+IMRA    equ MFP+$12
+VR      equ MFP+$16
+TACR    equ MFP+$18
+TCDCR   equ MFP+$1C
+TADR    equ MFP+$1E
+TDDR    equ MFP+$24
+UCR     equ MFP+$28
+TSR     equ MFP+$2C
+UDR     equ MFP+$2E
+TICKS   equ $200000         ; the count, a word in RAM
+SHOWN   equ $200002         ; the last count printed, in eighths
+
+        org 0
+        dc.l $210000        ; the supervisor stack: the top of the RAM
+        dc.l start          ; the reset vector
+        org $134            ; vector $4D: the MFP's channel 13, timer A
+        dc.l tick
+        org $13C            ; vector $4F: channel 15, GPIP7
+        dc.l button
+
+        org $400
+start:  clr.w TICKS
+        clr.w SHOWN
+        move.b #$0F,DDR     ; GPIP0-3 out: the count
+        move.b #$00,AER     ; GPIP7 interrupts on its falling edge
+        move.b #1,TDDR      ; timer D: 2.4576 MHz / 4 / 1 is 614.4 kHz,
+        move.b #$01,TCDCR   ; TDO a 307.2 kHz square wave: 19,200 x 16
+        move.b #$88,UCR     ; / 16, eight bits, one stop bit, no parity
+        move.b #$05,TSR     ; transmitter on, SO high while it is off
+        move.b #96,TADR     ; timer A: 2.4576 MHz / 16 / 96 is 1,600 Hz
+        move.b #$40,VR      ; vectors $40-$4F, end of interrupt automatic
+        move.b #$A0,IERA    ; GPIP7 and timer A enabled...
+        move.b #$A0,IMRA    ; ...and unmasked
+        move.b #$03,TACR    ; timer A: delay mode, / 16
+        lea hello(pc),a0
+        bsr print
+        move #$2000,sr      ; interrupts on
+loop:   move.w TICKS,d2
+        move.w d2,d1
+        lsr.w #3,d1
+        cmp.w SHOWN,d1      ; into a new eighth?
+        beq.s loop
+        move.w d1,SHOWN
+        moveq #3,d3         ; four digits
+        bsr hexout
+        moveq #13,d0
+        bsr putc
+        moveq #10,d0
+        bsr putc
+        bra.s loop
+
+; Timer A: one more tick, the low four bits of it on GPIP0-3.
+tick:   addq.w #1,TICKS
+        move.b TICKS+1,GPDR
+        rte
+
+; GPIP7: the button. Back to zero.
+button: clr.w TICKS
+        clr.w SHOWN
+        rte
+
+; Prints the low D3+1 hex digits of D2.
+hexout: move.w d3,d6
+        addq.w #1,d6
+        lsl.w #2,d6
+        neg.w d6
+        add.w #32,d6
+        lsl.l d6,d2
+digits: rol.l #4,d2
+        move.b d2,d0
+        and.b #$0F,d0
+        cmp.b #10,d0
+        blt.s decimal
+        addq.b #7,d0
+decimal: add.b #'0',d0
+        bsr.s putc
+        dbra d3,digits
+        rts
+
+; Sends D0 when the USART's buffer is empty.
+putc:   btst #7,TSR
+        beq.s putc
+        move.b d0,UDR
+        rts
+
+print:  move.b (a0)+,d0
+        beq.s printed
+        bsr.s putc
+        bra.s print
+printed: rts
+
+hello:  dc.b "MFP ticks",13,10,0
+```
+
+### The 68000 board's limits
+
+- A 68000 board solves at a few hundred bus cycles a second: run milliseconds, not seconds. Keep
+  delays short and serial rates high, as the examples do.
+- The interrupt priority synchronisation, the address bus floating between cycles and the timing
+  inside a state are simplified, as above; so are the peripherals' modes listed under each.
 
 ---
 

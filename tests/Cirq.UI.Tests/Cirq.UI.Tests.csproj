@@ -21,5 +21,6 @@
     <!-- The stand-in Anthropic API the chat tests use, so the window's AI Chat is tested the same way. -->
     <Compile Include="../Cirq.Chat.Tests/FakeClaude.cs" Link="Support/FakeClaude.cs" />
     <Compile Include="../Cirq.Components.Tests/Assembler6502.cs" Link="Support/Assembler6502.cs" />
+    <Compile Include="../Cirq.Components.Tests/Assembler68000.cs" Link="Support/Assembler68000.cs" />
   </ItemGroup>
 </Project>
