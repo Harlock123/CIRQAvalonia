@@ -557,6 +557,8 @@ public static class ComponentCatalog
                 () => new Duart68681()),
             new("68230 PI/T", "Parallel interface and timer for a 68000: two handshaking 8-bit ports (or one 16-bit), port C and a 24-bit timer, with vectored interrupts",
                 () => new Pit68230()),
+            new("68901 MFP", "Multi-function peripheral for a 68000: eight GPIP lines with edge interrupts, a 16-source vectored interrupt controller, four timers and a USART",
+                () => new Mfp68901()),
         ]),
 
         new("Sensors & Actuators",
