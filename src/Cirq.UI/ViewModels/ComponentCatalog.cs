@@ -559,6 +559,10 @@ public static class ComponentCatalog
                 () => new Pit68230()),
             new("68901 MFP", "Multi-function peripheral for a 68000: eight GPIP lines with edge interrupts, a 16-source vectored interrupt controller, four timers and a USART",
                 () => new Mfp68901()),
+            new("6809", "Motorola MC6809, cycle by cycle on its pins — two accumulators, four index registers, every indexed mode, its own clock: EXTAL at four times E, E and Q out",
+                () => new Cpu6809()),
+            new("6809E", "MC6809E: the 6809 clocked from outside on E and Q, with TSC, LIC, AVMA and BUSY for sharing the bus — the CoCo's processor",
+                () => new Cpu6809E()),
         ]),
 
         new("Sensors & Actuators",
