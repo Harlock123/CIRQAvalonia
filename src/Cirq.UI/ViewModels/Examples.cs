@@ -307,6 +307,10 @@ public static partial class Examples
                 Load68000Monitor),
             new("68000 Timer Interrupts", "The same 68000 with a 68901 MFP: timer A interrupts 1,600 times a second through its vector, counting on GPIP and printing over the USART",
                 Load68000Ticks),
+            new("6809 Single-Board Computer", "An MC6809 at 1.8432 MHz with an EPROM, a 62256 RAM, a 74138 and a 6850 ACIA clocked from E: a monitor at 115,200 baud dumps memory for the terminal",
+                Load6809Monitor),
+            new("6809 PIA Button Counter", "The same 6809 with a 6821 PIA: an HD44780 on its ports, and a button on CA1 interrupting through /IRQA, each press counted on the display",
+                Load6809Buttons),
         ]),
     ];
 

@@ -52,16 +52,17 @@ the [README](../README.md), and what changed between releases is in the
 40. [Development boards](#development-boards)
 41. [A 6502 computer](#a-6502-computer)
 42. [A 68000 computer](#a-68000-computer)
-43. [Saving and loading](#saving-and-loading)
-44. [Printing](#printing)
-45. [Exporting](#exporting)
-46. [The command line](#the-command-line)
-47. [AI: the chat and agents](#ai-the-chat-and-agents)
-48. [Appearance](#appearance)
-49. [What version is this](#what-version-is-this)
-50. [Closing a dialog](#closing-a-dialog)
-51. [Keyboard reference](#keyboard-reference)
-52. [When a circuit will not simulate](#when-a-circuit-will-not-simulate)
+43. [A 6809 computer](#a-6809-computer)
+44. [Saving and loading](#saving-and-loading)
+45. [Printing](#printing)
+46. [Exporting](#exporting)
+47. [The command line](#the-command-line)
+48. [AI: the chat and agents](#ai-the-chat-and-agents)
+49. [Appearance](#appearance)
+50. [What version is this](#what-version-is-this)
+51. [Closing a dialog](#closing-a-dialog)
+52. [Keyboard reference](#keyboard-reference)
+53. [When a circuit will not simulate](#when-a-circuit-will-not-simulate)
 
 This guide is also attached to every [release](../../releases) as a PDF, with a contents page and
 the screenshots in place — the same document, laid out for reading away from the machine. Build it
@@ -189,7 +190,7 @@ The palette holds **322 components in 17 categories**:
 | 40xx Series | 47 | CMOS gates and the **4049 / 4050 level converters**; flip-flops and latches; counters including the **4026 and 4033 with their own display drivers**, the **4029, 4510 and 4516 up/down counters** and the **4518 / 4520**; the **4028** and **4543 LCD driver**; shift registers to the **4094**; the **4051, 4052, 4053 and 4067 analog multiplexers**; the **4047, 4528 and 4538** timers; a **4046 phase-locked loop** — see [below](#the-40xx-series) |
 | Buses | 19 | **Bus tap** and **bus line**, I2C master, EEPROM, port expander, DS1307 clock, ADS1115 ADC, MCP4725 DAC and INA219 current sensor, SPI master and **MCP3008 ADC**, 1-Wire master and DS18B20 thermometer, serial terminal and device, **RS-485**, **CAN** and **RS-232 (MAX232)** transceivers, level shifter — see [below](#making-its-own-rails) |
 | Digital I/O | 9 | Logic toggle, clock, **pattern generator**, rotary encoder, oscillator module, ADC and DAC bridges, and a **2K × 8 SRAM and ROM** — see [below](#something-worth-addressing) |
-| Memory & CPUs | 25 | The **2716, 2732, 2764 and 27C256 EPROMs**, the **28C256 EEPROM**, the **6116 and 62256 static RAMs** — each loadable from a binary, Intel HEX or S-record file — and the **65C02**, **6502**, **6510** and **8500** processors, **6522 VIA**, **6551 ACIA**, **6526 CIA** and the **6581 and 8580 SIDs**, the **68000**, **68681 DUART**, **68230 PI/T** and **68901 MFP**, and the **6809**, **6809E**, **6821** and **6520 PIAs** and **6850 ACIA** — see [below](#memories-by-their-part-numbers) and [the 6502 computer](#a-6502-computer) |
+| Memory & CPUs | 25 | The **2716, 2732, 2764 and 27C256 EPROMs**, the **28C256 EEPROM**, the **6116 and 62256 static RAMs** — each loadable from a binary, Intel HEX or S-record file — and the **65C02**, **6502**, **6510** and **8500** processors, **6522 VIA**, **6551 ACIA**, **6526 CIA** and the **6581 and 8580 SIDs**, the **68000**, **68681 DUART**, **68230 PI/T** and **68901 MFP**, and the **6809**, **6809E**, **6821** and **6520 PIAs** and **6850 ACIA** — see [below](#memories-by-their-part-numbers), [the 6502 computer](#a-6502-computer) and [the 6809 computer](#a-6809-computer) |
 | Sensors & Actuators | 20 | DC motor, LDR, thermistors, **LM35 and TMP36** analog thermometers, buzzers, speaker, microphone, servo, stepper in **unipolar and bipolar** wirings, thermocouple, load cell, HC-SR04 ranger, Hall switch, phototransistor, **reed switch** and **PIR motion sensor** — see [below](#sensors-and-actuators) |
 | Switching & Isolation | 11 | Relay, fuses and a **resettable PPTC**, optocouplers, ULN2003, H-bridge, **A4988 microstepping driver**, **solid-state relay**, **MOSFET gate driver** — see [below](#regulating-a-current-instead-of-applying-a-voltage) |
 | Dev Boards | 6 | Raspberry Pi, Arduino Uno / Nano / Mega, **Raspberry Pi Pico** and **ESP32 DevKit** — see [below](#development-boards) |
@@ -7035,6 +7036,581 @@ hello:  dc.b "MFP ticks",13,10,0
   delays short and serial rates high, as the examples do.
 - The interrupt priority synchronisation, the address bus floating between cycles and the timing
   inside a state are simplified, as above; so are the peripherals' modes listed under each.
+
+---
+
+## A 6809 computer
+
+The **Memory & CPUs** group also has Motorola's 8-bit flagship: the **MC6809** — the processor of
+the Tandy Color Computer, the Dragon 32 and 64, the Vectrex and a generation of arcade boards —
+and the **MC6809E**, the same processor clocked from outside, as the Color Computer runs it. With
+them come the 6800 family's two classic peripherals: the **6821 PIA** (and the **6520**, MOS's
+copy of it) and the **6850 ACIA**. **File > Examples > Computers** has two machines: a
+[single-board computer running a monitor](#the-6809-single-board-computer) over a 6850, and
+[a button counted by interrupt](#counting-presses-on-a-6821) through a 6821.
+
+![The 6809 single-board computer on the canvas: the MC6809 on the left with its 7.3728 MHz oscillator into EXTAL, reset button and pull-up, a 2764 EPROM and a 62256 RAM beside it, a 74138 and a 7400 below them decoding the address, the 6850 ACIA on the right clocked from E, and the serial terminal showing the end of the monitor's dump of $E000 and its prompt](images/58-6809-computer.png)
+
+### The 6809 and its bus
+
+**Four quarters to a cycle.** The 6809 makes its own clock: a crystal on XTAL and EXTAL — here an
+oscillator into EXTAL — runs at four times the bus rate, and every rising edge on EXTAL is a quarter
+of a cycle. Q rises, then E, then Q falls, then E falls: two outputs at a quarter of the input, Q a
+quarter of a cycle ahead of E. Peripherals of the 6800 family take E as their clock. A cycle **ends
+as E falls**: a read takes the data bus at that instant, and the address, R/W, BA and BS change
+50 ns later. A write's data goes out 30 ns after Q rises and is held 60 ns past E falling. The
+1 MHz MC6809 wants a 4 MHz clock; the 68A09 and 68B09 run at 1.5 and 2 MHz on E.
+
+**Every cycle is a bus cycle.** A 6809 has no idle: a cycle it spends inside itself shows on the
+bus as a read of **$FFFF**, the "dead" or VMA cycle in Motorola's tables, and the cycle after a
+one-byte opcode reads the next byte and ignores it. They are real reads — the EPROM at $FFFF answers
+them — and here they are on the pins, in the bus log and marked in the bus decode.
+
+**The other pins.** /IRQ and /FIRQ are levels, masked by I and by F; /NMI is an edge, and is not
+armed after a reset until the program has loaded S, so it cannot strike before there is a stack.
+They are sampled as Q falls and acted on between instructions. **MRDY** low as E is due to fall
+holds E high another quarter, and another, until it comes back: a slow memory stretches the cycle in
+quarter steps (the processor counts them, **StretchedQuarters**). **/HALT** stops the processor at the
+end of the instruction; **/DMA/BREQ** stops it at the end of the cycle, after a dead cycle, taking
+one cycle back every fifteen to refresh itself and a dead cycle when the request ends. In both, and
+in SYNC, BA goes high and the address bus, R/W and the data bus let go. BA and BS together say what
+the processor is doing:
+
+| BA | BS | |
+| --- | --- | --- |
+| 0 | 0 | Running |
+| 0 | 1 | Fetching a vector: an interrupt (or SWI) or reset acknowledge |
+| 1 | 0 | SYNC: waiting for an interrupt line, buses let go |
+| 1 | 1 | Halted, or the bus granted on /DMA/BREQ |
+
+**/RESET** low holds it; let go, it masks IRQ and FIRQ, clears DP, disarms NMI and fetches the
+vector at $FFFE (power-on runs that too, as though the button had been pressed). None of the inputs
+is pulled up inside, so tie the unused ones high. Pinout: 1 = VSS, 2 = /NMI, 3 = /IRQ, 4 = /FIRQ,
+5 = BS, 6 = BA, 7 = VCC, 8-23 = A0-A15, 24-31 = D7-D0, 32 = R/W, 33 = /DMA/BREQ, 34 = E, 35 = Q,
+36 = MRDY, 37 = /RESET, 38 = EXTAL, 39 = XTAL, 40 = /HALT. XTAL is drawn but not simulated: drive
+EXTAL.
+
+**The 6809E** has no clock generator: E and Q come in (the Color Computer's SAM makes them; the
+examples' tests use a 7474 as a Johnson counter), and pins 33, 36, 38 and 39 become **BUSY**,
+**AVMA**, **LIC** and **TSC**. TSC high floats the address bus, R/W and the data bus for another
+master. **LIC** is high in the last cycle of every instruction, so its fall marks an opcode fetch;
+**AVMA** is high when the next cycle will use the bus, low before a dead cycle. Both look a cycle
+ahead, which the chip can because neither depends on the byte in flight; the part works them out by
+replaying the instruction so far on a copy of its core. Where the byte in flight does decide it —
+the opcode of TSTA and TSTB, whose second cycle is dead, the undocumented $38, and an undefined
+indexed postbyte — they are given as if a bus cycle followed. **BUSY** is high in the read and modify
+cycles of a read-modify-write, the first byte of a 16-bit operand, and the first byte of an indirect
+pointer or a vector. There is no MRDY or /DMA/BREQ. Pinout as the 6809's but for 33 = BUSY,
+34 = E (in), 35 = Q (in), 36 = AVMA, 38 = LIC, 39 = TSC.
+
+**The instruction set**, written from Motorola's MC6809 datasheet and the 6809 programming manual,
+not from any emulator: two accumulators, A and B, that are also D; X, Y, U and S; PC, DP and CC
+(EFHINZVC); every instruction on the three opcode pages, TFR and EXG, the stack instructions,
+SWI/SWI2/SWI3, SYNC and CWAI, RTI pulling as much as E says was stacked — the entire state for NMI,
+IRQ and the SWIs, PC and CC alone for FIRQ — and every addressing mode at the cycle counts in the
+manual. Indexed addressing is where the 6809 spends its cycles, and they are the manual's:
+
+| Form | Indexed | Extra cycles | Indirect | Extra cycles |
+| --- | --- | --- | --- | --- |
+| No offset | `,R` | 0 | `[,R]` | 3 |
+| 5-bit offset | `n,R` | 1 | — | |
+| 8-bit offset | `n,R` | 1 | `[n,R]` | 4 |
+| 16-bit offset | `n,R` | 4 | `[n,R]` | 7 |
+| Accumulator | `A,R` `B,R` | 1 | `[A,R]` `[B,R]` | 4 |
+| Accumulator D | `D,R` | 4 | `[D,R]` | 7 |
+| Increment | `,R+` `,R++` | 2, 3 | `[,R++]` | 6 |
+| Decrement | `,-R` `,--R` | 2, 3 | `[,--R]` | 6 |
+| PC, 8-bit | `n,PCR` | 1 | `[n,PCR]` | 4 |
+| PC, 16-bit | `n,PCR` | 5 | `[n,PCR]` | 8 |
+| Extended | — | | `[n]` | 5 |
+
+R is X, Y, U or S. Each extra cycle is a bus cycle — a read of the offset, a don't-care read of the
+next byte, or a dead cycle — and an indirect form reads its pointer, high byte first, then takes a
+dead cycle.
+
+**What Motorola left undefined** runs deterministically, as published characterisations of the
+silicon have it:
+
+| Opcode | Runs as |
+| --- | --- |
+| $01, $41, $51, $61, $71 | NEG |
+| $02, $42, $52, $62, $72 | COM if C is set, NEG if not |
+| $05, $45, $55, $65, $75 | LSR |
+| $0B, $4B, $5B, $6B, $7B | DEC, and C set unless the operand was zero |
+| $4E, $5E | CLRA, CLRB, leaving C alone |
+| $1B | NOP |
+| $18 | CC becomes CC AND the next byte, shifted left one, with V also set if Z was |
+| $38 | ANDCC, in four cycles |
+| $3E | The entire state stacked and the RESET vector taken, E and the masks untouched |
+| $87, $C7 | "STA #", "STB #": N and Z from the register, V cleared, nothing written |
+| $8F, $CF | "STX #", "STU #": N and Z, and the low byte written over the instruction's last byte |
+| $14, $15, $CD | The test mode: the processor stops (dead cycles) until reset |
+| Page 2 $20 | LBRA |
+| Page 2 and 3 $3E | Like $3E, with the SWI2 and FIRQ vectors |
+| Page 2 $C3, $D3, $E3, $F3 | ADDD's flags, D unchanged; on page 3 the same with U |
+| Page 2 $8F, $CF | The store-immediates with Y and S |
+| Any other unassigned page 2 or 3 opcode | The page 1 instruction, a cycle later; a run of prefixes counts as the first |
+| Indexed postbytes $x7, $xA, $xE | The address $0000, at once |
+
+**Validated against an external suite.** There is no 6809 suite in Tom Harte's SingleStepTests
+collection, but there is one in its format: [neetandev/m6809](https://github.com/neetandev/m6809),
+1,000 cases for each of 320 opcodes, each the registers and memory before and after one instruction
+and every bus cycle it ran — generated by running MAME's 6809 core, so it records an emulator's
+behaviour rather than the silicon's, and its cycle counts were checked against the datasheet's
+table. Five opcodes it skips (SYNC, CWAI and the three test-mode ones). The core agrees with all
+**315,000** cases, registers, memory and every cycle's address, direction and data. One difference
+is counted as agreement: the suite records the second cycle of the undocumented $38 as no bus
+access at all, which no 6809 does; the core puts a dead cycle there. Where the address of a
+don't-care cycle was not certain from Motorola's tables — the read of the next byte in the middle of
+a read-modify-write, after an 8-bit index offset, after a 16-bit arithmetic operand and at the end
+of RTS, RTI and the pulls; the dead cycles of BSR, LBSR and JSR — the core follows the suite, and
+the undocumented opcodes' behaviour above is the suite's characterisation of them. Run the other way,
+the 6809E's LIC and AVMA agree with the cycle the core then runs in 311,779 of the 315,000 cases;
+the rest are the opcode-dependent ones described above. The suite has no interrupts, SYNC, CWAI,
+/HALT, DMA or reset; those have tests of their own, written from the datasheet's sequences. The suite
+is not in the repository and no test needs the network.
+
+**How fast it runs.** EXTAL runs at four times the bus rate, so a 6809 cycle is eight clock edges
+where a 6502's is two, each a time point with the whole board solved. Measured on the development
+machine (an 8-core ARM virtual machine, shared and busy), in a release build, the 6809 single-board
+computer runs at **about 3 ms of simulated time per second — some 6,000 bus cycles a second** — and
+the PIA example, with its LCD, at about 2.7 ms (4,900 cycles); on the same run the Ben Eater 6502
+did 11,000 cycles a second and the 68000 monitor 1,600 bus cycles. A debug build is two to three
+times slower. The examples run E at **1.8432 MHz** from a 7.3728 MHz oscillator, a 68B09's speed:
+a slower clock costs the same per cycle, and E ÷ 16 is exactly 115,200 baud for the 6850, so a
+character takes 87 µs and the monitor's whole exchange about 6.5 ms — two seconds of solving.
+
+**Simplifications.** The control inputs are sampled once a cycle, as Q falls, and an interrupt is
+taken by the sample from the instruction's next-to-last cycle; NMI arriving while another interrupt
+is being stacked waits for the next boundary; the reset sequence is dead cycles while /RESET is low
+and one more before the vector; MRDY stretches without the datasheet's ten-microsecond limit; and
+timing inside a quarter is one propagation delay.
+
+### The 6809's peripherals
+
+**The 6821 PIA** has two 8-bit ports, each with a data direction register (a one makes that line an
+output) and a control register, and four handshake lines. RS1 and RS0 pick an address; bit 2 of the
+port's control register decides whether its first address is the direction register or the data:
+
+| RS1 RS0 | Control bit 2 | Register |
+| --- | --- | --- |
+| 00 | 1 | Port A data: reads the PA pins, writes ORA |
+| 00 | 0 | DDRA |
+| 01 | | CRA |
+| 10 | 1 | Port B data: reads ORB for the outputs and the pins for the inputs, writes ORB |
+| 10 | 0 | DDRB |
+| 11 | | CRB |
+
+Each control register: bit 0 enables CA1's (CB1's) interrupt, bit 1 picks its active edge (0
+falling, 1 rising), bit 2 the DDR or data register, bits 3-5 control CA2 (CB2), and bits 6 and 7 —
+read only — are CA2's and CA1's flags, set by their active edges and cleared by a read of the port's
+data register. CA2 and CB2:
+
+| Bits 5 4 3 | CA2 (CB2) |
+| --- | --- |
+| 0 e i | An input: e picks the active edge, i enables its interrupt |
+| 1 0 0 | Handshake: low after a read of port A (for CB2, a write of port B), high again on the next active CA1 (CB1) edge |
+| 1 0 1 | Pulse: low for one E cycle after the read (the write) |
+| 1 1 b | An output held at b |
+
+CA2 goes low as E falls after the read; CB2 on the rising edge of E after the write. /IRQA is low
+while CA1's flag and enable are set, or CA2's as an input; /IRQB the same for B. Both are open drain.
+**The two ports are built differently**, as the datasheet says, and it matters. Port A's lines are
+pulled up inside — an input nobody drives reads high, and holding one low takes a TTL load of
+current — and a port A output is a pull-down with that pull-up for its high, so reading port A
+always reads the pins: an output loaded down reads as the low it really is, and a load that wants
+current cannot have much of it. Port B is three-state: an input floats, an output drives both ways
+(enough for a Darlington's base), and reading it gives the output register for output bits whatever
+the load does to the pin. CA2 is pulled up like port A; CB2 floats like port B. /RESET clears every
+register: every line an input. Pinout: 1 = VSS, 2-9 = PA0-PA7, 10-17 = PB0-PB7, 18 = CB1, 19 = CB2,
+20 = VCC, 21 = R/W, 22 = CS0, 23 = /CS2, 24 = CS1, 25 = E, 26-33 = D7-D0, 34 = /RESET, 35 = RS1,
+36 = RS0, 37 = /IRQB, 38 = /IRQA, 39 = CA2, 40 = CA1. **The 6520**, MOS Technology's second source
+for the 6820 and the PIA of the PET and the Atari 800, has the same pins, registers and behaviour,
+pin 25 called Φ2: here it is the 6821 under another number.
+
+**The 6850 ACIA** is a UART with two addresses. RS low is the control register (write) and the
+status register (read); RS high the transmit (write) and receive (read) data registers.
+
+| Control bits | |
+| --- | --- |
+| 1-0 | Counter divide: 00 ÷1, 01 ÷16, 10 ÷64, 11 **master reset** |
+| 4-2 | Word: 000 7E2, 001 7O2, 010 7E1, 011 7O1, 100 8N2, 101 8N1, 110 8E1, 111 8O1 |
+| 6-5 | 00 /RTS low; 01 /RTS low, transmit interrupt on; 10 /RTS high; 11 /RTS low and a break |
+| 7 | Receive interrupt on: a byte, an overrun, or the carrier lost |
+
+| Status bit | |
+| --- | --- |
+| 0 RDRF | A byte is waiting |
+| 1 TDRE | Room to send — held low while /CTS is high |
+| 2 DCD | The carrier was lost (/DCD went high) |
+| 3 CTS | The /CTS pin |
+| 4 FE | The waiting byte's stop bit was low |
+| 5 OVRN | Bytes were lost |
+| 6 PE | The waiting byte's parity was wrong |
+| 7 IRQ | /IRQ is low |
+
+The datasheet's sequences are kept. Reading the received byte clears RDRF, FE and PE. An
+**overrun** — a byte finishing while RDRF is still set — loses the new byte and does not show at
+once: the next read of the data register hands over the byte that was waiting and sets OVRN, RDRF
+staying set; the read after that clears both. **/DCD** going high latches DCD, interrupts if the
+receive interrupt is on, and holds the receiver in reset; reading the status and then the data
+clears it once /DCD is low again (while /DCD stays high the bit follows it). At power-on the chip
+waits for a **master reset**, as the datasheet requires before use: until a program writes one,
+nothing is sent and /RTS is high. TxCLK and RxCLK clock the two halves at 1, 16 or 64 times the bit
+rate — on a 6809 board both are often E — and the part times the bits from each clock's measured
+period, so the rate follows whatever drives the pin. TxData and RxData are ordinary logic: they
+connect to the **Serial Terminal** and read in the **UART** bus decode. Not modelled: at ÷1 the
+receiver samples mid-bit (the chip wants RxCLK synchronised to the data); a start bit begins at the
+next time point after the data register is loaded rather than on a TxCLK edge. Pinout (DIP-24):
+1 = VSS, 2 = RxData, 3 = RxCLK, 4 = TxCLK, 5 = /RTS, 6 = TxData, 7 = /IRQ, 8 = CS0, 9 = /CS2,
+10 = CS1, 11 = RS, 12 = VCC, 13 = R/W, 14 = E, 15-22 = D7-D0, 23 = /DCD, 24 = /CTS.
+
+**On a 68000.** Both are 6800-family parts, and a 68000 talks to them the way it was designed to:
+the address decode drives **/VPA**, the 68000 asserts **/VMA** in time with its own **E** (CLK ÷
+10), and the peripheral, clocked by that E, is selected with /CS2 on /VMA and CS1 on the decoded
+address. The tests drive a 6821 and a 6850 from a 68000 program that way, on the odd bytes.
+
+### The 6809 single-board computer
+
+**File > Examples > Computers > 6809 Single-Board Computer** is built in the style of Grant Searle's
+simple 6809:
+
+| Address | What | Selected by |
+| --- | --- | --- |
+| $0000-$7FFF | 62256 RAM | /CE = A15; /OE = /RD, /WE = /WR |
+| $A000-$BFFF | 6850 ACIA, registers at $A000 and $A001 | /CS2 = ACIA_SEL (74138 Y5), RS = A0 |
+| $C000-$DFFF | Free — the PIA example puts its 6821 here | PIA_SEL (Y6) |
+| $E000-$FFFF | 2764 EPROM, the vectors at its top | /CE = ROM_SEL (Y7), /OE tied low |
+
+A **74138** on A13-A15 splits the top half into 8K blocks. A **7400** makes /RD = NAND(E, R/W) and
+/WR = NAND(E, NOT R/W), so the RAM answers only while E is high and a write lands while the data is
+steady. The EPROM's /OE is tied low and its /CE alone selects it: at 1.8432 MHz an E high is 271 ns,
+and a 250 ns EPROM enabled only by /RD would not have its byte ready as E falls. The 6850's TxCLK and
+RxCLK are both E, so ÷16 is 115,200 baud. The EPROM holds this monitor, which prints a banner and a
+prompt, reads a line, and for **D** and an address dumps the eight bytes there. The terminal types
+`D E000` at 2.5 ms:
+
+```asm
+; A small monitor for the 6809 single-board computer: a 6850 at $A000
+; talking to the terminal at 115,200 baud (E ÷ 16, E being 1.8432 MHz),
+; RAM at $0000-$7FFF and this ROM at $E000-$FFFF. It prints a banner and
+; a prompt; D and an address in hex dumps the eight bytes there.
+
+ACIA    equ $A000       ; control register (write), status register (read)
+ACIAD   equ $A001       ; transmit data (write), receive data (read)
+LINE    equ $0100       ; the line being typed
+
+        org $E000
+reset:  lds #$8000      ; the stack at the top of RAM
+        lda #$03
+        sta ACIA        ; master reset
+        lda #$15
+        sta ACIA        ; ÷16, 8 bits, no parity, 1 stop bit, no interrupts
+        ldx #banner
+        bsr print
+prompt: ldx #ready
+        bsr print
+        ldy #LINE
+getc:   lda ACIA        ; wait for a character: RDRF
+        bita #$01
+        beq getc
+        lda ACIAD
+        bsr putc        ; echo it
+        cmpa #13
+        beq entered
+        sta ,y+
+        bra getc
+entered: clr ,y          ; the line ends with a zero
+        lda #10
+        bsr putc
+        ldy #LINE
+        lda ,y+
+        anda #$DF       ; upper case
+        cmpa #'D'
+        bne what
+        bsr hex16       ; X = the address
+        bcs what
+        tfr x,d
+        bsr out16       ; "E000:"
+        lda #':'
+        bsr putc
+        ldb #8
+dump:   lda #' '
+        bsr putc
+        lda ,x+
+        bsr out8
+        decb
+        bne dump
+        bsr crlf
+        bra prompt
+what:   ldx #query
+        bsr print
+        bra prompt
+
+; Sends A when the transmitter has room: TDRE. Keeps every register.
+putc:   pshs b
+putw:   ldb ACIA
+        bitb #$02
+        beq putw
+        sta ACIAD
+        puls b,pc
+
+; Sends the text at X, up to a zero byte.
+print:  lda ,x+
+        beq done
+        bsr putc
+        bra print
+done:   rts
+
+crlf:   lda #13
+        bsr putc
+        lda #10
+        bra putc
+
+; Sends D as four hex digits, A as two.
+out16:  pshs b
+        bsr out8
+        puls a
+out8:   pshs a
+        lsra
+        lsra
+        lsra
+        lsra
+        bsr nibble
+        puls a
+nibble: anda #$0F
+        adda #'0'
+        cmpa #'9'
+        bls digit
+        adda #7
+digit:  bra putc
+
+; Reads a hex number at Y into X, after any spaces. C set if there is none.
+hex16:  ldx #0
+skip:   lda ,y+
+        cmpa #' '
+        beq skip
+        bsr value
+        bcs none
+more:   pshs a          ; X = X * 16 + the digit
+        tfr x,d
+        aslb
+        rola
+        aslb
+        rola
+        aslb
+        rola
+        aslb
+        rola
+        orb ,s+
+        tfr d,x
+        lda ,y+
+        bsr value
+        bcc more
+        andcc #$FE
+none:   rts
+
+; The value of the hex digit in A, C set if it is not one.
+value:  cmpa #'0'
+        blo bad
+        cmpa #'9'
+        bls decimal
+        anda #$DF
+        cmpa #'A'
+        blo bad
+        cmpa #'F'
+        bhi bad
+        suba #'A'-10
+        andcc #$FE
+        rts
+decimal: suba #'0'
+        andcc #$FE
+        rts
+bad:    orcc #$01
+        rts
+
+banner: fcc "CIRQ 6809 monitor"
+        fcb 13,10,0
+ready:  fcc "> "
+        fcb 0
+query:  fcc "?"
+        fcb 13,10,0
+
+        org $FFFE
+        fdb reset       ; the reset vector
+```
+
+It prints `CIRQ 6809 monitor`, echoes the command and answers `E000: 10 CE 80 00 86 03 B7 A0` — its
+own first instructions — after about 6.5 ms. Polling the status register like this is the simplest
+way to drive a 6850; set bit 7 of the control register and it interrupts on every byte instead.
+**Simulate > Decode Bus** offers a **Cpu6809** decode: every cycle as an address, a byte and a
+direction, the dead cycles as `dead $FFFF`, the vector reads with BS high, and each instruction
+disassembled where it starts:
+
+```
+V $FFFE E0   V $FFFF 00   dead $FFFF   $E000 LDS #$8000   R $E001 CE   R $E002 80   R $E003 00
+$E004 LDA #$03   R $E005 03   $E006 STA $A000   R $E007 A0   R $E008 00   dead $FFFF   W $A000 03
+```
+
+### Counting presses on a 6821
+
+**File > Examples > Computers > 6809 PIA Button Counter** is the same computer with a **6821** at
+$C000 (/CS2 = PIA_SEL, RS0 = A0, RS1 = A1) in place of the ACIA. Port B is an HD44780's data bus and
+PA5, PA6 and PA7 its RS, RW and E, as on Ben Eater's 6502; a push button with a pull-up drives
+**CA1**, and /IRQA drives the processor's /IRQ. Each press is CA1's falling edge: the PIA sets its
+flag and pulls /IRQA low, the handler reads port A — which clears the flag — and counts in BCD, and
+the main loop puts the count on the display's second line.
+
+![The 6809 with a 6821 PIA: the same EPROM, RAM and decoding, the PIA's port B on an HD44780's data lines and PA5-PA7 on its RS, RW and E, a push button with a pull-up on CA1, /IRQA on the processor's /IRQ, and the display reading "CIRQ 6809 + 6821" and "Presses: 05"](images/59-6809-pia.png)
+
+```asm
+; Counting button presses on a 6809 with a 6821 PIA at $C000: an HD44780
+; on port B (its data) and PA5-PA7 (RS, RW and E), as on Ben Eater's
+; computer, and a push button on CA1 interrupting on each press.
+
+PORTA   equ $C000       ; DDRA while CRA bit 2 is clear
+CRA     equ $C001
+PORTB   equ $C002       ; DDRB while CRB bit 2 is clear
+CRB     equ $C003
+E       equ %10000000   ; the LCD's control lines, on port A
+RW      equ %01000000
+RS      equ %00100000
+COUNT   equ $0010       ; presses so far, in BCD
+SHOWN   equ $0011       ; the count the display shows
+
+        org $E000
+reset:  lds #$8000
+        clr COUNT
+        lda #$FF
+        sta SHOWN       ; not yet shown
+; Port A's pull-ups have held E high since reset. E and RW go into ORA
+; high first, so when the lines become outputs E does not move.
+        lda #%00000100
+        sta CRA         ; CRA: the data register
+        lda #RW+E
+        sta PORTA
+        clr CRA         ; CRA: the direction register
+        lda #%11100000
+        sta PORTA       ; PA5-PA7 drive the LCD's control lines
+        clr CRB
+        lda #$FF
+        sta PORTB       ; port B drives its data lines
+        lda #%00000101  ; CA1: falling edge, interrupt on; the data register
+        sta CRA
+        lda #%00000100  ; port B: the data register
+        sta CRB
+        lda #RW
+        sta PORTA       ; E low with RW high: a harmless read
+        ldx #setup
+init:   lda ,x+         ; the set-up commands, in order
+        beq title
+        bsr command
+        bra init
+title:  lda #$80        ; line 1
+        bsr command
+        ldx #text
+        bsr puts
+        andcc #$EF      ; let the button interrupt
+idle:   lda COUNT       ; wait for the count to change
+        cmpa SHOWN
+        beq idle
+        sta SHOWN
+        lda #$C0        ; line 2
+        bsr command
+        ldx #label
+        bsr puts
+        lda SHOWN       ; two BCD digits
+        lsra
+        lsra
+        lsra
+        lsra
+        adda #'0'
+        bsr write
+        lda SHOWN
+        anda #$0F
+        adda #'0'
+        bsr write
+        bra idle
+
+; The button: CA1 fell. Reading port A clears the flag, and /IRQA with it.
+irq:    lda PORTA
+        lda COUNT
+        adda #1
+        daa
+        sta COUNT
+        rti
+
+; Sends the text at X to the LCD, up to a zero byte.
+puts:   lda ,x+
+        beq sent
+        bsr write
+        bra puts
+sent:   rts
+
+; Sends A to the LCD as a command (RS low) or a character (RS high).
+command: ldb #0
+        bra send
+write:  ldb #RS
+send:   bsr wait
+        sta PORTB       ; the byte onto the LCD's data lines
+        stb PORTA       ; RS as wanted, E low
+        pshs b
+        orb #E
+        stb PORTA       ; E high...
+        puls b
+        stb PORTA       ; ...and low: the LCD takes the byte as E falls
+        rts
+
+; Waits while the LCD is busy, reading its busy flag through port B.
+wait:   pshs a,b
+        clr CRB
+        clr PORTB       ; port B in
+        lda #%00000100
+        sta CRB
+busy:   lda #RW
+        sta PORTA       ; RW high, E low
+        lda #RW+E
+        sta PORTA       ; E high: the LCD drives its busy flag onto D7
+        ldb PORTB
+        lda #RW
+        sta PORTA       ; E low again
+        tstb
+        bmi busy        ; still busy
+        clr CRB
+        lda #$FF
+        sta PORTB       ; port B out again
+        lda #%00000100
+        sta CRB
+        puls a,b,pc
+
+setup:  fcb %00111000   ; eight bits, two lines, 5x8 font
+        fcb %00001100   ; display on, cursor off
+        fcb %00000110   ; move the cursor right after each character
+        fcb 0
+text:   fcc "CIRQ 6809 + 6821"
+        fcb 0
+label:  fcc "Presses: "
+        fcb 0
+
+        org $FFF8
+        fdb irq         ; IRQ
+        org $FFFE
+        fdb reset       ; RESET
+```
+
+**Port A's pull-ups show up here.** From reset until the program makes PA5-PA7 outputs, the lines
+are inputs and their pull-ups hold E, RW and RS high. Turning them into outputs with ORA still zero
+would drop E with RW low — a write of whatever floats on port B, which the HD44780 takes as a
+command: here, as on the bench, it can land the display in four-bit mode. So the program writes E
+and RW high into ORA first: when the lines become outputs E stays where it was, and the first fall,
+with RW high, is a harmless read. Port B, which floats at reset, carries the data.
+
+### The 6809 board's limits
+
+- The 6809 board solves at a few thousand bus cycles a second: run milliseconds, not seconds, and
+  keep delays short and serial rates high, as the examples do.
+- Interrupt sampling, the reset sequence, MRDY's limit and the timing inside a quarter cycle are
+  simplified, as above; so are the peripherals' details listed under each.
 
 ---
 

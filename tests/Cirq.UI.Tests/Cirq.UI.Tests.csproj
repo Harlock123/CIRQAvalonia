@@ -22,5 +22,6 @@
     <Compile Include="../Cirq.Chat.Tests/FakeClaude.cs" Link="Support/FakeClaude.cs" />
     <Compile Include="../Cirq.Components.Tests/Assembler6502.cs" Link="Support/Assembler6502.cs" />
     <Compile Include="../Cirq.Components.Tests/Assembler68000.cs" Link="Support/Assembler68000.cs" />
+    <Compile Include="../Cirq.Components.Tests/Assembler6809.cs" Link="Support/Assembler6809.cs" />
   </ItemGroup>
 </Project>
