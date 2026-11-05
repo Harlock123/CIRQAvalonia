@@ -289,6 +289,19 @@ public static class Recipes
         return recipe.Text("Tell the person what the monitor prints and how the 68000 reaches the DUART: a byte at an odd address, on D0-D7 with /LDS. The terminal sends \"D 000400\" at 8 ms and the monitor answers with a dump of its own code; run on to 20 ms (half a minute or so of solving) to see it.");
     }
 
+    [McpServerPrompt(Name = "computer_6809", Title = "A 6809 computer")]
+    [Description("Opens the 6809 Single-Board Computer example (an MC6809 with E at 1.8432 MHz, a 2764 EPROM, a 62256 RAM, a 74138 and a 7400 decoding the address, and a 6850 ACIA clocked from E on a serial terminal at 115,200 baud), reads the monitor in the EPROM, runs it, and checks the processor, its dead cycles and what the ACIA has sent.")]
+    public static string Computer6809()
+    {
+        var recipe = new Recipe("Explore a 6809 computer: the example is an MC6809 (U2) with a 2764 EPROM (U3) at $E000-$FFFF, a 62256 RAM (U4) at $0000-$7FFF, a 74138 (U5) and a 7400 (U6) decoding the address, and a 6850 ACIA (U7) at $A000 talking to a serial terminal (U8) at 115,200 baud — E ÷ 16, TxCLK and RxCLK both on E. Every cycle is a bus cycle: the ones the processor spends inside itself are dead cycles, reads of $FFFF.");
+        recipe.Step("Open the example. If it refuses because the open circuit has unsaved changes, save that first, or ask the person whether to discard it.", "load_example", new { name = "6809 Single-Board Computer" });
+        recipe.Step("Read the monitor in the EPROM: the vectors at the top say where it starts.", "disassemble", new { part = "U3", origin = 0xE000, count = 16, variant = "6809" });
+        recipe.Step("Run it for 2 ms of simulated time: the ACIA reset and set up, and the banner going out. Every quarter of every E cycle is solved on the pins, so this takes a second or so.", "run_transient", new { duration = "2m", plot = false });
+        recipe.Step("Where the 6809 got to: its registers and flags, and its last bus cycles, dead ones marked.", "cpu_state", new { cycles = 12 });
+        recipe.Step("What the ACIA is doing: its word format, the baud rate E gives it, its status, and what it has sent so far.", "peripheral_state", new { part = "U7" });
+        return recipe.Text("Tell the person what the monitor prints and how the 6809 polls the 6850's status register for TDRE before each byte. The terminal sends \"D E000\" at 2.5 ms and the monitor answers with a dump of its own first bytes; run on to 6.5 ms (a few seconds of solving) to see it.");
+    }
+
     private sealed class Recipe(string intro)
     {
         private readonly StringBuilder _text = new(intro + "\n\nFollow these steps in order. A line starting with \"" + CallMarker.Trim() + "\" is one tool call, with its arguments as JSON. If a step fails, read the error, fix the cause and carry on.\n");

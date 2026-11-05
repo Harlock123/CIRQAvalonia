@@ -46,7 +46,7 @@ public class EndToEndTests
         Assert.Equal(ToolNames, CircuitServer.Definitions().Select(t => t.Name));
 
         var prompts = await s.Client.ListPromptsAsync(cancellationToken: CancellationToken.None);
-        Assert.Equal(["rc_low_pass", "led_with_resistor", "astable_555", "inverting_amplifier", "bridge_rectifier", "decade_counter", "computer_6502", "sid_player", "computer_68000"], prompts.Select(p => p.Name));
+        Assert.Equal(["rc_low_pass", "led_with_resistor", "astable_555", "inverting_amplifier", "bridge_rectifier", "decade_counter", "computer_6502", "sid_player", "computer_68000", "computer_6809"], prompts.Select(p => p.Name));
     }
 
     [Fact]

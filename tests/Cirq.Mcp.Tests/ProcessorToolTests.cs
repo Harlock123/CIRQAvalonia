@@ -77,7 +77,50 @@ public class ProcessorToolTests
         Assert.Equal(38400, (double)duart["channel_a"]!["baud"]!);
         Assert.True((bool)duart["channel_a"]!["transmitter_on"]!);
         Assert.StartsWith("CI", (string)duart["channel_a"]!["sent"]!);
-        Assert.Contains("not a 68681", await Error(b.Tools.PeripheralState("U2")));
+        Assert.Contains("not a 6821", await Error(b.Tools.PeripheralState("U2")));
+    }
+
+    /// <summary>The 6809 computer: its EPROM disassembled with the vectors, a run, its registers and dead cycles, and the ACIA's state.</summary>
+    [Fact]
+    public async Task The_6809_computer_disassembles_runs_and_reports()
+    {
+        using var b = new Bench();
+        await b.Tools.LoadExample("6809 Single-Board Computer");
+
+        var listing = await Parse(b.Tools.Disassemble("U3", origin: 0xE000, count: 2, variant: "6809"));
+        Assert.Equal(["$E000  10 CE 80 00     LDS #$8000", "$E004  86 03           LDA #$03"],
+            listing["lines"]!.AsArray().Select(l => (string)l!));
+        Assert.Equal("$E000", (string)listing["vectors"]!["reset"]!);
+
+        await b.Tools.RunTransient(System.Text.Json.JsonSerializer.SerializeToElement("1m"), plot: false);
+
+        var cpu = await Parse(b.Tools.CpuState(cycles: 6));
+        Assert.Equal("MC6809", (string)cpu["chip"]!);
+        Assert.Equal("running", (string)cpu["state"]!);
+        Assert.Equal("$00", (string)cpu["dp"]!);
+        Assert.StartsWith("eF", (string)cpu["flags"]!);       // FIRQ masked since reset
+        Assert.InRange((long)cpu["cycles"]!, 1700, 1900);       // 1 ms at 1.8432 MHz
+        Assert.Equal(6, cpu["recent_cycles"]!.AsArray().Count);
+        Assert.Equal("RESET", (string)cpu["last_interrupt"]!);
+
+        var acia = await Parse(b.Tools.PeripheralState("U7"));
+        Assert.Equal("MC6850", (string)acia["chip"]!);
+        Assert.Equal("8N1", (string)acia["word"]!);
+        Assert.Equal("÷16", (string)acia["divide"]!);
+        Assert.InRange((double)acia["transmit_baud"]!, 115000, 115400);
+        Assert.StartsWith("CIRQ", (string)acia["sent"]!);
+    }
+
+    [Fact]
+    public async Task Peripheral_state_reads_a_pia()
+    {
+        using var b = new Bench();
+        await b.Tools.AddParts([new() { Kind = "6821 PIA" }]);
+        var pia = await Parse(b.Tools.PeripheralState());
+        Assert.Equal("MC6821", (string)pia["chip"]!);
+        Assert.Equal("$00", (string)pia["port_a"]!["direction"]!);
+        Assert.Equal("CA2 an input, falling edge, interrupt off", (string)pia["port_a"]!["c2"]!);
+        Assert.False((bool)pia["irqa_low"]!);
     }
 
     [Fact]
@@ -102,7 +145,7 @@ public class ProcessorToolTests
         using var b = new Bench();
         await b.Tools.AddParts([new() { Kind = "Resistor" }]);
         Assert.Contains("no 6502", await Error(b.Tools.CpuState()));
-        Assert.Contains("no 68681", await Error(b.Tools.PeripheralState()));
+        Assert.Contains("no 6821", await Error(b.Tools.PeripheralState()));
     }
 
     /// <summary>sid_state before and after a run of the SID player, and what it says without a SID.</summary>

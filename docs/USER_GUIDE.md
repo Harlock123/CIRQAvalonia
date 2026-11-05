@@ -8070,13 +8070,15 @@ it is told to.
 | Files | `new_circuit`, `open_circuit`, `save_circuit` |
 
 A run comes back as measurements (frequency, duty cycle, peak to peak, rise time, the −3 dB corner)
-and as a plot the agent looks at. The server also offers nine recipes, step-by-step plans with the
+and as a plot the agent looks at. The server also offers ten recipes, step-by-step plans with the
 exact calls: an RC low-pass, an LED and its resistor, a 555 astable, an inverting amplifier, a
 bridge rectifier with smoothing, a decade counter, a tour of the 6502 computer — its ROM
 disassembled, a run, and the processor, LCD and RAM read afterwards — and the SID player, its
 interrupt handler disassembled, a run, and the 6510's port and the SID's voices read afterwards —
 and the 68000 computer, its monitor disassembled across the ROM pair, a run, and the processor's
-registers and wait states and the DUART's channel read afterwards. A transient run hands its end
+registers and wait states and the DUART's channel read afterwards — and the 6809 computer, its
+monitor disassembled from the EPROM with the vectors, a run, and the processor's registers, its dead
+cycles and the ACIA's state read afterwards. A transient run hands its end
 state back to the circuit, so a processor's registers, a memory's bytes, an LCD's text and a CIA's,
 SID's or 68000 peripheral's registers are where the run left them.
 
