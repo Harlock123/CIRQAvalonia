@@ -553,6 +553,8 @@ public static class ComponentCatalog
                 () => new Sid8580()),
             new("68000", "Motorola MC68000, the 16/32-bit processor of the Mac, Amiga and Atari ST, on its asynchronous bus: /AS, /UDS, /LDS and wait states until /DTACK",
                 () => new Cpu68000()),
+            new("68681 DUART", "Two serial ports for a 68000's bus, 50 to 38,400 baud from a 3.6864 MHz crystal, a counter/timer and I/O ports — talks to the Serial Terminal",
+                () => new Duart68681()),
         ]),
 
         new("Sensors & Actuators",
