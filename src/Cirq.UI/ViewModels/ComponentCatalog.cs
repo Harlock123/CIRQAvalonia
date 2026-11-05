@@ -555,6 +555,8 @@ public static class ComponentCatalog
                 () => new Cpu68000()),
             new("68681 DUART", "Two serial ports for a 68000's bus, 50 to 38,400 baud from a 3.6864 MHz crystal, a counter/timer and I/O ports — talks to the Serial Terminal",
                 () => new Duart68681()),
+            new("68230 PI/T", "Parallel interface and timer for a 68000: two handshaking 8-bit ports (or one 16-bit), port C and a 24-bit timer, with vectored interrupts",
+                () => new Pit68230()),
         ]),
 
         new("Sensors & Actuators",
