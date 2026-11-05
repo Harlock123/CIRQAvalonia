@@ -61,6 +61,13 @@ dotnet run --project src/Cirq.UI -- --mcp      # the MCP server on stdio, headle
     cycle), `CpuZ80BusDecoder`, and the Z80 family in `Z80Peripheral` (the bus with no /WR and the
     interrupt daisy chain they share), `Z80Pio`, `Z80Ctc` and `Z80Sio.cs` (`Z80SerialController`,
     the `Z80Sio` and `Z80Dart` parts, on `SerialLine`).
+  - And the 8085: `I8085Core` (two partial files: the T-states, interrupts, HOLD and reset; the
+    instructions), `Opcodes8085` (the disassembler and the patterns the test-side assembler is
+    built from), `Cpu8085` (the DIP-40 part, X1 at twice CLK OUT), `Cpu8085BusDecoder`, and Intel's
+    peripherals: `Ram8155.cs` (`RamIoTimer8155`, the `Ram8155` and `Ram8156` parts, on the
+    multiplexed bus with their own latch), and on `IntelPeripheral` (the demultiplexed bus they
+    share) `Ppi8255`, `Usart8251` (on `SerialLine`), `Pit8253.cs` (`IntervalTimer`, the `Pit8253`
+    and `Pit8254` parts) and `Pic8259`.
   - `Serialization/` reads and writes `.cirq` files (indented JSON).
   - `Spice/` imports and exports SPICE models and netlists.
 - `src/Cirq.UI/`: the Avalonia editor.
@@ -178,6 +185,28 @@ dotnet run --project src/Cirq.UI -- --mcp      # the MCP server on stdio, headle
   watch for ED 4D, /INT and IEO. A chip supplies its sources' `Pending`, `VectorFor` and
   `Acknowledged` (the PIO and CTC forget a request once acknowledged; the SIO keeps its cause until
   it is dealt with). `Z80DaisyChainTests` runs a CTC, a SIO and a PIO in one chain.
+- **The 8085 core is a sequence of T-states.** `I8085Core` yields once per T-state, having set
+  `Kind` (the machine cycle, as IO/M, S1 and S0 and the strobe say), `State` (T1-T6, Tw, or a
+  HALT, hold or reset state), `Address` and `DataOut`; the caller completes it with the bus's byte
+  when `SamplesData` says so, sets `ReadyLow` in a T-state with `SamplesReady`, and sets the
+  interrupt, HOLD and SID inputs before completing: interrupts are decided from the sample of the
+  next-to-last T-state, HOLD from T2 (or T4 of a six-state fetch). RST 7.5 and TRAP latch their
+  edges in `SenseEdges`, which `Cpu8085` also calls whenever the pins change. `Cpu8085` turns
+  X1's rising edges into CLK OUT and starts each T-state as CLK OUT falls. The V and K flags follow
+  the control lines reverse-engineered from the die, not Tundra's CA80C85B sheet; change them only
+  with a source. Test with `Cpu8085CoreTests` (the test-side `Assembler8085`, its table built from
+  `Opcodes8085.Pattern`; every opcode's T-states against Intel's table), `Cpu8085CircuitTests` (a
+  board with a 74373, a 27C256, a 62256 and two 74138s, which the peripheral tests reuse), and
+  locally against Ian Bartholomew's 8085 exerciser (`8085EX1`, with a real D8085AH-1's CRCs; it
+  masks V and K out), 8080PRE and TST8080 with a CP/M stand-in, downloaded outside the repository and
+  never committed. The 8085 examples' EPROM images are byte arrays in `Examples.I8085.cs`, checked
+  against the guide's source by a UI test.
+- **Intel's peripherals share their bus.** `IntelPeripheral.EvaluateBus` does /CS with /RD and
+  /WR: a write's byte taken as /WR rises, a read driven while /RD is low with its side effects as
+  it rises (`ReadStarted` for what must happen as it begins), and `Drive` for bytes put on the bus
+  without /CS (the 8259A's /INTA answers). The 8155 and 8156 latch AD0-AD7, IO/M and CE
+  themselves as ALE falls. RESET, where a chip has it (the 8155, 8156, 8255A and 8251A), is
+  active high, from the 8085's RESET OUT.
 - **6800-family peripherals act on E.** The 6821 and 6850 latch a write and do a read's side
   effects as E falls, and drive a read while E is high and they are selected, so on a 68000 they
   want /VPA from the decode and /VMA on a chip select. The 6821's port A pull-ups are stamped

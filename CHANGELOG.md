@@ -8,6 +8,57 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+## [0.48.0] - 2026-11-05
+
+The Intel 8085 and its peripherals. An 8085A that runs every opcode — the ten undocumented ones and
+the undocumented V and K flags included — T-state by T-state on its multiplexed bus, with ALE, its
+clock at half the crystal, READY, HOLD, TRAP and the RST interrupts, SIM and RIM, and SID and SOD;
+and the chips Intel built around it: the 8155 and 8156, the 8255A, the 8251A, the 8253 and 8254, and
+the 8259A. Two 8085 computers as examples. 335 components in 17 categories, 116 worked examples,
+5309 tests.
+
+### Added
+
+**The 8085**, written from Intel's 8080/8085 programming manual, the MCS-80/85 user's manual and
+the 8085AH datasheet: every instruction with Intel's T-states — the conditional jumps and calls
+reading only their low byte when not taken — and flags, the 8085's AC after ANA, bit 3 always 0;
+SIM and RIM with the three masks and the RST 7.5 flip-flop, TRAP keeping the old interrupt enable
+for the first RIM after it, EI's delay and HLT. The undocumented DSUB, ARHL, RDEL, LDHI, LDSI,
+RSTV, SHLX, LHLX, JNK and JK, and the V and K flags as the reverse-engineered die stores them. It
+matches all 24 groups of Ian Bartholomew's 8085 exerciser against the CRCs of a real Intel
+D8085AH-1, and passes 8080PRE and TST8080.
+
+**The 8085's pins.** X1 at twice the processor's clock and CLK OUT for the board; a T-state per
+CLK OUT cycle; ALE with the address on AD0-AD7 in T1, for a 74373; the status lines IO/M, S1 and
+S0; /RD, /WR and /INTA; READY's wait states; HOLD and HLDA floating the bus; TRAP, RST 7.5 (an edge,
+latched), RST 6.5, RST 5.5 and INTR, answered with /INTA — an RST in one acknowledge, a CALL in
+three; RESET IN and RESET OUT; SID and SOD.
+
+**The 8155 and 8156** — 256 bytes of RAM, three ports with strobed handshakes and a 14-bit timer,
+latching their own address on ALE. **The 8255A** — three ports in modes 0, 1 and 2, bit
+set/reset and the status word. **The 8251A** — a serial port in its asynchronous modes, x1, x16 and
+x64, errors, break detect and the reset idiom, talking to the Serial Terminal; the synchronous modes
+are not modelled, and the guide says so. **The 8253 and 8254** — three counters in all six modes,
+binary or BCD, with the latch command and the 8254's read-back. **The 8259A** — eight interrupts
+ranked, masked and nested, answering an 8085's /INTA with a CALL to each one's handler (or an
+8086 with a vector), EOIs, AEOI, rotation, poll and cascading.
+
+**Two examples in File > Examples > Computers.** *8085 Single-Board Computer*: a 74373 on ALE, a
+2764, an 8156 for RAM and a baud-rate timer, a 74138 and an 8251A at 19,200 baud, running a small
+monitor that dumps memory for the terminal. *8085 Timer Interrupts*: the same board with an 8253
+interrupting a thousand times a second through the 8259A's CALL to count on eight LEDs on an 8255A,
+a button on RST 7.5 turning the count round, and the processor in HLT between. The guide prints
+both programs; a test checks the EPROMs hold them.
+
+**Simulate > Decode Bus** reads an 8085's bus: each machine cycle with its status, the bus idle
+and acknowledge cycles, halts, holds and wait states, and each instruction disassembled where it
+starts.
+
+**Agent tools.** `cpu_state` and `disassemble` work for the 8085 (its registers, the flags with V
+and K, the interrupt system, SID and SOD; its code in Intel's mnemonics with the restart addresses),
+`peripheral_state` reports the 8155, 8156, 8255A, 8251A, 8253, 8254 and 8259A, and a
+`computer_8085` recipe tours the example. 37 tools and twelve recipes.
+
 ## [0.47.0] - 2026-11-05
 
 The Zilog Z80 and its family. A Z80 that runs every opcode — the undocumented ones included —
@@ -2763,7 +2814,8 @@ First public build of CirqAvalonia — an electronic circuit analyzer and mixed-
 
 **501 tests** measure the solver against closed-form answers rather than recorded output.
 
-[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.47.0...HEAD
+[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.48.0...HEAD
+[0.48.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.47.0...v0.48.0
 [0.47.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.46.0...v0.47.0
 [0.46.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.45.0...v0.46.0
 [0.45.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.44.1...v0.45.0

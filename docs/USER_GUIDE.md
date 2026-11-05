@@ -171,7 +171,7 @@ Three of those are worth separating, because they are easy to confuse:
 
 ## Placing components
 
-![The component palette: a Find a part box at the top, "327 parts in 17 groups" under it, and the seventeen categories with their counts — passive 11, switches 5, sources 16, semiconductors 13, transistors 13, LEDs and displays 11, power 10, analog ICs 13, logic gates 14, 74xx series 79, 40xx series 47, buses 19, digital I/O 9, memory and CPUs 30, sensors and actuators 20, switching and isolation 11, dev boards 6 — every group closed, so all seventeen headings fit on screen at once](images/02-palette.png)
+![The component palette: a Find a part box at the top, "335 parts in 17 groups" under it, and the seventeen categories with their counts — passive 11, switches 5, sources 16, semiconductors 13, transistors 13, LEDs and displays 11, power 10, analog ICs 13, logic gates 14, 74xx series 79, 40xx series 47, buses 19, digital I/O 9, memory and CPUs 38, sensors and actuators 20, switching and isolation 11, dev boards 6 — every group closed, so all seventeen headings fit on screen at once](images/02-palette.png)
 
 Click a palette entry, then click the canvas. The part lands where you click, snapped to the grid.
 
