@@ -54,16 +54,17 @@ the [README](../README.md), and what changed between releases is in the
 42. [A 68000 computer](#a-68000-computer)
 43. [A 6809 computer](#a-6809-computer)
 44. [A Z80 computer](#a-z80-computer)
-45. [Saving and loading](#saving-and-loading)
-46. [Printing](#printing)
-47. [Exporting](#exporting)
-48. [The command line](#the-command-line)
-49. [AI: the chat and agents](#ai-the-chat-and-agents)
-50. [Appearance](#appearance)
-51. [What version is this](#what-version-is-this)
-52. [Closing a dialog](#closing-a-dialog)
-53. [Keyboard reference](#keyboard-reference)
-54. [When a circuit will not simulate](#when-a-circuit-will-not-simulate)
+45. [An 8085 computer](#an-8085-computer)
+46. [Saving and loading](#saving-and-loading)
+47. [Printing](#printing)
+48. [Exporting](#exporting)
+49. [The command line](#the-command-line)
+50. [AI: the chat and agents](#ai-the-chat-and-agents)
+51. [Appearance](#appearance)
+52. [What version is this](#what-version-is-this)
+53. [Closing a dialog](#closing-a-dialog)
+54. [Keyboard reference](#keyboard-reference)
+55. [When a circuit will not simulate](#when-a-circuit-will-not-simulate)
 
 This guide is also attached to every [release](../../releases) as a PDF, with a contents page and
 the screenshots in place — the same document, laid out for reading away from the machine. Build it
@@ -191,7 +192,7 @@ The palette holds **335 components in 17 categories**:
 | 40xx Series | 47 | CMOS gates and the **4049 / 4050 level converters**; flip-flops and latches; counters including the **4026 and 4033 with their own display drivers**, the **4029, 4510 and 4516 up/down counters** and the **4518 / 4520**; the **4028** and **4543 LCD driver**; shift registers to the **4094**; the **4051, 4052, 4053 and 4067 analog multiplexers**; the **4047, 4528 and 4538** timers; a **4046 phase-locked loop** — see [below](#the-40xx-series) |
 | Buses | 19 | **Bus tap** and **bus line**, I2C master, EEPROM, port expander, DS1307 clock, ADS1115 ADC, MCP4725 DAC and INA219 current sensor, SPI master and **MCP3008 ADC**, 1-Wire master and DS18B20 thermometer, serial terminal and device, **RS-485**, **CAN** and **RS-232 (MAX232)** transceivers, level shifter — see [below](#making-its-own-rails) |
 | Digital I/O | 9 | Logic toggle, clock, **pattern generator**, rotary encoder, oscillator module, ADC and DAC bridges, and a **2K × 8 SRAM and ROM** — see [below](#something-worth-addressing) |
-| Memory & CPUs | 38 | The **2716, 2732, 2764 and 27C256 EPROMs**, the **28C256 EEPROM**, the **6116 and 62256 static RAMs** — each loadable from a binary, Intel HEX or S-record file — and the **65C02**, **6502**, **6510** and **8500** processors, **6522 VIA**, **6551 ACIA**, **6526 CIA** and the **6581 and 8580 SIDs**, the **68000**, **68681 DUART**, **68230 PI/T** and **68901 MFP**, the **6809**, **6809E**, **6821** and **6520 PIAs** and **6850 ACIA**, and the **Z80**, **Z80 PIO**, **Z80 CTC**, **Z80 SIO/0** and **Z80 DART**, and the **8085**, **8155**, **8156**, **8255A**, **8251A**, **8253**, **8254** and **8259A** — see [below](#memories-by-their-part-numbers), [the 6502 computer](#a-6502-computer), [the 6809 computer](#a-6809-computer) and [the Z80 computer](#a-z80-computer) |
+| Memory & CPUs | 38 | The **2716, 2732, 2764 and 27C256 EPROMs**, the **28C256 EEPROM**, the **6116 and 62256 static RAMs** — each loadable from a binary, Intel HEX or S-record file — and the **65C02**, **6502**, **6510** and **8500** processors, **6522 VIA**, **6551 ACIA**, **6526 CIA** and the **6581 and 8580 SIDs**, the **68000**, **68681 DUART**, **68230 PI/T** and **68901 MFP**, the **6809**, **6809E**, **6821** and **6520 PIAs** and **6850 ACIA**, and the **Z80**, **Z80 PIO**, **Z80 CTC**, **Z80 SIO/0** and **Z80 DART**, and the **8085**, **8155**, **8156**, **8255A**, **8251A**, **8253**, **8254** and **8259A** — see [below](#memories-by-their-part-numbers), [the 6502 computer](#a-6502-computer), [the 6809 computer](#a-6809-computer), [the Z80 computer](#a-z80-computer) and [the 8085 computer](#an-8085-computer) |
 | Sensors & Actuators | 20 | DC motor, LDR, thermistors, **LM35 and TMP36** analog thermometers, buzzers, speaker, microphone, servo, stepper in **unipolar and bipolar** wirings, thermocouple, load cell, HC-SR04 ranger, Hall switch, phototransistor, **reed switch** and **PIR motion sensor** — see [below](#sensors-and-actuators) |
 | Switching & Isolation | 11 | Relay, fuses and a **resettable PPTC**, optocouplers, ULN2003, H-bridge, **A4988 microstepping driver**, **solid-state relay**, **MOSFET gate driver** — see [below](#regulating-a-current-instead-of-applying-a-voltage) |
 | Dev Boards | 6 | Raspberry Pi, Arduino Uno / Nano / Mega, **Raspberry Pi Pico** and **ESP32 DevKit** — see [below](#development-boards) |
@@ -8175,6 +8176,768 @@ watched; press the button (double-click it) and they count down.
   point a non-linear solve: the CTC and PIO example runs at about half the monitor's speed.
 - The SIO's synchronous modes are not modelled; the simplifications of the processor and of each
   peripheral are listed above.
+
+---
+
+## An 8085 computer
+
+The **Memory & CPUs** group also has Intel's **8085** — the 8080's successor on a single 5 V
+supply, the processor of the SDK-85 kit, the TRS-80 Model 100 and a generation of instruments and
+controllers (and, as the radiation-hardened 80C85, of the Sojourner rover) — and the peripheral
+chips Intel built for it and for the 8080: the **8155** and **8156** (256 bytes of RAM, three ports
+and a timer, on the 8085's own multiplexed bus), the **8255A** (three parallel ports), the **8251A**
+(a serial port), the **8253** and **8254** (three counters) and the **8259A** (an interrupt
+controller). **File > Examples > Computers** has two machines: a
+[single-board computer running a monitor](#the-8085-single-board-computer) through an 8251A, and
+[timer interrupts through an 8259A](#timer-interrupts-through-an-8259a), counting on LEDs.
+
+![The 8085 single-board computer on the canvas: the 8085 with its 3.6864 MHz oscillator on X1, reset button and pull-ups, the 74373 address latch beside it, the 2764 EPROM, the 8156 with its RAM and timer, a 74138 decoding, the 8251A with its clocks from the 8156's timer, and the serial terminal showing the monitor's banner, the dump of $0000 and its prompt](images/62-8085-computer.png)
+
+### The 8085 and its bus
+
+**A T-state is a clock — at half the crystal's frequency.** The 8085 has its clock generator on the
+chip: X1 and X2 take a crystal (or X1 a clock, X2 left open) at **twice** the processor's frequency,
+and **CLK OUT** gives the processor's clock to the rest of the board. In the library X1 is driven
+by an oscillator module and every rising edge on it turns CLK OUT over; a T-state is one CLK OUT
+cycle and starts as CLK OUT falls. An instruction is a run of **machine cycles** — an opcode fetch
+of four or six T-states, memory and I/O reads and writes of three, and **bus idle** cycles of
+three for the instructions that need more time inside — and the counts are Intel's: 4 for most
+register instructions, 6 for INX, DCX, PUSH's fetch and the like, 7 for an immediate load or a
+memory operand, 10 for LXI, DAD, JMP and RET, 12 for PUSH and RST, 13 for LDA and STA, 16 for LHLD,
+SHLD and XTHL, 18 for CALL.
+
+**The bus is multiplexed.** AD0-AD7 carry the address's low byte in T1 and the data after it, so an
+8085 board has an address latch: **ALE** is high in the first half of T1, and a **74373** with ALE
+on its LE holds the byte when ALE falls (the 8155, 8156 and 8755 latch it themselves). A8-A15
+carry the high byte throughout. Three **status lines** say what each machine cycle is from its
+start, so they can select a device before any strobe:
+
+| Cycle | IO/M | S1 | S0 | Strobe | T-states |
+| --- | --- | --- | --- | --- | --- |
+| Opcode fetch | 0 | 1 | 1 | /RD | 4 or 6: T1-T3 on the bus, T4 (T5, T6) inside |
+| Memory read | 0 | 1 | 0 | /RD | 3 |
+| Memory write | 0 | 0 | 1 | /WR | 3 |
+| I/O read | 1 | 1 | 0 | /RD | 3, the port on AD0-AD7 *and* A8-A15 |
+| I/O write | 1 | 0 | 1 | /WR | 3, the port on both halves |
+| INTR acknowledge | 1 | 1 | 1 | /INTA | 6 (or 4), then 3 for each more byte |
+| Restart acknowledge (TRAP, RST n.5) | 1 | 1 | 1 | none | 6 |
+| Bus idle (DAD, DSUB, RDEL, ARHL, LDHI, LDSI) | 0 | 1 | 0 | none, and no ALE | 3 |
+| HALT | floating | 0 | 0 | floating | until an interrupt |
+
+In T1 the status lines change, the address goes out and ALE pulses. **/RD** (or /INTA) goes low as
+T2 begins, with AD0-AD7 let go for the device, and the byte is taken — and /RD raised — as CLK OUT
+rises in T3; **/WR** goes low as T2 begins with the processor's byte already on AD0-AD7, and rises at
+the same point in T3, the byte held until the next T1. On the pins, the changes come 40 ns after
+X1's edge. Because an I/O port's number is on A8-A15 too, the I/O can be decoded from A8-A15 alone,
+with no latch; the examples decode both memory and I/O with one **74138**, IO/M on one of its
+inputs.
+
+**READY** low as CLK OUT rises in T2 adds a wait state, and another, until it is seen high — the
+slow device's way of stretching a read or write; bus idle cycles and the restart acknowledge ignore
+it. **HOLD** is latched as CLK OUT rises in T2 (or T4 of a six-state fetch, or any HALT state):
+**HLDA** goes high for the next T-state, the address and data buses, /RD, /WR and IO/M float from
+the one after, the machine cycle's own internal states run on, and the next machine cycle waits in
+hold states until HOLD is seen low. **RESET IN** low (a Schmitt input, for an RC on power-up) floats
+the bus and drives **RESET OUT** high; let go, the processor clears PC, disables interrupts, sets
+all three RST masks, clears the RST 7.5 and TRAP flip-flops and SOD, and fetches from $0000 — the
+other registers keep what they had (the datasheet calls them unpredictable). None of the inputs is
+pulled up inside: tie READY high and the unused interrupts and HOLD low. Pinout: 1 = X1, 2 = X2,
+3 = RESET OUT, 4 = SOD, 5 = SID, 6 = TRAP, 7 = RST 7.5, 8 = RST 6.5, 9 = RST 5.5, 10 = INTR,
+11 = /INTA, 12-19 = AD0-AD7, 20 = VSS, 21-28 = A8-A15, 29 = S0, 30 = ALE, 31 = /WR, 32 = /RD,
+33 = S1, 34 = IO/M, 35 = READY, 36 = /RESET IN, 37 = CLK OUT, 38 = HLDA, 39 = HOLD, 40 = VCC.
+
+**Five interrupts.** All five are sampled as CLK OUT rises in the next-to-last T-state of each
+instruction (and in every HALT and hold state), and the highest valid one is taken:
+
+| Input | Priority | Goes to | Triggered by | Masked by |
+| --- | --- | --- | --- | --- |
+| TRAP | 1 | $0024 | a rising edge, latched, *and* the level still high when sampled | nothing |
+| RST 7.5 | 2 | $003C | a rising edge, latched in a flip-flop even while masked | SIM, DI |
+| RST 6.5 | 3 | $0034 | a high level | SIM, DI |
+| RST 5.5 | 4 | $002C | a high level | SIM, DI |
+| INTR | 5 | what the device puts on the bus | a high level | DI |
+
+TRAP and the RSTs make up their own restart: a six-state opcode fetch with no strobe (IO/M, S1 and
+S0 all high), then PC pushed — 12 T-states. **INTR** is answered with **/INTA** in place of /RD,
+PC held: the device puts an instruction on the bus — an **RST** (12 T-states), or a **CALL**, whose
+two address bytes come in two more acknowledges (18 T-states: the 8259A's way). Taking any interrupt
+disables the others until **EI**, which itself only takes effect after the next instruction; TRAP
+also keeps the enable it found, which the first RIM after it reports. **SIM** and **RIM** set and read
+the interrupt system and the serial pins through A:
+
+| Bit | SIM (A out) | RIM (A in) |
+| --- | --- | --- |
+| 7 | SOD: the bit for the SOD pin | SID: the SID pin |
+| 6 | SDE: 1 copies bit 7 to SOD | I7.5: the RST 7.5 flip-flop |
+| 5 | — | I6.5: the RST 6.5 pin |
+| 4 | R7.5: 1 clears the RST 7.5 flip-flop | I5.5: the RST 5.5 pin |
+| 3 | MSE: 1 loads the three masks | IE: interrupts enabled (after a TRAP, once, the enable before it) |
+| 2-0 | M7.5, M6.5, M5.5: 1 masks it out | the three masks |
+
+SOD changes in T2 of the next instruction's fetch, as the datasheet draws it; SID is read by RIM as
+it executes. Together they make a one-bit serial port in software. **HLT** takes five T-states and
+then floats the bus (S1 and S0 low) in HALT states until an interrupt — or HOLD, for as long as the
+hold lasts — and returns to the instruction after the HLT.
+
+**The instruction set**, written from Intel's 8080/8085 Assembly Language Programming Manual, the
+MCS-80/85 Family User's Manual (its state transitions and machine cycle charts) and the 8085AH
+datasheet, not from any emulator: every documented instruction with Intel's T-states, the conditional
+jumps and calls reading only their low byte when not taken (7 and 9 T-states against 10 and 18),
+and the flags as Intel gives them — the 8085 sets **AC after ANA**, where the 8080 ORs bit 3 of the
+operands — with bit 3 of the flags always 0. **Undocumented, and in**: the ten opcodes Intel left out
+of the manual, named and timed as Tundra's CA80C85B datasheet lists them (they were found by
+Dehnhardt and Sorensen in 1979), and the two flags behind them:
+
+| Opcode | Instruction | T-states | What it does |
+| --- | --- | --- | --- |
+| $08 | DSUB | 10 | HL - BC; CY the borrow; S, P and AC from the high byte, Z from both |
+| $10 | ARHL | 7 | HL shifted right arithmetically, bit 0 into CY |
+| $18 | RDEL | 10 | DE rotated left through CY |
+| $28 | LDHI n | 10 | DE = HL + n, no flags |
+| $38 | LDSI n | 10 | DE = SP + n, no flags (also written LDSP) |
+| $CB | RSTV | 6 / 12 | a call to $0040 if V is set |
+| $D9 | SHLX | 10 | L to (DE), H to (DE+1) |
+| $ED | LHLX | 10 | L from (DE), H from (DE+1) |
+| $DD | JNK nn | 7 / 10 | jump if K is clear (also JNX5) |
+| $FD | JK nn | 7 / 10 | jump if K is set (also JX5) |
+
+**V** (bit 1) is the signed overflow, the carry into bit 7 exclusive-ORed with the carry out of it;
+**K** (bit 5, also called X5 or UI) is V exclusive-ORed with bit 7 of the result — after a subtract
+or a compare, set when A was less than the operand as signed numbers — except after INX and DCX,
+where it is the 16-bit incrementer's carry: set going from $FFFF to $0000 either way. Which
+instructions store them follows the reverse engineering of the die (Ken Shirriff's analysis of the
+visual6502 team's photographs of the chip): the 8-bit arithmetic and logic (V clear for ANA, XRA and
+ORA, so K is the sign there), INR and DCR, DAA, the four rotates (RLC and RAL add A to itself, so V
+is A7 ^ A6; RRC and RAR shift right and clear V) and ARHL store both; INX and DCX store K; DAD, DSUB,
+RDEL, LDHI and LDSI store neither — where Tundra's sheet and the die disagree (RDEL's and DSUB's V),
+the core follows the die.
+
+**Validated.** Ian Bartholomew's **8085 exerciser** — Frank Cringle's ZEXALL turned into an 8080 and
+8085 one, running instruction groups through every combination of operands and folding the results
+into a CRC — was run on a real **Intel D8085AH-1** and its CRCs published; the core matches **all 24
+groups** it has results for (the 8-bit ALU on registers was not run on the chip). It masks the
+flags to S, Z, AC, P and CY, so V and K are not covered; their tests here are written from the
+die's control lines. The core also passes **8080PRE** and the Microcosm **TST8080** diagnostic, and
+SuperSoft's **CPUTEST** runs every lettered test and its timing test, then stops at test 000BH: it
+expects flag bit 1 to read 1 after an INR, as it does on an 8080, where the 8085 holds V there.
+**8080EXM**, the same exerciser with an 8080's CRCs and the whole flag byte in them, passes its LXI
+and MVI groups and fails the other 23, all of which fold the flags in; for those whose operands
+leave bits 1, 3 and 5 clear — LHLD, SHLD and STAX — the core's CRC is the one the real D8085AH-1 gave
+in the 8085 exerciser, so a real 8085 fails them too. All of them ran locally on the core alone
+with a two-call CP/M stand-in; they are GPL or freely distributed programs, so they are not in the
+repository and no test runs them.
+
+**How fast it runs.** Measured on the development machine (an 8-core ARM virtual machine, shared and busy),
+in a release build, the 8085 single-board computer runs at **about 3.4 to 4.1 ms of simulated time
+per second — some 6,200 to 7,500 T-states a second** at 1.8432 MHz — and the timer example, its eight
+LEDs making every time point a non-linear solve, at about 2 ms (3,800 T-states); on the same runs the
+Z80 single-board computer did 4.8 ms (17,700 T-states). An 8085 T-state costs more than a Z80's
+because X1 runs at twice CLK OUT: four X1 edges, each a time point, to every T-state. So the examples
+run the 8085 at **1.8432 MHz** from a 3.6864 MHz crystal — a slower clock costs the same per T-state,
+and a serial link's time is fixed: 19,200 baud, the 8251A's rated limit, takes 521 µs a character
+whatever the processor does, so the monitor's whole exchange is about 34 ms — ten seconds or so of
+solving. A debug build is two to three times slower.
+
+**Simplifications.** HOLD is honoured before the next machine cycle, with the fetch's T4-T6 run
+first (the chip runs them under the hold); the data bus is sampled as CLK OUT rises in T3 and a
+write's byte is driven from the start of T2, timing inside a T-state being one propagation delay;
+RESET IN is taken at the next rising edge of CLK OUT and the processor starts the T-state it is let
+go, where the chip wants three clocks of it; and the address on A8-A15 during T4-T6 and bus idle
+cycles holds what it had (the datasheet leaves it unspecified).
+
+### The 8085's peripherals
+
+Apart from the 8155 and 8156, which sit on the multiplexed bus with an address latch of their own,
+these are the peripherals of the 8080 era: they want the **demultiplexed** bus — D0-D7 on AD0-AD7,
+A0 (and A1) from the 74373, **/CS** from a decoder, **/RD** and **/WR** from the processor. A write's
+byte is taken as /WR rises, a read's byte driven while /RD is low, and the side effects of a read
+(a status cleared, a latch let go) done as /RD rises. They are I/O devices in the examples, decoded
+from IO/M and the port number on A8-A15, but nothing stops a decoder putting them in memory.
+
+**The 8155 and 8156** (`8155`, `8156`) are Intel's companion for the 8085: 256 bytes of static RAM,
+two 8-bit ports and a 6-bit one, and a 14-bit timer, all on the multiplexed bus — the chip has its own
+address latch, so it needs no 74373. As ALE falls it keeps AD0-AD7, IO/M and its chip enable; then
+/RD low drives AD0-AD7 with the RAM byte (IO/M low) or an I/O register (IO/M high), and a write's
+byte is taken as /WR goes high. The 8155 is selected by **/CE low**, the 8156 by **CE high** — tie an
+8156's CE to A15 and it is RAM at $8000 (mirrored every 256 bytes) and ports at $80-$87 (mirrored
+every eight) with no gate at all. Its I/O registers, by AD2-AD0:
+
+| Address | Register |
+| --- | --- |
+| xxxxx000 | Command (write), status (read) |
+| xxxxx001 | Port A |
+| xxxxx010 | Port B |
+| xxxxx011 | Port C, six bits |
+| xxxxx100 | The timer's count length, low byte |
+| xxxxx101 | Its high six bits, with the timer mode in bits 7-6 |
+
+| Command bit | |
+| --- | --- |
+| 0, 1 | Port A, port B: 1 an output, 0 an input |
+| 3-2 | Port C: 00 **ALT1**, all inputs; 11 **ALT2**, all outputs; 01 **ALT3**, port A strobed — PC0 A INTR, PC1 A BF, PC2 /A STB — and PC3-PC5 outputs; 10 **ALT4**, both strobed — PC3 B INTR, PC4 B BF, PC5 /B STB as well |
+| 4, 5 | Port A's, port B's interrupt enable |
+| 7-6 | The timer: 00 nothing, 01 stop, 10 stop after the next terminal count, 11 start — load the length and mode and start now, or, if it is running, at its next terminal count |
+
+The **status** register reads A INTR, A BF, A INTE, B INTR, B BF and B INTE in bits 0-5, and in bit 6
+**TIMER**, set at each terminal count and cleared by reading the status (and by RESET). The command
+register cannot be read back.
+
+An **output** port drives its pins from its latch and reads the latch back; an **input** port lets
+its pins float and reads them. A port's output latch is cleared when it becomes an input and cannot be
+written while it is one, so a port turned to an output starts low. In a **strobed input** mode, /STB
+low loads the pins into the port's latch and raises BF, /STB rising raises INTR, and reading the port
+drops INTR as the read begins and BF as it ends — wire INTR to RST 5.5 or 6.5 and the 8085 is
+interrupted for each byte. In a **strobed output** mode a write drops INTR and raises BF, and the
+peripheral's /STB drops BF and its rising edge raises INTR: the port is empty again. INTR reaches its
+pin, and the status, only while the port's interrupt is enabled; entering a strobed mode, BF starts
+low and INTR low for an input, high for an output.
+
+**The timer** counts rising edges on TIMER IN — usually CLK OUT — over a length of 2 to $3FFF, and
+/TIMER OUT gives, by mode bits M2 M1: 00 one square wave, 01 a continuous square wave (high for the
+first half of each count, one cycle longer when the count is odd, low for the second), 10 one low
+pulse a TIMER IN cycle long at the terminal count, 11 such a pulse at every terminal count. A new
+length or mode takes effect only with a START command. RESET — the 8085's RESET OUT, active high —
+clears the command register (every port an input, port C ALT1), the output latches and the status,
+and stops the timer, keeping its length and mode. Not modelled: reading the timer registers gives the
+count still to go, plainly, where the chip's counter counts by twos twice a cycle and needs the
+datasheet's arithmetic to read; the handshakes act on the strobe edges at once; and TIMER IN's
+minimum high and low times are not checked. Pinout (DIP-40): 1 = PC3, 2 = PC4, 3 = TIMER IN,
+4 = RESET, 5 = PC5, 6 = /TIMER OUT, 7 = IO/M, 8 = /CE (CE on the 8156), 9 = /RD, 10 = /WR, 11 = ALE,
+12-19 = AD0-AD7, 20 = VSS, 21-28 = PA0-PA7, 29-36 = PB0-PB7, 37 = PC0, 38 = PC1, 39 = PC2, 40 = VCC.
+
+**The 8255A** (`8255A PPI`) has three 8-bit ports for the 8080 and 8085 on the demultiplexed bus:
+/CS from the decoder, /RD and /WR from the processor, and A1 and A0 from the address latch picking
+port A (00), port B (01), port C (10) or the control register (11). A write's byte is taken as /WR
+rises; a read drives D0-D7 while /RD is low. The NMOS 8255A's control register cannot be read; here a
+read of it gives the mode word last written, as the CMOS 82C55A does.
+
+A control word with **bit 7 set is a mode word**; with **bit 7 clear it sets or resets one bit of
+port C**:
+
+| Bit | Mode word | Bit set/reset |
+| --- | --- | --- |
+| 7 | 1 | 0 |
+| 6-5 | Group A's mode: 00 mode 0, 01 mode 1, 1x mode 2 | — |
+| 4 | Port A: 1 input, 0 output | — |
+| 3 | PC4-PC7: 1 input, 0 output | Bits 3-1: which bit of port C |
+| 2 | Group B's mode: 0 or 1 | |
+| 1 | Port B: 1 input, 0 output | |
+| 0 | PC0-PC3: 1 input, 0 output | 1 set, 0 reset |
+
+A mode word clears every output latch and every handshake and interrupt flip-flop. Group A is port
+A and PC4-PC7, group B port B and PC0-PC3 — but the strobed modes borrow port C's bits across the
+halves:
+
+| Mode | |
+| --- | --- |
+| 0, basic I/O | Each port, and each half of port C, an input or an output. An input reads its pins as they stand; an output drives its latch and reads it back |
+| 1, strobed input | /STB low (PC4 for A, PC2 for B) loads the pins into the input latch and raises **IBF** (PC5, PC1); as /STB rises, **INTR** (PC3, PC0) goes high if the port's INTE is set. A read of the port drops INTR as /RD falls and IBF as it rises |
+| 1, strobed output | A write drops INTR as /WR falls and takes **/OBF** (PC7, PC1) low as it rises; the peripheral's **/ACK** low (PC6, PC2) raises /OBF again, and as /ACK rises INTR goes high if INTE is set |
+| 2, bidirectional (port A only) | Both at once: /STB (PC4) loads the input latch and raises IBF (PC5); a write takes /OBF (PC7) low, and port A's drivers are on only while /ACK (PC6) is low; INTR A (PC3) is the input's request (with INTE 2) or the output's (with INTE 1). Group B can be mode 0 or 1 alongside |
+
+The **INTE** flip-flops are set and cleared with the bit set/reset word on the bit of the strobe or
+acknowledge they belong to: INTE A is PC4 for a mode 1 input and PC6 for an output, INTE B is PC2,
+and in mode 2 INTE 1 (output) is PC6 and INTE 2 (input) PC4. Set on a port that is already waiting
+(an output with /OBF high, an input with IBF high) INTR rises at once, so a mode 1 output asks for
+its first byte as soon as it is enabled. **A read of port C** in modes 1 and 2 is the status word:
+the handshake outputs (INTR, IBF, /OBF) as they are, the INTE flip-flops in place of the /STB and
+/ACK pins, and the port C bits no mode uses as plain I/O by the direction bits. A write to port C
+changes only those plain bits. **RESET** high puts every port in mode 0 as an input and clears the
+latches. Not modelled: the strobes' minimum pulse widths (the flip-flops change as the pins cross
+their thresholds); port B's Darlington drive and the NMOS part's weak pull-ups on the ports; a mode
+word written mid-transfer simply clears it. Pinout (DIP-40): 1 = PA3, 2 = PA2, 3 = PA1, 4 = PA0,
+5 = /RD, 6 = /CS, 7 = GND, 8 = A1, 9 = A0, 10 = PC7, 11 = PC6, 12 = PC5, 13 = PC4, 14 = PC0,
+15 = PC1, 16 = PC2, 17 = PC3, 18-25 = PB0-PB7, 26 = +5V, 27 = D7, 28 = D6, 29 = D5, 30 = D4,
+31 = D3, 32 = D2, 33 = D1, 34 = D0, 35 = RESET, 36 = /WR, 37 = PA7, 38 = PA6, 39 = PA5, 40 = PA4.
+
+**The 8251A** (`8251A USART`) is Intel's serial port for the 8080 and 8085: a transmitter with a
+one-character buffer in front of its shift register, a receiver with one character behind its own,
+and four modem lines. C/D picks the data register (low) or the control port (high): a data read gives
+the character received and a data write the one to send; a control read gives the status, and a
+control write is a mode instruction, a sync character or a command, according to where the chip is
+in its **sequence**. After RESET (the pin high) or a command with IR set, the next control write is
+the **mode**; a synchronous mode is followed by one or two sync characters; every control write after
+that is a **command**. A chip in an unknown state is put right by three $00s and a $40 — in the mode
+state they are a synchronous mode and its two sync characters, in the command state they do nothing,
+and either way the $40 is an internal reset — which is how most 8085 monitors start it.
+
+| Mode bit | Asynchronous |
+| --- | --- |
+| 1-0 | The baud factor: 01 x1, 10 x16, 11 x64 (00 is synchronous) |
+| 3-2 | Bits per character: 00 5, 01 6, 10 7, 11 8 |
+| 4 | Parity on |
+| 5 | Even parity (1) or odd |
+| 7-6 | Stop bits sent: 01 one, 10 one and a half, 11 two — the receiver needs only one |
+
+| Command bit | |
+| --- | --- |
+| 0 | TxEN: the transmitter on |
+| 1 | DTR: the /DTR pin low |
+| 2 | RxE: the receiver on |
+| 3 | SBRK: TxD held low, a break |
+| 4 | ER: clear PE, OE and FE |
+| 5 | RTS: the /RTS pin low |
+| 6 | IR: an internal reset, back to the mode |
+| 7 | EH: enter hunt (synchronous only) |
+
+| Status bit | |
+| --- | --- |
+| 0 | TxRDY: the transmit buffer is empty — whatever TxEN and /CTS say, unlike the pin |
+| 1 | RxRDY: a character is waiting |
+| 2 | TxEMPTY: nothing to shift out |
+| 3, 4, 5 | PE, OE, FE: a parity error, an overrun, a stop bit found low — held until ER |
+| 6 | SYNDET/BRKDET |
+| 7 | DSR: the /DSR pin is low |
+
+The transmitter sends only while TxEN is set and **/CTS** is low; the **TxRDY** pin is the buffer
+empty with both, and **TxEMPTY** is high while there is nothing to send (or the transmitter is off).
+The receiver, with RxE set, finds a start bit, checks it mid-bit and samples the middle of each bit:
+a character raises **RxRDY** until it is read, its unused high bits reading 0; a character finished
+before the last was read replaces it and sets OE. **BRKDET** goes high when RxD has stayed low
+through two whole characters, stop bits included, and low as soon as RxD is high again. /TxC and
+/RxC clock each half at 1, 16 or 64 times the bit rate, and the part times the bits from each clock's
+measured period, as the 6850 and the Z80 SIO do — so the rate is whatever an 8253, the 8155's timer
+or an oscillator puts there: 1.8432 MHz at x16 is 115,200 baud. TxD and RxD are ordinary logic, for
+the **Serial Terminal** and the **UART** bus decode. CLK is the system clock. Not modelled: the **synchronous modes** — a synchronous mode and its sync
+characters are taken in the sequence, so the reset idiom works, but then both halves stay idle, EH
+does nothing, and SYNDET is an output that stays low (no external sync detect); at x1 the receiver
+samples mid-bit, where the chip wants /RxC synchronised to the data; a character starts at the next
+time point after it is written rather than on a /TxC edge; TxRDY falls as the write ends rather than
+as /WR falls; and the status is up to date at once rather than within 28 CLK periods. Pinout
+(DIP-28): 1 = D2, 2 = D3, 3 = RxD, 4 = GND, 5 = D4, 6 = D5, 7 = D6, 8 = D7, 9 = /TxC, 10 = /WR,
+11 = /CS, 12 = C/D, 13 = /RD, 14 = RxRDY, 15 = TxRDY, 16 = SYNDET/BRKDET, 17 = /CTS, 18 = TxEMPTY,
+19 = TxD, 20 = CLK, 21 = RESET, 22 = /DSR, 23 = /RTS, 24 = /DTR, 25 = /RxC, 26 = +5V, 27 = D0,
+28 = D1.
+
+**The 8253 and 8254** (`8253 PIT`, `8254 PIT`) are Intel's programmable interval timers: three
+independent 16-bit down counters, each with a CLK input, a GATE input and an OUT pin. A1 and A0
+pick counter 0, 1 or 2 — a count to write or the count to read — or, with both high, the control
+word, which is written only. Every counter counts the falling edges of its own CLK, GATE being
+sampled on the rising edges before them; a *CLK pulse* is a rising edge and the falling one after.
+
+| Control bits | |
+| --- | --- |
+| 7-6 | The counter, 0 to 2 (11: the 8254's read-back command; ignored by the 8253) |
+| 5-4 | 00 a counter latch command; 01 the low byte only; 10 the high byte only; 11 the low byte, then the high |
+| 3-1 | The mode, 0 to 5 (110 is mode 2, 111 mode 3) |
+| 0 | BCD (1): four decades, 0 meaning 10000; binary 0 means 65536 |
+
+Writing a control word sets OUT to the mode's starting level and leaves the counter waiting for a
+count. A count is loaded into the counter on the next CLK pulse (modes 0, 2, 3 and 4), or on the
+pulse after a GATE rising edge (modes 1 and 5); a new count written to a running mode 2 or 3
+counter takes over at the end of the period under way.
+
+| Mode | OUT | GATE |
+| --- | --- | --- |
+| 0, interrupt on terminal count | Low from the control word; high N + 1 pulses after the count is written, and stays high. Writing the first of two bytes stops the count and takes OUT low | Low pauses the count |
+| 1, retriggerable one-shot | High; a trigger takes it low on the next pulse for N pulses | A rising edge triggers, and retriggers |
+| 2, rate generator | High, low for one pulse each time the count reaches 1, then reloaded: OUT divides CLK by N | Low stops the count with OUT high; a rising edge reloads |
+| 3, square wave | High for (N + 1) / 2 pulses and low for N / 2 — even N a square wave, odd N a pulse longer high | As mode 2 |
+| 4, software triggered strobe | High, low for one pulse N + 1 pulses after the count is written, once | Low pauses the count |
+| 5, hardware triggered strobe | High, low for one pulse N + 1 pulses after a trigger | A rising edge triggers, and retriggers |
+
+**Reading** a counter gives its count as it stands — the low byte, the high byte, or the two in
+turn, as bits 5-4 said. A **counter latch command** holds the count as it was until it has been
+read, so a running counter reads consistently; a second latch before then is ignored. The 8254's
+**read-back command** (bits 7-6 = 11, bit 5 low to latch the counts, bit 4 low to latch the status
+bytes, bits 3-1 picking counters 2, 1 and 0) latches several at once; a **status byte** — OUT in
+bit 7, NULL COUNT in bit 6 (a count written but not yet loaded), then RW1, RW0, M2-M0 and BCD — is
+read before the count. Counter 0 in mode 3 with a count of 2 turns CLK OUT into a 16× baud clock for
+an 8251; in mode 2 its OUT on RST 7.5 makes a periodic interrupt.
+
+Not modelled: the chips' delays — a counter changes as its CLK edge comes; a mode 3 counter reads as
+its half-period's count doubled (the chip counts down by twos, loading N − 1 for an odd N); a count
+of 1 in modes 2 and 3, illegal by the datasheet, divides by 1; a read of the control word address
+gives $FF where the chip floats the bus; OUT is low at power-on, where the chip's is undefined;
+and the 8253's and 8254's maximum clock rates are not enforced. Pinout (DIP-24, both): 1-8 = D7-D0,
+9 = CLK0, 10 = OUT0, 11 = GATE0, 12 = GND, 13 = OUT1, 14 = GATE1, 15 = CLK1, 16 = GATE2, 17 = OUT2,
+18 = CLK2, 19 = A0, 20 = A1, 21 = /CS, 22 = /RD, 23 = /WR, 24 = +5V.
+
+**The 8259A** (`8259A PIC`) takes eight interrupt requests, IR0-IR7, ranks them, masks them, keeps
+track of which are being served, and answers the processor's acknowledge with a call to the
+request's own handler — so an 8085 with one INTR pin gets eight vectored interrupts. Its INT goes
+to INTR, the processor's /INTA to its /INTA, and A0 (from the address latch) picks one of its two
+ports; /SP/EN tied high makes it a master (or a chip on its own). Programming it is a short
+sequence of **initialisation command words**, then **operation command words** whenever needed:
+
+| Word | A0 | Bits |
+| --- | --- | --- |
+| ICW1 | 0 | D4 = 1 marks it; D0 IC4 (an ICW4 follows), D1 SNGL (no other 8259A, so no ICW3), D2 ADI (handlers 4 bytes apart when 1, 8 when 0), D3 LTIM (level-triggered), D7-D5 A7-A5 of the handlers' address. It clears the mask, forgets every edge, makes IR7 the lowest priority and points reads at the IRR |
+| ICW2 | 1 | A15-A8 of the handlers' address (8085), or T7-T3 of the vector (8086) |
+| ICW3 | 1 | Only without SNGL: on a master, a 1 for each IR with a slave on it; on a slave, its ID (0-7) |
+| ICW4 | 1 | Only with IC4: D0 µPM (1 for an 8086), D1 AEOI, D2 M/S (in buffered mode), D3 BUF, D4 SFNM. Without it, all 0 |
+| OCW1 | 1 | The mask (IMR): a 1 masks that IR. A read with A0 high gives it back |
+| OCW2 | 0 | D4 D3 = 00; D7-D5: 001 non-specific EOI, 011 specific EOI for the level in D2-D0, 101 rotate on non-specific EOI, 111 rotate on specific EOI, 110 set priority (D2-D0 the lowest), 100 and 000 set and clear rotation in AEOI mode |
+| OCW3 | 0 | D4 D3 = 01; D6 D5 = 11 or 10 sets or ends special mask mode, D2 a poll, D1 D0 = 10 or 11 points reads with A0 low at the IRR or the ISR |
+
+**Requests and priority.** Edge-triggered, a rising edge on an IR sets its bit in the **IRR** —
+and the line must stay high until the acknowledge; level-triggered, the IRR bit is simply the
+line. INT goes high when an unmasked request outranks everything in the **ISR**, the levels
+acknowledged and not yet ended: **fully nested**, so IR0 can break into IR2's handler (once that
+has done EI) but IR5 waits until IR2's handler sends its **EOI**. A non-specific EOI (OCW2 $20)
+ends the highest level in service, which in fully nested mode is always the handler's own; a
+specific EOI ($60 + n) ends level n, whatever else is in service. With **AEOI** (ICW4) the 8259A
+ends the service itself as the acknowledge finishes, and handlers send nothing — at the cost of
+the nesting. IR0 ranks highest until a **rotation**: set priority, or a rotating EOI that makes
+the level just served the lowest, for devices of equal importance taking turns.
+
+**The acknowledge, on the 8085's bus.** Step by step:
+
+1. An unmasked request outranks the ISR: INT goes high, on the processor's INTR.
+2. In the next-to-last T-state of the instruction it is running the 8085 samples INTR, and after
+   the instruction it clears its interrupt enable and starts an acknowledge in place of an opcode
+   fetch: IO/M high, S1 S0 = 11, /INTA low where /RD would be, PC on the bus and not counted on.
+3. On the **first /INTA** the 8259A chooses the highest request, sets its ISR bit, clears its IRR
+   bit, and puts **$CD** on the bus — a CALL.
+4. The processor decodes a three-byte instruction and fetches the rest with two more /INTA
+   cycles: the **second** gets the handler's address's low byte — A7-A5 from ICW1 with the IR
+   number in A4-A2 at interval 4, or A7-A6 with it in A5-A3 at interval 8 — and the **third** the
+   high byte, ICW2. With AEOI the ISR bit is cleared as this pulse ends.
+5. The processor pushes PC (still the address of the instruction it would have run) and jumps:
+   CALL $0200 for IR0 with ICW1 $16 and ICW2 $02, $0204 for IR1, and so on — 18 T-states in all,
+   as for a CALL in the program.
+
+The bus decode shows the three cycles as `INTA CD`, `INTA 00`, `INTA 02`, and the processor keeps
+the three bytes it was given. A handler ends with the EOI, then `EI` and `RET`. In **8086 mode**
+(ICW4 µPM) the acknowledge is two pulses: the first drives nothing, the second the vector — T7-T3
+from ICW2 with the level in D2-D0. A request that has gone by the first /INTA is answered as
+**IR7** with nothing put in service — the spurious interrupt, so an IR7 handler should read the ISR
+before it sends an EOI. A **poll** (OCW3 with D2) turns the next read with A0 low into the
+acknowledge: it gives 1000 0nnn if something was requesting (and puts it in service), 0 if not —
+interrupts handled with INTR left alone.
+
+**Cascading.** Up to eight slaves hang on a master's IRs, their INTs on the master's IR pins, all
+the CAS0-CAS2 lines together, a slave's /SP/EN tied low. Each is initialised without SNGL: the
+master's ICW3 has a 1 for each IR with a slave, a slave's ICW3 its ID. On the first /INTA the
+master puts the slave's IR number on CAS0-CAS2 and still sends the CALL; the slave with that ID
+puts its own request in service and sends the address bytes. A handler for a slave's level sends
+an EOI to both. With SFNM the master lets a slave's level interrupt again while in service, for
+that slave's higher requests.
+
+Not modelled: the edge sense is a latch set by the rising edge and cleared by the acknowledge,
+the line still having to be high at the first /INTA, rather than the chip's exact edge circuit;
+the choice is frozen as the first /INTA falls (the chip freezes it during the pulse), and a slave
+decides it is addressed as that pulse ends; special mask mode lets every unmasked level not itself
+in service interrupt; in buffered mode /SP/EN goes low while the chip drives D0-D7 and ICW4's M/S
+picks master or slave, with no transceiver timing beyond that. Pinout (DIP-28): 1 = /CS, 2 = /WR,
+3 = /RD, 4-11 = D7-D0, 12 = CAS0, 13 = CAS1, 14 = GND, 15 = CAS2, 16 = /SP/EN, 17 = INT,
+18-25 = IR0-IR7, 26 = /INTA, 27 = A0, 28 = +5V.
+
+### The 8085 single-board computer
+
+**File > Examples > Computers > 8085 Single-Board Computer** is built in the style of Intel's SDK-85:
+
+| Address | What | Selected by |
+| --- | --- | --- |
+| $0000-$1FFF | 2764 EPROM | /CE = ROM_SEL (the 74138's Y0: IO/M, A13, A14 and A15 low); /OE = /RD |
+| $8000-$80FF | The 8156's RAM, mirrored up to $FFFF | CE = A15, IO/M low — latched by the 8156 itself as ALE falls |
+| Ports $80-$85 | The 8156's command/status, ports A, B and C, and timer, mirrored up to $FF | CE = A15, IO/M high |
+| Ports $00-$01 | 8251A: data, then mode, command and status | /CS = UART_SEL (Y4: IO/M high, A13-A15 low), C/D = A0 |
+| Ports $20, $40, $60 | Free — the next example puts its 8253, 8255A and 8259A there | PIT_SEL (Y5), PPI_SEL (Y6), PIC_SEL (Y7) |
+
+The 8085 runs at **1.8432 MHz** from a 3.6864 MHz oscillator module on X1, and its CLK OUT clocks
+the rest. A **74373** with ALE on its LE gives the EPROM A0-A7; the **8156** needs no latch and no
+gate, its active-high CE straight on A15. One **74138** does the rest: A13, A14 and IO/M on its
+inputs and A15 on /E2, so Y0 selects the EPROM only for memory cycles and Y4-Y7 are blocks of 32
+ports, decoded from A8-A15 — where the 8085 puts the port number too. The 8156's **timer** divides
+CLK OUT by 6 into a 307.2 kHz square wave on /TIMER OUT, the 8251A's /TxC and /RxC: x16 is
+**19,200 baud**, the top of the 8251A's rating. The EPROM holds this monitor, which prints a banner
+and a prompt, reads a line, and for **D** and an address dumps the eight bytes there; the terminal
+types `D 0000` at 11.5 ms:
+
+```asm
+; A small monitor for the 8085 single-board computer: an 8251A at ports
+; $00-$01 talking to the terminal at 19,200 baud (the 8156's timer divides
+; CLK OUT, 1.8432 MHz, by 6 for the 8251A's x16 clock), this EPROM at
+; $0000-$1FFF and the 8156's 256 bytes of RAM at $8000. It prints a banner
+; and a prompt; D and an address in hex dumps the eight bytes there.
+
+UDATA   equ $00         ; 8251A data
+USTAT   equ $01         ; 8251A mode, command and status
+TCMD    equ $80         ; 8156 command and status
+TLOW    equ $84         ; 8156 timer, low byte
+THIGH   equ $85         ; 8156 timer, high bits and mode
+LINE    equ $8000       ; the line typed, in the 8156's RAM
+
+        org $0000
+start:  lxi sp,$8100    ; the stack at the top of the 8156's RAM
+        mvi a,6         ; the timer: 6 counts, a continuous square wave
+        out TLOW
+        mvi a,$40
+        out THIGH
+        mvi a,$C0       ; start it; ports A, B and C inputs
+        out TCMD
+        xra a           ; the 8251A's reset: three zeros and an internal
+        out USTAT       ; reset reach the mode instruction from any state
+        out USTAT
+        out USTAT
+        mvi a,$40
+        out USTAT
+        mvi a,$4E       ; mode: one stop bit, no parity, 8 bits, x16
+        out USTAT
+        mvi a,$37       ; command: RTS, error reset, receive, DTR, transmit
+        out USTAT
+        lxi h,banner
+        call puts
+prompt: lxi h,gt
+        call puts
+        lxi h,LINE
+getc:   call getch
+        cpi 13
+        jz eol
+        call putch      ; echo it
+        mov m,a
+        inx h
+        jmp getc
+eol:    mvi m,0
+        call crlf
+        lxi h,LINE
+        mov a,m
+        ani $DF         ; upper case
+        cpi 'D'
+        jnz what
+        inx h
+        call gethex     ; DE = the address; CY set if there was none
+        jc what
+        xchg
+        mov a,h
+        call puthex
+        mov a,l
+        call puthex
+        mvi a,':'
+        call putch
+        mvi b,8
+dump:   mvi a,' '
+        call putch
+        mov a,m
+        call puthex
+        inx h
+        dcr b
+        jnz dump
+        call crlf
+        jmp prompt
+what:   lxi h,huh
+        call puts
+        jmp prompt
+
+; Send A once the transmit buffer is empty (status bit 0, TxRDY). A is kept.
+putch:  push psw
+txwait: in USTAT
+        ani $01
+        jz txwait
+        pop psw
+        out UDATA
+        ret
+
+; Wait for a character (status bit 1, RxRDY) and return it in A.
+getch:  in USTAT
+        ani $02
+        jz getch
+        in UDATA
+        ret
+
+; Send the string at HL, up to its zero.
+puts:   mov a,m
+        ora a
+        rz
+        call putch
+        inx h
+        jmp puts
+
+crlf:   mvi a,13
+        call putch
+        mvi a,10
+        jmp putch
+
+; A as two hex digits.
+puthex: push psw
+        rrc
+        rrc
+        rrc
+        rrc
+        call nibble
+        pop psw
+nibble: ani $0F
+        adi '0'
+        cpi '9'+1
+        jc putch
+        adi 7
+        jmp putch
+
+; Skip spaces at HL, then read hex digits into DE. CY set if there were none.
+gethex: lxi d,0
+        mvi b,0
+skip:   mov a,m
+        cpi ' '
+        jnz digit
+        inx h
+        jmp skip
+digit:  mov a,m
+        call hexval
+        jc gotit
+        xchg
+        dad h
+        dad h
+        dad h
+        dad h
+        ora l
+        mov l,a
+        xchg
+        inx h
+        inr b
+        jmp digit
+gotit:  mov a,b
+        sui 1           ; CY set only if B was zero
+        ret
+
+; A hex digit's value in A, or CY set if A is not one.
+hexval: cpi '0'
+        jc bad
+        cpi '9'+1
+        jc num
+        ani $DF
+        cpi 'A'
+        jc bad
+        cpi 'F'+1
+        jnc bad
+        sui 'A'-10
+        ret             ; CY clear: 'A'-10 is below A
+num:    sui '0'
+        ret
+bad:    stc
+        ret
+
+banner: db "CIRQ 8085 monitor",13,10,0
+gt:     db "> ",0
+huh:    db "?",13,10,0
+```
+
+It prints `CIRQ 8085 monitor`, echoes the command and answers `0000: 31 00 81 3E 06 D3 84 3E` — its
+own first instructions — after about 34 ms. The 8251A is set up as most 8085 monitors set it up: three
+zeros and an internal reset ($40) reach the mode instruction from whatever state it is in, then the
+mode and a command; polling its status for TxRDY and RxRDY is the simplest way to drive it.
+**Simulate > Decode Bus** offers a **Cpu8085** decode: every machine cycle with its address and byte,
+the I/O with its port, the bus idle cycles of DAD (the monitor's hex reader shifts with four of
+them), the acknowledges, halts, holds and wait states, and each instruction disassembled where it
+starts — here the 8156's timer being set up:
+
+```
+$0000 LXI SP,$8100   R $0001 00   R $0002 81   $0003 MVI A,$06   R $0004 06   $0005 OUT $84
+R $0006 84   OUT $84 06   $0007 MVI A,$40   R $0008 40   $0009 OUT $85   R $000A 85   OUT $85 40
+```
+
+### Timer interrupts through an 8259A
+
+**File > Examples > Computers > 8085 Timer Interrupts** is the same computer with an **8253** at $20
+(/CS = PIT_SEL, A0 and A1 from the latch), an **8255A** at $40 (PPI_SEL) and an **8259A** at $60
+(PIC_SEL, A0), and no 8251A. Counter 0 of the 8253 divides CLK OUT by 1843 in mode 3, a 1 kHz square
+wave on **OUT0**, which is the 8259A's **IR0**; the 8259A's INT is the 8085's **INTR** and its /INTA
+the 8085's. Each rising edge on IR0 interrupts: the 8085 answers INTR with three /INTA cycles, the
+8259A gives it `CALL $0040`, and the handler moves a count on eight LEDs on the 8255A's **port A**,
+in mode 0. A push button with a pull-down drives **RST 7.5**: a press is a rising edge, which the
+8085 latches, and the RST 7.5 handler at $003C turns the count round. Between interrupts the
+processor waits in **HLT**, the bus floating — `HALT` in the bus decode.
+
+![The 8085 with an 8253, an 8259A and an 8255A: the same EPROM, 8156 and decoding, the 8253's OUT0 wired to the 8259A's IR0, the 8259A's INT on INTR, the 8255A's port A driving eight LEDs through resistors, a push button with a pull-down on RST 7.5, and the LEDs showing the count](images/63-8085-interrupts.png)
+
+```asm
+; Timer interrupts on an 8085. The 8253's counter 0 divides CLK OUT,
+; 1.8432 MHz, by 1843 into a square wave of 1 kHz on OUT0, the 8259A's
+; IR0. Each rising edge interrupts through the 8259A, which answers the
+; 8085's /INTA with a CALL to $0040, and the handler moves a count on the
+; LEDs on the 8255A's port A. A button on RST 7.5 turns the count round.
+; Between interrupts the processor waits in HLT.
+
+CNT0    equ $20         ; 8253 counter 0
+PITCTL  equ $23         ; 8253 control word
+PA      equ $40         ; 8255A port A
+PPICTL  equ $43         ; 8255A control word
+PIC0    equ $60         ; 8259A with A0 low: ICW1, OCW2, OCW3
+PIC1    equ $61         ; 8259A with A0 high: ICW2, OCW1
+COUNT   equ $8000       ; the count shown on the LEDs
+STEP    equ $8001       ; 1 counting up, -1 counting down
+
+        org $0000
+        jmp start
+
+        org $003C       ; RST 7.5: the button
+        jmp button
+
+        org $0040       ; the 8259A's CALL table, four bytes apart
+        jmp tick        ; IR0: the 8253's OUT0
+
+        org $0060
+start:  lxi sp,$8100    ; the stack at the top of the 8156's RAM
+        xra a
+        sta COUNT
+        inr a
+        sta STEP
+        mvi a,$80
+        out PPICTL      ; 8255A: mode 0, every port an output
+        xra a
+        out PA
+        mvi a,$56
+        out PIC0        ; ICW1: table at $0040, interval 4, single, edge
+        xra a
+        out PIC1        ; ICW2: the table's high byte, $00
+        mvi a,$FE
+        out PIC1        ; OCW1: IR0 alone unmasked
+        mvi a,$36
+        out PITCTL      ; counter 0: low byte then high, mode 3, binary
+        mvi a,1843 & $FF
+        out CNT0
+        mvi a,1843 >> 8
+        out CNT0
+        mvi a,$1B
+        sim             ; RST 7.5 unmasked and its flip-flop cleared
+        ei
+idle:   hlt             ; wait for an interrupt
+        jmp idle
+
+; IR0, through the 8259A: the count moves on by STEP and goes out to the LEDs.
+tick:   push psw
+        push h
+        lxi h,STEP
+        lda COUNT
+        add m
+        sta COUNT
+        out PA
+        mvi a,$20
+        out PIC0        ; OCW2: a non-specific end of interrupt
+        pop h
+        pop psw
+        ei
+        ret
+
+; RST 7.5: the button turns the count round.
+button: push psw
+        lda STEP
+        cma
+        inr a
+        sta STEP
+        pop psw
+        ei
+        ret
+```
+
+**The 8259A, in practice.** ICW1 $56 puts the handlers at $0040 (A7-A5 = 010), four bytes apart,
+with no other 8259A and edge triggering; ICW2 gives the high byte, $00; no ICW4, so it is in 8085
+mode. OCW1 masks everything but IR0. The handler ends with an **EOI** — OCW2 $20 — then `EI` and
+`RET`: without the EOI IR0 stays in service and the 8259A never interrupts again. The 8085 takes
+INTR (and RST 7.5) only with interrupts enabled, and taking one disables them, which is why each
+handler re-enables them last. SIM's $1B leaves RST 7.5 unmasked, masks 6.5 and 5.5, and clears the
+RST 7.5 flip-flop of anything latched before. With the simulator running at a couple of milliseconds
+of simulated time a second the LEDs count up about twice a second; press the button (double-click it)
+and they count down.
+
+### The 8085 board's limits
+
+- The 8085 board solves at some six or seven thousand T-states a second — a T-state is four X1 edges:
+  run milliseconds, not seconds, and keep delays short. Each LED (a diode) makes every time point a
+  non-linear solve: the timer example runs at about half the monitor's speed.
+- The 8251A's synchronous modes are not modelled, and nor are the 8279 keyboard and display
+  controller or the 8355 and 8755 ROM and EPROM with I/O; the simplifications of the processor and
+  of each peripheral are listed above.
 
 ---
 

@@ -315,6 +315,10 @@ public static partial class Examples
                 LoadZ80Monitor),
             new("Z80 CTC and PIO Interrupts", "The same Z80 with a CTC and a PIO in a mode 2 daisy chain: the CTC interrupts a thousand times a second to count on eight LEDs, and a button on the PIO turns the count round",
                 LoadZ80Counter),
+            new("8085 Single-Board Computer", "An 8085 at 1.8432 MHz with a 74373 on ALE, a 2764, an 8156 for RAM and a timer, a 74138 and an 8251A clocked from the 8156: a monitor at 19,200 baud dumps memory for the terminal",
+                Load8085Monitor),
+            new("8085 Timer Interrupts", "The same 8085 with an 8253, an 8259A and an 8255A: the timer interrupts a thousand times a second through the 8259A's CALL to count on eight LEDs, and a button on RST 7.5 turns the count round",
+                Load8085Counter),
         ]),
     ];
 
