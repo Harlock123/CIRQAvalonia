@@ -66,6 +66,12 @@ public sealed class LiveTests : IDisposable
     private readonly TempFolder _folder = new();
     private readonly string _pipe = "cirq-test-" + Guid.NewGuid().ToString("N")[..12];
 
+    /// <summary>
+    /// How long a bridge that should reach the listener waits for it: a busy CI runner can take longer than the usual two
+    /// seconds to schedule the listener's end of the handshake.
+    /// </summary>
+    private static readonly TimeSpan Patient = TimeSpan.FromSeconds(30);
+
     private LiveListener Listen(TestEditor editor, TimeSpan? busyWait = null) =>
         new(_pipe, root => new LiveHost(_ui, editor, Bench.Library, root) { BusyWait = busyWait ?? TimeSpan.FromSeconds(5), BusyPoll = TimeSpan.FromMilliseconds(20) });
 
@@ -78,7 +84,7 @@ public sealed class LiveTests : IDisposable
         listener.ConnectionsChanged += connections.Enqueue;
         listener.Start();
 
-        await using var bridge = new LiveBridge(_pipe, _folder.Path);
+        await using var bridge = new LiveBridge(_pipe, _folder.Path) { ConnectTimeout = Patient };
         await using var s = await InProcess.Start(bridge.Options());
         Assert.Contains("live app", s.Client.ServerInstructions);
         Assert.Equal(EndToEndTests.ToolNames, (await s.Client.ListToolsAsync(cancellationToken: CancellationToken.None)).Select(t => t.Name));
@@ -105,7 +111,7 @@ public sealed class LiveTests : IDisposable
         var editor = new TestEditor(_ui) { BusyWith = "a dialog box is open in CirqAvalonia" };
         await using var listener = Listen(editor, TimeSpan.FromMilliseconds(300));
         listener.Start();
-        await using var bridge = new LiveBridge(_pipe, _folder.Path);
+        await using var bridge = new LiveBridge(_pipe, _folder.Path) { ConnectTimeout = Patient };
         await using var s = await InProcess.Start(bridge.Options());
 
         var message = await s.Client.Fails("add_parts", new { parts = new object[] { new { kind = "Resistor" } } });
@@ -128,6 +134,7 @@ public sealed class LiveTests : IDisposable
         Assert.Contains("Allow AI Agents", await s.Client.Fails("get_circuit"));
 
         // It connects as soon as one is.
+        bridge.ConnectTimeout = Patient;
         var editor = new TestEditor(_ui);
         await using var listener = Listen(editor);
         listener.Start();

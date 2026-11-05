@@ -20,8 +20,8 @@ public sealed class LiveBridge(string pipeName, string root) : IAsyncDisposable
 
     public string Root { get; } = Path.GetFullPath(root);
 
-    /// <summary>How long to wait for the app to answer.</summary>
-    public TimeSpan ConnectTimeout { get; init; } = TimeSpan.FromSeconds(2);
+    /// <summary>How long to wait for the app to answer, on each connection.</summary>
+    public TimeSpan ConnectTimeout { get; set; } = TimeSpan.FromSeconds(2);
 
     public const string NotRunning =
         "No CirqAvalonia is taking AI agents just now. Start CirqAvalonia and turn on AI › Allow AI Agents (MCP), " +

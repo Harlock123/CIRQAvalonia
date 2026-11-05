@@ -172,11 +172,14 @@ public class AgentWindowTests(WindowSession session) : IDisposable
             // An outside agent works in the window used last.
             App.Agents.Activated(other);
             other.Circuit.Title = "The other one";
-            var bridge = new LiveBridge(App.AgentPipe, _folder);
+            // A busy machine (a CI runner, all the test projects at once) can take more than the bridge's usual two
+            // seconds to schedule the app's end of the handshake; this is about the window it reaches, not the timeout.
+            var bridge = new LiveBridge(App.AgentPipe, _folder) { ConnectTimeout = TimeSpan.FromSeconds(30) };
             var call = bridge.CallAsync(new ModelContextProtocol.Protocol.CallToolRequestParams { Name = "get_circuit" }, CancellationToken.None).AsTask();
             var result = Finish(call);
-            Assert.NotEqual(true, result.IsError);
-            Assert.Contains("The other one", ((ModelContextProtocol.Protocol.TextContentBlock)result.Content[0]).Text);
+            var text = ((ModelContextProtocol.Protocol.TextContentBlock)result.Content[0]).Text;
+            Assert.False(result.IsError == true, text);
+            Assert.Contains("The other one", text);
             Finish(bridge.DisposeAsync().AsTask());
 
             other.AllowAgents = false;
