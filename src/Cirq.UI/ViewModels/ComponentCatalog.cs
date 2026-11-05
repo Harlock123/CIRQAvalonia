@@ -551,6 +551,8 @@ public static class ComponentCatalog
                 () => new Sid6581()),
             new("8580 SID", "The C64C's SID: the same voices, 9 V on VDD, a near-linear filter on 22 nF capacitors",
                 () => new Sid8580()),
+            new("68000", "Motorola MC68000, the 16/32-bit processor of the Mac, Amiga and Atari ST, on its asynchronous bus: /AS, /UDS, /LDS and wait states until /DTACK",
+                () => new Cpu68000()),
         ]),
 
         new("Sensors & Actuators",
