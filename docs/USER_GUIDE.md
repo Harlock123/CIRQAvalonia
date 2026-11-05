@@ -53,16 +53,17 @@ the [README](../README.md), and what changed between releases is in the
 41. [A 6502 computer](#a-6502-computer)
 42. [A 68000 computer](#a-68000-computer)
 43. [A 6809 computer](#a-6809-computer)
-44. [Saving and loading](#saving-and-loading)
-45. [Printing](#printing)
-46. [Exporting](#exporting)
-47. [The command line](#the-command-line)
-48. [AI: the chat and agents](#ai-the-chat-and-agents)
-49. [Appearance](#appearance)
-50. [What version is this](#what-version-is-this)
-51. [Closing a dialog](#closing-a-dialog)
-52. [Keyboard reference](#keyboard-reference)
-53. [When a circuit will not simulate](#when-a-circuit-will-not-simulate)
+44. [A Z80 computer](#a-z80-computer)
+45. [Saving and loading](#saving-and-loading)
+46. [Printing](#printing)
+47. [Exporting](#exporting)
+48. [The command line](#the-command-line)
+49. [AI: the chat and agents](#ai-the-chat-and-agents)
+50. [Appearance](#appearance)
+51. [What version is this](#what-version-is-this)
+52. [Closing a dialog](#closing-a-dialog)
+53. [Keyboard reference](#keyboard-reference)
+54. [When a circuit will not simulate](#when-a-circuit-will-not-simulate)
 
 This guide is also attached to every [release](../../releases) as a PDF, with a contents page and
 the screenshots in place — the same document, laid out for reading away from the machine. Build it
@@ -190,7 +191,7 @@ The palette holds **327 components in 17 categories**:
 | 40xx Series | 47 | CMOS gates and the **4049 / 4050 level converters**; flip-flops and latches; counters including the **4026 and 4033 with their own display drivers**, the **4029, 4510 and 4516 up/down counters** and the **4518 / 4520**; the **4028** and **4543 LCD driver**; shift registers to the **4094**; the **4051, 4052, 4053 and 4067 analog multiplexers**; the **4047, 4528 and 4538** timers; a **4046 phase-locked loop** — see [below](#the-40xx-series) |
 | Buses | 19 | **Bus tap** and **bus line**, I2C master, EEPROM, port expander, DS1307 clock, ADS1115 ADC, MCP4725 DAC and INA219 current sensor, SPI master and **MCP3008 ADC**, 1-Wire master and DS18B20 thermometer, serial terminal and device, **RS-485**, **CAN** and **RS-232 (MAX232)** transceivers, level shifter — see [below](#making-its-own-rails) |
 | Digital I/O | 9 | Logic toggle, clock, **pattern generator**, rotary encoder, oscillator module, ADC and DAC bridges, and a **2K × 8 SRAM and ROM** — see [below](#something-worth-addressing) |
-| Memory & CPUs | 30 | The **2716, 2732, 2764 and 27C256 EPROMs**, the **28C256 EEPROM**, the **6116 and 62256 static RAMs** — each loadable from a binary, Intel HEX or S-record file — and the **65C02**, **6502**, **6510** and **8500** processors, **6522 VIA**, **6551 ACIA**, **6526 CIA** and the **6581 and 8580 SIDs**, the **68000**, **68681 DUART**, **68230 PI/T** and **68901 MFP**, the **6809**, **6809E**, **6821** and **6520 PIAs** and **6850 ACIA**, and the **Z80**, **Z80 PIO**, **Z80 CTC**, **Z80 SIO/0** and **Z80 DART** — see [below](#memories-by-their-part-numbers), [the 6502 computer](#a-6502-computer) and [the 6809 computer](#a-6809-computer) |
+| Memory & CPUs | 30 | The **2716, 2732, 2764 and 27C256 EPROMs**, the **28C256 EEPROM**, the **6116 and 62256 static RAMs** — each loadable from a binary, Intel HEX or S-record file — and the **65C02**, **6502**, **6510** and **8500** processors, **6522 VIA**, **6551 ACIA**, **6526 CIA** and the **6581 and 8580 SIDs**, the **68000**, **68681 DUART**, **68230 PI/T** and **68901 MFP**, the **6809**, **6809E**, **6821** and **6520 PIAs** and **6850 ACIA**, and the **Z80**, **Z80 PIO**, **Z80 CTC**, **Z80 SIO/0** and **Z80 DART** — see [below](#memories-by-their-part-numbers), [the 6502 computer](#a-6502-computer), [the 6809 computer](#a-6809-computer) and [the Z80 computer](#a-z80-computer) |
 | Sensors & Actuators | 20 | DC motor, LDR, thermistors, **LM35 and TMP36** analog thermometers, buzzers, speaker, microphone, servo, stepper in **unipolar and bipolar** wirings, thermocouple, load cell, HC-SR04 ranger, Hall switch, phototransistor, **reed switch** and **PIR motion sensor** — see [below](#sensors-and-actuators) |
 | Switching & Isolation | 11 | Relay, fuses and a **resettable PPTC**, optocouplers, ULN2003, H-bridge, **A4988 microstepping driver**, **solid-state relay**, **MOSFET gate driver** — see [below](#regulating-a-current-instead-of-applying-a-voltage) |
 | Dev Boards | 6 | Raspberry Pi, Arduino Uno / Nano / Mega, **Raspberry Pi Pico** and **ESP32 DevKit** — see [below](#development-boards) |
@@ -7611,6 +7612,568 @@ with RW high, is a harmless read. Port B, which floats at reset, carries the dat
   keep delays short and serial rates high, as the examples do.
 - Interrupt sampling, the reset sequence, MRDY's limit and the timing inside a quarter cycle are
   simplified, as above; so are the peripherals' details listed under each.
+
+---
+
+## A Z80 computer
+
+The **Memory & CPUs** group also has Zilog's **Z80** — the processor of the ZX Spectrum, the
+TRS-80, the MSX machines, CP/M and a generation of arcade boards and embedded controllers — and the
+family Zilog built around it: the **Z80 PIO** (parallel ports), the **Z80 CTC** (counters and
+timers), the **Z80 SIO/0** (serial) and the **Z80 DART** (the SIO's asynchronous half alone). What
+ties them together is the **interrupt daisy chain**: the chips pass a priority down a wire from
+one to the next, each hands the processor its own vector, and each watches the instruction stream
+for the RETI that ends its interrupt. **File > Examples > Computers** has two machines: a
+[single-board computer running a monitor](#the-z80-single-board-computer) through a SIO, and
+[a CTC and a PIO in a daisy chain](#a-ctc-and-a-pio-in-the-daisy-chain).
+
+![The Z80 single-board computer on the canvas: the Z80 on the left with its 3.6864 MHz oscillator, reset button and pull-ups, a 27C256 EPROM and a 62256 RAM beside it, two 74138s below them decoding memory and I/O, the SIO/0 on the right with its clocks on CLK, and the serial terminal showing the monitor's banner, the dump of $0000 and its prompt](images/60-z80-computer.png)
+
+### The Z80 and its bus
+
+**A T-state is a clock.** The Z80 takes one CLK input and counts in T-states, one CLK cycle each,
+from rising edge to rising edge. An instruction is a run of **machine cycles** — an opcode fetch
+(M1), memory reads and writes, I/O reads and writes — of three to six T-states each, with internal
+T-states between them, and the counts are Zilog's: 4 for most register instructions, 7 for an
+immediate load, 11 for a PUSH, 17 for a CALL, 19 for an (IX+d) load, 21 for each round of an LDIR.
+On the pins, a T-state's changes come 40 ns after CLK's edge:
+
+| Cycle | T1 | T2 | (TW) | T3 | T4 |
+| --- | --- | --- | --- | --- | --- |
+| M1 (fetch) | the PC out, /M1 low; /MREQ and /RD as CLK falls | /WAIT sampled as CLK falls | | the opcode taken as T3 begins; /M1, /MREQ, /RD high; the refresh address out, /RFSH low, /MREQ again as CLK falls | /MREQ high as CLK falls |
+| Memory read | the address; /MREQ and /RD as CLK falls | /WAIT sampled | | the byte taken as CLK falls; /MREQ and /RD high | |
+| Memory write | the address; /MREQ and the data as CLK falls | /WR low as CLK falls; /WAIT sampled | | /WR and /MREQ high as CLK falls | |
+| I/O read or write | the port: A0-A7, with A or B (or the count) on A8-A15 | /IORQ with /RD or /WR from CLK rising | one automatic; /WAIT sampled | the byte taken as CLK falls; all high | |
+| Interrupt acknowledge | the PC out, /M1 low | | two automatic: /IORQ low from the middle of the first, /WAIT sampled in the second | the device's byte taken as T3 begins; then a refresh | as an M1 |
+
+**The refresh** is the second half of every M1: R's low seven bits on A0-A6 (bit 7 as LD R,A left
+it) and I on A8-A15, with /RFSH and /MREQ low, for dynamic RAM. R counts every M1 — prefixes and
+acknowledges included — in its low seven bits. Nothing in the library needs refreshing, but the
+cycles are on the pins and marked in the bus decode.
+
+**/WAIT** low as CLK falls in T2 (or in the automatic wait state of an I/O cycle, or the second of an
+acknowledge's) adds a wait state, and another, until it is seen high: a slow memory or peripheral
+stretches the cycle a T-state at a time. The processor counts them, and the bus decode shows them
+as `+2w`. An opcode fetch gives a memory 1.5 T-states from /RD to the byte — 407 ns at 3.6864 MHz,
+plenty for the 150 ns 27C256 — and a read two, so the examples need none.
+
+**The other pins.** /INT is a level, sampled as the last T-state of an instruction begins, and taken
+if IFF1 is set; **/NMI** is an edge, latched whenever it comes and taken ahead of /INT. **/HALT** goes
+low while the processor runs HALT's NOPs — an M1 at the address after the HALT, again and again,
+R counting — until an interrupt. **/BUSREQ**, sampled as the last T-state of a machine cycle begins,
+floats the address and data buses and /MREQ, /IORQ, /RD and /WR before the next cycle, and takes
+**/BUSACK** low; the processor takes the bus back the T-state it sees /BUSREQ high, with no
+refresh meanwhile. **/RESET** low floats the buses and holds the controls inactive; let go, the
+processor clears PC, I, R, IFF1 and IFF2, sets interrupt mode 0, sets AF and SP to $FFFF (as the
+undocumented documentation finds) and fetches from $0000 (power-on does that too). None of the inputs
+is pulled up inside, so tie the unused ones high. Pinout: 1-5 = A11-A15, 6 = CLK, 7 = D4, 8 = D3,
+9 = D5, 10 = D6, 11 = +5V, 12 = D2, 13 = D7, 14 = D0, 15 = D1, 16 = /INT, 17 = /NMI, 18 = /HALT,
+19 = /MREQ, 20 = /IORQ, 21 = /RD, 22 = /WR, 23 = /BUSACK, 24 = /WAIT, 25 = /BUSREQ, 26 = /RESET,
+27 = /M1, 28 = /RFSH, 29 = GND, 30-40 = A0-A10.
+
+**Three interrupt modes.** IM 0, the 8080's: the acknowledge reads an instruction from the data bus
+and runs it — an RST, usually, which takes 13 T-states. IM 1: the byte is ignored and the processor
+calls $0038, in 13. **IM 2**, the one the Z80 family is built for: the byte is the low half of a
+pointer whose high half is I, and the processor calls the address stored there, in 19 — so each
+interrupting source can have its own handler, through a table of addresses on a page of its own.
+EI enables only after the next instruction, so `EI` then `RETI` (or `RET`) leaves no window for a
+second interrupt on the stack. An NMI is an opcode fetch thrown away and a call to $0066 in 11
+T-states, clearing IFF1 and keeping IFF2, which RETN puts back; LD A,I and LD A,R copy IFF2 into P/V,
+except that an interrupt taken straight after one clears P/V — the NMOS part's fault, kept.
+
+**The instruction set**, written from Zilog's Z80 CPU User Manual (UM0080) and datasheet, not from
+any emulator, with the behaviour Zilog did not document taken from published characterisations ("The
+Undocumented Z80 Documented", and the MEMPTR research after it) as reference: the main registers
+and the alternate set (EX AF,AF' and EXX), IX and IY, SP, PC, I and R; every opcode on the CB, ED,
+DD, FD, DDCB and FDCB pages. Undocumented, and in: the halves **IXH, IXL, IYH, IYL** (DD or FD in
+front of an instruction on H or L); **SLL** (CB $30-$37: shift left, a 1 in); the DDCB forms with a
+register in bits 0-2, which write the result back to memory *and* copy it to the register; DDCB BIT
+with any register bits; **IN F,(C)** (ED $70, the flags only) and **OUT (C),0** (ED $71); the ED
+duplicates of NEG, RETN and IM; the ED opcodes outside Zilog's map, which are two-byte NOPs; and a
+DD or FD in front of an instruction it does not change, which costs its four T-states and nothing
+else. **The flags** are exact, the undocumented ones included: bits 5 and 3 (Y and X) copy the result
+(the operand, for CP), and come from MEMPTR's high byte for BIT n,(HL) — **MEMPTR** (WZ), the
+internal address register, kept for exactly that; SCF and CCF take them from A ORed with what the
+instruction before changed in F (**Q**), as on Zilog's NMOS part; the block instructions' X and Y
+come from A plus the byte moved (LDI) or the comparison's result (CPI), and their repeating forms'
+from PC; INI, IND, OUTI and OUTD set H, C and P/V from the byte, L or C, and B, as characterised; and
+**DAA** is exact for every A, H, N and C.
+
+**Validated against an external suite.** Tom Harte's
+[SingleStepTests for the Z80](https://github.com/SingleStepTests/z80) (`v1`) are 1,000 cases for
+each of 1,604 opcodes — every opcode on every page, the undocumented ones included — each the
+registers, WZ, Q and memory before and after one instruction, the I/O it did, and the bus at the end
+of every T-state: the address, the data, and which of /RD, /WR, /MREQ and /IORQ were low. They were
+generated from a translated and corrected emulator core (Ares's), so they record an emulator's
+behaviour, cross-checked, rather than the silicon's. The core agrees with **all 1,604,000** cases:
+registers, flags, WZ, Q, R, memory, ports, and every T-state's address, data and request lines. The
+suite draws the requests more simply than the pins do — /MREQ and /RD for one T-state where the chip
+holds them for two — so the comparison maps each of the core's T-states to the suite's convention; on
+the pins they are as the datasheet draws them. It has no interrupts, /WAIT, /BUSREQ, HALT's NOPs or
+reset, nor the ED opcodes outside Zilog's map; those have tests of their own written from the
+datasheet's sequences. The suite is not in the repository and no test needs the network. ZEXDOC and
+ZEXALL, the instruction exercisers, were not run: they are GPL code needing a CP/M stand-in, and
+nothing of theirs could be committed.
+
+**How fast it runs.** A T-state is two CLK edges, each a time point with the whole board solved —
+where a 6809's E cycle is eight. Measured on the development machine (an 8-core ARM virtual machine,
+shared and busy), in a release build, the Z80 single-board computer runs at **about 2.8 ms of
+simulated time per second — some 10,000 T-states, or 3,700 machine cycles and refreshes, a second**
+— and the CTC and PIO example, its eight LEDs making every time point a non-linear solve, at about
+1.5 ms (5,400 T-states); on the same run the 6809 single-board computer did 3.6 ms (6,600 E cycles).
+A debug build is two to three times slower. The examples run the Z80 at **3.6864 MHz**, a common Z80
+crystal: a slower clock costs the same per T-state, and 3.6864 MHz ÷ 32 is exactly 115,200 baud for
+the SIO, so a character takes 87 µs, 320 T-states, and the monitor's whole exchange about 6.5 ms —
+two or three seconds of solving.
+
+**Simplifications.** /BUSREQ is honoured only before a bus cycle — after an internal machine cycle
+too on the chip — and the bus comes back the T-state /BUSREQ is seen high, with no extra T-state;
+the reset needs one T-state of /RESET low where the chip asks for three; in mode 0 only the first
+byte comes from the acknowledge — an instruction longer than one byte reads the rest from memory at
+PC, as the bus would give it on a board with nothing to answer, which is why mode 0 here wants an RST;
+/HALT goes low as the first NOP begins rather than in the HALT's own T4; and timing inside a
+T-state is one propagation delay.
+
+### The Z80's peripherals and the daisy chain
+
+All four are I/O devices: they answer /IORQ, never /MREQ. **There is no /WR pin** — with /CE and
+/IORQ low and /M1 high, /RD low is a read and /RD high a write — and each has /M1, /IORQ and /RD
+from the processor, its CLK, and the three chain pins.
+
+**The daisy chain.** Wire the chips' IEO to the next one's IEI, the first chip's IEI to +5 V, and
+every /INT (open drain) together onto the processor's /INT with a pull-up. A chip — and within a
+chip, a source: the PIO's two ports, the CTC's four channels, the SIO's six — has a place in the
+order, the first chip's first source highest. Then:
+
+1. A chip pulls /INT low for its highest pending source only while its IEI is high and none of its
+   own sources at or above that one is **under service**.
+2. IEO is high only while IEI is high and the chip has nothing under service — and during an M1,
+   nothing pending either. So when the processor acknowledges (/M1 with /IORQ, after the two
+   automatic wait states that give the chain time to settle), exactly one chip has IEI high and a
+   request: it puts its **vector** on the data bus, and that source goes under service. In mode 2
+   the processor calls through it.
+3. A chip with something under service holds its IEO low, so everything below it waits — but a
+   chip above can still interrupt, and the handler is interrupted in its turn, as long as it has
+   done `EI`.
+4. Each chip **watches the opcode fetches** (/M1 with /RD) for **RETI**, ED 4D. On the ED, a chip
+   with something pending but nothing under service lets IEO back up for the next fetch, so the
+   chip under service further down sees IEI high when the 4D comes: that one chip — the one whose
+   IEI is high — ends the service of its highest source, and the chain moves on. RETN, or a RET,
+   ends nothing: a handler on a chained chip ends with `EI` and `RETI`.
+
+The bus decode shows the acknowledges as `INTA` with the vector; **peripheral_state**, for an agent,
+lists each chip's sources pending and under service.
+
+**The PIO** (`Z80 PIO`) has two 8-bit ports. B/A picks the port, C/D the data (low) or control (high)
+register. A control write is one of four words, told apart by its low bits:
+
+| Bits | Word |
+| --- | --- |
+| `vvvvvvv0` | The port's interrupt vector |
+| `mm xx 1111` | The mode: 00 output, 01 input, 10 bidirectional (port A only), 11 bit control — which takes the next byte as the I/O register, a 1 making that line an input |
+| `e a l m 0111` | Interrupt control: e enables; a picks AND (1) or OR of the monitored lines; l active high (1) or low; m says the mask follows as the next byte, a 1 masking a line out |
+| `e xxx 0011` | The enable alone |
+
+| Mode | |
+| --- | --- |
+| 0, output | A write puts the byte on the port and raises RDY; the peripheral's /STB pulse says it has taken it — RDY falls as /STB rises, and the port interrupts. A read gives the output register |
+| 1, input | /STB low latches the lines; as it rises RDY falls and the port interrupts. A read gives the latched byte and raises RDY — so a program starts with one read |
+| 2, bidirectional | Port A, with port B in mode 3: output with ARDY and /ASTB, the drivers on only while /ASTB is low; input with BRDY and /BSTB; both through port A's vector |
+| 3, bit control | Each line an input or an output; a read gives the inputs' pins and the outputs' register. The port interrupts as the logic of its monitored inputs becomes true — OR, any of them at the active level; AND, all of them. RDY stays low |
+
+Port A outranks port B. At power-on, and when /M1 is held low with neither /RD nor /IORQ for three
+CLK rising edges (no Z80 cycle does that; a reset circuit can), both ports go to mode 1 with
+interrupts off and every line masked. Not modelled: the handshakes act on the strobe edges at once
+rather than on CLK; a mode 3 interrupt comes as the condition *becomes* true, so one already true
+when interrupts are enabled waits for the next time; port B has no Darlington drive; and the NMOS
+part's control register reads back as $FF. Pinout (DIP-40): 1 = D2, 2 = D7, 3 = D6, 4 = /CE,
+5 = C/D, 6 = B/A, 7-10 = PA7-PA4, 11 = GND, 12-15 = PA3-PA0, 16 = /ASTB, 17 = /BSTB, 18 = ARDY,
+19 = D0, 20 = D1, 21 = BRDY, 22 = IEO, 23 = /INT, 24 = IEI, 25 = CLK, 26 = +5V, 27-34 = PB7-PB0,
+35 = /RD, 36 = /IORQ, 37 = /M1, 38 = D3, 39 = D4, 40 = D5.
+
+**The CTC** (`Z80 CTC`) has four channels; CS1 and CS0 pick one, a read gives its down-counter as it
+stands, and a write is a control word (bit 0 set), a time constant, or — written to channel 0 with
+bit 0 clear — the vector.
+
+| Control bit | |
+| --- | --- |
+| 7 | Interrupt enable |
+| 6 | Counter (1) or timer (0) |
+| 5 | The timer's prescaler: 256 (1) or 16 |
+| 4 | The active CLK/TRG edge: rising (1) or falling |
+| 3 | A timer starts as its time constant is loaded (0), or on the CLK/TRG edge after (1) |
+| 2 | A time constant follows, as the next byte |
+| 1 | Software reset: the channel stops |
+| 0 | 1: a control word |
+
+The time constant, 1 to 256 (0 is 256), loads the down-counter. A **timer** counts CLK through its
+prescaler — one count every 16 or 256 clocks — and a **counter** counts CLK/TRG edges. At each zero
+the down-counter reloads, **ZC/TO** goes high for one clock (channel 3 has no pin for it), and the
+channel interrupts if enabled; wire ZC/TO to the next channel's CLK/TRG and they cascade. A new time
+constant written while a channel runs is taken at the next zero. The vector's bits 7-3 are what
+channel 0 was given; the acknowledge puts the channel in bits 2-1, channel 0 highest. /RESET stops
+all four and disables their interrupts. Not modelled: a timer starts on the first clock after its
+time constant (the chip waits for the second), and CLK/TRG edges are taken as they come rather
+than synchronised to CLK, so a counter can count faster than the datasheet's half CLK. Pinout
+(DIP-28): 1-4 = D4-D7, 5 = GND, 6 = /RD, 7-9 = ZC/TO0-ZC/TO2, 10 = /IORQ, 11 = IEO, 12 = /INT,
+13 = IEI, 14 = /M1, 15 = CLK, 16 = CLK/TRG3, 17 = /RESET, 18 = CS1, 19 = CS0, 20 = /CE,
+21-23 = CLK/TRG2-CLK/TRG0, 24 = +5V, 25-28 = D0-D3.
+
+**The SIO** (`Z80 SIO/0`) has two serial channels, A and B; B/A picks one, C/D its data or its
+control port. The control port reaches the write registers through a pointer: bits 2-0 of a WR0
+write say which register the next control access is — a write to WR1-WR7 or a read of RR0-RR2 —
+after which it goes back to 0. Only the **asynchronous** modes are modelled: the synchronous ones
+(monosync, bisync, SDLC/HDLC, the CRC, and the sync characters in WR6 and WR7) are not, and WR4's
+stop bits 00, which select them, leave both halves idle.
+
+| Register | |
+| --- | --- |
+| WR0 | Bits 2-0 the pointer; bits 5-3 a command: 010 reset external/status interrupts, 011 channel reset, 100 enable the interrupt on the next received character, 101 reset the transmit interrupt, 110 error reset, 111 return from interrupt (channel A, for a SIO not watching for RETI); bits 7-6 = 11 reset the transmit underrun latch |
+| WR1 | Bit 0 external/status interrupts, bit 1 transmit interrupts, bit 2 (channel B) **status affects vector**, bits 4-3 the receive interrupt — 00 none, 01 on the first character, 10 on every one with a parity error special, 11 on every one — and bits 7-5 /W/RDY: on, ready (1) or wait (0), receive (1) or transmit (0) |
+| WR2 | The vector (channel B only) |
+| WR3 | Bit 0 receiver on, bit 5 **auto enables** (the receiver only while /DCD is low, the transmitter only while /CTS is low), bits 7-6 bits per character: 00 5, 01 7, 10 6, 11 8 |
+| WR4 | Bit 0 parity on, bit 1 even, bits 3-2 stop bits (01 one, 10 one and a half, 11 two), bits 7-6 the clock: x1, x16, x32, x64 |
+| WR5 | Bit 1 RTS, bit 3 transmitter on, bit 4 send a break, bits 6-5 bits per character, bit 7 DTR |
+| RR0 | Bit 0 a character waiting, 1 an interrupt pending (channel A only), 2 the transmit buffer empty, 3 DCD, 4 SYNC (RI on the DART), 5 CTS, 6 the underrun latch, 7 a break. Bits 3, 4, 5 and 7 hold what an external/status interrupt saw until it is reset |
+| RR1 | Bit 0 all sent, 4 a parity error, 5 a receive overrun (both held until an error reset), 6 the waiting character's framing error |
+| RR2 | The vector (channel B), with the source in bits 3-1 under status affects vector |
+
+With **status affects vector**, bits 3-1 of the vector say which source interrupted, so each has a
+handler of its own: B transmit 000, B external/status 001, B receive 010, B special receive 011, and
+channel A's the same with bit 3 set. Each channel has a transmit buffer in front of its shift
+register and a **three-byte FIFO** behind its receiver: a fourth character over a full FIFO
+overwrites the last, which carries the overrun into RR1 when it reaches the top. A framing error, an
+overrun, and in receive mode 10 a parity error are **special receive conditions**: they interrupt
+through their own vector code until an error reset. The transmit interrupt comes when the buffer
+empties into the shift register, not merely because it is empty; a break (every bit low, the stop
+bit too) puts a null in the FIFO and raises an external/status interrupt as it starts and as it
+ends. The ranking is A receive, A transmit, A external/status, then B's. **/W/RDY** as a *ready*
+(for a DMA controller) is low while the buffer is empty (or a character waits, on receive); as a
+*wait*, open drain onto the Z80's /WAIT, it holds the processor in wait states while it writes a
+full buffer (or reads an empty FIFO), so a program needs no polling. /TxC and /RxC clock each half
+at 1, 16, 32 or 64 times the bit rate, and the part times the bits from each clock's measured period,
+as the 6850 does; TxD and RxD are ordinary logic, so they connect to the **Serial Terminal** and read
+in the **UART** bus decode. /RESET resets both channels. Not modelled, besides the synchronous modes:
+x1 samples mid-bit (the chip wants the clock synchronised to the data); a character starts at the
+next time point after it is written; /RTS follows WR5 at once, where the chip holds it until the
+transmitter is empty; RR1's residue codes read 0. Pinout (DIP-40): 1 = D1, 2 = D3, 3 = D5, 4 = D7,
+5 = /INT, 6 = IEI, 7 = IEO, 8 = /M1, 9 = +5V, 10 = /W/RDYA, 11 = /SYNCA, 12 = RxDA, 13 = /RxCA,
+14 = /TxCA, 15 = TxDA, 16 = /DTRA, 17 = /RTSA, 18 = /CTSA, 19 = /DCDA, 20 = CLK, 21 = /RESET,
+22 = /DCDB, 23 = /CTSB, 24 = /RTSB, 25 = /DTRB, 26 = TxDB, 27 = /RxTxCB, 28 = RxDB, 29 = /SYNCB,
+30 = /W/RDYB, 31 = GND, 32 = /RD, 33 = C/D, 34 = B/A, 35 = /CE, 36 = /IORQ, 37 = D6, 38 = D4,
+39 = D2, 40 = D0.
+
+**The SIO/1 and SIO/2** are the same chip bonded into the same 40 pins differently, each giving up a
+pin of channel B's so that its receive and transmit clocks get one each: the SIO/1 loses /DTRB, the
+SIO/2 /SYNCB. The SIO/0 here has channel B's clocks on one pin, /RxTxCB. **The DART**
+(`Z80 DART`) is the SIO's asynchronous channels with nothing synchronous at all — no WR6 or WR7 —
+and a ring-indicator input, **/RI**, where the SIO has /SYNC: its level in RR0 bit 4, its changes an
+external/status interrupt. Pinout as the SIO/0's, with 11 = /RIA and 29 = /RIB.
+
+### The Z80 single-board computer
+
+**File > Examples > Computers > Z80 Single-Board Computer** is built in the style of the RC2014 Mini
+and Grant Searle's simple Z80:
+
+| Address | What | Selected by |
+| --- | --- | --- |
+| $0000-$7FFF | 27C256 EPROM | /CE = ROM_SEL (the memory 74138's Y0: A15 low, /MREQ low); /OE = /RD |
+| $8000-$FFFF | 62256 RAM | /CE = RAM_SEL (Y1: A15 high, /MREQ low); /OE = /RD, /WE = /WR |
+| Ports $80-$83 | SIO/0: channel A data, B data, A control, B control | /CE = SIO_SEL (the I/O 74138's Y4), B/A = A0, C/D = A1 |
+| Ports $A0-$BF, $C0-$DF | Free — the next example puts its CTC and PIO here | CTC_SEL (Y5), PIO_SEL (Y6) |
+
+Two **74138**s do all the decoding. The memory one has A15 on its A input and **/MREQ** on /E1,
+so a refresh or an I/O cycle selects neither memory and a read cycle selects one; the I/O one has
+A5-A7 on its inputs, **/IORQ** on /E1 and **/M1** on E3, so an interrupt acknowledge — /M1 with
+/IORQ — selects no port and the chips that answer it are the ones in the daisy chain. The Z80 runs
+at **3.6864 MHz** from an oscillator module, and the SIO's /RxCA, /TxCA and /RxTxCB are CLK too, so
+x32 is exactly 115,200 baud. The EPROM holds this monitor, which prints a banner and a prompt, reads
+a line, and for **D** and an address dumps the eight bytes there. The terminal types `D 0000` at
+2.5 ms:
+
+```asm
+; A small monitor for the Z80 single-board computer: a SIO/0 at $80
+; talking to the terminal at 115,200 baud (CLK ÷ 32, CLK being 3.6864 MHz),
+; this ROM at $0000-$7FFF and RAM at $8000-$FFFF. It prints a banner and
+; a prompt; D and an address in hex dumps the eight bytes there.
+
+SIOAD   equ $80         ; channel A data
+SIOAC   equ $82         ; channel A control
+LINE    equ $8000       ; the line typed, in RAM
+
+        org $0000
+start:  ld sp,$0000     ; the stack grows down from the top of RAM
+        ld hl,siotab
+        ld b,siotabend-siotab
+        ld c,SIOAC
+        otir            ; channel A: reset, then WR4, WR3 and WR5
+        ld hl,banner
+        call puts
+prompt: ld hl,gt
+        call puts
+        ld hl,LINE
+getc:   call getch
+        cp 13
+        jr z,eol
+        call putch      ; echo it
+        ld (hl),a
+        inc hl
+        jr getc
+eol:    ld (hl),0
+        call crlf
+        ld hl,LINE
+        ld a,(hl)
+        and $DF         ; upper case
+        cp 'D'
+        jr nz,what
+        inc hl
+        call gethex     ; DE = the address; C set if there was none
+        jr c,what
+        ex de,hl
+        ld a,h
+        call puthex
+        ld a,l
+        call puthex
+        ld a,':'
+        call putch
+        ld b,8
+dump:   ld a,' '
+        call putch
+        ld a,(hl)
+        call puthex
+        inc hl
+        djnz dump
+        call crlf
+        jr prompt
+what:   ld hl,huh
+        call puts
+        jr prompt
+
+; Send A, once the transmit buffer is empty (RR0 bit 2). A is kept.
+putch:  push af
+txwait: in a,(SIOAC)
+        bit 2,a
+        jr z,txwait
+        pop af
+        out (SIOAD),a
+        ret
+
+; Wait for a character (RR0 bit 0) and return it in A.
+getch:  in a,(SIOAC)
+        bit 0,a
+        jr z,getch
+        in a,(SIOAD)
+        ret
+
+; Send the string at HL, up to its zero.
+puts:   ld a,(hl)
+        or a
+        ret z
+        call putch
+        inc hl
+        jr puts
+
+crlf:   ld a,13
+        call putch
+        ld a,10
+        jr putch
+
+; A as two hex digits.
+puthex: push af
+        rrca
+        rrca
+        rrca
+        rrca
+        call nibble
+        pop af
+nibble: and $0F
+        add a,'0'
+        cp '9'+1
+        jr c,putch
+        add a,7
+        jr putch
+
+; Skip spaces at HL, then read hex digits into DE. C set if there were none.
+gethex: ld de,0
+        ld b,0
+skip:   ld a,(hl)
+        cp ' '
+        jr nz,digit
+        inc hl
+        jr skip
+digit:  ld a,(hl)
+        call hexval
+        jr c,gotit
+        ex de,hl
+        add hl,hl
+        add hl,hl
+        add hl,hl
+        add hl,hl
+        or l
+        ld l,a
+        ex de,hl
+        inc hl
+        inc b
+        jr digit
+gotit:  ld a,b
+        sub 1           ; C set only if B was zero
+        ret
+
+; A hex digit's value in A, or C set if A is not one.
+hexval: cp '0'
+        jr c,bad
+        cp '9'+1
+        jr c,num
+        and $DF
+        cp 'A'
+        jr c,bad
+        cp 'F'+1
+        jr nc,bad
+        sub 'A'-10
+        ret             ; C clear: 'A'-10 is below A
+num:    sub '0'
+        ret
+bad:    scf
+        ret
+
+siotab: db $18          ; WR0: channel reset
+        db 4,$84        ; WR4: x32 clock, one stop bit, no parity
+        db 3,$C1        ; WR3: 8 bits, receiver on
+        db 5,$EA        ; WR5: DTR, 8 bits, transmitter on, RTS
+siotabend:
+banner: db "CIRQ Z80 monitor",13,10,0
+gt:     db "> ",0
+huh:    db "?",13,10,0
+```
+
+It prints `CIRQ Z80 monitor`, echoes the command and answers `0000: 31 00 00 21 DF 00 06 07` — its
+own first instructions — after about 6.5 ms. The SIO is set up by OTIR from a table: a channel reset,
+then WR4, WR3 and WR5, as Zilog's examples do; polling RR0 like this is the simplest way to drive it,
+and WR1 turns on its interrupts instead. **Simulate > Decode Bus** offers a **CpuZ80** decode: every
+machine cycle with its address and byte, the refreshes after each M1 marked, the I/O with its port,
+the wait states and the acknowledges, and each instruction disassembled where it starts — here the
+OTIR going round, an M1 for the opcode after its ED prefix, its read of the table and its output:
+
+```
+$0000 LD SP,$0000   RFSH $0000   R $0001 00   R $0002 00   $0003 LD HL,$00DF   RFSH $0001
+R $0004 DF   R $0005 00   $0006 LD B,$07   RFSH $0002   R $0007 07   $0008 LD C,$82   RFSH $0003
+R $0009 82   $000A OTIR   RFSH $0004   M1 $000B B3   RFSH $0005   R $00DF 18   OUT $82 18
+```
+
+### A CTC and a PIO in the daisy chain
+
+**File > Examples > Computers > Z80 CTC and PIO Interrupts** is the same computer with a **CTC** at
+$A0 (/CE = CTC_SEL, CS0 = A0, CS1 = A1) and a **PIO** at $C0 (/CE = PIO_SEL, B/A = A0, C/D = A1),
+and no SIO. The CTC comes first in the daisy chain — its IEI tied high, its IEO on the PIO's IEI —
+and both /INTs are on the processor's, pulled up. CTC channel 0's **ZC/TO0** is wired to channel 1's
+**CLK/TRG1**: channel 0 divides CLK by 16 × 23 into 10 kHz pulses, and channel 1 counts ten of them,
+so it interrupts about a thousand times a second (3.6864 MHz ÷ 3,680 = 1,001.7 Hz). Each interrupt
+moves a count on eight LEDs on PIO **port A**, in mode 0. A push button with a pull-up drives
+**PB0**; port B is in mode 3, PB0 monitored alone, active low, so a press interrupts through the PIO
+and turns the count round. Between interrupts the processor waits in **HALT** — /HALT low, its NOP
+fetches in the bus decode as `HALT NOP`.
+
+![The Z80 with a CTC and a PIO: the same EPROM, RAM and decoding, the CTC with ZC/TO0 wired to CLK/TRG1 and its IEO on the PIO's IEI, the PIO's port A driving eight LEDs through resistors, a push button with a pull-up on PB0, and the LEDs showing the count](images/61-z80-ctc-pio.png)
+
+```asm
+; The CTC counts and the PIO shows and listens. CTC channel 0 divides
+; CLK by 16 x 23 into 10 kHz pulses on ZC/TO0, which is wired to
+; CLK/TRG1; channel 1 counts ten of them and interrupts, about a thousand
+; times a second, and each interrupt moves the count on port A's LEDs. A
+; button on PB0 interrupts through the PIO and turns the count round.
+; Both interrupt in mode 2, the CTC ahead of the PIO in the daisy chain;
+; between them the processor waits in HALT.
+
+CTC0    equ $A0         ; CTC channel 0 (and the vector)
+CTC1    equ $A1         ; CTC channel 1
+PIOAD   equ $C0         ; PIO port A data
+PIOAC   equ $C2         ; PIO port A control
+PIOBC   equ $C3         ; PIO port B control
+COUNT   equ $8000       ; the count shown on the LEDs
+STEP    equ $8001       ; 1 counting up, -1 counting down
+
+        org $0000
+        jp start
+
+        org $0010       ; the vector table, I = 0
+        dw tick         ; $10: CTC channel 0 (not enabled)
+        dw tick         ; $12: CTC channel 1
+        dw tick         ; $14: channel 2 (not enabled)
+        dw tick         ; $16: channel 3 (not enabled)
+        dw button       ; $18: PIO port B
+
+start:  ld sp,$0000
+        xor a
+        ld (COUNT),a
+        ld i,a          ; the table is on page 0
+        inc a
+        ld (STEP),a
+        im 2
+        ld a,$0F
+        out (PIOAC),a   ; port A: mode 0, output
+        xor a
+        out (PIOAD),a
+        ld a,$18
+        out (PIOBC),a   ; port B's vector
+        ld a,$CF
+        out (PIOBC),a   ; port B: mode 3, bit control
+        ld a,$FF
+        out (PIOBC),a   ; every line an input
+        ld a,$97
+        out (PIOBC),a   ; interrupts on, OR, active low, a mask follows
+        ld a,$FE
+        out (PIOBC),a   ; PB0 alone
+        ld a,$10
+        out (CTC0),a    ; the CTC's vector
+        ld a,$07
+        out (CTC0),a    ; channel 0: timer, prescaler 16, a time constant follows, reset
+        ld a,23
+        out (CTC0),a
+        ld a,$D7
+        out (CTC1),a    ; channel 1: interrupts on, counter, rising edges, a time constant follows, reset
+        ld a,10
+        out (CTC1),a
+        ei
+idle:   halt            ; wait for an interrupt
+        jr idle
+
+; CTC channel 1: the count moves on by STEP and goes out to the LEDs.
+tick:   push af
+        push hl
+        ld hl,STEP
+        ld a,(COUNT)
+        add a,(hl)
+        ld (COUNT),a
+        out (PIOAD),a
+        pop hl
+        pop af
+        ei
+        reti
+
+; PIO port B: the button turns the count round.
+button: push af
+        ld a,(STEP)
+        neg
+        ld (STEP),a
+        pop af
+        ei
+        reti
+```
+
+**Mode 2, in practice.** I is 0, so the table is on page 0: the CTC was given $10 and puts its
+channel in bits 2-1, so channel 1 comes as $12; the PIO's port B was given $18. Each handler ends
+with `EI` and `RETI`, and the RETI is what tells the chip its interrupt is over — the CTC, being
+first in the chain, would otherwise hold the PIO off for good. With the simulator running at a
+millisecond or two of simulated time a second, the LEDs count up about as fast as they can be
+watched; press the button (double-click it) and they count down.
+
+### The Z80 board's limits
+
+- The Z80 board solves at some ten thousand T-states a second: run milliseconds, not seconds, and
+  keep delays short and serial rates high, as the examples do. Each LED (a diode) makes every time
+  point a non-linear solve: the CTC and PIO example runs at about half the monitor's speed.
+- The SIO's synchronous modes are not modelled; the simplifications of the processor and of each
+  peripheral are listed above.
 
 ---
 

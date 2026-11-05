@@ -311,6 +311,10 @@ public static partial class Examples
                 Load6809Monitor),
             new("6809 PIA Button Counter", "The same 6809 with a 6821 PIA: an HD44780 on its ports, and a button on CA1 interrupting through /IRQA, each press counted on the display",
                 Load6809Buttons),
+            new("Z80 Single-Board Computer", "A Z80 at 3.6864 MHz with a 27C256, a 62256, two 74138s decoding memory and I/O, and a SIO/0 clocked from CLK: a monitor at 115,200 baud dumps memory for the terminal",
+                LoadZ80Monitor),
+            new("Z80 CTC and PIO Interrupts", "The same Z80 with a CTC and a PIO in a mode 2 daisy chain: the CTC interrupts a thousand times a second to count on eight LEDs, and a button on the PIO turns the count round",
+                LoadZ80Counter),
         ]),
     ];
 
