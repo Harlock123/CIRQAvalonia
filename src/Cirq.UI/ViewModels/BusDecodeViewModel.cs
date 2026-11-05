@@ -41,6 +41,13 @@ public enum BusProtocol
     /// instruction disassembled where it starts.
     /// </summary>
     CpuZ80,
+
+    /// <summary>
+    /// An 8085's bus from its own record: every machine cycle — opcode fetches, memory and I/O reads
+    /// and writes, INTR and restart acknowledges, bus idle cycles — with the wait states READY added,
+    /// where halts and holds began, and each instruction disassembled where it starts.
+    /// </summary>
+    Cpu8085,
 }
 
 /// <summary>One decoded element, dressed for the list.</summary>
@@ -130,7 +137,7 @@ public sealed partial class BusDecodeViewModel : ObservableObject
     /// <summary>What the four channel pickers are called for the chosen protocol.</summary>
     public string LabelA => Protocol switch
     {
-        BusProtocol.Cpu6502 or BusProtocol.Cpu68000 or BusProtocol.Cpu6809 or BusProtocol.CpuZ80 => "CPU",
+        BusProtocol.Cpu6502 or BusProtocol.Cpu68000 or BusProtocol.Cpu6809 or BusProtocol.CpuZ80 or BusProtocol.Cpu8085 => "CPU",
         BusProtocol.I2c => "SDA",
         BusProtocol.Spi => "SCLK",
         BusProtocol.Can => "Bus",
@@ -158,6 +165,7 @@ public sealed partial class BusDecodeViewModel : ObservableObject
         BusProtocol.Cpu68000 => _circuit.Components.OfType<Cirq.Components.Processors.Cpu68000>().Count() > 1,
         BusProtocol.Cpu6809 => _circuit.Components.OfType<Cirq.Components.Processors.Processor6809>().Count() > 1,
         BusProtocol.CpuZ80 => _circuit.Components.OfType<Cirq.Components.Processors.CpuZ80>().Count() > 1,
+        BusProtocol.Cpu8085 => _circuit.Components.OfType<Cirq.Components.Processors.Cpu8085>().Count() > 1,
         _ => true,
     };
 
@@ -217,6 +225,7 @@ public sealed partial class BusDecodeViewModel : ObservableObject
         if (Protocol == BusProtocol.Cpu68000) return Decode68000();
         if (Protocol == BusProtocol.Cpu6809) return Decode6809();
         if (Protocol == BusProtocol.CpuZ80) return DecodeZ80();
+        if (Protocol == BusProtocol.Cpu8085) return Decode8085();
 
         var a = Of(ChannelA);
 
@@ -338,6 +347,29 @@ public sealed partial class BusDecodeViewModel : ObservableObject
     }
 
     /// <summary>
+    /// An 8085's bus, from the processor's own record: the one channel A's probe is on, or the
+    /// circuit's only one. The latest cycles, as for the 6502.
+    /// </summary>
+    private DecodeResult Decode8085()
+    {
+        var cpu = ChannelA?.TargetTerminal?.Owner as Cirq.Components.Processors.Cpu8085
+                  ?? _circuit.Components.OfType<Cirq.Components.Processors.Cpu8085>().FirstOrDefault();
+
+        if (cpu is null)
+            return DecodeResult.Nothing(Cirq.Components.Processors.Cpu8085BusDecoder.Protocol,
+                "There is no 8085 in the circuit to decode the bus of.");
+
+        var log = cpu.BusLog;
+        var recent = log.Count > MaxCpuCycles ? log.Skip(log.Count - MaxCpuCycles).ToList() : log;
+        var result = Cirq.Components.Processors.Cpu8085BusDecoder.Decode(recent);
+        result = result with { Summary = $"{cpu.Name} ({cpu.PartNumber}): {result.Summary}" };
+
+        return log.Count > MaxCpuCycles
+            ? result with { Summary = $"{result.Summary} — the last {MaxCpuCycles} of {log.Count} recorded" }
+            : result;
+    }
+
+    /// <summary>
     /// A first guess at the protocol from what the probes are called. Every shipped example names
     /// its probes after the signals, so this lands on the right answer for all of them — and where
     /// it does not, the pickers are right there.
@@ -357,6 +389,7 @@ public sealed partial class BusDecodeViewModel : ObservableObject
         if (_circuit.Components.OfType<Cirq.Components.Processors.Cpu68000>().Any()) return BusProtocol.Cpu68000;
         if (_circuit.Components.OfType<Cirq.Components.Processors.Processor6809>().Any()) return BusProtocol.Cpu6809;
         if (_circuit.Components.OfType<Cirq.Components.Processors.CpuZ80>().Any()) return BusProtocol.CpuZ80;
+        if (_circuit.Components.OfType<Cirq.Components.Processors.Cpu8085>().Any()) return BusProtocol.Cpu8085;
 
         return BusProtocol.Uart;
     }
@@ -403,6 +436,11 @@ public sealed partial class BusDecodeViewModel : ObservableObject
 
             case BusProtocol.CpuZ80:
                 ChannelA = Traces.FirstOrDefault(p => p.TargetTerminal?.Owner is Cirq.Components.Processors.CpuZ80)
+                           ?? Traces.FirstOrDefault();
+                break;
+
+            case BusProtocol.Cpu8085:
+                ChannelA = Traces.FirstOrDefault(p => p.TargetTerminal?.Owner is Cirq.Components.Processors.Cpu8085)
                            ?? Traces.FirstOrDefault();
                 break;
 

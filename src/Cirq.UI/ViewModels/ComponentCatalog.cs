@@ -573,6 +573,8 @@ public static class ComponentCatalog
                 () => new Z80Sio()),
             new("Z80 DART", "Zilog Z80 DART: the SIO's two asynchronous channels alone, with ring-indicator inputs in place of /SYNC",
                 () => new Z80Dart()),
+            new("8085", "Intel 8085A, T-state by T-state on its pins — the multiplexed AD0-AD7 with ALE, X1 at twice CLK OUT, TRAP and RST 7.5/6.5/5.5 with SIM and RIM, SID and SOD, READY, HOLD, and the undocumented instructions and V and K flags",
+                () => new Cpu8085()),
             new("6821 PIA", "Peripheral interface adapter for a 6809 (or a 68000 on /VPA): two ports with direction registers, CA1/CA2 and CB1/CB2 handshakes and interrupts — port A pulled up, port B three-state",
                 () => new Pia6821()),
             new("6520 PIA", "MOS 6520, the PET's and Atari 800's PIA: the 6821's registers, handshakes and pinout, Φ2 for E",
