@@ -567,6 +567,8 @@ public static class ComponentCatalog
                 () => new CpuZ80()),
             new("Z80 PIO", "Zilog Z80 PIO: two 8-bit ports in output, input, bidirectional or bit-control mode, RDY and /STB handshakes, and a vector for each port in the interrupt daisy chain",
                 () => new Z80Pio()),
+            new("Z80 CTC", "Zilog Z80 CTC: four 8-bit channels, each a timer on the system clock through a prescaler of 16 or 256 or a counter of CLK/TRG edges, with ZC/TO pulses and a vectored interrupt in the daisy chain",
+                () => new Z80Ctc()),
             new("6821 PIA", "Peripheral interface adapter for a 6809 (or a 68000 on /VPA): two ports with direction registers, CA1/CA2 and CB1/CB2 handshakes and interrupts — port A pulled up, port B three-state",
                 () => new Pia6821()),
             new("6520 PIA", "MOS 6520, the PET's and Atari 800's PIA: the 6821's registers, handshakes and pinout, Φ2 for E",
