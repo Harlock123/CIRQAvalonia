@@ -587,6 +587,8 @@ public static class ComponentCatalog
                 () => new Pit8253()),
             new("8254 PIT", "Intel 8254: the 8253's three counters and six modes with the read-back command and a status byte — a baud clock for an 8251, or a periodic interrupt on RST 7.5",
                 () => new Pit8254()),
+            new("8259A PIC", "Intel 8259A programmable interrupt controller: eight requests ranked, masked and nested, answered on /INTA with a CALL to each one's handler for an 8085 (or a vector for an 8086), EOIs, rotation, poll and cascading on CAS0-CAS2",
+                () => new Pic8259()),
             new("6821 PIA", "Peripheral interface adapter for a 6809 (or a 68000 on /VPA): two ports with direction registers, CA1/CA2 and CB1/CB2 handshakes and interrupts — port A pulled up, port B three-state",
                 () => new Pia6821()),
             new("6520 PIA", "MOS 6520, the PET's and Atari 800's PIA: the 6821's registers, handshakes and pinout, Φ2 for E",
