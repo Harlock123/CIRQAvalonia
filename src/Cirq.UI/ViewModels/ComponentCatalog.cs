@@ -567,6 +567,8 @@ public static class ComponentCatalog
                 () => new Pia6821()),
             new("6520 PIA", "MOS 6520, the PET's and Atari 800's PIA: the 6821's registers, handshakes and pinout, Φ2 for E",
                 () => new Pia6520()),
+            new("6850 ACIA", "Serial port for a 6809 (or a 68000 on /VPA), clocked from its TxCLK and RxCLK pins ÷1, ÷16 or ÷64 — E ÷ 16 is 115,200 baud from 1.8432 MHz. Talks to the Serial Terminal",
+                () => new Acia6850()),
         ]),
 
         new("Sensors & Actuators",
