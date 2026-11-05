@@ -11,7 +11,7 @@ namespace Cirq.Mcp;
 public sealed partial class CircuitTools
 {
     [McpServerTool(Name = "cpu_state", ReadOnly = true, Idempotent = true)]
-    [Description("A processor's state. A 6502, 65C02, 6510 or 8500: its registers (A, X, Y, S, PC), its flags (NV-BDIZC, capitals set), the instruction it is executing (disassembled from its bus), how many cycles and instructions it has run, whether it is running, waiting (WAI) or stopped (STP/JAM), any reads that found the data bus at no logic level, its last bus cycles, and on a 6510 or 8500 its I/O port ($0000 direction, $0001 data, and the P0-P5 pins). A 68000: D0-D7, A0-A7, USP and SSP, PC, SR and its flags (T, S, the interrupt mask, XNZVC), the last instruction it finished, its clocks, bus cycles and wait states, the last exception, whether it is running, stopped (STOP), halted (double bus fault) or held in reset, and its last bus cycles with size, function code and wait states. A 6809 or 6809E: A, B, D, X, Y, U, S, PC, DP and CC with its flags (EFHINZVC, capitals set), the instruction it is executing, its E cycles (dead ones included) and instructions, the last interrupt it took, whether NMI is armed, whether it is running, in SYNC, in CWAI, halted, granted the bus or stopped, MRDY's stretch, and its last bus cycles with the dead ($FFFF) ones marked. In the app this is the live simulation; otherwise where the last run_transient left it.")]
+    [Description("A processor's state. A 6502, 65C02, 6510 or 8500: its registers (A, X, Y, S, PC), its flags (NV-BDIZC, capitals set), the instruction it is executing (disassembled from its bus), how many cycles and instructions it has run, whether it is running, waiting (WAI) or stopped (STP/JAM), any reads that found the data bus at no logic level, its last bus cycles, and on a 6510 or 8500 its I/O port ($0000 direction, $0001 data, and the P0-P5 pins). A 68000: D0-D7, A0-A7, USP and SSP, PC, SR and its flags (T, S, the interrupt mask, XNZVC), the last instruction it finished, its clocks, bus cycles and wait states, the last exception, whether it is running, stopped (STOP), halted (double bus fault) or held in reset, and its last bus cycles with size, function code and wait states. A 6809 or 6809E: A, B, D, X, Y, U, S, PC, DP and CC with its flags (EFHINZVC, capitals set), the instruction it is executing, its E cycles (dead ones included) and instructions, the last interrupt it took, whether NMI is armed, whether it is running, in SYNC, in CWAI, halted, granted the bus or stopped, MRDY's stretch, and its last bus cycles with the dead ($FFFF) ones marked. A Z80: AF, BC, DE, HL and the alternate set, IX, IY, SP, PC, I and R, WZ, IFF1 and IFF2, the interrupt mode, the flags (SZYHXPNC, capitals set), the instruction it is executing, its T-states, instructions and wait states, the last interrupt, whether it is running, halted (HALT), holding the bus released (/BUSREQ) or held in reset, and its last machine cycles with the refreshes and acknowledges marked. In the app this is the live simulation; otherwise where the last run_transient left it.")]
     public Task<string> CpuState(
         [Description("The processor's designator, e.g. \"U2\". Optional when the circuit has only one.")] string? part = null,
         [Description("How many of its most recent bus cycles to list, from 0 to 64. Default 16.")] int cycles = 16,
@@ -22,6 +22,7 @@ public sealed partial class CircuitTools
             var any = AnyProcessor(s.Circuit, part);
             if (any is Cpu68000 m68k) return State68000(m68k, cycles);
             if (any is Processor6809 m6809) return State6809(m6809, cycles);
+            if (any is CpuZ80 z80) return StateZ80(z80, cycles);
             var cpu = Processor(s.Circuit, part);
             var core = cpu.Core;
             var log = cpu.BusLog;
@@ -61,26 +62,27 @@ public sealed partial class CircuitTools
         }, cancel);
 
     [McpServerTool(Name = "disassemble", ReadOnly = true, Idempotent = true)]
-    [Description("Disassembles code held in a memory part (a ROM or RAM), as the processor would see it: give the address in the processor's memory map and where the chip starts in it (origin; a ROM decoded at $8000 has origin 32768). Lists each instruction's address, bytes and text. For a 6502 (variant 65C02 or 6502) undocumented NMOS opcodes are marked *, and with the chip holding $FFFA-$FFFF the NMI, reset and IRQ vectors are given too. For a 68000 (variant 68000) give the pair of byte-wide chips its 16-bit memory is made of: part the even bytes (D8-D15) and odd_part the odd ones (D0-D7); origin is then where the pair starts, and with origin 0 the reset vectors (the stack pointer and PC) are given. For a 6809 (variant 6809) undocumented opcodes are marked *, and with the chip holding $FFF2-$FFFF the SWI3, SWI2, FIRQ, IRQ, SWI, NMI and RESET vectors are given too.")]
+    [Description("Disassembles code held in a memory part (a ROM or RAM), as the processor would see it: give the address in the processor's memory map and where the chip starts in it (origin; a ROM decoded at $8000 has origin 32768). Lists each instruction's address, bytes and text. For a 6502 (variant 65C02 or 6502) undocumented NMOS opcodes are marked *, and with the chip holding $FFFA-$FFFF the NMI, reset and IRQ vectors are given too. For a 68000 (variant 68000) give the pair of byte-wide chips its 16-bit memory is made of: part the even bytes (D8-D15) and odd_part the odd ones (D0-D7); origin is then where the pair starts, and with origin 0 the reset vectors (the stack pointer and PC) are given. For a 6809 (variant 6809) undocumented opcodes are marked *, and with the chip holding $FFF2-$FFFF the SWI3, SWI2, FIRQ, IRQ, SWI, NMI and RESET vectors are given too. For a Z80 (variant Z80) in Zilog's syntax, the undocumented opcodes (IXH and IXL, SLL, the DDCB copies, the ED duplicates) marked *.")]
     public Task<string> Disassemble(
         [Description("The memory part's designator, e.g. \"U3\".")] string part,
         [Description("Where to start, in the processor's address space, e.g. 32768 for $8000. Default: the origin.")] int? address = null,
         [Description("The processor address of the chip's first byte, e.g. 32768 for a ROM at $8000. Default 0.")] int origin = 0,
         [Description("How many instructions, from 1 to 200. Default 24.")] int count = 24,
-        [Description("\"65C02\" (default), \"6502\" for the NMOS part's opcodes, \"68000\", or \"6809\".")] string variant = "65C02",
+        [Description("\"65C02\" (default), \"6502\" for the NMOS part's opcodes, \"68000\", \"6809\", or \"Z80\".")] string variant = "65C02",
         [Description("For a 68000: the chip holding the odd bytes (D0-D7, /LDS), part being the even one. Optional; without it part is read as holding every byte.")] string? odd_part = null,
         CancellationToken cancel = default) =>
         Read("disassemble", s =>
         {
             if (variant?.Trim() is "68000" or "68k" or "MC68000") return Disassemble68000(s.Circuit, part, odd_part, address, origin, count);
             if (variant?.Trim().ToUpperInvariant() is "6809" or "MC6809" or "6809E" or "MC6809E") return Disassemble6809(s.Circuit, part, address, origin, count);
+            if (variant?.Trim().ToUpperInvariant() is "Z80" or "Z8400") return DisassembleZ80(s.Circuit, part, address, origin, count);
             if (count is < 1 or > 200) throw new ArgumentException("count must be from 1 to 200.");
             if (origin is < 0 or > 0xFFFF) throw new ArgumentException("origin must be from 0 to 65535.");
             var kind = variant?.Trim().ToUpperInvariant() switch
             {
                 "65C02" or "W65C02" or "W65C02S" or "CMOS" => Cpu6502Variant.Wdc65C02,
                 "6502" or "NMOS" => Cpu6502Variant.Nmos6502,
-                _ => throw new ArgumentException($"variant is \"65C02\", \"6502\", \"68000\" or \"6809\", not \"{variant}\"."),
+                _ => throw new ArgumentException($"variant is \"65C02\", \"6502\", \"68000\", \"6809\" or \"Z80\", not \"{variant}\"."),
             };
             var memory = Memory(s.Circuit, part);
             var start = address ?? origin;
@@ -190,9 +192,9 @@ public sealed partial class CircuitTools
         }, cancel);
 
     [McpServerTool(Name = "peripheral_state", ReadOnly = true, Idempotent = true)]
-    [Description("A peripheral chip's state. A 6821 or 6520 PIA: each port's data direction register, output register and control register with its flags and CA2/CB2 mode, the pins, and whether /IRQA and /IRQB are low. A 6850 ACIA: the control register (divide, word format, transmitter control, receive interrupt), the status register and its bits (RDRF, TDRE, DCD, CTS, FE, OVRN, PE, IRQ), the baud rates its TxCLK and RxCLK give, whether it is still waiting for a master reset, and what it has sent and received. A 68681 DUART: each channel's MR1, MR2, clock select and baud rate, status (RxRDY, FFULL, TxRDY, TxEMT, OE, PE, FE, RB), whether its transmitter and receiver are on, the FIFO depth, its mode (normal, echo, loopbacks) and what it has sent and received; ISR, IMR, IVR, ACR, the output port and OPCR, and the counter/timer's preload, count, output and whether it runs. A 68230 PI/T: PGCR, PSRR, each port's control, direction and output registers, PSR, the port and timer vectors, the timer's control, preload, count and ZDS. A 68901 MFP: GPIP data, edges and directions, the interrupt enable, pending, in-service and mask registers (channel 15 in bit 15), VR, each timer's control, count, reload and time-outs, and the USART's control, status and what it has sent. In the app this is the live simulation; otherwise where the last run_transient left it.")]
+    [Description("A peripheral chip's state. A 6821 or 6520 PIA: each port's data direction register, output register and control register with its flags and CA2/CB2 mode, the pins, and whether /IRQA and /IRQB are low. A 6850 ACIA: the control register (divide, word format, transmitter control, receive interrupt), the status register and its bits (RDRF, TDRE, DCD, CTS, FE, OVRN, PE, IRQ), the baud rates its TxCLK and RxCLK give, whether it is still waiting for a master reset, and what it has sent and received. A 68681 DUART: each channel's MR1, MR2, clock select and baud rate, status (RxRDY, FFULL, TxRDY, TxEMT, OE, PE, FE, RB), whether its transmitter and receiver are on, the FIFO depth, its mode (normal, echo, loopbacks) and what it has sent and received; ISR, IMR, IVR, ACR, the output port and OPCR, and the counter/timer's preload, count, output and whether it runs. A 68230 PI/T: PGCR, PSRR, each port's control, direction and output registers, PSR, the port and timer vectors, the timer's control, preload, count and ZDS. A 68901 MFP: GPIP data, edges and directions, the interrupt enable, pending, in-service and mask registers (channel 15 in bit 15), VR, each timer's control, count, reload and time-outs, and the USART's control, status and what it has sent. A Z80 PIO: each port's mode, output and input registers, I/O register and mask (mode 3), vector, interrupt control and RDY. A Z80 CTC: each channel's control word decoded, time constant, down-counter, whether it runs or waits, its zero counts, and the vector. A Z80 SIO/0 or DART: each channel's write registers WR0-WR7, RR0 and RR1 with their bits, the format and baud rates, the characters waiting, and what it has sent and received, and the vector with RR2. For the Z80 chips, which interrupt sources are pending and under service in the daisy chain. In the app this is the live simulation; otherwise where the last run_transient left it.")]
     public Task<string> PeripheralState(
-        [Description("The chip's designator, e.g. \"U13\". Optional when the circuit has only one 6821, 6520, 6850, 68681, 68230 or 68901.")] string? part = null,
+        [Description("The chip's designator, e.g. \"U13\". Optional when the circuit has only one 6821, 6520, 6850, 68681, 68230, 68901, or Z80 PIO, CTC, SIO or DART.")] string? part = null,
         CancellationToken cancel = default) =>
         Read("peripheral_state", s =>
         {
@@ -203,14 +205,14 @@ public sealed partial class CircuitTools
                 chip = all.Count switch
                 {
                     1 => all[0],
-                    0 => throw new ArgumentException("The circuit has no 6821, 6520, 6850, 68681, 68230 or 68901."),
+                    0 => throw new ArgumentException("The circuit has no 6821, 6520, 6850, 68681, 68230, 68901, or Z80 PIO, CTC, SIO or DART."),
                     _ => throw new ArgumentException($"The circuit has {all.Count} of them ({string.Join(", ", all.Select(c => c.Name))}): say which with part."),
                 };
             }
             else
             {
                 var c = Pins.Part(s.Circuit, part);
-                chip = IsPeripheral(c) ? c : throw new ArgumentException($"{c.Name} is a {c.ComponentType}, not a 6821, 6520, 6850, 68681, 68230 or 68901.");
+                chip = IsPeripheral(c) ? c : throw new ArgumentException($"{c.Name} is a {c.ComponentType}, not a 6821, 6520, 6850, 68681, 68230, 68901, or Z80 PIO, CTC, SIO or DART.");
             }
 
             static string Hex(int value, int digits = 2) => "$" + value.ToString(digits == 2 ? "X2" : digits == 4 ? "X4" : "X6", CultureInfo.InvariantCulture);
@@ -222,6 +224,15 @@ public sealed partial class CircuitTools
 
                 case Acia6850 acia:
                     return StateAcia(acia);
+
+                case Z80Pio pio:
+                    return StatePio(pio);
+
+                case Z80Ctc ctc:
+                    return StateCtc(ctc);
+
+                case Z80SerialController sio:
+                    return StateSio(sio);
 
                 case Duart68681 duart:
                 {
@@ -344,7 +355,7 @@ public sealed partial class CircuitTools
             }
         }, cancel);
 
-    private static bool IsPeripheral(CircuitComponent c) => c is Duart68681 or Pit68230 or Mfp68901 or PeripheralInterfaceAdapter or Acia6850;
+    private static bool IsPeripheral(CircuitComponent c) => c is Duart68681 or Pit68230 or Mfp68901 or PeripheralInterfaceAdapter or Acia6850 or Z80Peripheral;
 
     private static string Hex2(int value) => "$" + value.ToString("X2", CultureInfo.InvariantCulture);
 
@@ -578,22 +589,216 @@ public sealed partial class CircuitTools
         return result;
     }
 
+    /// <summary>A Z80's registers, flags, state and latest machine cycles, for cpu_state.</summary>
+    private static JsonObject StateZ80(CpuZ80 cpu, int cycles)
+    {
+        var core = cpu.Core;
+        var log = cpu.BusLog;
+        var recent = log.Skip(Math.Max(0, log.Count - cycles)).Select(c => (JsonNode)string.Create(CultureInfo.InvariantCulture,
+            $"{c.Kind switch { Z80CycleKind.Fetch => c.Halted ? "halt-nop" : "m1", Z80CycleKind.Write => "write", Z80CycleKind.IoRead => "in", Z80CycleKind.IoWrite => "out", Z80CycleKind.Acknowledge => "inta", Z80CycleKind.Internal => "refresh", _ => "read" }} ${c.Address:X4}{(c.IsRefresh ? "" : $" {c.Data:X2}")}{(c.WaitStates > 0 ? $" +{c.WaitStates}w" : "")}")).ToArray();
+
+        var result = new JsonObject
+        {
+            ["part"] = cpu.Name,
+            ["chip"] = cpu.PartNumber,
+            ["pc"] = $"${core.PC:X4}",
+            ["af"] = $"${core.AF:X4}",
+            ["bc"] = $"${core.BC:X4}",
+            ["de"] = $"${core.DE:X4}",
+            ["hl"] = $"${core.HL:X4}",
+            ["alternate"] = new JsonObject
+            {
+                ["af"] = $"${core.AlternateAF:X4}",
+                ["bc"] = $"${core.AlternateBC:X4}",
+                ["de"] = $"${core.AlternateDE:X4}",
+                ["hl"] = $"${core.AlternateHL:X4}",
+            },
+            ["ix"] = $"${core.IX:X4}",
+            ["iy"] = $"${core.IY:X4}",
+            ["sp"] = $"${core.SP:X4}",
+            ["i"] = $"${core.I:X2}",
+            ["r"] = $"${core.R:X2}",
+            ["wz"] = $"${core.WZ:X4}",
+            ["iff1"] = core.Iff1,
+            ["iff2"] = core.Iff2,
+            ["interrupt_mode"] = core.InterruptMode,
+            ["flags"] = CpuZ80.Flags(core.F),
+            ["instruction"] = cpu.CurrentInstruction,
+            ["t_states"] = core.TStates,
+            ["instructions"] = core.Instructions,
+            ["wait_states"] = core.WaitStates,
+            ["last_interrupt"] = core.LastInterrupt,
+            ["state"] = core.ResetAsserted ? "held in reset" : core.BusAcknowledged ? "bus released" : core.Halted ? "halted" : "running",
+            ["recent_cycles"] = new JsonArray(recent),
+        };
+        if (cpu.UndefinedReads > 0) result["undefined_reads"] = $"{cpu.UndefinedReads}, first at ${cpu.FirstUndefinedRead:X4}";
+        if (core.TStates == 0) result["note"] = "It hasn't run a T-state yet: run_transient runs the circuit (or transport run, in the app).";
+        return result;
+    }
+
+    /// <summary>Z80 code in a memory part, for disassemble.</summary>
+    private static JsonObject DisassembleZ80(Circuit circuit, string part, int? address, int origin, int count)
+    {
+        if (count is < 1 or > 200) throw new ArgumentException("count must be from 1 to 200.");
+        if (origin is < 0 or > 0xFFFF) throw new ArgumentException("origin must be from 0 to 65535.");
+        var memory = Memory(circuit, part);
+        var start = address ?? origin;
+        if (start < origin || start >= origin + memory.Size)
+            throw new ArgumentException($"{memory.Name} holds ${origin:X4}-${origin + memory.Size - 1:X4} with origin ${origin:X4}; ${start:X4} isn't in it.");
+
+        byte Byte(int a) => a >= origin && a < origin + memory.Size ? memory.ReadByte(a - origin) : (byte)0;
+
+        var lines = new JsonArray();
+        var at = start;
+        for (var i = 0; i < count && at < origin + memory.Size; i++)
+        {
+            var (text, length) = OpcodesZ80.Disassemble(at, a => Byte(a & 0xFFFF));
+            var bytes = string.Join(" ", Enumerable.Range(0, length).Select(k => Byte(at + k).ToString("X2", CultureInfo.InvariantCulture)));
+            lines.Add(string.Create(CultureInfo.InvariantCulture, $"${at:X4}  {bytes,-11}  {text}"));
+            at += length;
+        }
+
+        return new JsonObject { ["part"] = memory.Name, ["variant"] = "Z80", ["lines"] = lines };
+    }
+
+    /// <summary>The daisy chain's view of a Z80 peripheral: its sources pending and under service.</summary>
+    private static JsonObject Chain(Z80Peripheral chip)
+    {
+        JsonArray Named(IReadOnlyList<bool> flags) => [.. chip.InterruptSources.Where((_, i) => flags[i]).Select(n => (JsonNode)n)];
+        return new JsonObject
+        {
+            ["pending"] = Named(chip.PendingSources),
+            ["under_service"] = Named(chip.InService),
+            ["int_low"] = chip.Interrupting,
+            ["acknowledges"] = chip.Acknowledges,
+            ["retis"] = chip.Returns,
+        };
+    }
+
+    /// <summary>A Z80 PIO's ports and interrupts, for peripheral_state.</summary>
+    private static JsonObject StatePio(Z80Pio pio)
+    {
+        JsonObject Port(bool b)
+        {
+            var p = pio.Describe(b);
+            var port = new JsonObject
+            {
+                ["mode"] = p.Mode,
+                ["mode_name"] = p.Mode switch { 0 => "output", 1 => "input", 2 => "bidirectional", _ => "bit control" },
+                ["output"] = Hex2(p.Output),
+                ["input"] = Hex2(p.Input),
+                ["vector"] = Hex2(p.Vector),
+                ["interrupt_enabled"] = p.InterruptEnabled,
+                ["ready"] = p.Ready,
+            };
+            if (p.Mode == 3)
+            {
+                port["io_register"] = Hex2(p.Direction);
+                port["mask"] = Hex2(p.Mask);
+                port["logic"] = $"{(p.And ? "AND" : "OR")}, active {(p.ActiveHigh ? "high" : "low")}";
+            }
+
+            return port;
+        }
+
+        return new JsonObject
+        {
+            ["part"] = pio.Name,
+            ["chip"] = pio.PartNumber,
+            ["port_a"] = Port(false),
+            ["port_b"] = Port(true),
+            ["chain"] = Chain(pio),
+        };
+    }
+
+    /// <summary>A Z80 CTC's channels, for peripheral_state.</summary>
+    private static JsonObject StateCtc(Z80Ctc ctc)
+    {
+        var channels = new JsonArray();
+        for (var i = 0; i < 4; i++)
+        {
+            var c = ctc.Describe(i);
+            var counter = (c.Control & 0x40) != 0;
+            channels.Add(new JsonObject
+            {
+                ["channel"] = i,
+                ["control"] = Hex2(c.Control),
+                ["mode"] = counter ? $"counter, {((c.Control & 0x10) != 0 ? "rising" : "falling")} edges" : $"timer, prescaler {((c.Control & 0x20) != 0 ? 256 : 16)}",
+                ["interrupt_enabled"] = (c.Control & 0x80) != 0,
+                ["time_constant"] = c.TimeConstant,
+                ["counter"] = c.Counter,
+                ["state"] = c.Running ? "running" : c.AwaitingConstant ? "waiting for a time constant" : c.AwaitingTrigger ? "waiting for its trigger" : "stopped",
+                ["zero_counts"] = c.ZeroCounts,
+            });
+        }
+
+        return new JsonObject
+        {
+            ["part"] = ctc.Name,
+            ["chip"] = ctc.PartNumber,
+            ["vector"] = Hex2(ctc.Vector),
+            ["channels"] = channels,
+            ["chain"] = Chain(ctc),
+        };
+    }
+
+    /// <summary>A Z80 SIO's or DART's channels, for peripheral_state.</summary>
+    private static JsonObject StateSio(Z80SerialController sio)
+    {
+        JsonObject Channel(bool b)
+        {
+            var rr0 = sio.ReadRegisterValue(b, 0);
+            var rr1 = sio.ReadRegisterValue(b, 1);
+            string[] rr0Names = ["Rx available", b ? "-" : "INT pending", "Tx buffer empty", "DCD", sio.IsDart ? "RI" : "SYNC", "CTS", "Tx underrun", "break"];
+            string[] rr1Names = ["all sent", "-", "-", "-", "parity error", "Rx overrun", "framing error", "-"];
+            var (tx, rx) = sio.Baud(b);
+            var wr = new JsonObject();
+            for (var r = 0; r < (sio.IsDart ? 6 : 8); r++)
+                if (r != 2 || b) wr[$"wr{r}"] = Hex2(sio.WriteRegisterValue(b, r));
+            return new JsonObject
+            {
+                ["write_registers"] = wr,
+                ["rr0"] = Hex2(rr0),
+                ["rr0_bits"] = new JsonArray([.. rr0Names.Where((n, i) => n != "-" && (rr0 & (1 << i)) != 0).Select(n => (JsonNode)n)]),
+                ["rr1"] = Hex2(rr1),
+                ["rr1_bits"] = new JsonArray([.. rr1Names.Where((n, i) => n != "-" && (rr1 & (1 << i)) != 0).Select(n => (JsonNode)n)]),
+                ["format"] = sio.Format(b),
+                ["transmit_baud"] = Math.Round(tx, 1),
+                ["receive_baud"] = Math.Round(rx, 1),
+                ["waiting"] = sio.Waiting(b),
+                ["sent"] = sio.TransmittedText(b),
+                ["received"] = string.Concat(sio.ReceivedBytes(b).Select(x => x is >= 0x20 and < 0x7F ? (char)x : '.')),
+            };
+        }
+
+        return new JsonObject
+        {
+            ["part"] = sio.Name,
+            ["chip"] = sio.PartNumber,
+            ["channel_a"] = Channel(false),
+            ["channel_b"] = Channel(true),
+            ["vector_rr2"] = Hex2(sio.ReadRegisterValue(true, 2)),
+            ["chain"] = Chain(sio),
+            ["note"] = "Asynchronous modes only: the synchronous ones (SDLC, bisync) are not modelled.",
+        };
+    }
+
     /// <summary>A 6502-family processor or a 68000: the one called <paramref name="name"/>, or the circuit's only processor.</summary>
     private static CircuitComponent AnyProcessor(Circuit circuit, string? name)
     {
-        var all = circuit.Components.Where(c => c is Processor6502 or Cpu68000 or Processor6809).ToList();
+        var all = circuit.Components.Where(c => c is Processor6502 or Cpu68000 or Processor6809 or CpuZ80).ToList();
         if (string.IsNullOrWhiteSpace(name))
         {
             return all.Count switch
             {
                 1 => all[0],
-                0 => throw new ArgumentException("The circuit has no 6502, 65C02, 6510, 68000 or 6809."),
+                0 => throw new ArgumentException("The circuit has no 6502, 65C02, 6510, 68000, 6809 or Z80."),
                 _ => throw new ArgumentException($"The circuit has {all.Count} processors ({string.Join(", ", all.Select(c => c.Name))}): say which with part."),
             };
         }
 
         var c = Pins.Part(circuit, name);
-        return c is Processor6502 or Cpu68000 or Processor6809 ? c : throw new ArgumentException($"{c.Name} is a {c.ComponentType}, not a processor.{(all.Count > 0 ? $" The processors: {string.Join(", ", all.Select(p => p.Name))}." : "")}");
+        return c is Processor6502 or Cpu68000 or Processor6809 or CpuZ80 ? c : throw new ArgumentException($"{c.Name} is a {c.ComponentType}, not a processor.{(all.Count > 0 ? $" The processors: {string.Join(", ", all.Select(p => p.Name))}." : "")}");
     }
 
     /// <summary>The processor called <paramref name="name"/>, or the circuit's only one.</summary>

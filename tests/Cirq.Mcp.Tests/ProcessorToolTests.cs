@@ -44,7 +44,7 @@ public class ProcessorToolTests
 
         Assert.Contains("isn't in it", await Error(b.Tools.Disassemble("U3", address: 0x1000, origin: 0x8000)));
         Assert.Contains("not a memory", await Error(b.Tools.Disassemble("U2")));
-        Assert.Contains("variant is", await Error(b.Tools.Disassemble("U3", variant: "Z80")));
+        Assert.Contains("variant is", await Error(b.Tools.Disassemble("U3", variant: "8080")));
         Assert.Contains("not a processor", await Error(b.Tools.CpuState("U3")));
     }
 
@@ -109,6 +109,57 @@ public class ProcessorToolTests
         Assert.Equal("÷16", (string)acia["divide"]!);
         Assert.InRange((double)acia["transmit_baud"]!, 115000, 115400);
         Assert.StartsWith("CIRQ", (string)acia["sent"]!);
+    }
+
+    /// <summary>The Z80 computer: its EPROM disassembled, a run, its registers and refreshes, and the SIO's state.</summary>
+    [Fact]
+    public async Task The_z80_computer_disassembles_runs_and_reports()
+    {
+        using var b = new Bench();
+        await b.Tools.LoadExample("Z80 Single-Board Computer");
+
+        var listing = await Parse(b.Tools.Disassemble("U3", count: 2, variant: "Z80"));
+        Assert.Equal(["$0000  31 00 00     LD SP,$0000", "$0003  21 DF 00     LD HL,$00DF"],
+            listing["lines"]!.AsArray().Select(l => (string)l!));
+
+        await b.Tools.RunTransient(System.Text.Json.JsonSerializer.SerializeToElement("1m"), plot: false);
+
+        var cpu = await Parse(b.Tools.CpuState(cycles: 8));
+        Assert.Equal("Z80", (string)cpu["chip"]!);
+        Assert.Equal("running", (string)cpu["state"]!);
+        Assert.Equal(0, (int)cpu["interrupt_mode"]!);
+        Assert.False((bool)cpu["iff1"]!);
+        Assert.InRange((long)cpu["t_states"]!, 3600, 3750);     // 1 ms at 3.6864 MHz
+        Assert.Equal(8, cpu["recent_cycles"]!.AsArray().Count);
+        Assert.Contains(cpu["recent_cycles"]!.AsArray(), c => ((string)c!).StartsWith("refresh", StringComparison.Ordinal));
+
+        var sio = await Parse(b.Tools.PeripheralState("U7"));
+        Assert.Equal("Z80 SIO/0", (string)sio["chip"]!);
+        Assert.Equal("8N1", (string)sio["channel_a"]!["format"]!);
+        Assert.Equal("$84", (string)sio["channel_a"]!["write_registers"]!["wr4"]!);
+        Assert.InRange((double)sio["channel_a"]!["transmit_baud"]!, 115000, 115400);
+        Assert.StartsWith("CIRQ", (string)sio["channel_a"]!["sent"]!);
+    }
+
+    [Fact]
+    public async Task Peripheral_state_reads_the_z80_chips()
+    {
+        using var b = new Bench();
+        await b.Tools.AddParts([new() { Kind = "Z80 PIO" }, new() { Kind = "Z80 CTC" }, new() { Kind = "Z80 DART" }]);
+        Assert.Contains("say which", await Error(b.Tools.PeripheralState()));
+
+        var pio = await Parse(b.Tools.PeripheralState("U1"));
+        Assert.Equal("Z80 PIO", (string)pio["chip"]!);
+        Assert.Equal("input", (string)pio["port_a"]!["mode_name"]!);
+        Assert.Empty(pio["chain"]!["under_service"]!.AsArray());
+
+        var ctc = await Parse(b.Tools.PeripheralState("U2"));
+        Assert.Equal(4, ctc["channels"]!.AsArray().Count);
+        Assert.Equal("stopped", (string)ctc["channels"]![0]!["state"]!);
+
+        var dart = await Parse(b.Tools.PeripheralState("U3"));
+        Assert.Equal("Z80 DART", (string)dart["chip"]!);
+        Assert.Null(dart["channel_a"]!["write_registers"]!["wr6"]);
     }
 
     [Fact]

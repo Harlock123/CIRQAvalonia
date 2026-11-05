@@ -302,6 +302,19 @@ public static class Recipes
         return recipe.Text("Tell the person what the monitor prints and how the 6809 polls the 6850's status register for TDRE before each byte. The terminal sends \"D E000\" at 2.5 ms and the monitor answers with a dump of its own first bytes; run on to 6.5 ms (a few seconds of solving) to see it.");
     }
 
+    [McpServerPrompt(Name = "computer_z80", Title = "A Z80 computer")]
+    [Description("Opens the Z80 Single-Board Computer example (a Z80 at 3.6864 MHz, a 27C256 EPROM, a 62256 RAM, two 74138s decoding memory and I/O, and a Z80 SIO/0 clocked from CLK on a serial terminal at 115,200 baud), reads the monitor in the EPROM, runs it, and checks the processor, its refreshes and what the SIO has sent.")]
+    public static string ComputerZ80()
+    {
+        var recipe = new Recipe("Explore a Z80 computer: the example is a Z80 (U2) with a 27C256 EPROM (U3) at $0000-$7FFF, a 62256 RAM (U4) at $8000-$FFFF, two 74138s decoding memory (U5, on A15 and /MREQ) and I/O (U6, on A5-A7, /IORQ and /M1), and a Z80 SIO/0 (U7) at ports $80-$83 talking to a serial terminal (U8) at 115,200 baud — CLK ÷ 32, its clock pins on CLK. Every M1 ends with a refresh: I and R on the address bus with /RFSH low.");
+        recipe.Step("Open the example. If it refuses because the open circuit has unsaved changes, save that first, or ask the person whether to discard it.", "load_example", new { name = "Z80 Single-Board Computer" });
+        recipe.Step("Read the monitor in the EPROM: it starts at $0000, where a Z80 starts after reset.", "disassemble", new { part = "U3", origin = 0, count = 16, variant = "Z80" });
+        recipe.Step("Run it for 2 ms of simulated time: the SIO set up by OTIR from a table, and the banner going out. Every half of every T-state is solved on the pins, so this takes a second or so.", "run_transient", new { duration = "2m", plot = false });
+        recipe.Step("Where the Z80 got to: its registers, the alternate set, the flags, and its last machine cycles, refreshes marked.", "cpu_state", new { cycles = 12 });
+        recipe.Step("What the SIO is doing: its write registers, RR0 and RR1, the format and the baud rate CLK gives it, and what it has sent so far.", "peripheral_state", new { part = "U7" });
+        return recipe.Text("Tell the person what the monitor prints and how the Z80 polls RR0 for the transmit buffer before each byte. The terminal sends \"D 0000\" at 2.5 ms and the monitor answers with a dump of its own first bytes; run on to 6.5 ms (a few seconds of solving) to see it.");
+    }
+
     private sealed class Recipe(string intro)
     {
         private readonly StringBuilder _text = new(intro + "\n\nFollow these steps in order. A line starting with \"" + CallMarker.Trim() + "\" is one tool call, with its arguments as JSON. If a step fails, read the error, fix the cause and carry on.\n");

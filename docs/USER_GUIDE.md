@@ -8628,12 +8628,12 @@ it is told to.
 | Build | `add_parts`, `set_part`, `remove_parts`, `connect`, `disconnect`, `add_probe`, `remove_probe`, `set_parameter`, `set_conditions` |
 | Check | `get_circuit`, `get_part`, `check_circuit`, `explain_circuit`, `render_schematic`, `get_spice_netlist` |
 | Run | `operating_point`, `run_transient`, `ac_sweep`, `dc_sweep`, `get_trace` |
-| Memories and processors | `load_memory` (an image as Intel HEX, S-records, hex bytes, base64 or a file, all its bytes or one lane of a 68000's pair), `read_memory`, `cpu_state` (registers, flags, recent bus cycles, a 6510's port; a 68000's D0-D7, A0-A7, USP, SSP, SR and wait states), `disassemble` (6502 code, or 68000 code across a ROM pair), `sid_state` (a SID's voices, envelopes, filter and volume), `peripheral_state` (a 68681's, 68230's or 68901's registers, channels and timers) |
+| Memories and processors | `load_memory` (an image as Intel HEX, S-records, hex bytes, base64 or a file, all its bytes or one lane of a 68000's pair), `read_memory`, `cpu_state` (registers, flags, recent bus cycles, a 6510's port; a 68000's D0-D7, A0-A7, USP, SSP, SR and wait states; a 6809's; a Z80's main and alternate registers, IX, IY, I, R, IFF1 and IFF2 and its mode), `disassemble` (6502, 6809 or Z80 code, or 68000 code across a ROM pair), `sid_state` (a SID's voices, envelopes, filter and volume), `peripheral_state` (a 6821's, 6850's, 68681's, 68230's or 68901's registers, channels and timers, and a Z80 PIO's, CTC's, SIO's or DART's, with what is pending and under service in the daisy chain) |
 | The editor | `transport` (Run, Pause, Reset), `set_scope`, `undo`, `redo` |
 | Files | `new_circuit`, `open_circuit`, `save_circuit` |
 
 A run comes back as measurements (frequency, duty cycle, peak to peak, rise time, the −3 dB corner)
-and as a plot the agent looks at. The server also offers ten recipes, step-by-step plans with the
+and as a plot the agent looks at. The server also offers eleven recipes, step-by-step plans with the
 exact calls: an RC low-pass, an LED and its resistor, a 555 astable, an inverting amplifier, a
 bridge rectifier with smoothing, a decade counter, a tour of the 6502 computer — its ROM
 disassembled, a run, and the processor, LCD and RAM read afterwards — and the SID player, its
@@ -8641,9 +8641,10 @@ interrupt handler disassembled, a run, and the 6510's port and the SID's voices 
 and the 68000 computer, its monitor disassembled across the ROM pair, a run, and the processor's
 registers and wait states and the DUART's channel read afterwards — and the 6809 computer, its
 monitor disassembled from the EPROM with the vectors, a run, and the processor's registers, its dead
-cycles and the ACIA's state read afterwards. A transient run hands its end
-state back to the circuit, so a processor's registers, a memory's bytes, an LCD's text and a CIA's,
-SID's or 68000 peripheral's registers are where the run left them.
+cycles and the ACIA's state read afterwards — and the Z80 computer, its monitor disassembled from the
+EPROM, a run, and the processor's registers and refreshes and the SIO's registers read afterwards. A
+transient run hands its end state back to the circuit, so a processor's registers, a memory's bytes,
+an LCD's text and a CIA's, SID's or peripheral chip's registers are where the run left them.
 
 ## Appearance
 
