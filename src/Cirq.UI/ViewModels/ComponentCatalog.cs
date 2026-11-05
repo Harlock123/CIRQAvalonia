@@ -581,6 +581,8 @@ public static class ComponentCatalog
                 () => new Ram8156()),
             new("8255A PPI", "Intel 8255A programmable peripheral interface: three 8-bit ports in mode 0 I/O, mode 1 strobed with /STB, IBF, /OBF, /ACK and INTR on port C, or port A bidirectional in mode 2, with bit set/reset on port C",
                 () => new Ppi8255()),
+            new("8251A USART", "Intel 8251A USART for an 8080's or 8085's bus, in its asynchronous mode: five to eight bits, parity, x1, x16 or x64 clocks on /TxC and /RxC, TxRDY, RxRDY, TxEMPTY and break detect — talks to the Serial Terminal",
+                () => new Usart8251()),
             new("6821 PIA", "Peripheral interface adapter for a 6809 (or a 68000 on /VPA): two ports with direction registers, CA1/CA2 and CB1/CB2 handshakes and interrupts — port A pulled up, port B three-state",
                 () => new Pia6821()),
             new("6520 PIA", "MOS 6520, the PET's and Atari 800's PIA: the 6821's registers, handshakes and pinout, Φ2 for E",
