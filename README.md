@@ -154,11 +154,11 @@ uses, as 37 tools: `list_parts` and `describe_part` to find a part and its pins,
 `connect`, `set_part` and `add_probe` to build, `check_circuit`, `explain_circuit` and
 `render_schematic` to check the drawing, and `operating_point`, `run_transient`, `ac_sweep` and
 `dc_sweep` to run it, and `load_memory`, `read_memory`, `cpu_state`, `disassemble`, `sid_state` and
-`peripheral_state` for the memories, the 6502s, the 68000, the 6809 and the Z80, the SID and the peripheral chips of the 68000, the 6809 and the Z80. The runs come back as measurements (frequency, duty cycle, peak to peak, the
+`peripheral_state` for the memories, the 6502s, the 68000, the 6809, the Z80 and the 8085, the SID and the peripheral chips of the 68000, the 6809, the Z80 and the 8085. The runs come back as measurements (frequency, duty cycle, peak to peak, the
 −3 dB corner) **and** as plots the agent looks at, so it can see the capacitor charging or the Bode
-plot rolling off rather than guess from numbers. Eleven saved recipes (an RC low-pass, an LED and its
+plot rolling off rather than guess from numbers. Twelve saved recipes (an RC low-pass, an LED and its
 resistor, a 555 astable, an inverting amplifier, a bridge rectifier, a decade counter, a 6502
-computer, a SID player, a 68000 computer, a 6809 computer and a Z80 computer) are served
+computer, a SID player, a 68000 computer, a 6809 computer, a Z80 computer and an 8085 computer) are served
 as MCP prompts, and every example circuit can be loaded by name.
 
 ![The AI Chat building a 555 astable: the circuit Claude placed and wired on the canvas, its capacitor ramp and square-wave output in the scope, and the chat panel on the right with each tool call on a line, thumbnails of the schematic and the run it looked at, and its answer quoting the measured 989.5 Hz and 52.8 % duty cycle](docs/images/35-ai-chat.png)

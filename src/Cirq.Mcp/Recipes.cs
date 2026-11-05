@@ -315,6 +315,20 @@ public static class Recipes
         return recipe.Text("Tell the person what the monitor prints and how the Z80 polls RR0 for the transmit buffer before each byte. The terminal sends \"D 0000\" at 2.5 ms and the monitor answers with a dump of its own first bytes; run on to 6.5 ms (a few seconds of solving) to see it.");
     }
 
+    [McpServerPrompt(Name = "computer_8085", Title = "An 8085 computer")]
+    [Description("Opens the 8085 Single-Board Computer example (an 8085 at 1.8432 MHz with a 74373 address latch on ALE, a 2764 EPROM, an 8156 for RAM and a baud-rate timer, a 74138, and an 8251A on a serial terminal at 19,200 baud), reads the monitor in the EPROM, runs it, and checks the processor, its bus idle cycles and what the 8251A and the 8156 are doing.")]
+    public static string Computer8085()
+    {
+        var recipe = new Recipe("Explore an 8085 computer: the example is an 8085 (U2) at 1.8432 MHz, a 74373 (U3) taking A0-A7 off the multiplexed AD0-AD7 as ALE falls, a 2764 EPROM (U4) at $0000-$1FFF, an 8156 (U5) with its CE on A15 — 256 bytes of RAM at $8000 and its ports and timer at $80-$85 — a 74138 (U6) decoding the rest from A13, A14 and IO/M, and an 8251A (U7) at ports $00-$01 talking to a serial terminal (U8) at 19,200 baud: the 8156's timer divides CLK OUT by 6 for the 8251A's x16 clock.");
+        recipe.Step("Open the example. If it refuses because the open circuit has unsaved changes, save that first, or ask the person whether to discard it.", "load_example", new { name = "8085 Single-Board Computer" });
+        recipe.Step("Read the monitor in the EPROM: it starts at $0000, where an 8085 starts after reset.", "disassemble", new { part = "U4", origin = 0, count = 16, variant = "8085" });
+        recipe.Step("Run it for 3 ms of simulated time: the 8156's timer started, the 8251A reset and set up, and the banner going out. X1 runs at twice the processor's clock, so this takes a second or so.", "run_transient", new { duration = "3m", plot = false });
+        recipe.Step("Where the 8085 got to: its registers, the flags (K and V included), the interrupt system, and its last machine cycles.", "cpu_state", new { cycles = 12 });
+        recipe.Step("What the 8251A is doing: its mode and command, the format and the baud rate the 8156's timer gives it, its status, and what it has sent so far.", "peripheral_state", new { part = "U7" });
+        recipe.Step("And the 8156: its timer running as a continuous square wave of length 6, and its ports, all inputs.", "peripheral_state", new { part = "U5" });
+        return recipe.Text("Tell the person what the monitor prints and how the 8085 polls the 8251A's status for TxRDY before each byte. The terminal sends \"D 0000\" at 11.5 ms and the monitor answers with a dump of its own first bytes; run on to 34 ms (ten seconds or so of solving) to see it.");
+    }
+
     private sealed class Recipe(string intro)
     {
         private readonly StringBuilder _text = new(intro + "\n\nFollow these steps in order. A line starting with \"" + CallMarker.Trim() + "\" is one tool call, with its arguments as JSON. If a step fails, read the error, fix the cause and carry on.\n");

@@ -46,7 +46,7 @@ public class EndToEndTests
         Assert.Equal(ToolNames, CircuitServer.Definitions().Select(t => t.Name));
 
         var prompts = await s.Client.ListPromptsAsync(cancellationToken: CancellationToken.None);
-        Assert.Equal(["rc_low_pass", "led_with_resistor", "astable_555", "inverting_amplifier", "bridge_rectifier", "decade_counter", "computer_6502", "sid_player", "computer_68000", "computer_6809", "computer_z80"], prompts.Select(p => p.Name));
+        Assert.Equal(["rc_low_pass", "led_with_resistor", "astable_555", "inverting_amplifier", "bridge_rectifier", "decade_counter", "computer_6502", "sid_player", "computer_68000", "computer_6809", "computer_z80", "computer_8085"], prompts.Select(p => p.Name));
     }
 
     [Fact]
@@ -137,6 +137,8 @@ public class EndToEndTests
         Assert.Equal("\"Hello, world!\"", (string)Last("computer_6502", "get_part")["value"]!);
         Assert.Equal("$0000  31 00 00     LD SP,$0000", (string)Last("computer_z80", "disassemble")["lines"]![0]!);
         Assert.Equal("8N1", (string)Last("computer_z80", "peripheral_state")["channel_a"]!["format"]!);
+        Assert.Equal("$0000  31 00 81  LXI SP,$8100", (string)Last("computer_8085", "disassemble")["lines"]![0]!);
+        Assert.Equal("continuous square wave", (string)Last("computer_8085", "peripheral_state")["timer"]!["mode"]!);
         Assert.Equal("$01", (string)Last("sid_player", "cpu_state")["port"]!["direction"]!);
         var sid = Last("sid_player", "sid_state");
         Assert.Equal(110, (double)sid["voices"]![0]!["hz"]!, 0.5);

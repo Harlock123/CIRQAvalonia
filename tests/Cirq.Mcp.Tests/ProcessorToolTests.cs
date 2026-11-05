@@ -162,6 +162,65 @@ public class ProcessorToolTests
         Assert.Null(dart["channel_a"]!["write_registers"]!["wr6"]);
     }
 
+    /// <summary>The 8085 computer: its EPROM disassembled with the restart addresses, a run, its registers and interrupt system, and the 8251A's and 8156's state.</summary>
+    [Fact]
+    public async Task The_8085_computer_disassembles_runs_and_reports()
+    {
+        using var b = new Bench();
+        await b.Tools.LoadExample("8085 Single-Board Computer");
+
+        var listing = await Parse(b.Tools.Disassemble("U4", count: 2, variant: "8085"));
+        Assert.Equal(["$0000  31 00 81  LXI SP,$8100", "$0003  3E 06     MVI A,$06"],
+            listing["lines"]!.AsArray().Select(l => (string)l!));
+        Assert.Equal("$003C", (string)listing["restarts"]!["rst_7_5"]!);
+
+        await b.Tools.RunTransient(System.Text.Json.JsonSerializer.SerializeToElement("1m"), plot: false);
+
+        var cpu = await Parse(b.Tools.CpuState(cycles: 8));
+        Assert.Equal("8085", (string)cpu["chip"]!);
+        Assert.Equal("running", (string)cpu["state"]!);
+        Assert.False((bool)cpu["interrupts_enabled"]!);
+        Assert.True((bool)cpu["masks"]!["rst_7_5"]!);
+        Assert.InRange((long)cpu["t_states"]!, 1800, 1880);     // 1 ms at 1.8432 MHz
+        Assert.Equal(8, cpu["recent_cycles"]!.AsArray().Count);
+        Assert.Equal(7, ((string)cpu["flags"]!).Length);
+
+        var uart = await Parse(b.Tools.PeripheralState("U7"));
+        Assert.Equal("8251A", (string)uart["chip"]!);
+        Assert.Equal("8N1", (string)uart["format"]!);
+        Assert.Equal("$4E", (string)uart["mode"]!);
+        Assert.Equal("command", (string)uart["expects"]!);
+        Assert.InRange((double)uart["transmit_baud"]!, 19150, 19250);
+        Assert.StartsWith("C", (string)uart["sent"]!);       // the banner's first character, at 19,200 baud
+
+        var riot = await Parse(b.Tools.PeripheralState("U5"));
+        Assert.Equal("8156", (string)riot["chip"]!);
+        Assert.Equal(6, (int)riot["timer"]!["length"]!);
+        Assert.True((bool)riot["timer"]!["running"]!);
+        Assert.Equal("input", (string)riot["port_a"]!);
+    }
+
+    [Fact]
+    public async Task Peripheral_state_reads_the_8085_family()
+    {
+        using var b = new Bench();
+        await b.Tools.AddParts([new() { Kind = "8255A PPI" }, new() { Kind = "8254 PIT" }, new() { Kind = "8259A PIC" }]);
+        Assert.Contains("say which", await Error(b.Tools.PeripheralState()));
+
+        var ppi = await Parse(b.Tools.PeripheralState("U1"));
+        Assert.Equal("8255A", (string)ppi["chip"]!);
+        Assert.Equal("mode 0, input", (string)ppi["port_a"]!["mode"]!);
+
+        var pit = await Parse(b.Tools.PeripheralState("U2"));
+        Assert.Equal(3, pit["counters"]!.AsArray().Count);
+        Assert.NotNull(pit["counters"]![0]!["status_byte"]);
+
+        var pic = await Parse(b.Tools.PeripheralState("U3"));
+        Assert.Equal("8259A", (string)pic["chip"]!);
+        Assert.False((bool)pic["initialised"]!);
+        Assert.Equal(8, pic["handlers"]!.AsArray().Count);
+    }
+
     [Fact]
     public async Task Peripheral_state_reads_a_pia()
     {
