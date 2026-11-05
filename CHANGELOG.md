@@ -8,6 +8,15 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+## [0.44.1] - 2026-11-04
+
+A test-only release: nothing in the simulator changed.
+
+- The tests that connect an outside AI agent to the running app now give it up to 30 seconds to
+  connect, instead of the bridge's usual two. On a busy build machine the app's end of the
+  connection could take longer than that to start, so a test failed now and then although nothing
+  was wrong. When one of these tests does fail, it now shows the bridge's own message.
+
 ## [0.44.0] - 2026-11-04
 
 The Commodore 64's chips. A 6510 on the 6502's core with its I/O port, a 6526 CIA with every
@@ -2604,7 +2613,8 @@ First public build of CirqAvalonia — an electronic circuit analyzer and mixed-
 
 **501 tests** measure the solver against closed-form answers rather than recorded output.
 
-[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.44.0...HEAD
+[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.44.1...HEAD
+[0.44.1]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.44.0...v0.44.1
 [0.44.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.43.0...v0.44.0
 [0.43.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.42.0...v0.43.0
 [0.42.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.41.1...v0.42.0
