@@ -8,6 +8,16 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+### Added
+
+**What the AI Chat uses, as it goes.** A line under Send counts this chat's tokens as the API reports
+them (how much came from the prompt cache) and an estimate in dollars, live while Claude works; each
+turn ends with a small line giving its requests, tokens, the pictures sent to Claude and its cost,
+with every request in its tooltip. **Cost…** in the panel's header sets a budget the chat stops at
+between requests (another message carries it on), your own prices if Anthropic's change, and shows
+today's and this month's totals, kept in `chat-usage.json` as counts and dollars only. The dollars
+are estimates; the Anthropic Console has the bill.
+
 ## [0.48.0] - 2026-11-05
 
 The Intel 8085 and its peripherals. An 8085A that runs every opcode — the ten undocumented ones and

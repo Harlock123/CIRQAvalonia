@@ -227,7 +227,8 @@ internal sealed class Replay : HttpMessageHandler
             {
                 ["id"] = $"msg_{++_id}", ["type"] = "message", ["role"] = "assistant", ["model"] = "claude-opus-5-5",
                 ["content"] = new JsonArray(), ["stop_reason"] = null, ["stop_sequence"] = null,
-                ["usage"] = new JsonObject { ["input_tokens"] = 1, ["output_tokens"] = 1 },
+                // About what a real request of the chat reports, so the usage line reads true in a retake.
+                ["usage"] = new JsonObject { ["input_tokens"] = 1200, ["output_tokens"] = 1, ["cache_read_input_tokens"] = 26000 },
             },
         });
         var index = 0;
@@ -246,7 +247,7 @@ internal sealed class Replay : HttpMessageHandler
         Event("message_delta", new JsonObject
         {
             ["delta"] = new JsonObject { ["stop_reason"] = calls.Length > 0 ? "tool_use" : "end_turn", ["stop_sequence"] = null },
-            ["usage"] = new JsonObject { ["output_tokens"] = 1 },
+            ["usage"] = new JsonObject { ["output_tokens"] = 160 },
         });
         Event("message_stop", new JsonObject());
         return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(sse.ToString(), Encoding.UTF8, "text/event-stream") };

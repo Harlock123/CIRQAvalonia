@@ -30,7 +30,7 @@ public class ChatTests
         Assert.False(rig.Chat.Working);
 
         // What the panel shows: the person, Claude, the two tool calls, Claude's answer.
-        var entries = rig.Chat.Entries;
+        var entries = rig.Chat.Shown();
         Assert.Equal("place a 10k resistor", Assert.IsType<UserEntry>(entries[0]).Text);
         Assert.Equal("I'll place a resistor.", Assert.IsType<AssistantEntry>(entries[1]).Text);
         var placed = Assert.IsType<ToolEntry>(entries[2]);
@@ -125,7 +125,7 @@ public class ChatTests
             .Reply(Say("There's no flux capacitor in the palette."));
         await using var rig = await Rig.Start(api);
         await rig.Send("a flux capacitor");
-        var failed = rig.Chat.Entries.OfType<ToolEntry>().ToList();
+        var failed = rig.Chat.Shown().OfType<ToolEntry>().ToList();
         Assert.All(failed, f => Assert.True(f.IsError));
         Assert.Contains("✗", failed[0].Line);
         var result = Json.Results(api.Requests[1]).Single();
@@ -134,7 +134,7 @@ public class ChatTests
         Assert.Contains("no argument", Json.Results(api.Requests[2]).Last().ToJsonString());
         // A failed call changes nothing.
         Assert.Empty(rig.Host.Session.Circuit.Components);
-        Assert.Equal("There's no flux capacitor in the palette.", ((AssistantEntry)rig.Chat.Entries[^1]).Text);
+        Assert.Equal("There's no flux capacitor in the palette.", ((AssistantEntry)rig.Chat.Shown()[^1]).Text);
     }
 
     [Theory]
@@ -147,7 +147,7 @@ public class ChatTests
         var api = new FakeClaude().Error(status, type, "Something went wrong.").Reply(Say("Here I am."));
         await using var rig = await Rig.Start(api);
         await rig.Send("hello");
-        var error = Assert.IsType<NoticeEntry>(rig.Chat.Entries[^1]);
+        var error = Assert.IsType<NoticeEntry>(rig.Chat.Shown()[^1]);
         Assert.Equal(NoticeKind.Error, error.Kind);
         Assert.True(error.CanRetry);
         Assert.Contains(says, error.Text);
@@ -157,7 +157,7 @@ public class ChatTests
 
         await rig.Chat.RetryAsync(Cancel);
         Assert.False(error.CanRetry);
-        Assert.Equal("Here I am.", ((AssistantEntry)rig.Chat.Entries[^1]).Text);
+        Assert.Equal("Here I am.", ((AssistantEntry)rig.Chat.Shown()[^1]).Text);
         Assert.Equal(api.Requests[0]["messages"]!.ToJsonString(), api.Requests[1]["messages"]!.ToJsonString());
     }
 
@@ -167,7 +167,7 @@ public class ChatTests
         await using var rig = await Rig.Start();
         rig.Chat.Client = new Anthropic.AnthropicClient { ApiKey = Key, HttpClient = new HttpClient(new Unreachable()), MaxRetries = 0 };
         await rig.Send("hello");
-        var error = Assert.IsType<NoticeEntry>(rig.Chat.Entries[^1]);
+        var error = Assert.IsType<NoticeEntry>(rig.Chat.Shown()[^1]);
         Assert.Contains("Couldn't reach the Anthropic API", error.Text);
         Assert.True(error.CanRetry);
     }
@@ -186,8 +186,8 @@ public class ChatTests
         await using var rig = await Rig.Start(api);
         rig.Chat.MaxToolCalls = 5;
         await rig.Send("resistors forever");
-        Assert.Equal(5, rig.Chat.Entries.OfType<ToolEntry>().Count());
-        var notice = Assert.IsType<NoticeEntry>(rig.Chat.Entries[^1]);
+        Assert.Equal(5, rig.Chat.Shown().OfType<ToolEntry>().Count());
+        var notice = Assert.IsType<NoticeEntry>(rig.Chat.Shown()[^1]);
         Assert.Contains("5 tool calls", notice.Text);
         Assert.Equal(0, api.Left);
         // Every tool_use still has its tool_result (the sixth refused), so "continue" can carry on.
@@ -211,13 +211,13 @@ public class ChatTests
         rig.Chat.MaxToolCalls = 3;
         rig.Chat.AutoContinues = 2;
         await rig.Send("eight calls");
-        var tools = rig.Chat.Entries.OfType<ToolEntry>().ToList();
+        var tools = rig.Chat.Shown().OfType<ToolEntry>().ToList();
         Assert.Equal(8, tools.Count);
         Assert.All(tools, t => Assert.DoesNotContain("limit of", t.Result));
-        var notices = rig.Chat.Entries.OfType<NoticeEntry>().ToList();
+        var notices = rig.Chat.Shown().OfType<NoticeEntry>().ToList();
         Assert.Equal(2, notices.Count);
         Assert.Contains("carrying on by itself (2 of 2", notices[1].Text);
-        Assert.Equal("All done.", ((AssistantEntry)rig.Chat.Entries[^1]).Text);
+        Assert.Equal("All done.", ((AssistantEntry)rig.Chat.Shown()[^1]).Text);
         Assert.Equal(4, rig.Host.Session.Circuit.Components.Count);
 
         // Past its last automatic continue, it stops as before.
@@ -227,8 +227,8 @@ public class ChatTests
         rig2.Chat.MaxToolCalls = 2;
         rig2.Chat.AutoContinues = 1;
         await rig2.Send("resistors forever");
-        Assert.Equal(4, rig2.Chat.Entries.OfType<ToolEntry>().Count(t => !t.IsError));
-        Assert.Contains("Stopped after 4 tool calls", Assert.IsType<NoticeEntry>(rig2.Chat.Entries[^1]).Text);
+        Assert.Equal(4, rig2.Chat.Shown().OfType<ToolEntry>().Count(t => !t.IsError));
+        Assert.Contains("Stopped after 4 tool calls", Assert.IsType<NoticeEntry>(rig2.Chat.Shown()[^1]).Text);
     }
 
     [Fact]
@@ -242,7 +242,7 @@ public class ChatTests
         rig.Chat.Stop();
         await send.WaitAsync(TimeSpan.FromSeconds(10), Cancel);
         Assert.False(rig.Chat.Working);
-        Assert.Equal("Stopped.", Assert.IsType<NoticeEntry>(rig.Chat.Entries[^1]).Text);
+        Assert.Equal("Stopped.", Assert.IsType<NoticeEntry>(rig.Chat.Shown()[^1]).Text);
         await rig.Send("are you there?");
         var only = Assert.Single(api.Requests[^1]["messages"]!.AsArray())!;
         Assert.Equal(2, only["content"]!.AsArray().Count);
@@ -260,10 +260,10 @@ public class ChatTests
         var send = chat.SendAsync("a resistor", Cancel);
         for (var i = 0; i < 500 && person.Asked < 2; i++) await Task.Delay(10, Cancel);
         Assert.True(chat.Working);
-        Assert.True(Assert.Single(chat.Entries.OfType<ToolEntry>()).Running);
+        Assert.True(Assert.Single(chat.Shown().OfType<ToolEntry>()).Running);
         chat.Stop();
         await send.WaitAsync(TimeSpan.FromSeconds(10), Cancel);
-        var tool = Assert.Single(chat.Entries.OfType<ToolEntry>());
+        var tool = Assert.Single(chat.Shown().OfType<ToolEntry>());
         Assert.True(tool.IsError);
         Assert.Contains("Stopped", tool.Result);
         Assert.Empty(person.Session.Circuit.Components);
@@ -283,11 +283,11 @@ public class ChatTests
         for (var i = 0; i < 500 && person.Asked < 2; i++) await Task.Delay(10, Cancel);
         chat.NewChat();
         await send.WaitAsync(TimeSpan.FromSeconds(10), Cancel);
-        Assert.Empty(chat.Entries);
+        Assert.Empty(chat.Shown());
         Assert.Empty(chat.Turns);
         await chat.SendAsync("hello", Cancel);
         Assert.Single(api.Requests[^1]["messages"]!.AsArray());
-        Assert.Equal("Fresh start.", ((AssistantEntry)chat.Entries[^1]).Text);
+        Assert.Equal("Fresh start.", ((AssistantEntry)chat.Shown()[^1]).Text);
     }
 
     private sealed class BusyPerson : ILiveCircuit, IUiThread
@@ -306,7 +306,7 @@ public class ChatTests
         await using var rig = await Rig.Start(api);
         rig.Chat.Client = null;
         await rig.Send("hello");
-        var notice = Assert.IsType<NoticeEntry>(rig.Chat.Entries[^1]);
+        var notice = Assert.IsType<NoticeEntry>(rig.Chat.Shown()[^1]);
         Assert.Contains(ApiKeyStore.EnvironmentVariable, notice.Text);
         Assert.Contains("CirqAvalonia", notice.Text);
         Assert.Contains("Key…", notice.Text);
@@ -322,7 +322,7 @@ public class ChatTests
         rig.Chat.Cleared += () => cleared++;
         await rig.Send("first");
         rig.Chat.NewChat();
-        Assert.Empty(rig.Chat.Entries);
+        Assert.Empty(rig.Chat.Shown());
         Assert.Equal(1, cleared);
         await rig.Send("second");
         Assert.Single(api.Requests[1]["messages"]!.AsArray());

@@ -9363,6 +9363,20 @@ account can read, is sent only to the Anthropic API, and is only ever shown mask
 The environment variable wins when both are set. Files the chat opens or saves are in your Documents
 folder.
 
+**What it uses** shows as it goes. The line under the model and Send says what this chat has used so
+far — *This chat: 37.0k in (29.4k from cache) · 180 out · ≈ $0.047* — counting up while Claude works,
+with *this turn* added until it finishes; hover it for today's and this month's totals. Each turn
+ends with a small line of its own (*This turn: 3 requests · … · 1 picture · ≈ $0.020*), whose tooltip
+lists every request. A turn is often several requests, because each tool call sends the conversation
+again; the prompt cache makes most of each one cheap, which is what *from cache* counts. The tokens
+are the ones the API reports, and the dollars are an estimate from Anthropic's list prices: the
+Anthropic Console has the bill. **Cost…** in the panel's header sets a **budget** — the chat stops
+between requests when it has used about that many dollars, and sending another message lets it carry
+on for as much again — and each model's prices (input, output, cache write and cache read, in dollars
+a million tokens), so the estimate stays right if they change. It also shows today's and this month's
+totals, kept in `chat-usage.json` beside `settings.json` as counts and dollars only, never a word of a
+chat, and **Reset Totals** clears them.
+
 ### Letting an outside agent in
 
 An agent running outside the application, such as Claude Code or Claude Desktop, can work in the

@@ -134,6 +134,72 @@ public class AgentWindowTests(WindowSession session) : IDisposable
     });
 
     [Fact]
+    public void The_chat_shows_what_it_uses_and_Cost_sets_a_budget_and_prices_that_are_remembered() => session.Run(() =>
+    {
+        var (window, editor) = Open();
+        editor.IsChatOpen = true;
+        Dispatcher.UIThread.RunJobs();
+        var chat = window.Chat!;
+        // The totals go in chat-usage.json beside the test's settings, never the person's own.
+        Assert.Equal(Path.Combine(_folder, "chat-usage.json"), chat.Ledger!.Path);
+        Assert.Equal("This chat: nothing used yet.", chat.UsageText.Text);
+        Assert.True(chat.UsageText.IsVisible);
+        var api = new FakeClaude { Tokens = (100, 1000, 5000, 20) }
+            .Reply(Say("Adding it."), Call("toolu_1", "add_parts", new { parts = new object[] { new { kind = "Resistor", x = 200, y = 0 } } }))
+            .Reply(Say("Done."));
+        chat.ClientFactory = _ => api.Client();
+        chat.Keys.Override = FakeClaude.Key;
+        try
+        {
+            chat.Input.Text = "add a resistor";
+            chat.Send();
+            Finish(chat.Running);
+            // Two requests at Opus 5.5's prices: $0.0136.
+            Assert.Equal("This chat: 12.2k in (10.0k from cache) · 40 out · ≈ $0.014", chat.UsageText.Text);
+            Assert.Contains(Texts(chat), t => t == "This turn: 2 requests · 12.2k in (10.0k from cache) · 40 out · ≈ $0.014");
+            Assert.Contains("Today: 12.2k in", chat.Totals.Text);
+            // Kept as counts and dollars only: not a word of the chat.
+            var kept = File.ReadAllText(Path.Combine(_folder, "chat-usage.json"));
+            Assert.Contains("\"CacheRead\": 10000", kept);
+            Assert.DoesNotContain("resistor", kept, StringComparison.OrdinalIgnoreCase);
+
+            // A budget and a price of the person's own are kept in the settings; a bad one is refused and said so.
+            chat.BudgetBox.Text = "$2.50";
+            chat.ReadBudget();
+            Assert.Equal(2.5, chat.Session.Budget);
+            var opus = chat.PriceBoxes[Cirq.Chat.ChatModels.Opus];
+            opus.Text = "8 40 10 0.4";
+            chat.ReadPrice(Cirq.Chat.ChatModels.Opus, opus);
+            Assert.Equal("This chat: 12.2k in (10.0k from cache) · 40 out · ≈ $0.014", chat.UsageText.Text);
+            Assert.Equal(8, chat.Session.Price!.Input);
+            var saved = new JsonSettingsStore(Path.Combine(_folder, "settings.json")).Load();
+            Assert.Equal(2.5, saved.ChatBudget);
+            Assert.Equal([8, 40, 10, 0.4], saved.ChatPrices[Cirq.Chat.ChatModels.Opus]);
+            opus.Text = "eight";
+            chat.ReadPrice(Cirq.Chat.ChatModels.Opus, opus);
+            Assert.Contains("four numbers", editor.StatusMessage);
+            Assert.Equal("8 40 10 0.4", opus.Text);
+            // Emptied, the built-in prices are back.
+            opus.Text = "";
+            chat.ReadPrice(Cirq.Chat.ChatModels.Opus, opus);
+            Assert.Equal("4 20 5 0.2", opus.Text);
+            Assert.False(App.Settings.ChatPrices.ContainsKey(Cirq.Chat.ChatModels.Opus));
+
+            // New Chat starts the line again; the totals stay.
+            chat.Session.NewChat();
+            Assert.Equal("This chat: nothing used yet.", chat.UsageText.Text);
+            chat.Ledger.Reset();
+            Dispatcher.UIThread.RunJobs();
+            Assert.Contains("Today: nothing", chat.Totals.Text);
+        }
+        finally
+        {
+            chat.BudgetBox.Text = "";
+            chat.ReadBudget();
+        }
+    });
+
+    [Fact]
     public void An_agents_change_that_fails_leaves_the_window_as_it_was_and_a_run_fills_the_scope() => session.Run(() =>
     {
         var (_, editor) = Open();

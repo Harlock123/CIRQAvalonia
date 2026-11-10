@@ -83,7 +83,10 @@ dotnet run --project src/Cirq.UI -- --mcp      # the MCP server on stdio, headle
     examples and the schematic picture come from the host's `ICircuitLibrary`, which the editor supplies.
   - `LiveListener` (a per-user named pipe) and `LiveBridge` (`--mcp --attach`) let outside agents into the editor.
 - `src/Cirq.Chat/`: the AI Chat's conversation (`ChatSession`), its Claude client (the Anthropic SDK), the API key
-  store and the bridge to the MCP server's tools. No UI.
+  store and the bridge to the MCP server's tools. No UI. `ChatUsage.cs` is what it uses: `TokenUsage` from the
+  stream's usage, `ChatPricing` (list prices as of a date, overridable from `AppSettings.ChatPrices`), the
+  `UsageLedger` behind the totals (`chat-usage.json`, one per app: `App.ChatUsage`) and the `UsageEntry` line
+  after each turn. Tests that look at the whole conversation use `Shown()`, which leaves those lines out.
 - `src/Cirq.UI/Agents/`: the editor's side: `EditorLibrary` (the palette, examples and print-coloured PNG),
   `EditorSession` (a window's document, undo and transport as an agent sees them) and `LiveAgents` (the pipe door
   and every window's chat host). The panel is `Views/ChatPanel.cs`.

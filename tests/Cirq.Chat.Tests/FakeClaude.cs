@@ -61,6 +61,9 @@ internal sealed class FakeClaude : HttpMessageHandler
 
     public int Left => _script.Count;
 
+    /// <summary>The tokens each reply says it used: input read fresh, written to the cache, read from it, and output.</summary>
+    public (int Input, int CacheWrite, int CacheRead, int Output) Tokens { get; set; } = (100, 0, 0, 20);
+
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancel)
     {
         Assert.Equal("https://api.anthropic.com/v1/messages", request.RequestUri!.GetLeftPart(UriPartial.Path));
@@ -83,8 +86,9 @@ internal sealed class FakeClaude : HttpMessageHandler
 
     private static int _messages;
 
-    private static HttpResponseMessage Stream(Part[] parts)
+    private HttpResponseMessage Stream(Part[] parts)
     {
+        var tokens = Tokens;
         var sse = new StringBuilder();
         void Event(string type, JsonObject data)
         {
@@ -97,7 +101,11 @@ internal sealed class FakeClaude : HttpMessageHandler
             {
                 ["id"] = $"msg_{Interlocked.Increment(ref _messages)}", ["type"] = "message", ["role"] = "assistant", ["model"] = ChatModels.Default,
                 ["content"] = new JsonArray(), ["stop_reason"] = null, ["stop_sequence"] = null,
-                ["usage"] = new JsonObject { ["input_tokens"] = 100, ["output_tokens"] = 1 },
+                ["usage"] = new JsonObject
+                {
+                    ["input_tokens"] = tokens.Input, ["output_tokens"] = 1,
+                    ["cache_creation_input_tokens"] = tokens.CacheWrite, ["cache_read_input_tokens"] = tokens.CacheRead,
+                },
             },
         });
         for (int i = 0; i < parts.Length; i++)
@@ -126,7 +134,7 @@ internal sealed class FakeClaude : HttpMessageHandler
         Event("message_delta", new JsonObject
         {
             ["delta"] = new JsonObject { ["stop_reason"] = tools ? "tool_use" : "end_turn", ["stop_sequence"] = null },
-            ["usage"] = new JsonObject { ["output_tokens"] = 20 },
+            ["usage"] = new JsonObject { ["output_tokens"] = tokens.Output },
         });
         Event("message_stop", new JsonObject());
         return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(sse.ToString(), Encoding.UTF8, "text/event-stream") };
@@ -163,4 +171,10 @@ internal static class Json
 
     public static IEnumerable<JsonObject> Results(JsonObject request) =>
         request["messages"]!.AsArray().SelectMany(m => m!["content"] is JsonArray a ? a.OfType<JsonObject>() : []).Where(b => (string?)b["type"] == "tool_result");
+}
+
+internal static class ShownEntries
+{
+    /// <summary>The chat's entries but the line after each turn saying what it used (the usage tests look at those).</summary>
+    public static IReadOnlyList<ChatEntry> Shown(this ChatSession chat) => chat.Entries.Where(e => e is not UsageEntry).ToList();
 }

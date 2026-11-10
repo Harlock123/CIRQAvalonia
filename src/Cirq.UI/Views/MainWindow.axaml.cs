@@ -1005,6 +1005,7 @@ public partial class MainWindow : Window
             var folder = Path.GetDirectoryName(app.SettingsStore.Location) ?? Path.GetTempPath();
             _chat = new ChatPanel(_chatTools, ApiKeyStore.ForApp(folder), text => viewModel.StatusMessage = text,
                 app.Settings, () => app.SettingsStore.Save(app.Settings));
+            _chat.Ledger = app.ChatUsage;
             _chat.CloseRequested += () => viewModel.IsChatOpen = false;
             if (this.FindControl<Border>("ChatHost") is { } host) host.Child = _chat;
         }

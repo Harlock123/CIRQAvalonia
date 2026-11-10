@@ -22,6 +22,12 @@ public sealed class ChatSession(IToolBridge tools)
     private CancellationTokenSource? _running;
     private int _generation;
     private IReadOnlyList<McpTool>? _toolDefinitions;
+    private readonly List<RequestUsage> _turnRequests = [];
+    private TokenUsage _chatTokens, _live;
+    private double _chatCost;
+    private int _pendingPictures;
+    private double _allowance;
+    private double? _budget;
 
     /// <summary>The Claude API client, or null while there's no key.</summary>
     public IAnthropicClient? Client { get; set; }
@@ -46,6 +52,63 @@ public sealed class ChatSession(IToolBridge tools)
         $"There's no Anthropic API key yet. Set the {ApiKeyStore.EnvironmentVariable} environment variable before starting CirqAvalonia, or enter a key with the Key… button above. Your own API account is billed for what the chat uses.";
 
     public IReadOnlyList<ChatEntry> Entries => _entries;
+
+    // ───────────────────────────── what it uses ─────────────────────────────
+
+    /// <summary>The person's own prices (the panel's Cost…), over <see cref="ChatPricing.Defaults"/>.</summary>
+    public IReadOnlyList<ModelPrice> OwnPrices { get; set; } = [];
+
+    /// <summary>Where each request's use is added up day by day (the panel's today and this month), or null.</summary>
+    public UsageLedger? Ledger { get; set; }
+
+    /// <summary>The time a request's use is booked at (tests set it).</summary>
+    public Func<DateTimeOffset> Clock { get; set; } = () => DateTimeOffset.Now;
+
+    /// <summary>
+    /// About how many dollars a chat may spend before it stops between requests and says so (null: no limit). Sending
+    /// another message after it stops allows as much again.
+    /// </summary>
+    public double? Budget
+    {
+        get => _budget;
+        set
+        {
+            _budget = value is > 0 && double.IsFinite(value.Value) ? value : null;
+            _allowance = _budget is { } b ? Math.Max(_allowance, b) : 0;
+        }
+    }
+
+    /// <summary>The price the next request is reckoned at: the model's, or null if it has none.</summary>
+    public ModelPrice? Price => ChatPricing.Find(Model, OwnPrices);
+
+    /// <summary>This chat's tokens so far, the request under way included.</summary>
+    public TokenUsage ChatTokens => _chatTokens + _live;
+
+    /// <summary>This chat's estimated cost so far, the request under way included.</summary>
+    public double ChatCost => _chatCost + (Price?.Cost(_live) ?? 0);
+
+    /// <summary>The turn under way's tokens (since the person's last message), the request under way included.</summary>
+    public TokenUsage TurnTokens => _turnRequests.Aggregate(_live, (a, r) => a + r.Tokens);
+
+    /// <summary>The turn under way's estimated cost, the request under way included.</summary>
+    public double TurnCost => _turnRequests.Sum(r => r.Cost ?? 0) + (Price?.Cost(_live) ?? 0);
+
+    /// <summary>Raised as the tokens used change: during a request as the API reports them, and after it.</summary>
+    public event Action? UsageChanged;
+
+    /// <summary>A request's use is final: it's added to the chat, the turn and the ledger.</summary>
+    private void Commit(TokenUsage used)
+    {
+        _live = default;
+        if (used.IsEmpty && used.Requests == 0) return;
+        double? cost = Price?.Cost(used);
+        _chatCost += cost ?? 0;
+        _chatTokens += used;
+        _turnRequests.Add(new RequestUsage(used, cost, _pendingPictures));
+        _pendingPictures = 0;
+        Ledger?.Add(Clock(), used, cost);
+        UsageChanged?.Invoke();
+    }
 
     /// <summary>A new entry was added at the end.</summary>
     public event Action<ChatEntry>? EntryAdded;
@@ -75,6 +138,8 @@ public sealed class ChatSession(IToolBridge tools)
             return;
         }
         AddToUserTurn(new TextBlockParam { Text = text });
+        // Stopped by the budget: the person's carrying on allows as much again.
+        if (_budget is { } b && ChatCost >= _allowance) _allowance = ChatCost + b;
         await RunAsync(cancel);
     }
 
@@ -103,6 +168,10 @@ public sealed class ChatSession(IToolBridge tools)
         _generation++;
         _entries.Clear();
         _turns.Clear();
+        (_chatTokens, _live, _chatCost, _pendingPictures) = (default, default, 0, 0);
+        _turnRequests.Clear();
+        _allowance = _budget ?? 0;
+        UsageChanged?.Invoke();
         Cleared?.Invoke();
     }
 
@@ -123,6 +192,8 @@ public sealed class ChatSession(IToolBridge tools)
     {
         using var running = CancellationTokenSource.CreateLinkedTokenSource(cancel);
         _running = running;
+        _turnRequests.Clear();
+        int generation = _generation;
         WorkingChanged?.Invoke();
         try
         {
@@ -130,6 +201,12 @@ public sealed class ChatSession(IToolBridge tools)
         }
         finally
         {
+            // What the turn used, after it (a request cut short counts what was reported of it).
+            if (generation == _generation)
+            {
+                if (!_live.IsEmpty) Commit(_live with { Requests = 1 });
+                if (_turnRequests.Any(r => !r.Tokens.IsEmpty)) Add(new UsageEntry([.. _turnRequests], Price?.Model));
+            }
             _running = null;
             WorkingChanged?.Invoke();
         }
@@ -139,8 +216,15 @@ public sealed class ChatSession(IToolBridge tools)
     {
         int calls = 0, continues = 0, generation = _generation;
         bool Gone() => generation != _generation;
-        while (true)
+        for (int request = 0; ; request++)
         {
+            // The budget is checked between requests (never the first of a turn: the person's message is a go-ahead).
+            if (request > 0 && _budget is { } budget && ChatCost >= _allowance)
+            {
+                Add(new NoticeEntry($"Stopped at the chat's budget: it has used about {ChatPricing.Dollars(ChatCost)} (the budget is {ChatPricing.Dollars(budget)} a go). " +
+                    "Send another message to let Claude carry on for as much again, or change the budget with Cost… above.", NoticeKind.Info));
+                return;
+            }
             var reply = new AssistantEntry();
             Message message;
             try
@@ -180,6 +264,8 @@ public sealed class ChatSession(IToolBridge tools)
                 return;
             }
             if (Gone()) return;
+            var used = Tokens(message.Usage);
+            Commit(used.IsEmpty ? _live with { Requests = 1 } : used);
             reply.Finish();
 
             // An empty reply (a refusal can be one) isn't kept: the API takes no empty turns.
@@ -236,6 +322,8 @@ public sealed class ChatSession(IToolBridge tools)
                 if (Gone()) return;
                 entry.Finish(outcome);
                 results.Add(Result(use.ID, outcome));
+                // Its pictures go to Claude with the next request.
+                _pendingPictures += outcome.Images.Count;
             }
             // Every tool_use has its tool_result, so the conversation can go on after a stop or the cap.
             AddToUserTurn([.. results]);
@@ -292,7 +380,9 @@ public sealed class ChatSession(IToolBridge tools)
     private async Task<Message> StreamAsync(MessageCreateParams request, AssistantEntry reply, CancellationToken cancel)
     {
         // Text shows as it streams; the whole reply is put together from the same events afterwards, by the SDK.
+        // The input's tokens come with the start and the output's grow with each delta, so the panel counts as it goes.
         var events = new List<RawMessageStreamEvent>();
+        int generation = _generation;
         await foreach (var ev in Client!.Messages.CreateStreaming(request, cancel).WithCancellation(cancel))
         {
             events.Add(ev);
@@ -302,9 +392,29 @@ public sealed class ChatSession(IToolBridge tools)
                 if (reply.Text.Length == 0 && !_entries.Contains(reply)) Add(reply);
                 reply.Append(text.Text);
             }
+            else if (generation == _generation && ev.TryPickStart(out var start))
+            {
+                _live = Tokens(start.Message.Usage);
+                UsageChanged?.Invoke();
+            }
+            else if (generation == _generation && ev.TryPickDelta(out var md))
+            {
+                var u = md.Usage;
+                _live = _live with
+                {
+                    Output = u.OutputTokens,
+                    Input = u.InputTokens ?? _live.Input,
+                    CacheWrite = u.CacheCreationInputTokens ?? _live.CacheWrite,
+                    CacheRead = u.CacheReadInputTokens ?? _live.CacheRead,
+                };
+                UsageChanged?.Invoke();
+            }
         }
         return await events.ToAsyncEnumerable().Aggregate();
     }
+
+    internal static TokenUsage Tokens(Usage u) =>
+        new(u.InputTokens, u.OutputTokens, u.CacheCreationInputTokens ?? 0, u.CacheReadInputTokens ?? 0, 1);
 
     /// <summary>Claude's reply as it goes back in the next request: text, tool calls and thinking, unchanged.</summary>
     private static List<ContentBlockParam> AssistantBlocks(Message message)

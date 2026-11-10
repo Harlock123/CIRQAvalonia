@@ -39,7 +39,21 @@ public sealed class AppSettings
     /// <summary>The Claude model the AI Chat uses, by its API id; empty for the default.</summary>
     public string ChatModel { get; set; } = string.Empty;
 
-    public AppSettings Clone() => (AppSettings)MemberwiseClone();
+    /// <summary>
+    /// The person's own prices for the AI Chat's Claude models (Cost…), by model id: four numbers of dollars a million
+    /// tokens for input, output, cache writes and cache reads. A model not here uses the built-in prices.
+    /// </summary>
+    public Dictionary<string, double[]> ChatPrices { get; set; } = [];
+
+    /// <summary>About how many dollars an AI Chat may spend before it stops and asks (null: no limit).</summary>
+    public double? ChatBudget { get; set; }
+
+    public AppSettings Clone()
+    {
+        var copy = (AppSettings)MemberwiseClone();
+        copy.ChatPrices = ChatPrices.ToDictionary(kv => kv.Key, kv => (double[])kv.Value.Clone());
+        return copy;
+    }
 }
 
 /// <summary>Reads and writes <see cref="AppSettings"/>.</summary>

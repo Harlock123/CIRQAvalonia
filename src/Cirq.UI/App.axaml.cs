@@ -22,6 +22,22 @@ public partial class App : Application
     /// </summary>
     public LiveAgents Agents { get; } = new();
 
+    private Cirq.Chat.UsageLedger? _chatUsage;
+
+    /// <summary>
+    /// The AI Chat's use day by day, in chat-usage.json beside the settings: one for the app, so every window's chat
+    /// adds to the same totals.
+    /// </summary>
+    public Cirq.Chat.UsageLedger ChatUsage
+    {
+        get
+        {
+            var path = Path.Combine(Path.GetDirectoryName(SettingsStore.Location) ?? Path.GetTempPath(), "chat-usage.json");
+            if (_chatUsage?.Path != path) _chatUsage = new Cirq.Chat.UsageLedger(path);
+            return _chatUsage;
+        }
+    }
+
     /// <summary>The pipe outside agents connect on (tests use one of their own).</summary>
     public string AgentPipe { get; set; } = LiveProtocol.PipeName;
 

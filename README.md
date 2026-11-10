@@ -172,7 +172,9 @@ at a time. It needs an Anthropic API key: set `ANTHROPIC_API_KEY` before startin
 in the panel (it is kept in a file only your account can read, and only ever shown masked). Your own
 API account is billed for what it uses. Claude Opus, Sonnet and Haiku are offered; **Auto-continue**
 lets a long job carry on past the 60-calls-per-request limit by itself (up to 600), and Stop ends it
-at any point.
+at any point. A line under Send shows what the chat has used as it goes — tokens as the API reports
+them and an estimate in dollars — each turn ends with a line of its own, and **Cost…** sets a budget
+the chat stops at, the prices it estimates with, and shows today's and this month's totals.
 
 ![The AI Chat after designing a 1 kHz RC low-pass: the filter on the canvas, the square wave and its rounded response in the scope, and in the chat the frequency sweep opened to show its input, its result and the Bode plot Claude looked at, with its answer giving the corner at 997.3 Hz](docs/images/36-ai-chat-bode.png)
 
