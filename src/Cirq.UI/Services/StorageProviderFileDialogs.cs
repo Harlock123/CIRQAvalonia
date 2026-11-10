@@ -285,6 +285,7 @@ public sealed class StorageProviderFileDialogs : ICircuitFileDialogs
         var schematicOnly = Radio("group-content", "Schematic", isChecked: true);
         var tracesOnly = Radio("group-content", "Oscilloscope traces", isEnabled: hasTraces);
         var both = Radio("group-content", "Both", isEnabled: hasTraces);
+        var protoboard = Radio("group-content", "Protoboard — the circuit built on breadboards");
 
         var oneFile = Radio("group-layout", "One file, schematic above the traces", isChecked: true);
         var separate = Radio("group-layout", "A file each, plus a combined PDF");
@@ -338,7 +339,7 @@ public sealed class StorageProviderFileDialogs : ICircuitFileDialogs
         var contentPanel = new StackPanel
         {
             Spacing = 4,
-            Children = { Caption("What to export"), schematicOnly, tracesOnly, both },
+            Children = { Caption("What to export"), schematicOnly, tracesOnly, both, protoboard },
         };
 
         var layoutPanel = new StackPanel
@@ -403,7 +404,7 @@ public sealed class StorageProviderFileDialogs : ICircuitFileDialogs
             note.IsVisible = note.Text.Length > 0;
         }
 
-        foreach (var button in new[] { schematicOnly, tracesOnly, both })
+        foreach (var button in new[] { schematicOnly, tracesOnly, both, protoboard })
             button.IsCheckedChanged += (_, _) => Refresh();
 
         format.SelectionChanged += (_, _) => Refresh();
@@ -449,6 +450,7 @@ public sealed class StorageProviderFileDialogs : ICircuitFileDialogs
         {
             var content = tracesOnly.IsChecked == true ? ExportContent.Traces
                 : both.IsChecked == true ? ExportContent.Both
+                : protoboard.IsChecked == true ? ExportContent.Protoboard
                 : ExportContent.Schematic;
 
             chosen = new ExportOptions(

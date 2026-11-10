@@ -404,6 +404,49 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void ToggleChat() => IsChatOpen = !IsChatOpen;
 
+    // ---- the protoboard view ------------------------------------------------
+
+    /// <summary>
+    /// Showing the circuit built on breadboards rather than the schematic (View › Protoboard, F11). Both are the same
+    /// circuit: parts are added and wired on the schematic, and the board is laid out from it.
+    /// </summary>
+    [ObservableProperty]
+    public partial bool IsProtoboardView { get; set; }
+
+    /// <summary>The other half of the View menu's pair of radio items.</summary>
+    public bool IsSchematicView
+    {
+        get => !IsProtoboardView;
+        set => IsProtoboardView = !value;
+    }
+
+    partial void OnIsProtoboardViewChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsSchematicView));
+        StatusMessage = value
+            ? "Protoboard: drag a part to move it, a lead or a wire's end on its own; right-click for more. F11 for the schematic"
+            : "Schematic";
+    }
+
+    [RelayCommand]
+    private void ToggleProtoboard() => IsProtoboardView = !IsProtoboardView;
+
+    [RelayCommand]
+    private void ShowSchematic() => IsProtoboardView = false;
+
+    [RelayCommand]
+    private void ShowProtoboard() => IsProtoboardView = true;
+
+    /// <summary>Raised to lay the whole board out again, forgetting what was moved by hand.</summary>
+    public event EventHandler? RequestArrangeProtoboard;
+
+    [RelayCommand]
+    private void ArrangeProtoboard()
+    {
+        IsProtoboardView = true;
+        RequestArrangeProtoboard?.Invoke(this, EventArgs.Empty);
+    }
+
     /// <summary>
     /// Whether AI agents outside the application may work in it (AI › Allow AI Agents): an MCP
     /// server started as <c>CirqAvalonia --mcp --attach</c> reaches the window used last. An
@@ -663,6 +706,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         Circuit.AdaptiveTimeStep = loaded.AdaptiveTimeStep;
         Circuit.Revision = loaded.Revision;
         Circuit.Author = loaded.Author;
+        Circuit.Board.CopyFrom(loaded.Board);
 
         RefreshSheets();
     }
@@ -1713,6 +1757,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
           Tab          Step to the next part on the sheet; Shift+Tab the previous
           Enter        Drop the armed part in the middle of the view
           Ctrl+L       Show live values — volts on every net, amps through every part
+          F11          The protoboard view — the circuit built on breadboards — and back
           F12          AI Chat — ask Claude to build, wire, probe and run circuits
 
         Simulation

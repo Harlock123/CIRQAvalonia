@@ -223,6 +223,12 @@ public partial class Circuit : ObservableObject
     [ObservableProperty]
     public partial bool AdaptiveTimeStep { get; set; }
 
+    /// <summary>
+    /// Where parts sit on the protoboard view when somebody has put them there by hand. Empty for a board that is
+    /// laid out automatically, which is every circuit until someone moves a part on it.
+    /// </summary>
+    public BoardArrangement Board { get; } = new();
+
     /// <summary>Adds a component, auto-naming it with the next free reference designator.</summary>
     public T Add<T>(T component) where T : CircuitComponent
     {
@@ -289,6 +295,7 @@ public partial class Circuit : ObservableObject
         AdaptiveTimeStep = false;
         Revision = string.Empty;
         Author = string.Empty;
+        Board.Clear();
     }
 
     /// <summary>Resolves the current topology into a netlist.</summary>

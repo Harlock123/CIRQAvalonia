@@ -35,6 +35,22 @@ public sealed class EditorLibrary : ICircuitLibrary
         return new LoadedExample(copy, editor.Scope.TimebasePerDivision, editor.Scope.VoltsPerDivision);
     }
 
+    /// <summary>The protoboard as a PNG, drawn as the protoboard view draws it.</summary>
+    public byte[] BoardPicture(Circuit circuit, double scale)
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"cirq-agent-board-{Guid.NewGuid():N}.png");
+        try
+        {
+            CircuitExporter.WriteProtoboard(circuit, path, new ExportOptions(ExportFormat.Png, ExportContent.Protoboard, RasterScale: scale));
+            return File.ReadAllBytes(path);
+        }
+        finally
+        {
+            try { File.Delete(path); }
+            catch (IOException) { }
+        }
+    }
+
     /// <summary>The schematic as a PNG, drawn black on white as it prints, whatever theme the editor is in.</summary>
     public byte[] Picture(Circuit circuit, string? sheet, double scale)
     {

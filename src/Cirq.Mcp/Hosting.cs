@@ -30,6 +30,9 @@ public interface ICircuitLibrary
 
     /// <summary>The schematic drawn as a PNG, black on white as it prints; one sheet of it, or all of a one-page drawing.</summary>
     byte[] Picture(Circuit circuit, string? sheet, double scale);
+
+    /// <summary>The circuit built on breadboards, as the protoboard view draws it, as a PNG; <paramref name="scale"/> pixels per drawing unit (a pitch is ten).</summary>
+    byte[] BoardPicture(Circuit circuit, double scale);
 }
 
 /// <summary>What an agent may ask the editor's own simulation to do (the transport buttons).</summary>
@@ -244,6 +247,7 @@ public static class Contents
         into.AdaptiveTimeStep = from.AdaptiveTimeStep;
         into.Revision = from.Revision;
         into.Author = from.Author;
+        into.Board.CopyFrom(from.Board);
     }
 }
 

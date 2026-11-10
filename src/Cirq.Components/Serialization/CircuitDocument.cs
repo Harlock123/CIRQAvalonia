@@ -83,6 +83,48 @@ public sealed class CircuitDocument
     /// </summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<string>? Sheets { get; set; }
+
+    /// <summary>
+    /// Where parts were put by hand on the protoboard view. Null for a board laid out automatically, which is every
+    /// circuit until somebody moves a part on it, so an ordinary file is byte for byte what it was.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ProtoboardRecord? Protoboard { get; set; }
+}
+
+/// <summary>The protoboard view's hand-made choices, as the file holds them. Holes are named as the board prints them: <c>e12</c>, <c>T+5</c>, <c>2:a30</c>.</summary>
+public sealed class ProtoboardRecord
+{
+    public List<BoardPartRecord> Parts { get; set; } = [];
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<BoardWireRecord>? Wires { get; set; }
+}
+
+/// <summary>One part put somewhere by hand: the hole of each pin, or where it stands on the bench.</summary>
+public sealed class BoardPartRecord
+{
+    public Guid Id { get; set; }
+
+    /// <summary>Hole by pin id.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, string>? Pins { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public double? BenchX { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public double? BenchY { get; set; }
+}
+
+/// <summary>A jumper wire whose ends were moved by hand.</summary>
+public sealed class BoardWireRecord
+{
+    public string Key { get; set; } = string.Empty;
+
+    public string From { get; set; } = string.Empty;
+
+    public string To { get; set; } = string.Empty;
 }
 
 /// <summary>One named number, as the file holds it.</summary>

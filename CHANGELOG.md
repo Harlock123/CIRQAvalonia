@@ -10,6 +10,20 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ### Added
 
+**The protoboard view.** `F11`, `View > Protoboard` or the switch at the top right of the canvas
+shows the circuit built on white solderless breadboards, and `F11` goes back to the schematic. It is
+laid out from the schematic's own netlist: chips straddle the channel left to right as they read on
+the schematic, resistors (with their real colour bands), capacitors, diodes and LEDs go beside the
+pins they join, transistors and regulators stand in the pin order of their usual package, ground
+and the supply take the rails, coloured jumpers join each net's strips, and supplies, generators and
+dev boards sit on the bench with their leads. A circuit too big for one board gets more. The board
+checks itself against the schematic and says so in the status bar, and while the circuit runs its
+LEDs light and its displays show their digits. Drag a part, a single lead, or a jumper's end along
+its strip to arrange it by hand: each move is an undo step, is saved in the `.cirq` file, and is
+refused with the reason if it would short two nets. **Arrange the Board Automatically** lays it out
+afresh. Export it as a picture (**Protoboard** in `File > Export...`), and the AI Chat and outside
+agents can see and arrange it too, with two new tools, `render_protoboard` and `arrange_protoboard`.
+
 **What the AI Chat uses, as it goes.** A line under Send counts this chat's tokens as the API reports
 them (how much came from the prompt cache) and an estimate in dollars, live while Claude works; each
 turn ends with a small line giving its requests, tokens, the pictures sent to Claude and its cost,

@@ -241,6 +241,8 @@ public static class CircuitSerializer
 
         if (circuit.Sheets.Count > 0) document.Sheets = [.. circuit.Sheets];
 
+        document.Protoboard = BoardRecord(circuit);
+
         if (circuit.Parameters.Count > 0)
         {
             document.Parameters = [.. circuit.Parameters.Select(p => new ParameterRecord
@@ -269,6 +271,63 @@ public static class CircuitSerializer
         }
 
         return document;
+    }
+
+    /// <summary>What was put somewhere by hand on the protoboard, for parts still in the circuit; null when nothing was.</summary>
+    private static ProtoboardRecord? BoardRecord(Circuit circuit)
+    {
+        if (circuit.Board.IsEmpty) return null;
+        var present = Flattening.Flatten(circuit.Components).Select(c => c.Id).ToHashSet();
+        var record = new ProtoboardRecord();
+        foreach (var (id, placement) in circuit.Board.Parts.OrderBy(p => p.Key))
+        {
+            if (!present.Contains(id)) continue;
+            record.Parts.Add(new BoardPartRecord
+            {
+                Id = id,
+                Pins = placement.Pins.Count == 0 ? null
+                    : placement.Pins.OrderBy(p => p.Key, StringComparer.Ordinal).ToDictionary(p => p.Key, p => Protoboard.Breadboard.Name(p.Value), StringComparer.Ordinal),
+                BenchX = placement.BenchX,
+                BenchY = placement.BenchY,
+            });
+        }
+
+        if (circuit.Board.Wires.Count > 0)
+            record.Wires = [.. circuit.Board.Wires.OrderBy(w => w.Key, StringComparer.Ordinal).Select(w => new BoardWireRecord
+            {
+                Key = w.Key,
+                From = Protoboard.Breadboard.Name(w.Value.From),
+                To = Protoboard.Breadboard.Name(w.Value.To),
+            })];
+
+        return record.Parts.Count == 0 && record.Wires is null ? null : record;
+    }
+
+    /// <summary>Reads the hand-made board back; a hole that doesn't parse is a warning, and that part is laid out afresh.</summary>
+    private static void RestoreBoard(ProtoboardRecord record, Circuit circuit, ICollection<string> warnings)
+    {
+        foreach (var part in record.Parts)
+        {
+            var pins = new Dictionary<string, BoardHole>(StringComparer.Ordinal);
+            var bad = false;
+            foreach (var (pin, name) in part.Pins ?? [])
+            {
+                if (Protoboard.Breadboard.Parse(name) is { } hole) pins[pin] = hole;
+                else bad = true;
+            }
+
+            if (bad)
+            {
+                warnings.Add($"A part's place on the protoboard names a hole that isn't on the board; it was laid out afresh.");
+                continue;
+            }
+
+            circuit.Board.SetPart(part.Id, new BoardPlacement(pins, part.BenchX, part.BenchY));
+        }
+
+        foreach (var wire in record.Wires ?? [])
+            if (Protoboard.Breadboard.Parse(wire.From) is { } from && Protoboard.Breadboard.Parse(wire.To) is { } to && wire.Key.Length > 0)
+                circuit.Board.SetWire(wire.Key, from, to);
     }
 
     /// <summary>
@@ -654,6 +713,8 @@ public static class CircuitSerializer
         }
 
         if (document.Baseline is { } baseline) circuit.Baseline = Restore(baseline, result.Warnings);
+
+        if (document.Protoboard is { } board) RestoreBoard(board, circuit, result.Warnings);
 
         return result;
     }

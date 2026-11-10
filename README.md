@@ -150,9 +150,10 @@ the tests drive exactly what the executable does, exit code included.
 ## AI: the chat and agents
 
 CirqAvalonia is an MCP server. An AI agent gets the same parts, wiring, probes and analyses a person
-uses, as 37 tools: `list_parts` and `describe_part` to find a part and its pins, `add_parts`,
+uses, as 39 tools: `list_parts` and `describe_part` to find a part and its pins, `add_parts`,
 `connect`, `set_part` and `add_probe` to build, `check_circuit`, `explain_circuit` and
-`render_schematic` to check the drawing, and `operating_point`, `run_transient`, `ac_sweep` and
+`render_schematic` to check the drawing, `render_protoboard` and `arrange_protoboard` to see and
+arrange it built on breadboards, and `operating_point`, `run_transient`, `ac_sweep` and
 `dc_sweep` to run it, and `load_memory`, `read_memory`, `cpu_state`, `disassemble`, `sid_state` and
 `peripheral_state` for the memories, the 6502s, the 68000, the 6809, the Z80 and the 8085, the SID and the peripheral chips of the 68000, the 6809, the Z80 and the 8085. The runs come back as measurements (frequency, duty cycle, peak to peak, the
 −3 dB corner) **and** as plots the agent looks at, so it can see the capacitor charging or the Bode
@@ -1042,6 +1043,7 @@ counted as two lines, because they are two things to order.
 | Transport | `F5` run/pause, `F6` single step, `F8` reset |
 | Controls | Every switch, potentiometer, light level, temperature and magnet — and every supply voltage, generator frequency and amplitude — is gathered into a **CONTROLS** panel under the properties panel, and can be worked while the simulation runs. Sweep a frequency with the scope running and watch a filter turn over. A part declares a control by marking the property `[Operable]`, so a new component gets one without the UI being edited |
 | Interactive | Switches, buttons, logic toggles, LDRs, thermistors and the temperature sensors are operated by double-clicking them, and a keypad by double-clicking the key. They are ringed with a small dot so you can tell which parts those are; **View > Mark Interactive Parts** turns the rings off |
+| Protoboard | `F11` (or `View > Protoboard`, or the button at the canvas's top right) shows the circuit built on white breadboards: chips across the channel with pin 1 bottom left, resistors with their real colour bands, LEDs that light as the simulation runs, ground and the supply on the rails, coloured jumper wires, and the supplies, generators and dev boards on the bench beside it with their leads. It is laid out from the schematic's netlist and checks itself against it. Drag a part, one lead, or a wire's end along its strip to arrange it by hand (one undo step each, kept in the file); a move that would short two nets is refused. Exports as a picture |
 | Panels | `F9` collapses the palette to the left, `F10` the properties panel to the right — or click the chevron in either panel's header. A collapsed panel leaves a labelled rail at the edge; click it to bring the panel back. Palette groups also collapse individually (`All` toggles every group) |
 
 The toolbar wraps onto extra rows rather than overflowing, and `MinWidth` is deliberately small, so

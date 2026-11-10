@@ -58,6 +58,9 @@ public enum ExportContent
 
     /// <summary>Both — as two files, or as one, depending on <see cref="ExportOptions.AsSingleFile"/>.</summary>
     Both,
+
+    /// <summary>The circuit built on breadboards, as the protoboard view draws it.</summary>
+    Protoboard,
 }
 
 /// <param name="Format">The file format to write.</param>
@@ -466,6 +469,12 @@ public static class CircuitExporter
         // into it: there is one netlist however the drawing is cut up.
         if (IsText(options.Format)) return [WriteText(circuit, path, options)];
 
+        if (options.Content == ExportContent.Protoboard)
+        {
+            WriteProtoboard(circuit, path, options);
+            return [path];
+        }
+
         if (options.AllSheets && circuit.Sheets.Count > 1) return EverySheet(circuit, scope, path, options);
 
         var wantsTraces = options.Content is ExportContent.Traces or ExportContent.Both;
@@ -647,6 +656,40 @@ public static class CircuitExporter
                 }
             }
         });
+    }
+
+    /// <summary>
+    /// The protoboard view as a picture: the boards, the parts and wires on them, and the bench. Drawn by the renderer the
+    /// view uses, on a pale bench mat so the white boards stand out in either theme.
+    /// </summary>
+    public static Cirq.Components.Protoboard.ProtoboardLayout WriteProtoboard(Circuit circuit, string path, ExportOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(circuit);
+        var layout = Cirq.Components.Protoboard.ProtoboardLayout.Arrange(circuit);
+        if (layout.Parts.Count == 0 && layout.Bench.Count == 0)
+            throw new InvalidOperationException("There is nothing on the schematic to build on a board.");
+
+        var (left, top, right, bottom) = layout.Extent;
+        var unit = ProtoboardRenderer.Unit;
+        var margin = 2.0 * unit;
+        var width = ((right - left) * unit) + (2 * margin);
+        var height = ((bottom - top) * unit) + (2 * margin);
+        var mat = options.TransparentBackground ? options : options with { TransparentBackground = true };
+
+        Write(path, width, height, mat, canvas =>
+        {
+            if (!options.TransparentBackground)
+            {
+                using var paint = new SKPaint { Color = new SKColor(0xDE, 0xE3, 0xE7), Style = SKPaintStyle.Fill };
+                canvas.DrawRect(new SKRect(0, 0, (float)width, (float)height), paint);
+            }
+
+            using (Translate(canvas, (float)(margin - (left * unit)), (float)(margin - (top * unit))))
+            using (var drawing = new SkiaSymbolCanvas(canvas))
+                ProtoboardRenderer.Draw(drawing, layout);
+        });
+
+        return layout;
     }
 
     /// <summary>The schematic and the traces as two pages of one document.</summary>

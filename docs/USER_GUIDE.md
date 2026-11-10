@@ -49,22 +49,23 @@ the [README](../README.md), and what changed between releases is in the
 37. [Sheets](#sheets)
 38. [What is this circuit?](#what-is-this-circuit)
 39. [Checking the circuit](#checking-the-circuit)
-40. [Development boards](#development-boards)
-41. [A 6502 computer](#a-6502-computer)
-42. [A 68000 computer](#a-68000-computer)
-43. [A 6809 computer](#a-6809-computer)
-44. [A Z80 computer](#a-z80-computer)
-45. [An 8085 computer](#an-8085-computer)
-46. [Saving and loading](#saving-and-loading)
-47. [Printing](#printing)
-48. [Exporting](#exporting)
-49. [The command line](#the-command-line)
-50. [AI: the chat and agents](#ai-the-chat-and-agents)
-51. [Appearance](#appearance)
-52. [What version is this](#what-version-is-this)
-53. [Closing a dialog](#closing-a-dialog)
-54. [Keyboard reference](#keyboard-reference)
-55. [When a circuit will not simulate](#when-a-circuit-will-not-simulate)
+40. [The protoboard](#the-protoboard)
+41. [Development boards](#development-boards)
+42. [A 6502 computer](#a-6502-computer)
+43. [A 68000 computer](#a-68000-computer)
+44. [A 6809 computer](#a-6809-computer)
+45. [A Z80 computer](#a-z80-computer)
+46. [An 8085 computer](#an-8085-computer)
+47. [Saving and loading](#saving-and-loading)
+48. [Printing](#printing)
+49. [Exporting](#exporting)
+50. [The command line](#the-command-line)
+51. [AI: the chat and agents](#ai-the-chat-and-agents)
+52. [Appearance](#appearance)
+53. [What version is this](#what-version-is-this)
+54. [Closing a dialog](#closing-a-dialog)
+55. [Keyboard reference](#keyboard-reference)
+56. [When a circuit will not simulate](#when-a-circuit-will-not-simulate)
 
 This guide is also attached to every [release](../../releases) as a PDF, with a contents page and
 the screenshots in place — the same document, laid out for reading away from the machine. Build it
@@ -149,6 +150,7 @@ each row links to the section that explains it.
 | Does it still meet spec **at 85 °C** | [Requirements over a range](#requirements) — every requirement at every temperature | `Ctrl` `Shift` `F4` |
 | Can I write the behaviour as a **formula** | [A source that is a formula](#a-source-that-is-a-formula) — `= 2.5 * tanh(a)`, solved like any other device | — |
 | Can I check a circuit **without opening it** | [The command line](#the-command-line) — `cirq check` exits non-zero when a requirement is not met | — |
+| What would it look like **built on a breadboard** | [The protoboard](#the-protoboard) — the same circuit on white boards, chips across the channel, jumpers and all | `F11` |
 | How do I get this onto a **board** | [Taking it to a board](#taking-it-to-a-board) — a KiCad netlist, from the netlist that was simulated | `Ctrl` `E` |
 | **What value** gives me this answer | [Solve](#working-it-backwards), in the DC sweep window | `Shift` `F7` |
 
@@ -5571,6 +5573,74 @@ Running it on a working circuit should produce nothing at all, and does.
 
 ---
 
+## The protoboard
+
+`View > Protoboard`, `F11`, or the **Protoboard** button at the top right of the canvas shows the
+circuit built on white solderless breadboards, as you would build it on the bench. `F11` again, or
+**Schematic**, goes back. They are one circuit seen two ways: you add parts and wire them on the
+schematic, and the board is laid out from it, so anything you change on the schematic is on the
+board the next time you look.
+
+![The LED chaser built on a breadboard: a 5 V bench supply and a 6 Hz clock on the bench at the left, their leads into the board's rails and a strip, a 4017 straddling the centre channel, ten resistors with their colour bands and ten coloured LEDs in the strips around it, and black, red and coloured jumper wires joining the strips](images/64-protoboard.png)
+
+### How it is laid out
+
+The board is a full-size one: 63 columns of two five-hole strips either side of a channel 0.3 inch
+wide, with a + and a − rail along each edge (the rails run the whole length). A circuit that needs
+more room gets a second board, and a third, stacked below and jumpered rail to rail.
+
+- **Chips** straddle the channel with pin 1 at the bottom left and the notch to the left, left to
+  right in the order they read on the schematic. A 24-pin or bigger package is the 0.6 inch kind and
+  sits wider; a 68000 is 0.9 inch.
+- **Ground** goes on both − rails, and the **supply** (the net a DC source or battery holds above
+  ground) on the + rails, labelled with its voltage at the left end. A second supply, a −12 V say,
+  takes the bottom + rail.
+- **Resistors, capacitors, diodes and LEDs** go beside the pins they join, reusing a strip that
+  already carries their net where one is close, and lie flat across a few holes or stand in
+  neighbouring ones as the real parts do. Resistors carry their real colour bands (beige for 5 %,
+  blue for 1 %), ceramics their three-digit code, a diode its band at the cathode, an electrolytic
+  its stripe on the − side, an LED its flat on the cathode side.
+- **Transistors, regulators, trimmers** stand in a row of neighbouring holes, in the pin order
+  of their usual package: a 2N3904 reads E, B, C from the flat face, a BC547 C, B, E, a 7805
+  IN, GND, OUT. Check the datasheet for the one in your hand; makers do differ.
+- **Modules** the library knows only by their pins (a sensor, a level shifter, a logic gate drawn
+  on its own) stand on a row of header pins, labelled.
+- **Supplies, generators, dev boards, motors, speakers and displays** sit on the bench to the left,
+  their leads plugged into the board.
+- **Jumper wires** join each net's strips, cut to length and lying nearly flat: black for ground,
+  red for the supply, orange for a second supply, and a colour of its own for each other net, the
+  same colour wherever that net goes.
+
+The view checks itself. It works out what is connected to what from the board alone, from the
+strips, the wires and the leads, and holds that against the schematic's netlist, and the status bar
+says whether **the board matches the schematic**. It always should; if a part could not be placed
+it says which.
+
+While the circuit runs, the LEDs on the board light, seven-segment displays show their digits, a
+lamp glows and a character LCD on the bench shows its lines. Double-click a switch or a push
+button on the board and it works, as on the schematic.
+
+### Moving things by hand
+
+Drag a part to move it. Drag one lead of a resistor, capacitor, diode or LED on its own, to lay it
+across more holes or stand it up. Drag the end of a jumper wire along its strip to tidy it. A chip
+moves along the channel; the bench equipment moves anywhere. Each move is one undo step.
+
+Moving one part leaves everything else where it is, and the jumper wires are worked out again for
+the new places. A move that would put a pin in a hole that is taken, or in a strip that carries
+another net (which would join the two), is refused, and the status bar says why. Hover over any hole
+and its strip lights up, with what is on it: `e12: column 12 a–e, on +5V: U1.VCC, R2.A`.
+
+Where you put things is saved in the `.cirq` file; a board nobody has arranged adds nothing to it.
+Right-click a part for **Let the Layout Place** it again, or use **View > Arrange the Board
+Automatically** to forget every hand-made place and lay the board out afresh.
+
+To keep a picture of it, `File > Export...` has **Protoboard** under *What to export* (PNG, JPEG,
+BMP, SVG or PDF). Claude can look at the board and move parts on it too, with `render_protoboard`
+and `arrange_protoboard` (see [AI: the chat and agents](#ai-the-chat-and-agents)).
+
+---
+
 ## Development boards
 
 A Raspberry Pi or Arduino can sit on the schematic as either the **source** of signals or the
@@ -9082,7 +9152,8 @@ decides whether you get all of them or the one you are looking at.
 
 **What to export** — the schematic, the oscilloscope traces, or both. Traces are only offered when
 there is something on the scope; exporting an empty plot is a worse answer than being told there is
-nothing there.
+nothing there. **Protoboard** writes the circuit as the [protoboard view](#the-protoboard) draws it,
+built on breadboards.
 
 **How, when you asked for both** — one file with the schematic above the traces, or a file each
 *plus* a combined PDF holding the schematic on page one and the scope on page two. The second is
@@ -9405,6 +9476,7 @@ it is told to.
 | Find parts | `list_parts`, `describe_part` (pins and settings), `list_examples`, `load_example` |
 | Build | `add_parts`, `set_part`, `remove_parts`, `connect`, `disconnect`, `add_probe`, `remove_probe`, `set_parameter`, `set_conditions` |
 | Check | `get_circuit`, `get_part`, `check_circuit`, `explain_circuit`, `render_schematic`, `get_spice_netlist` |
+| The protoboard | `render_protoboard` (the board as a picture, with every part's holes), `arrange_protoboard` (move parts or leads to holes by name, `e12`, `T+5`; or lay it out afresh) |
 | Run | `operating_point`, `run_transient`, `ac_sweep`, `dc_sweep`, `get_trace` |
 | Memories and processors | `load_memory` (an image as Intel HEX, S-records, hex bytes, base64 or a file, all its bytes or one lane of a 68000's pair), `read_memory`, `cpu_state` (registers, flags, recent bus cycles, a 6510's port; a 68000's D0-D7, A0-A7, USP, SSP, SR and wait states; a 6809's; a Z80's main and alternate registers, IX, IY, I, R, IFF1 and IFF2 and its mode; an 8085's registers, flags with V and K, interrupt enable, masks and latches, SID and SOD), `disassemble` (6502, 6809, Z80 or 8085 code, or 68000 code across a ROM pair), `sid_state` (a SID's voices, envelopes, filter and volume), `peripheral_state` (a 6821's, 6850's, 68681's, 68230's or 68901's registers, channels and timers, a Z80 PIO's, CTC's, SIO's or DART's, with what is pending and under service in the daisy chain, and an 8155's or 8156's, 8255A's, 8251A's, 8253's or 8254's, or 8259A's) |
 | The editor | `transport` (Run, Pause, Reset), `set_scope`, `undo`, `redo` |
@@ -9503,6 +9575,7 @@ Also available in the app at **Help > Keyboard Shortcuts**.
 | Scope layout > Xy | Plot one trace against another instead of against time |
 | `Ctrl` `F` | Find a part — type into the palette's search box, Enter arms the first match |
 | `Ctrl` `Z` / `Ctrl` `Y` | Undo / redo (`Ctrl` `Shift` `Z` redoes as well) |
+| `F11` | The protoboard — the circuit built on breadboards — and back to the schematic |
 | `F12` | The AI Chat — ask Claude to build, wire, probe and run circuits in this window |
 | `Delete` | Delete selection |
 | `Ctrl` `+` / `Ctrl` `-` | Zoom in / out (the numeric keypad's `+` and `-` work too) |

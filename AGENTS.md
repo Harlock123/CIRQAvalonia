@@ -68,6 +68,14 @@ dotnet run --project src/Cirq.UI -- --mcp      # the MCP server on stdio, headle
     multiplexed bus with their own latch), and on `IntelPeripheral` (the demultiplexed bus they
     share) `Ppi8255`, `Usart8251` (on `SerialLine`), `Pit8253.cs` (`IntervalTimer`, the `Pit8253`
     and `Pit8254` parts) and `Pic8259`.
+  - `Protoboard/` is the protoboard view's model, with no UI: `Breadboard` (the 830-hole geometry, strips and
+    hole names such as `e12` and `T+5`), `BoardPackages` (how each part is built: a DIP by its pin numbers or a
+    named-pin table, a TO-92 or TO-220 in its datasheet's leg order, two leads, a header module, or bench
+    equipment), `ProtoboardLayout` (the automatic layout from the netlist, honouring `Circuit.Board`'s hand-made
+    places first, and the check that rebuilds the connections from the board alone and holds them against the
+    netlist) and `ProtoboardEdits` (moves by hand, each freezing the rest of the board). The view is
+    `Controls/ProtoboardCanvas.cs`, drawn by `Rendering/ProtoboardRenderer.cs` through `ISymbolCanvas`, so the
+    export is the same drawing.
   - `Serialization/` reads and writes `.cirq` files (indented JSON).
   - `Spice/` imports and exports SPICE models and netlists.
 - `src/Cirq.UI/`: the Avalonia editor.
@@ -254,6 +262,11 @@ dotnet run --project src/Cirq.UI -- --mcp      # the MCP server on stdio, headle
   the CIA and the SID) has the state its copy ended in written back after an agent's `run_transient`.
 - **Logic speed.** The simulator reuses an LU factorisation while the stamped matrix is unchanged, so a
   part must stamp through `MnaSystem.Add` (never write `Matrix` directly) or the reuse check misses it.
+- **The board is drawn from the netlist.** The protoboard is never a second description of the circuit: it is
+  laid out from `Circuit.BuildNetlist()` every time, and only hand-made places (`Circuit.Board`, saved as the
+  file's `Protoboard` record) are kept. A new part gets a package from `BoardPackages` by itself; add a table
+  entry only when its usual package has a pinout the generic rules would get wrong. Every example must lay out
+  with `ProtoboardLayout.Matches` true (`Every_example_builds_on_the_board_and_the_board_matches_its_schematic`).
 - **No real Anthropic API in tests.** The chat tests answer from `FakeClaude` (an `HttpMessageHandler` replaying
   scripted streams) with a made-up key; window tests point the settings and the key file at a temp folder. The key
   is only ever shown masked.

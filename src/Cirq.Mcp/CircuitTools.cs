@@ -485,6 +485,77 @@ public sealed partial class CircuitTools(ICircuitHost host)
         return new CallToolResult { Content = [ImageContentBlock.FromBytes(png, "image/png"), new TextContentBlock { Text = about }] };
     }
 
+    [McpServerTool(Name = "render_protoboard", ReadOnly = true, Idempotent = true)]
+    [Description("A picture of the circuit built on white solderless breadboards (the editor's protoboard view, F11), with the text of where everything is: each part's pins by hole (rows a-e and f-j either side of the centre channel, columns 1 to 63, the rails T+ T- B- B+; 2:e12 is on the second board), the jumper wires, the supplies and instruments on the bench with their leads, and whether the board matches the schematic. The board is laid out automatically from the schematic: chips across the channel, parts beside the pins they join, ground on the - rails and the supply on the + rails; parts moved with arrange_protoboard stay where they were put.")]
+    public async Task<CallToolResult> RenderProtoboard(
+        [Description("Pixels per board pitch (0.1 inch), from 4 to 40. Default 14.")] double scale = 14,
+        CancellationToken cancel = default)
+    {
+        if (scale is < 4 or > 40 || !double.IsFinite(scale)) throw new McpException("scale must be from 4 to 40.");
+        var (png, about) = await Run("drew the protoboard", s =>
+        {
+            if (s.Circuit.Components.Count == 0) throw new InvalidOperationException("The circuit is empty: there's nothing to build yet.");
+            var layout = Cirq.Components.Protoboard.ProtoboardLayout.Arrange(s.Circuit);
+            return (host.Library.BoardPicture(s.Circuit, scale / 10.0), layout.Describe());
+        }, cancel).ConfigureAwait(false);
+        return new CallToolResult { Content = [ImageContentBlock.FromBytes(png, "image/png"), new TextContentBlock { Text = about }] };
+    }
+
+    /// <summary>One move for arrange_protoboard.</summary>
+    public sealed class BoardMove
+    {
+        [Description("The part's designator, e.g. \"R1\".")]
+        public string Part { get; set; } = "";
+
+        [Description("The hole to move it to, as the board prints it: \"e12\", \"a30\", a rail as \"T+5\" or \"B-40\", \"2:f10\" on the second board.")]
+        public string To { get; set; } = "";
+
+        [Description("Which pin goes in that hole, e.g. \"B\" or \"VCC\". For a resistor, capacitor, diode or LED only that lead moves; for anything else the whole part moves so that pin lands there. Optional: the first pin (pin 1 of a chip).")]
+        public string? Pin { get; set; }
+    }
+
+    [McpServerTool(Name = "arrange_protoboard", Destructive = true)]
+    [Description("Moves parts on the protoboard by hand, in one undo step; everything else stays where it is and the jumper wires are worked out again. A move is refused, with the reason, if a pin would go in a hole that's taken or a strip carrying another net (that would join the two). reset lays the whole board out automatically again. Returns where everything now is, as render_protoboard's text does. It changes only the board, never the circuit.")]
+    public Task<string> ArrangeProtoboard(
+        [Description("The moves, in order, e.g. [{\"part\": \"U1\", \"to\": \"f20\"}, {\"part\": \"R1\", \"to\": \"a14\", \"pin\": \"B\"}]. Optional.")] BoardMove[]? moves = null,
+        [Description("Parts to hand back to the automatic layout, e.g. [\"R3\"]. Optional.")] string[]? release = null,
+        [Description("Forget every place made by hand first, so the board is laid out afresh.")] bool reset = false,
+        CancellationToken cancel = default) =>
+        Edit("Arrange the protoboard", s =>
+        {
+            if (!reset && (moves is null || moves.Length == 0) && (release is null || release.Length == 0))
+                throw new ArgumentException("Give moves, release or reset: there's nothing to do.");
+            if (reset) s.Circuit.Board.Clear();
+
+            foreach (var name in release ?? [])
+            {
+                var part = Pins.Part(s.Circuit, name);
+                var edit = Cirq.Components.Protoboard.ProtoboardEdits.Release(s.Circuit, Cirq.Components.Protoboard.ProtoboardLayout.Arrange(s.Circuit), part);
+                s.Circuit.Board.CopyFrom(edit.Arrangement!);
+            }
+
+            foreach (var move in moves ?? [])
+            {
+                var part = Pins.Part(s.Circuit, move.Part);
+                var layout = Cirq.Components.Protoboard.ProtoboardLayout.Arrange(s.Circuit);
+                var to = Cirq.Components.Protoboard.Breadboard.Parse(move.To)
+                    ?? throw new ArgumentException($"\"{move.To}\" isn't a hole. Holes are named as the board prints them: a row a to j and a column 1 to 63 (e12), a rail T+, T-, B- or B+ with its column (T+5), and 2: in front for the second board.");
+                if (layout.FindOnBench(part) is not null)
+                    throw new ArgumentException($"{part.Name} is equipment on the bench beside the board, joined by leads; it doesn't go in holes.");
+                var placed = layout.Find(part) ?? throw new InvalidOperationException($"{part.Name} isn't on the board (there was no room for it).");
+                var pin = string.IsNullOrWhiteSpace(move.Pin) ? null : part.TerminalByName(move.Pin.Trim());
+                var edit = pin is not null && placed.Package.Form == Cirq.Components.Protoboard.BoardForm.TwoLead
+                    ? Cirq.Components.Protoboard.ProtoboardEdits.MoveLead(s.Circuit, layout, part, pin, to)
+                    : Cirq.Components.Protoboard.ProtoboardEdits.MovePart(s.Circuit, layout, part,
+                        (pin is null ? null : placed.HoleOf(pin)) ?? placed.Holes[0], to);
+                if (!edit.Succeeded) throw new InvalidOperationException($"Couldn't move {part.Name} to {move.To}: {edit.Problem}");
+                s.Circuit.Board.CopyFrom(edit.Arrangement!);
+            }
+
+            var now = Cirq.Components.Protoboard.ProtoboardLayout.Arrange(s.Circuit);
+            return new JsonObject { ["board"] = now.Describe(), ["matches"] = now.Matches };
+        }, cancel);
+
     [McpServerTool(Name = "get_spice_netlist", ReadOnly = true)]
     [Description("The circuit as a SPICE deck (the editor's File › Export › SPICE netlist), to read or to hand to another simulator; with a path it's also written to a .cir file in the working folder. Parts SPICE has no model for are listed as skipped.")]
     public Task<string> GetSpiceNetlist(

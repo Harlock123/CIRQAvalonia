@@ -17,6 +17,7 @@ public partial class MainWindow : Window
 {
     private readonly DispatcherTimer _repaintTimer;
     private CircuitCanvas? _canvas;
+    private ProtoboardCanvas? _board;
     private MainWindowViewModel? _viewModel;
 
     public MainWindow()
@@ -43,6 +44,7 @@ public partial class MainWindow : Window
 
         _viewModel = viewModel;
         _canvas = this.FindControl<CircuitCanvas>("Canvas");
+        _board = this.FindControl<ProtoboardCanvas>("Board");
 
         // The view model asks for files through this rather than reaching for a window itself.
         viewModel.FileDialogs = new StorageProviderFileDialogs(this);
@@ -53,9 +55,22 @@ public partial class MainWindow : Window
         WireUpCanvas(viewModel);
         WireUpMenu(viewModel);
 
-        viewModel.RequestRedraw += (_, _) => Dispatcher.UIThread.Post(() => _canvas?.InvalidateVisual());
-        viewModel.RequestZoomToFit += (_, _) => Dispatcher.UIThread.Post(() => _canvas?.RequestFit());
-        viewModel.RequestZoomBy += (_, factor) => Dispatcher.UIThread.Post(() => _canvas?.ZoomBy(factor));
+        viewModel.RequestRedraw += (_, _) => Dispatcher.UIThread.Post(() =>
+        {
+            _canvas?.InvalidateVisual();
+            _board?.InvalidateVisual();
+        });
+        viewModel.RequestZoomToFit += (_, _) => Dispatcher.UIThread.Post(() =>
+        {
+            if (viewModel.IsProtoboardView) _board?.RequestFit();
+            else _canvas?.RequestFit();
+        });
+        viewModel.RequestZoomBy += (_, factor) => Dispatcher.UIThread.Post(() =>
+        {
+            if (viewModel.IsProtoboardView) _board?.ZoomBy(factor);
+            else _canvas?.ZoomBy(factor);
+        });
+        WireUpBoard(viewModel);
 
         // Posted rather than called straight: Ctrl+F may have just opened the palette, and the
         // box cannot take focus until the layout that reveals it has run.
@@ -138,6 +153,35 @@ public partial class MainWindow : Window
         }
     }
 
+    /// <summary>The protoboard view: its moves are undo steps like the schematic's, and it says what's under the pointer.</summary>
+    private void WireUpBoard(MainWindowViewModel viewModel)
+    {
+        if (_board is null) return;
+
+        _board.StatusChanged += (_, message) => viewModel.StatusMessage = message;
+        _board.InteractiveEditBegan += (_, label) => viewModel.BeginInteractiveEdit(label);
+        _board.InteractiveEditEnded += (_, _) => viewModel.EndInteractiveEdit();
+        _board.BoardEdited += (_, _) => viewModel.MarkModified();
+        viewModel.RequestArrangeProtoboard += (_, _) => _board.ArrangeAutomatically();
+        viewModel.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName != nameof(MainWindowViewModel.IsProtoboardView)) return;
+            Dispatcher.UIThread.Post(() =>
+            {
+                if (viewModel.IsProtoboardView)
+                {
+                    _board.RequestFit();
+                    _board.Focus();
+                    if (_board.Layout is { } layout) viewModel.StatusMessage = ProtoboardCanvas.Summary(layout);
+                }
+                else
+                {
+                    _canvas?.Focus();
+                }
+            });
+        };
+    }
+
     private void WireUpCanvas(MainWindowViewModel viewModel)
     {
         if (_canvas is null) return;
@@ -205,6 +249,7 @@ public partial class MainWindow : Window
         {
             Rendering.CanvasTheme.Invalidate();
             _canvas?.InvalidateVisual();
+            _board?.InvalidateVisual();
         });
 
         // Reflect the controller's starting speed in the Simulate menu.
@@ -805,6 +850,7 @@ public partial class MainWindow : Window
         }
 
         _canvas?.InvalidateVisual();
+        if (_board is { IsVisible: true }) _board.InvalidateVisual();
 
         // The parts can be worked from the canvas too — double-clicking a switch still flips it —
         // so the panel follows the components rather than assuming it is the only thing moving them.
@@ -939,6 +985,12 @@ public partial class MainWindow : Window
                     return;
                 case Key.F10:
                     _viewModel?.ToggleInspectorCommand.Execute(null);
+                    e.Handled = true;
+                    return;
+
+                // The protoboard view, in place of the schematic.
+                case Key.F11:
+                    _viewModel?.ToggleProtoboardCommand.Execute(null);
                     e.Handled = true;
                     return;
 

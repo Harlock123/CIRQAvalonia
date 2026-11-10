@@ -112,6 +112,13 @@
       </MenuItem>
 
       <MenuItem Header="_View">
+        <MenuItem Header="Sc_hematic" ToggleType="Radio" IsChecked="{Binding IsSchematicView, Mode=TwoWay}"
+                  ToolTip.Tip="The circuit drawn as a schematic, where it is built and wired" />
+        <MenuItem Header="Proto_board" InputGesture="F11" ToggleType="Radio" IsChecked="{Binding IsProtoboardView, Mode=TwoWay}"
+                  ToolTip.Tip="The same circuit built on white breadboards, with its jumper wires and the bench equipment beside it" />
+        <MenuItem Header="Arrange the Board Automatically" Command="{Binding ArrangeProtoboardCommand}"
+                  ToolTip.Tip="Lay the protoboard out afresh, forgetting where parts were moved by hand" />
+        <Separator />
         <MenuItem Header="Zoom _In" InputGesture="Ctrl+OemPlus" Command="{Binding ZoomInCommand}" />
         <MenuItem Header="Zoom _Out" InputGesture="Ctrl+OemMinus" Command="{Binding ZoomOutCommand}" />
         <MenuItem Header="Zoom to _Fit" InputGesture="F" Command="{Binding ZoomToFitCommand}" />
@@ -420,7 +427,28 @@
                                 ShowCurrentFlow="{Binding ShowCurrentFlow}"
                                 ShowLiveValues="{Binding ShowLiveValues}"
                                 SnapToGrid="{Binding SnapToGrid}"
-                                GridSize="{Binding GridSize}" />
+                                GridSize="{Binding GridSize}"
+                                IsVisible="{Binding !IsProtoboardView}" />
+
+        <controls:ProtoboardCanvas Grid.Row="1" Name="Board"
+                                   Circuit="{Binding Circuit}"
+                                   SelectedComponent="{Binding SelectedComponent, Mode=TwoWay}"
+                                   IsVisible="{Binding IsProtoboardView}" />
+
+        <!-- Schematic or protoboard: the same circuit, two ways of looking at it. Buttons rather than toggles,
+             so pressing the one already showing leaves it showing. -->
+        <Border Grid.Row="1" Margin="0,8,10,0" HorizontalAlignment="Right" VerticalAlignment="Top"
+                Background="{DynamicResource PanelBackground}" BorderBrush="{DynamicResource PanelBorder}"
+                BorderThickness="1" CornerRadius="5" Padding="2">
+          <StackPanel Orientation="Horizontal" Spacing="2">
+            <Button Name="SchematicViewButton" Classes="sheet" Classes.current="{Binding IsSchematicView}" Content="Schematic"
+                    CornerRadius="4" FontSize="11" Padding="10,3" Command="{Binding ShowSchematicCommand}"
+                    AutomationProperties.Name="Show the schematic" ToolTip.Tip="The circuit as a schematic (F11 switches)" />
+            <Button Name="ProtoboardViewButton" Classes="sheet" Classes.current="{Binding IsProtoboardView}" Content="Protoboard"
+                    CornerRadius="4" FontSize="11" Padding="10,3" Command="{Binding ShowProtoboardCommand}"
+                    AutomationProperties.Name="Show the protoboard" ToolTip.Tip="The circuit built on breadboards (F11 switches)" />
+          </StackPanel>
+        </Border>
 
         <GridSplitter Grid.Row="2" Background="{DynamicResource SplitterBackground}" />
 
