@@ -567,8 +567,8 @@ public class SevenSegmentTests
     [Fact]
     public void EveryPaletteColourIsDistinctAndLights()
     {
-        Assert.Equal(6, Led.Colours.Count);
-        Assert.Equal(6, Led.Colours.Select(c => c.Name).Distinct().Count());
+        Assert.Equal(7, Led.Colours.Count);
+        Assert.Equal(7, Led.Colours.Select(c => c.Name).Distinct().Count());
 
         foreach (var (name, _, _) in Led.Colours)
         {

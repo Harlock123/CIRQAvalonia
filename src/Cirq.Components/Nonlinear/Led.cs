@@ -45,6 +45,7 @@ public partial class Led : Diode, ICurrentRated
         ("Green", DiodeModel.LedGreen, "#2ECC40"),
         ("Blue", DiodeModel.LedBlue, "#3D9BFF"),
         ("White", DiodeModel.LedWhite, "#F2F6FF"),
+        ("Infrared", DiodeModel.LedInfrared, "#8B2E5A"),
     ];
 
     /// <summary>Builds an LED of a named colour from <see cref="Colours"/>.</summary>

@@ -21,7 +21,7 @@ namespace Cirq.UI.Rendering;
 /// the component's placement point. The caller supplies the world transform, so symbols never
 /// need to know about pan, zoom or rotation.
 /// </summary>
-public static class SymbolRenderer
+public static partial class SymbolRenderer
 {
     /// <summary>
     /// True while a part turned more than a quarter and less than three quarters is being drawn,
@@ -57,6 +57,13 @@ public static class SymbolRenderer
         switch (component)
         {
             case Resistor: DrawResistor(context, pen); break;
+            case var module when IsModule(module): DrawModule(context, pen, zoom, module); break;
+            case MultiLed multi: DrawMultiLed(context, pen, zoom, multi); break;
+            case var dip when NamedDip(dip) is { } package: DrawNamedDip(context, pen, zoom, dip, package.Pins, package.Name); break;
+            case Ds3231 rtc: DrawPackage(context, pen, zoom, rtc, "DS3231"); break;
+            case Mpu6050 imu: DrawPackage(context, pen, zoom, imu, "MPU-6050"); break;
+            case NixieTube nixie: DrawNixie(context, pen, zoom, nixie); break;
+            case Triode valve: DrawTriode(context, pen, valve); break;
             case Speaker speaker: DrawSpeaker(context, pen, zoom, speaker); break;
             case Crystal: DrawCrystal(context, pen); break;
             case CharacterLcd lcd: DrawCharacterLcd(context, pen, zoom, lcd); break;
@@ -2973,6 +2980,7 @@ public static class SymbolRenderer
     /// </summary>
     public static double LabelOffset(CircuitComponent component) => component switch
     {
+        var module when IsModule(module) => ModuleLabelOffset(module),
         DeveloperBoard board => BoardPackage.BodyHeight(board.Profile) / 2 + 16,
         Cirq.Components.Processors.ArduinoUnoFirmware => BoardPackage.BodyHeight(BoardProfile.ArduinoUno) / 2 + 16,
 
@@ -3028,6 +3036,9 @@ public static class SymbolRenderer
 
         // Eleven pins reaching 52 either side of centre.
         LevelShifter => 84.0,
+        NixieTube => 74.0,
+        var dip when NamedDip(dip) is { } package => DipPackage.BodyHeight(package.Pins) / 2 + 16,
+        Triode => 50.0,
         OscillatorModule => 44.0,
         Ne555 => DipPackage.BodyHeight(8) / 2 + 16,
 

@@ -52,6 +52,7 @@ public static partial class Examples
             new("MOSFET Driver", "Logic-level MOSFET switching an inductive load", LoadMosfetDriver),
             new("Lamp Inrush", "A 12 V bulb switched on cold draws ten times its running current — open SW1, let it cool, close it again",
                 LoadLampInrush),
+            new("RGB LED Mixing", "Three resistors set the mix of an RGB LED's red, green and blue; a square wave swaps a bicolour LED between its two", LoadRgbLedMixing),
         ]),
 
         new("Analog",
@@ -178,6 +179,9 @@ public static partial class Examples
                 LoadPhaseLockedLoop),
             new("Pulse Stretcher", "A 4538 one-shot turning short triggers into 1 ms pulses — and a burst into one long one, because it retriggers",
                 LoadPulseStretcher),
+            new("XR2206 Generator", "A function generator chip at 1/RC: a sine on STO and its square on SYNCO, at 1 kHz from 10 kΩ and 100 nF", LoadXr2206Generator),
+            new("NE567 Tone Decoder", "A PLL tone decoder set to 909 Hz — it lights the LED while the tone is at its frequency. Change the generator's frequency and watch it let go", LoadNe567ToneDecoder),
+            new("556 Tone Bursts", "Both halves of a 556: a 69 Hz astable gating a 6.9 kHz one through its RESET", LoadNe556Bursts),
         ]),
 
         new("Buses & Interfaces",
@@ -247,6 +251,8 @@ public static partial class Examples
                 LoadResistorBridge),
             new("High-Side Sensing", "Millivolts across a shunt at the top of a 24 V rail, read differentially — and the power it costs",
                 LoadHighSideSensing),
+            new("IR Remote Frame", "A TSOP38238 putting out an NEC frame: the leader, then 32 bits as short and long spaces. Double-click it to press again", LoadIrRemoteFrame),
+            new("DDS Generator", "An AD9833 told 1 kHz over SPI: a 28-bit frequency word in two halves, then out of reset", LoadDdsGenerator),
         ]),
 
         new("Signal Integrity & RF",
@@ -267,6 +273,8 @@ public static partial class Examples
         [
             new("Audio Amplifier", "A microphone into an LM386 into a speaker, and the two capacitors that matter",
                 LoadAudioAmplifier),
+            new("Valve Preamp", "Half a 12AX7 on 250 V: a 100 mV signal comes out at about 6 V, inverted", LoadValvePreamp),
+            new("AY-3-8910 Tone", "An Arduino Uno writing the sound chip's registers over its bus — 440 Hz on channel A", LoadUnoAyTone),
         ]),
 
         new("Displays",
@@ -279,6 +287,11 @@ public static partial class Examples
                 LoadNeoPixelChaser),
             new("Serial Display", "Bytes into a 4094 over three wires, shown on eight LEDs only when strobed",
                 LoadSerialDisplay),
+            new("LED Bar Graph", "An LM3914 lighting a bar of ten LEDs up to the signal on its pot — turn it. Tie MODE low for a dot", LoadLedBarGraph),
+            new("Nixie Counter", "A 7490 counting in BCD, a 74141 sinking the digit's cathode, an IN-14 striking on 180 V", LoadNixieCounter),
+            new("OLED Display", "The I2C master sets up an SSD1306 and draws a frame and a word on its 128 × 64 pixels", LoadOledDisplay),
+            new("LED Matrix", "The SPI master writes a MAX7219's registers: on, scan limit, brightness, then a face a row at a time", LoadLedMatrix),
+            new("TM1637 Display", "12:34 on a four-digit TM1637 module, its two-wire bus — LSB first, not I2C — played by a pattern generator", LoadTm1637Display),
         ]),
 
         new("Development Boards",
@@ -297,6 +310,8 @@ public static partial class Examples
                 LoadUnoSpiCounter),
             new("Arduino Uno I2C EEPROM", "A Uno writing \"HI!\" to a 24LC256 over I2C, reading it back with a repeated START, and printing it on a serial terminal at 9600 baud",
                 LoadUnoI2cEeprom),
+            new("ATtiny85 Blink", "The eight-pin AVR blinking its LED twice a second from Timer0's overflow interrupt", LoadAttiny85Blink),
+            new("AT89C2051 Serial", "An 8051 saying hello at 9600 baud from its UART, then lighting its LED", LoadAt89c2051Hello),
         ]),
 
         new("Computers",

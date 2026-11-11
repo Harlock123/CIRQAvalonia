@@ -168,6 +168,7 @@ public static partial class BoardPackages
         ["Led"] = BoardLook.Led,
         ["Photodiode"] = BoardLook.Led,
         ["Phototransistor"] = BoardLook.Led,
+        ["BicolourLed"] = BoardLook.Led,
         ["Fuse"] = BoardLook.Fuse,
         ["ResettableFuse"] = BoardLook.Disc,
         ["PushButton"] = BoardLook.Button,
@@ -222,6 +223,18 @@ public static partial class BoardPackages
         ["IRLZ44N"] = (BoardLook.To220, ["g", "d", "s"]),
         ["IRF9540"] = (BoardLook.To220, ["g", "d", "s"]),
         ["IRG4BC30"] = (BoardLook.To220, ["g", "c", "e"]),
+        ["BC557"] = (BoardLook.To92, ["c", "b", "e"]),
+        ["BS170"] = (BoardLook.To92, ["d", "g", "s"]),
+        ["IRF540N"] = (BoardLook.To220, ["g", "d", "s"]),
+
+        // The TO-126 pair read E, C, B with the face towards you; the 2N3055's TO-3 has base and emitter pins and
+        // its case for the collector, wired here as a third leg.
+        ["BD139"] = (BoardLook.To220, ["e", "c", "b"]),
+        ["BD140"] = (BoardLook.To220, ["e", "c", "b"]),
+        ["2N3055"] = (BoardLook.To220, ["b", "e", "c"]),
+
+        // A 78L05 in TO-92 reads OUT, GND, IN: the other way round from a 7805.
+        ["78L05"] = (BoardLook.To92, ["out", "com", "in"]),
     };
 
     /// <summary>The board package for <paramref name="part"/>.</summary>
@@ -363,6 +376,7 @@ public static partial class BoardPackages
             "RotaryEncoder" => (BoardLook.Header, ["a", "com", "b"]),
             "HallSensor" => (BoardLook.To92, ["vcc", "gnd", "out"]),
             "Ds18b20" => (BoardLook.To92, ["gnd", "dq", "vdd"]),
+            "IrReceiver" => (BoardLook.To92, ["out", "gnd", "vs"]),
             _ => null,
         };
 
@@ -371,10 +385,11 @@ public static partial class BoardPackages
         return pins.All(p => p is not null) && pins.Distinct().Count() == 3 ? (legs.Look, pins) : null;
     }
 
-    /// <summary>A 78xx reads IN, GND, OUT; a 79xx GND, IN, OUT; an LM317 ADJ, OUT, IN; an LD1117 GND, OUT, IN.</summary>
+    /// <summary>A 78xx reads IN, GND, OUT; a 79xx GND, IN, OUT; an LM317 ADJ, OUT, IN; an LM337 ADJ, IN, OUT; an LD1117 GND, OUT, IN.</summary>
     private static string[] Regulator(string label) =>
         label.Contains("79", StringComparison.Ordinal) ? ["com", "in", "out"]
         : label.Contains("317", StringComparison.Ordinal) || label.Contains("1117", StringComparison.Ordinal) ? ["com", "out", "in"]
+        : label.Contains("337", StringComparison.Ordinal) ? ["com", "in", "out"]
         : ["in", "com", "out"];
 
     private static Terminal? Find(CircuitComponent part, string id) =>

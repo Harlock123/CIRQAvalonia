@@ -78,6 +78,9 @@ public sealed record DiodeModel(
     /// up here as a temperature coefficient a fifth of the size it should be.
     /// </para>
     /// </summary>
+    /// <summary>An infrared (940 nm) LED, as in a remote control: 1.2 V at 20 mA, light you can't see.</summary>
+    public static readonly DiodeModel LedInfrared = new("LED (IR)", 7e-16, 1.5, 1.0, 5.0, EnergyGap: 1.42);
+
     public static readonly DiodeModel LedBlue = new("LED (blue)", 2.5e-19, 3.0, 4.0, 5.0, EnergyGap: 4.07);
 
     /// <summary>White LED, essentially a blue die with phosphor, ~3.1 V.</summary>
@@ -101,7 +104,7 @@ public sealed record DiodeModel(
     private static readonly IReadOnlyList<DiodeModel> BuiltIn =
     [
         D1N4148, D1N4001, D1N5817,
-        LedRed, LedAmber, LedYellow, LedGreen, LedBlue, LedWhite,
+        LedRed, LedAmber, LedYellow, LedGreen, LedBlue, LedWhite, LedInfrared,
         Zener(3.3), Zener(5.1), Zener(9.1), Zener(12.0),
     ];
 

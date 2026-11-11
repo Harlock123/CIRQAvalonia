@@ -25,7 +25,7 @@ namespace Cirq.Components.Processors;
 /// on PD2 and PD3, /RESET on PC6 (pulled up). VCC, AVCC and AREF are read for the supply and the ADC's reference.
 /// </para>
 /// </summary>
-public partial class Atmega328p : DigitalIc, IBreakpointSource, IRunState
+public partial class Atmega328p : DigitalIc, IBreakpointSource, IRunState, IFirmwareChip
 {
     /// <summary>The internal pull-ups, between 20 and 50 kΩ on the datasheet.</summary>
     public const double PullUpResistance = 35e3;
@@ -37,10 +37,10 @@ public partial class Atmega328p : DigitalIc, IBreakpointSource, IRunState
     /// </summary>
     public static LogicLevels AvrLevels { get; } = LogicLevels.Cmos5V with { Name = "AVR 5V", Vih = 3.0, Vil = 1.5 };
 
-    private readonly AvrCore _core = new();
-    private readonly Terminal[] _gpio = new Terminal[20];
-    private readonly (int Port, int Bit)[] _map = new (int, int)[20];
-    private readonly Terminal[] _adc = new Terminal[6];
+    private readonly AvrCore _core;
+    private readonly Terminal[] _gpio;
+    private readonly (int Port, int Bit)[] _map;
+    private readonly Terminal[] _adc;
     private double _cpuTime;
     private LogicState[] _driving = new LogicState[20];
 
@@ -53,9 +53,28 @@ public partial class Atmega328p : DigitalIc, IBreakpointSource, IRunState
     }
 
     /// <summary>The chip, as a DIP-28, or (<paramref name="uno"/>) on an Arduino Uno's header.</summary>
-    protected Atmega328p(bool uno) : base(28)
+    protected Atmega328p(bool uno) : this(uno ? 1 : 0)
     {
-        if (uno)
+    }
+
+    /// <summary>The packages: 0 the ATmega328P's DIP-28, 1 an Arduino Uno's header, 2 an ATtiny85's DIP-8.</summary>
+    protected Atmega328p(int layout) : base(layout == 2 ? 8 : 28)
+    {
+        _core = new AvrCore { Tiny = layout == 2 };
+        var count = layout == 2 ? 5 : 20;
+        _gpio = new Terminal[count];
+        _map = new (int, int)[count];
+        _adc = new Terminal[layout == 2 ? 4 : 6];
+        _driving = new LogicState[count];
+        if (layout == 2)
+        {
+            Terminals = BuildTiny();
+            ConfigurePins([Reset, .. _gpio], [.. _gpio]);
+            _core.Reset();
+            return;
+        }
+
+        if (layout == 1)
         {
             Terminals = BuildUno();
             ConfigurePins([Reset, .. _gpio], [.. _gpio]);
@@ -183,6 +202,43 @@ public partial class Atmega328p : DigitalIc, IBreakpointSource, IRunState
         return all;
     }
 
+    /// <summary>The flash the part has: 32 KB, or the ATtiny85's 8 KB.</summary>
+    public int FlashBytes => _core.Tiny ? 8192 : AvrCore.FlashWords * 2;
+
+    /// <summary>
+    /// The ATtiny85's DIP-8: PB5 is RESET (pin 1, pulled up), PB3 and PB4 pins 2 and 3, GND 4, PB0-PB2 pins 5-7 and VCC 8.
+    /// ADC0-ADC3 are on PB5, PB2, PB4 and PB3, INT0 on PB2, Timer0's OC0A and OC0B on PB0 and PB1.
+    /// </summary>
+    private List<Terminal> BuildTiny()
+    {
+        PropagationDelay = 5e-9;
+        Levels = LogicLevels.Cmos5V;
+        ClockFrequency = 8e6;
+        var pins = new Terminal[9];
+        Terminal Pin(int number, string name, TerminalType type) =>
+            pins[number] = new Terminal($"p{number}", name, type, DipPackage.PinOffset(number, 8));
+        Reset = Pin(1, "PB5/RESET", TerminalType.Input);
+        var pb3 = Pin(2, "PB3", TerminalType.Bidirectional);
+        var pb4 = Pin(3, "PB4", TerminalType.Bidirectional);
+        Gnd = Pin(4, "GND", TerminalType.Ground);
+        var pb0 = Pin(5, "PB0", TerminalType.Bidirectional);
+        var pb1 = Pin(6, "PB1", TerminalType.Bidirectional);
+        var pb2 = Pin(7, "PB2", TerminalType.Bidirectional);
+        Vcc = Pin(8, "VCC", TerminalType.Power);
+        Terminal[] gpio = [pb0, pb1, pb2, pb3, pb4];
+        for (var i = 0; i < 5; i++)
+        {
+            _gpio[i] = gpio[i];
+            _map[i] = (0, i);
+        }
+
+        (_adc[0], _adc[1], _adc[2], _adc[3]) = (Reset, pb2, pb4, pb3);
+        Avcc = Vcc;
+        Aref = Vcc;
+        Gnd2 = Gnd;
+        return [.. pins.Skip(1)];
+    }
+
     /// <summary>Its rails, and its ground pins after the first, as sources: the Uno feeds the circuit round it.</summary>
     public override int VoltageSourceCount => base.VoltageSourceCount + _rails.Count + _grounds.Count;
 
@@ -254,7 +310,7 @@ public partial class Atmega328p : DigitalIc, IBreakpointSource, IRunState
     {
         ArgumentNullException.ThrowIfNull(image);
         if (image.ByteCount == 0) throw new InvalidDataException("The image has no bytes in it.");
-        if (image.Blocks.Any(b => b.Address + b.Bytes.Length > AvrCore.FlashWords * 2))
+        if (image.Blocks.Any(b => b.Address + b.Bytes.Length > FlashBytes))
             throw new InvalidDataException("The image is bigger than the 32 KB flash.");
         var hex = new System.Text.StringBuilder();
         foreach (var (address, bytes) in image.Blocks)
@@ -414,6 +470,7 @@ public partial class Atmega328p : DigitalIc, IBreakpointSource, IRunState
         _core.AvccVolts = context.NodeVoltage(Avcc) - ground;
         _core.ArefVolts = context.NodeVoltage(Aref) - ground;
         if (_core.AvccVolts < 0.5) _core.AvccVolts = context.NodeVoltage(Vcc) - ground;
+        if (_core.Tiny) _core.PinInputs[2] = (byte)(_core.PinInputs[0] & 0x04);   // INT0 is PB2 on the tiny
         _core.SampleEdges();
     }
 

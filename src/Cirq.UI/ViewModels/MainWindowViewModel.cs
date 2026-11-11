@@ -2702,7 +2702,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     {
         if (FileDialogs is null) return;
 
-        if (SelectedComponent is Cirq.Components.Processors.Atmega328p chip)
+        if (SelectedComponent is Cirq.Components.Processors.IFirmwareChip chip)
         {
             var firmware = await FileDialogs.PickMemoryImageAsync(chip.Name);
             if (firmware is null) return;
@@ -2726,7 +2726,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
         if (SelectedComponent is not ParallelMemory memory)
         {
-            StatusMessage = "Select a memory part first — a ROM, an EEPROM or a RAM, or an ATmega328P for its firmware. This loads a file into one.";
+            StatusMessage = "Select a memory part first — a ROM, an EEPROM or a RAM, or a microcontroller (an ATmega328P, ATtiny85 or AT89C2051) for its firmware. This loads a file into one.";
             return;
         }
 

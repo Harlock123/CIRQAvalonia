@@ -52,8 +52,15 @@ public sealed record BjtModel(
     public static readonly BjtModel Bc557 = new("BC557", BjtPolarity.Pnp, 1.0e-14, 200, 5, 60);
     public static readonly BjtModel Tip32C = new("TIP32C", BjtPolarity.Pnp, 1.0e-13, 100, 2, 100);
 
+    /// <summary>Medium-power complementary pair in TO-126, a favourite for driver and output stages.</summary>
+    public static readonly BjtModel Bd139 = new("BD139", BjtPolarity.Npn, 5.0e-14, 150, 3, 100);
+    public static readonly BjtModel Bd140 = new("BD140", BjtPolarity.Pnp, 5.0e-14, 150, 3, 100);
+
+    /// <summary>The TO-3 power classic: big, slow, low gain, 15 A.</summary>
+    public static readonly BjtModel N2N3055 = new("2N3055", BjtPolarity.Npn, 9.7e-12, 50, 1, 100);
+
     private static readonly IReadOnlyList<BjtModel> BuiltIn =
-        [N2N3904, N2N2222, Bc547, Tip31C, P2N3906, Bc557, Tip32C];
+        [N2N3904, N2N2222, Bc547, Tip31C, P2N3906, Bc557, Tip32C, Bd139, Bd140, N2N3055];
 
     /// <summary>Models brought in from SPICE cards, which shadow a built-in of the same name.</summary>
     private static readonly List<BjtModel> ImportedModels = [];

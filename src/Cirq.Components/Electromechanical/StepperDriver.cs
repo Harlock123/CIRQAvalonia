@@ -46,7 +46,7 @@ namespace Cirq.Components.Electromechanical;
 /// unconnected.
 /// </para>
 /// </summary>
-public sealed partial class StepperDriver : DigitalComponent, IBreakpointSource
+public partial class StepperDriver : DigitalComponent, IBreakpointSource
 {
     /// <summary>The two windings, each driven by an H-bridge.</summary>
     private const int Windings = 2;
@@ -73,8 +73,14 @@ public sealed partial class StepperDriver : DigitalComponent, IBreakpointSource
     private LogicState _lastStep = LogicState.Low;
     private int _microstep;
 
-    public StepperDriver()
+    public StepperDriver() : this(drv8825: false)
     {
+    }
+
+    /// <summary>The A4988, or (<paramref name="drv8825"/>) the DRV8825, whose mode pins are M0-M2 and which steps down to 1/32.</summary>
+    protected StepperDriver(bool drv8825)
+    {
+        IsDrv8825 = drv8825;
         // TTL thresholds rather than CMOS: the real part's step and direction inputs are
         // specified low enough to be driven from a 3.3 V microcontroller, and a CMOS threshold
         // here would refuse a 3.4 V logic high from the 74-series parts in this palette.
@@ -83,9 +89,9 @@ public sealed partial class StepperDriver : DigitalComponent, IBreakpointSource
         Step = new Terminal("step", "STEP", TerminalType.Input, new Point(-50, -42));
         Direction = new Terminal("dir", "DIR", TerminalType.Input, new Point(-50, -20));
         Enable = new Terminal("en", "EN", TerminalType.Input, new Point(-50, 2));
-        Ms1 = new Terminal("ms1", "MS1", TerminalType.Input, new Point(-50, 24));
-        Ms2 = new Terminal("ms2", "MS2", TerminalType.Input, new Point(-50, 46));
-        Ms3 = new Terminal("ms3", "MS3", TerminalType.Input, new Point(-50, 68));
+        Ms1 = new Terminal("ms1", drv8825 ? "M0" : "MS1", TerminalType.Input, new Point(-50, 24));
+        Ms2 = new Terminal("ms2", drv8825 ? "M1" : "MS2", TerminalType.Input, new Point(-50, 46));
+        Ms3 = new Terminal("ms3", drv8825 ? "M2" : "MS3", TerminalType.Input, new Point(-50, 68));
 
         Vcc = new Terminal("vdd", "VDD", TerminalType.Power, new Point(0, -60));
         Gnd = new Terminal("gnd", "GND", TerminalType.Ground, new Point(0, 80));
@@ -164,14 +170,17 @@ public sealed partial class StepperDriver : DigitalComponent, IBreakpointSource
 
     public override string DesignatorPrefix => "U";
 
+    /// <summary>A DRV8825 rather than an A4988.</summary>
+    public bool IsDrv8825 { get; }
+
     public override string ValueLabel => IsEnabled
-        ? $"A4988 · 1/{Microsteps}"
+        ? $"{(IsDrv8825 ? "DRV8825" : "A4988")} · 1/{Microsteps}"
         : "disabled";
 
     /// <summary>Each output is driven through its own branch, two ends per winding.</summary>
     public override int VoltageSourceCount => base.VoltageSourceCount + (Windings * 2);
 
-    /// <summary>Microsteps per full step: 1, 2, 4, 8 or 16.</summary>
+    /// <summary>Microsteps per full step: 1, 2, 4, 8 or 16 (or 32 on a DRV8825).</summary>
     public int Microsteps { get; private set; } = 1;
 
     /// <summary>Where it is in the electrical cycle, in microsteps.</summary>
@@ -357,14 +366,9 @@ public sealed partial class StepperDriver : DigitalComponent, IBreakpointSource
         if (context.ReadInput(Ms2, Levels).IsHigh()) mode |= 2;
         if (context.ReadInput(Ms3, Levels).IsHigh()) mode |= 4;
 
-        Microsteps = mode switch
-        {
-            0 => 1,
-            1 => 2,
-            2 => 4,
-            3 => 8,
-            _ => 16,
-        };
+        Microsteps = IsDrv8825
+            ? mode switch { 0 => 1, 1 => 2, 2 => 4, 3 => 8, 4 => 16, _ => 32 }
+            : mode switch { 0 => 1, 1 => 2, 2 => 4, 3 => 8, _ => 16 };
 
         var step = context.ReadInput(Step, Levels);
 
@@ -393,4 +397,17 @@ public sealed partial class StepperDriver : DigitalComponent, IBreakpointSource
         Microsteps = 1;
         IsEnabled = true;
     }
+}
+
+/// <summary>
+/// A DRV8825 stepper driver: the A4988's bigger brother on the same carrier footprint, its mode pins M0-M2 reaching
+/// 1/32 steps (M0, M1, M2 as a number: 0 full, 1 half, 2 quarter, 3 eighth, 4 sixteenth, 5-7 thirty-second).
+/// </summary>
+public sealed partial class Drv8825 : StepperDriver
+{
+    public Drv8825() : base(drv8825: true)
+    {
+    }
+
+    public override string ComponentType => "Stepper Driver";
 }

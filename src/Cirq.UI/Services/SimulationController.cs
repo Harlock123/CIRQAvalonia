@@ -285,7 +285,7 @@ public sealed partial class SimulationController : ObservableObject, IDisposable
     private static readonly HashSet<string> Continuous = new(StringComparer.Ordinal)
     {
         "FunctionGenerator", "WaveformSource", "NoiseSource", "BehaviouralSource", "Microphone", "DcMotor", "Servo", "StepperMotor",
-        "Speaker", "Thermocouple", "SolarCell", "LoadCell", "TransmissionLine",
+        "Speaker", "Thermocouple", "SolarCell", "LoadCell", "TransmissionLine", "Ad9833", "Xr2206",
     };
 
     /// <summary>Whether a circuit changes only when its logic does: nothing integrating, no continuous waveform.</summary>

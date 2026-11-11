@@ -8,6 +8,53 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-11-11
+
+The parts drawer fills up. Thirty-seven new parts: displays that show what they're sent, modules that
+answer on I2C and SPI, the chips a hobbyist's bench is built from, and three more programmable ones,
+an ATtiny85, an 8051 and the AY-3-8910 sound chip. Fifteen new examples, three of them running
+firmware the guide prints. 374 components in 17 categories, 134 worked examples, 41 MCP tools,
+5540 tests.
+
+### Added
+
+**Displays on a bus.** An **SSD1306 OLED** (I2C, 128 × 64, drawing its pixels on the schematic), a
+**MAX7219 8 × 8 LED matrix** (SPI), a **TM1637 four-digit display** (its LSB-first two-wire bus, with
+`Tm1637Display.PatternFor` to drive it from a pattern generator), and a **Nixie tube** that strikes at
+170 V and holds down to 140 V, with the **74141** that drives it. The **LM3914** lights a bar or a dot
+of ten LEDs.
+
+**Modules on I2C and SPI.** The **DS3231** clock and **MPU-6050** accelerometer and gyro, **W25Q32**
+flash, an **SD card** in SPI mode, the **MCP4131** digital potentiometer and an **AD9833** DDS
+generator.
+
+**Sensors and LEDs.** The **DHT22** (and DHT11) answering a host's start pulse with its 40 bits, a
+**TSOP38238 IR receiver** with a built-in NEC remote (double-click to press), and **RGB**, **bicolour**
+and **infrared** LEDs.
+
+**Timers, tones and a valve.** The **7555** CMOS timer and the **556** dual timer, the **NE567** tone
+decoder, the **XR2206** function generator and half a **12AX7** triode on Koren's model.
+
+**Power and drivers.** The **LM337** negative regulator, the **78L05**, an **LM2596 buck module**, the
+**L293D** and an **L298N module**, and the **DRV8825** stepper driver to 1/32 steps. Transistors: the
+**BC557**, **BD139** and **BD140**, **2N3055**, **BS170** and **IRF540N**.
+
+**Three more programmable chips.** The **ATtiny85** on the ATmega's AVR core, with its own I/O map
+and vectors; the **AT89C2051**, an 8051 with the whole MCS-51 instruction set, both timers, the UART
+and the interrupts, loaded from an Intel HEX file like the ATmega (Load Memory Image and `load_memory`
+now take either); and the **AY-3-8910**, three tone channels, noise and an envelope written over its
+bus.
+
+**Fifteen examples.** RGB LED Mixing; XR2206 Generator, NE567 Tone Decoder and 556 Tone Bursts; LED Bar
+Graph, Nixie Counter, OLED Display, LED Matrix and TM1637 Display; Valve Preamp and an Arduino Uno
+playing the AY-3-8910; IR Remote Frame and DDS Generator; ATtiny85 Blink and AT89C2051 Serial.
+
+### Changed
+
+Modules are drawn as modules, their bodies sized to their pins and each pin named, rather than as a
+DIP or a generic box. The protoboard knows the new transistors' and regulators' leg orders (a 78L05
+reads OUT, GND, IN; an LM337 ADJ, IN, OUT).
+
 ## [1.2.0] - 2026-11-11
 
 A board you'd order and a bench you'd recognise. PCBs go double-sided with vias, pour their spare
@@ -3003,7 +3050,8 @@ First public build of CirqAvalonia — an electronic circuit analyzer and mixed-
 
 **501 tests** measure the solver against closed-form answers rather than recorded output.
 
-[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/Harlock123/CIRQAvalonia/compare/v1.0.0...v1.0.1

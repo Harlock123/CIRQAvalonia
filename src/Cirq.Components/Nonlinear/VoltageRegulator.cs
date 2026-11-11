@@ -58,8 +58,15 @@ public sealed record RegulatorModel(
         "LD1117-3.3", 3.3, 1.1, 0.8, 5e-3, 0.02, 60, false,
         ReferenceTempcoPerKelvin: -0.4e-3);
 
+    /// <summary>The LM317's negative twin: holds −1.25 V between OUT and ADJ.</summary>
+    public static readonly RegulatorModel Lm337 = new(
+        "LM337", -1.25, 2.0, 1.5, 5e-3, 0.02, 50, true, 65e-6, ReferenceTempcoPerKelvin: -1.25 * 1e-4);
+
+    /// <summary>A 7805 in a TO-92: the same 5 V for 100 mA, a little more dropout, much more heat per watt.</summary>
+    public static readonly RegulatorModel Lm78L05 = new("78L05", 5.0, 1.7, 0.14, 3e-3, 0.05, 180, false);
+
     public static readonly IReadOnlyList<RegulatorModel> Library =
-        [Lm7805, Lm7809, Lm7812, Lm7905, Lm317, Ld1117];
+        [Lm7805, Lm7809, Lm7812, Lm7905, Lm317, Ld1117, Lm337, Lm78L05];
 
     public override string ToString() => Name;
 }

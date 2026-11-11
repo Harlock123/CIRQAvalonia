@@ -96,6 +96,77 @@ public sealed class AvrCore
 
     public Registers State { get; set; } = new();
 
+    /// <summary>
+    /// An ATtiny85 rather than an ATmega328P: the same core, its I/O registers at the tiny's addresses (translated here to
+    /// the mega's, their bits moved where they differ), its 512 bytes of SRAM at 0x60-0x25F, one-word interrupt vectors,
+    /// Timer0's outputs on PB0 and PB1. The registers it has and the mega doesn't (Timer1's, the USI's) are held, not run.
+    /// </summary>
+    public bool Tiny { get; init; }
+
+    private readonly byte[] _tinyShadow = new byte[0x40];
+
+    private static readonly Dictionary<int, int> TinyToMega = new()
+    {
+        [0x36] = PINB, [0x37] = DDRB, [0x38] = PORTB,
+        [0x4A] = TCCR0A, [0x53] = TCCR0B, [0x52] = TCNT0, [0x49] = OCR0A, [0x48] = OCR0B,
+        [0x35] = PCMSK0, [0x26] = ADCSRA, [0x25] = ADCH, [0x24] = ADCL, [0x23] = ADCSRB,
+        [0x3C] = EECR, [0x3D] = EEDR, [0x3E] = EEARL, [0x3F] = EEARH,
+        [0x5D] = SPL, [0x5E] = SPH, [0x5F] = SREG,
+    };
+
+    private static int Bit(int value, int from, int to) => ((value >> from) & 1) << to;
+
+    private byte ReadTiny(int address)
+    {
+        if (TinyToMega.TryGetValue(address, out var mega)) return ReadMega(mega);
+        var shadow = _tinyShadow[address - 0x20];
+        return address switch
+        {
+            0x59 => (byte)((shadow & 0x64) | Bit(D[TIMSK0], 1, 4) | Bit(D[TIMSK0], 2, 3) | Bit(D[TIMSK0], 0, 1)),
+            0x58 => (byte)((shadow & 0x64) | Bit(D[TIFR0], 1, 4) | Bit(D[TIFR0], 2, 3) | Bit(D[TIFR0], 0, 1)),
+            0x5B => (byte)(Bit(D[EIMSK], 0, 6) | Bit(D[PCICR], 0, 5)),
+            0x5A => (byte)(Bit(D[EIFR], 0, 6) | Bit(D[PCIFR], 0, 5)),
+            0x55 => (byte)((D[EICRA] & 3) | Bit(D[SMCR], 0, 5) | (((D[SMCR] >> 1) & 3) << 3) | Bit(D[0x55], 4, 6)),
+            0x27 => shadow,
+            _ => shadow,
+        };
+    }
+
+    private void WriteTiny(int address, byte value)
+    {
+        if (TinyToMega.TryGetValue(address, out var mega))
+        {
+            WriteMega(mega, value);
+            return;
+        }
+
+        _tinyShadow[address - 0x20] = value;
+        switch (address)
+        {
+            case 0x59: D[TIMSK0] = (byte)(Bit(value, 4, 1) | Bit(value, 3, 2) | Bit(value, 1, 0)); break;
+            case 0x58: WriteMega(TIFR0, (byte)(Bit(value, 4, 1) | Bit(value, 3, 2) | Bit(value, 1, 0))); break;
+            case 0x5B:
+                D[EIMSK] = (byte)Bit(value, 6, 0);
+                D[PCICR] = (byte)Bit(value, 5, 0);
+                break;
+            case 0x5A:
+                WriteMega(EIFR, (byte)Bit(value, 6, 0));
+                WriteMega(PCIFR, (byte)Bit(value, 5, 0));
+                break;
+            case 0x55:
+                D[EICRA] = (byte)(value & 3);
+                D[SMCR] = (byte)((((value >> 3) & 3) << 1) | Bit(value, 5, 0));
+                D[0x55] = (byte)Bit(value, 6, 4);
+                break;
+            case 0x27:
+                // REFS: VCC, AREF, the 1.1 V bandgap. MUX 0x0C is the bandgap, as the mega's 0x0E.
+                var reference = ((value >> 6) & 3) switch { 0 => 1, 1 => 0, _ => 3 };
+                var mux = value & 0x0F;
+                D[ADMUX] = (byte)((reference << 6) | (value & 0x20) | (mux == 0x0C ? 0x0E : mux));
+                break;
+        }
+    }
+
     /// <summary>The pins' levels as last sampled, by port: B, C, D.</summary>
     public byte[] PinInputs { get; } = new byte[3];
 
@@ -166,7 +237,8 @@ public sealed class AvrCore
         var flash = State.Flash;
         var eeprom = State.Eeprom;
         State = new Registers { Flash = flash, Eeprom = eeprom };
-        SP = DataSize - 1;
+        SP = Tiny ? 0x25F : DataSize - 1;
+        Array.Clear(_tinyShadow);
         D[UCSR0A] = 0x20;
         D[UCSR0C] = 0x06;
         D[TWSR] = 0xF8;
@@ -176,6 +248,18 @@ public sealed class AvrCore
     private byte Read(int address)
     {
         address &= 0xFFFF;
+        if (Tiny)
+        {
+            if (address >= 0x260) return 0;
+            if (address >= 0x60) return D[address + 0xA0];
+            if (address >= 0x20) return ReadTiny(address);
+        }
+
+        return ReadMega(address);
+    }
+
+    private byte ReadMega(int address)
+    {
         if (address >= DataSize) return 0;
         switch (address)
         {
@@ -200,6 +284,27 @@ public sealed class AvrCore
     private void Write(int address, byte value)
     {
         address &= 0xFFFF;
+        if (Tiny)
+        {
+            if (address >= 0x260) return;
+            if (address >= 0x60)
+            {
+                D[address + 0xA0] = value;
+                return;
+            }
+
+            if (address >= 0x20)
+            {
+                WriteTiny(address, value);
+                return;
+            }
+        }
+
+        WriteMega(address, value);
+    }
+
+    private void WriteMega(int address, byte value)
+    {
         if (address >= DataSize) return;
         switch (address)
         {
@@ -270,16 +375,19 @@ public sealed class AvrCore
 
     private ushort Fetch() => State.Flash[State.Pc++ & (FlashWords - 1)];
 
+    /// <summary>Where an SRAM address is in <see cref="Registers.Data"/>: the tiny's 0x60 is the mega's 0x100.</summary>
+    private int RamIndex(int address) => Tiny ? (address & 0x3FF) + 0xA0 : address & 0xFFF;
+
     private void Push(byte value)
     {
-        D[SP & 0xFFF] = value;
+        D[RamIndex(SP)] = value;
         SP--;
     }
 
     private byte Pop()
     {
         SP++;
-        return D[SP & 0xFFF];
+        return D[RamIndex(SP)];
     }
 
     private void PushPc(int pc)
@@ -330,7 +438,16 @@ public sealed class AvrCore
         State.Sleeping = false;
         PushPc(State.Pc);
         SetFlag(I, false);
-        State.Pc = vector * 2;
+        State.Pc = Tiny ? vector switch
+        {
+            VectorInt0 => 1,
+            VectorPcint0 => 2,
+            VectorTimer0Ovf => 5,
+            VectorAdc => 8,
+            VectorTimer0CompA => 10,
+            VectorTimer0CompB => 11,
+            _ => 0,
+        } : vector * 2;
         return 4 + wake;
     }
 
@@ -1422,7 +1539,7 @@ public sealed class AvrCore
         var (ddr, portRegister) = port switch { 0 => (DDRB, PORTB), 1 => (DDRC, PORTC), _ => (DDRD, PORTD) };
         if (port == 2 && bit == 1 && TxEnabled) return State.TxLine;
         if (port == 2 && bit == 0 && RxEnabled) return null;
-        var oc = (port, bit) switch
+        var oc = Tiny ? (port, bit) switch { (0, 0) => 0, (0, 1) => 1, _ => -1 } : (port, bit) switch
         {
             (2, 6) => 0,
             (2, 5) => 1,

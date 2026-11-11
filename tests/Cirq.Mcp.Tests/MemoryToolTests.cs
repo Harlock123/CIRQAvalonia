@@ -44,6 +44,24 @@ public class MemoryToolTests
         Assert.Equal(4, b.Circuit.Components.OfType<Eprom27C256>().Single().ReadByte(19));
     }
 
+    /// <summary>Firmware goes into an 8051's flash as it does an ATmega's, and an ATtiny85's.</summary>
+    [Fact]
+    public async Task Firmware_loads_into_an_at89c2051_and_an_attiny85()
+    {
+        using var b = new Bench();
+        await b.Tools.AddParts([new() { Kind = "AT89C2051" }, new() { Kind = "ATtiny85", X = 200 }]);
+
+        var loaded = await Parse(b.Tools.LoadMemory("U1", hex: "75 89 20 80 FE"));
+        Assert.Equal("AT89C2051", (string)loaded["chip"]!);
+        Assert.Equal("5 bytes of firmware", (string)loaded["firmware"]!);
+        var mcu = b.Circuit.Components.OfType<Cirq.Components.Processors.At89c2051>().Single();
+        Assert.Null(mcu.FirmwareError);
+        Assert.Contains(":0500000075892080FE", mcu.Firmware, StringComparison.Ordinal);
+
+        loaded = await Parse(b.Tools.LoadMemory("U2", hex: "FF CF"));
+        Assert.Equal("ATtiny85", (string)loaded["chip"]!);
+    }
+
     /// <summary>A 68000's ROM pair: one S-record image, its even bytes into one chip and its odd into the other.</summary>
     [Fact]
     public async Task S_records_split_into_a_pair_of_chips_by_lane()

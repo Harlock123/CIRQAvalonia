@@ -26,5 +26,6 @@
     <Compile Include="../Cirq.Components.Tests/AssemblerZ80.cs" Link="Support/AssemblerZ80.cs" />
     <Compile Include="../Cirq.Components.Tests/Assembler8085.cs" Link="Support/Assembler8085.cs" />
     <Compile Include="../Cirq.Components.Tests/AssemblerAvr.cs" Link="Support/AssemblerAvr.cs" />
+    <Compile Include="../Cirq.Components.Tests/Assembler8051.cs" Link="Support/Assembler8051.cs" />
   </ItemGroup>
 </Project>
