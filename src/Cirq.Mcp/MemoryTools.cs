@@ -17,7 +17,7 @@ public sealed partial class CircuitTools
     public const int MaxMemoryRead = 4096;
 
     [McpServerTool(Name = "load_memory", Destructive = true)]
-    [Description("Loads a ROM or RAM image into a memory part (an EPROM, the 28C256 EEPROM, a 6116 or 62256 RAM, the 2K SRAM/ROM), in one undo step. Give exactly one of: hex (Intel HEX text, Motorola S-records, or plain hex bytes such as \"A9 01 8D 00 60\"), base64 (a raw binary), or path (a .bin, .rom, .hex, .s19/.s28/.s37/.srec file in the working folder). Intel HEX and S-records carry their own addresses; binary and plain bytes start at offset. Addresses beyond the chip wrap into it, as with its upper address lines unwired, so a 6502 image assembled at $8000 lands at the start of a 32K ROM. A 68000's 16-bit memory is a pair of byte-wide chips: load the same image into both, with lane \"even\" for the chip on D8-D15 (/UDS) and \"odd\" for the one on D0-D7 (/LDS); each takes its half of the bytes at half their address. The image becomes the part's preset: it's saved in the circuit and every run starts from it.")]
+    [Description("Loads a ROM or RAM image into a memory part (an EPROM, the 28C256 EEPROM, a 6116 or 62256 RAM, the 2K SRAM/ROM), or firmware (an avr-gcc or Arduino .hex) into an ATmega328P's flash, in one undo step. Give exactly one of: hex (Intel HEX text, Motorola S-records, or plain hex bytes such as \"A9 01 8D 00 60\"), base64 (a raw binary), or path (a .bin, .rom, .hex, .s19/.s28/.s37/.srec file in the working folder). Intel HEX and S-records carry their own addresses; binary and plain bytes start at offset. Addresses beyond the chip wrap into it, as with its upper address lines unwired, so a 6502 image assembled at $8000 lands at the start of a 32K ROM. A 68000's 16-bit memory is a pair of byte-wide chips: load the same image into both, with lane \"even\" for the chip on D8-D15 (/UDS) and \"odd\" for the one on D0-D7 (/LDS); each takes its half of the bytes at half their address. The image becomes the part's preset: it's saved in the circuit and every run starts from it.")]
     public Task<string> LoadMemory(
         [Description("The memory part's designator, e.g. \"U2\".")] string part,
         [Description("Intel HEX text (lines starting ':'), or bytes as hex separated by spaces. Optional.")] string? hex = null,
@@ -40,7 +40,9 @@ public sealed partial class CircuitTools
                 _ => throw new ArgumentException($"lane is \"both\", \"even\" or \"odd\", not \"{lane}\"."),
             };
 
-            var memory = Memory(s.Circuit, part);
+            var target = Pins.Part(s.Circuit, part);
+            var chip = target as Cirq.Components.Processors.Atmega328p;
+            var memory = chip is null ? Memory(s.Circuit, part) : null;
             MemoryImage image;
             string from;
 
@@ -71,7 +73,19 @@ public sealed partial class CircuitTools
             }
 
             image = image.Lane(byteLane);
-            var note = memory.Load(image);
+
+            // An ATmega328P's flash: the firmware it runs, from address 0.
+            if (chip is not null)
+                return new JsonObject
+                {
+                    ["part"] = chip.Name,
+                    ["chip"] = chip.PartNumber,
+                    ["firmware"] = chip.Load(image),
+                    ["from"] = from,
+                    ["note"] = "Firmware loaded into the flash; the chip starts it from the reset vector when the circuit runs.",
+                };
+
+            var note = memory!.Load(image);
             return new JsonObject
             {
                 ["part"] = memory.Name,

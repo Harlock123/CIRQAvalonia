@@ -573,6 +573,8 @@ public static class ComponentCatalog
                 () => new Z80Sio()),
             new("Z80 DART", "Zilog Z80 DART: the SIO's two asynchronous channels alone, with ring-indicator inputs in place of /SYNC",
                 () => new Z80Dart()),
+            new("ATmega328P", "Microchip ATmega328P, the Arduino Uno's chip: runs real firmware (an avr-gcc or Arduino .hex, via Load Memory Image) at 16 MHz, with its GPIO and pull-ups, timers and PWM, USART, ADC and interrupts",
+                () => new Atmega328p()),
             new("8085", "Intel 8085A, T-state by T-state on its pins — the multiplexed AD0-AD7 with ALE, X1 at twice CLK OUT, TRAP and RST 7.5/6.5/5.5 with SIM and RIM, SID and SOD, READY, HOLD, and the undocumented instructions and V and K flags",
                 () => new Cpu8085()),
             new("8155", "Intel 8155: 256 bytes of RAM, ports A, B and C with strobed handshakes, and a 14-bit timer on the 8085's multiplexed bus, latching its own address on ALE — selected by /CE low",

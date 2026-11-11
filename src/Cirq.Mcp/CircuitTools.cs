@@ -486,7 +486,7 @@ public sealed partial class CircuitTools(ICircuitHost host)
     }
 
     [McpServerTool(Name = "render_protoboard", ReadOnly = true, Idempotent = true)]
-    [Description("A picture of the circuit built on white solderless breadboards (the editor's protoboard view, F11), with the text of where everything is: each part's pins by hole (rows a-e and f-j either side of the centre channel, columns 1 to 63, the rails T+ T- B- B+; 2:e12 is on the second board), the jumper wires, the supplies and instruments on the bench with their leads, and whether the board matches the schematic. The board is laid out automatically from the schematic: chips across the channel, parts beside the pins they join, ground on the - rails and the supply on the + rails; parts moved with arrange_protoboard stay where they were put.")]
+    [Description("A picture of the circuit built on white solderless breadboards (the editor's protoboard view, F11), with the text of where everything is: each part's pins by hole (rows a-e and f-j either side of the centre channel, columns 1 to 63, the rails T+ T- B- B+; 2:e12 is on the second board; on stripboard, perfboard or a PCB, strip letter and hole number, C12), the jumper wires (or a soldered board's cuts, links, back wiring or traces), the supplies and instruments on the bench with their leads, and whether the board matches the schematic. The board is laid out automatically from the schematic: chips across the channel, parts beside the pins they join, ground on the - rails and the supply on the + rails; parts moved with arrange_protoboard stay where they were put.")]
     public async Task<CallToolResult> RenderProtoboard(
         [Description("Pixels per board pitch (0.1 inch), from 4 to 40. Default 14.")] double scale = 14,
         CancellationToken cancel = default)
@@ -515,12 +515,12 @@ public sealed partial class CircuitTools(ICircuitHost host)
     }
 
     [McpServerTool(Name = "arrange_protoboard", Destructive = true)]
-    [Description("Chooses what the protoboard is built on (board) and moves parts on breadboards by hand, in one undo step; everything else stays where it is and the jumper wires are worked out again. A move is refused, with the reason, if a pin would go in a hole that's taken or a strip carrying another net (that would join the two). reset lays the whole board out automatically again. Returns where everything now is, as render_protoboard's text does. It changes only the board, never the circuit.")]
+    [Description("Chooses what the protoboard is built on (board) and moves parts on it by hand, in one undo step; everything else stays where it is and the jumper wires (or a soldered board's cuts, links and back wiring) are worked out again. A move is refused, with the reason, if a pin would go in a hole that's taken or a strip carrying another net (that would join the two), or on stripboard too close to another net's pin to cut the copper between. reset lays the whole board out automatically again. Returns where everything now is, as render_protoboard's text does. It changes only the board, never the circuit.")]
     public Task<string> ArrangeProtoboard(
-        [Description("The moves, in order, e.g. [{\"part\": \"U1\", \"to\": \"f20\"}, {\"part\": \"R1\", \"to\": \"a14\", \"pin\": \"B\"}]. Optional.")] BoardMove[]? moves = null,
+        [Description("The moves, in order, e.g. [{\"part\": \"U1\", \"to\": \"f20\"}, {\"part\": \"R1\", \"to\": \"a14\", \"pin\": \"B\"}]. On stripboard, perfboard and a PCB holes are strip (column) letter and hole number, e.g. \"C12\". Optional.")] BoardMove[]? moves = null,
         [Description("Parts to hand back to the automatic layout, e.g. [\"R3\"]. Optional.")] string[]? release = null,
         [Description("Forget every place made by hand first, so the board is laid out afresh.")] bool reset = false,
-        [Description("What to build it on: \"breadboard\", \"stripboard\" (copper strips, cut and linked) or \"perfboard\" (pads wired on the back). Stripboard and perfboard are laid out automatically; moves are for breadboards. Optional.")] string? board = null,
+        [Description("What to build it on: \"breadboard\", \"stripboard\" (copper strips, cut and linked) , \"perfboard\" (pads wired on the back) or \"pcb\" (a single-sided printed circuit board, its traces routed on the back, a jumper where one can't get through; the editor exports its Gerber files). Optional.")] string? board = null,
         CancellationToken cancel = default) =>
         Edit("Arrange the protoboard", s =>
         {
@@ -529,12 +529,10 @@ public sealed partial class CircuitTools(ICircuitHost host)
             if (board is not null)
             {
                 if (!Enum.TryParse<BoardKind>(board.Trim(), true, out var kind) || !Enum.IsDefined(kind) || int.TryParse(board, out _))
-                    throw new ArgumentException($"board is breadboard, stripboard or perfboard, not \"{board}\".");
+                    throw new ArgumentException($"board is breadboard, stripboard, perfboard or pcb, not \"{board}\".");
                 s.Circuit.Board.Kind = kind;
             }
 
-            if (s.Circuit.Board.Kind != BoardKind.Breadboard && ((moves?.Length ?? 0) > 0 || (release?.Length ?? 0) > 0))
-                throw new ArgumentException($"The {s.Circuit.Board.Kind.ToString().ToLowerInvariant()} is laid out automatically; parts are moved by hand on breadboards (board \"breadboard\").");
             if (reset) s.Circuit.Board.Clear();
 
             foreach (var name in release ?? [])
@@ -548,7 +546,8 @@ public sealed partial class CircuitTools(ICircuitHost host)
             {
                 var part = Pins.Part(s.Circuit, move.Part);
                 var layout = Cirq.Components.Protoboard.ProtoboardLayout.Arrange(s.Circuit);
-                var to = Cirq.Components.Protoboard.Breadboard.Parse(move.To)
+                var to = (layout.Kind == BoardKind.Breadboard ? Cirq.Components.Protoboard.Breadboard.Parse(move.To) : Cirq.Components.Protoboard.SolderedLayout.Parse(move.To))
+                    ?? (layout.Kind != BoardKind.Breadboard ? throw new ArgumentException($"\"{move.To}\" isn't a hole. On a {layout.Kind.ToString().ToLowerInvariant()} a hole is its strip's letters and its number down the strip: C12.") : (BoardHole?)null)
                     ?? throw new ArgumentException($"\"{move.To}\" isn't a hole. Holes are named as the board prints them: a row a to j and a column 1 to 63 (e12), a rail T+, T-, B- or B+ with its column (T+5), and 2: in front for the second board.");
                 if (layout.FindOnBench(part) is not null)
                     throw new ArgumentException($"{part.Name} is equipment on the bench beside the board, joined by leads; it doesn't go in holes.");
@@ -567,7 +566,7 @@ public sealed partial class CircuitTools(ICircuitHost host)
         }, cancel);
 
     [McpServerTool(Name = "build_guide", ReadOnly = true, Idempotent = true)]
-    [Description("The protoboard as numbered steps to build it from, in the order a person would: on breadboards the rail jumpers, chips, transistors and modules, resistors, capacitors, diodes and LEDs (with colour bands, which leg is which, which way round), the jumpers net by net and the bench connections; on stripboard the strip cuts and wire links first; on perfboard the wiring on the back after the parts. The editor shows the same steps one at a time (View › Build Guide).")]
+    [Description("The protoboard as numbered steps to build it from, in the order a person would: on breadboards the rail jumpers, chips, transistors and modules, resistors, capacitors, diodes and LEDs (with colour bands, which leg is which, which way round), the jumpers net by net and the bench connections; on stripboard the strip cuts and wire links first; on perfboard the wiring on the back after the parts; on a PCB the board to have made, the parts and any wire jumpers. The editor shows the same steps one at a time (View › Build Guide).")]
     public Task<string> BuildGuide(CancellationToken cancel = default) =>
         Read("wrote the build guide", s =>
         {
@@ -583,12 +582,12 @@ public sealed partial class CircuitTools(ICircuitHost host)
         }, cancel);
 
     [McpServerTool(Name = "fault", Destructive = true)]
-    [Description("Fault finding, for teaching: hides a fault in the circuit that only the simulation sees (a pin not making contact, two neighbouring chip pins bridged, an LED, diode or electrolytic in backwards), for the person to find with the scope and the multimeter, as Simulate › Fault Finding does. hide picks one at random unless pin (and kind, second) say which; hint gives a hint, each more telling (the kind, then the net, then the part); guess says whether a part is the one; reveal says what it was and clears it; clear clears it; status says whether one is hidden. Your own runs (run_transient, operating_point) solve the circuit as drawn, without the fault, so they won't find it either.")]
+    [Description("Fault finding, for teaching: hides a fault in the circuit that only the simulation sees (a pin not making contact, two neighbouring chip pins bridged, an LED, diode or electrolytic in backwards), for the person to find with the scope and the multimeter, as Simulate › Fault Finding does. hide picks one at random unless pin (and kind, second) say which; hint gives a hint, each more telling (the kind, then the net, then the part); measure reads a pin's voltage (against second, or ground) in the faulty circuit at its DC operating point, as a meter would, for coaching without giving it away; guess says whether a part is the one; reveal says what it was and clears it; clear clears it; status says whether one is hidden. Your own runs (run_transient, operating_point) solve the circuit as drawn, without the fault, so they won't find it either.")]
     public Task<string> Fault(
-        [Description("hide, hint, guess, reveal, clear or status.")] string action,
-        [Description("For hide: the pin to put the fault at, e.g. \"R2.B\". Optional; at random without it.")] string? pin = null,
+        [Description("hide, hint, measure, guess, reveal, clear or status.")] string action,
+        [Description("For hide: the pin to put the fault at, e.g. \"R2.B\" (optional; at random without it). For measure: the pin to read.")] string? pin = null,
         [Description("For hide with a pin: open (not making contact), bridged (to the pin given as second) or reversed (a polarised part backwards). Default open.")] string? kind = null,
-        [Description("For a bridged fault: the neighbouring pin it is bridged to, e.g. \"U1.p3\".")] string? second = null,
+        [Description("For a bridged fault: the neighbouring pin it is bridged to, e.g. \"U1.p3\". For measure: the pin the black probe is on (default ground).")] string? second = null,
         [Description("For guess: the part's designator, e.g. \"R3\".")] string? part = null,
         [Description("For hint: how telling, 1 to 3. Default 1.")] int level = 1,
         CancellationToken cancel = default) =>
@@ -640,8 +639,19 @@ public sealed partial class CircuitTools(ICircuitHost host)
                     return new JsonObject { ["cleared"] = any };
                 case "status":
                     return new JsonObject { ["hidden"] = circuit.Faults.Count > 0 };
+                case "measure":
+                    var probed = Pins.Find(circuit, pin ?? throw new ArgumentException("Say which pin to measure: pin, e.g. \"R2.B\"."));
+                    var volts = Cirq.Components.Protoboard.FaultFinding.Measure(circuit, probed)
+                        ?? throw new InvalidOperationException("The circuit can't be solved there.");
+                    var against = second is null ? 0 : Cirq.Components.Protoboard.FaultFinding.Measure(circuit, Pins.Find(circuit, second)) ?? 0;
+                    return new JsonObject
+                    {
+                        ["pin"] = Pins.Name(probed),
+                        ["volts"] = Math.Round(volts - against, 4),
+                        ["note"] = $"What a meter reads at {Pins.Name(probed)}{(second is null ? " against ground" : $" against {second}")}, with the fault in, at the circuit's DC operating point.",
+                    };
                 default:
-                    throw new ArgumentException($"action is hide, hint, guess, reveal, clear or status, not \"{action}\".");
+                    throw new ArgumentException($"action is hide, hint, measure, guess, reveal, clear or status, not \"{action}\".");
             }
         }, cancel);
 

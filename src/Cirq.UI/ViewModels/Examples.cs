@@ -291,6 +291,8 @@ public static partial class Examples
                 LoadPicoGpio),
             new("ESP32 GPIO", "An ESP32 blinking an LED, reading a knob on an input-only pin, and a button on a pull-up",
                 LoadEsp32Gpio),
+            new("ATmega328P Blink", "An Arduino Uno's chip on its own, running firmware: Timer1's compare interrupt toggles PB5 (pin 13) twice a second, and the LED on it blinks at 1 Hz",
+                LoadAtmegaBlink),
         ]),
 
         new("Computers",

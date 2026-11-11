@@ -67,12 +67,17 @@ public class ProtoboardToolTests
         Assert.Contains(steps, x => x.Contains("R1, 10kΩ (brown, black, orange, gold)", StringComparison.Ordinal));
         Assert.Contains("matches the schematic", steps[^1]);
 
-        // Onto stripboard, an undo step; moves are for breadboards.
+        // Onto stripboard, an undo step; a part moved on it by its strip letter and hole number.
         var strip = await Parse(b.Tools.ArrangeProtoboard(board: "stripboard"));
         Assert.True((bool)strip["matches"]!);
         Assert.Contains("A stripboard", (string)strip["board"]!);
-        Assert.Contains("laid out automatically", await Error(b.Tools.ArrangeProtoboard([new() { Part = "R1", To = "C5" }])));
-        Assert.Contains("breadboard, stripboard or perfboard", await Error(b.Tools.ArrangeProtoboard(board: "veroboard")));
+        var movedOnStrip = await Parse(b.Tools.ArrangeProtoboard([new() { Part = "R1", To = "T20", Pin = "A" }]));
+        Assert.True((bool)movedOnStrip["matches"]!);
+        Assert.Contains("A=T20", (string)movedOnStrip["board"]!);
+        Assert.Contains("isn't a hole", await Error(b.Tools.ArrangeProtoboard([new() { Part = "R1", To = "12" }])));
+        await b.Tools.Undo();
+        Assert.Equal(Cirq.Core.Topology.BoardKind.Stripboard, b.Circuit.Board.Kind);
+        Assert.Contains("breadboard, stripboard, perfboard or pcb", await Error(b.Tools.ArrangeProtoboard(board: "veroboard")));
         Assert.Contains(steps.Count > 0 ? "Cut" : "", string.Join(" ", (await Parse(b.Tools.BuildGuide()))["steps"]!.AsArray().Select(x => (string)x!)));
         await b.Tools.Undo();
         Assert.Equal(Cirq.Core.Topology.BoardKind.Breadboard, b.Circuit.Board.Kind);
@@ -94,6 +99,16 @@ public class ProtoboardToolTests
         Assert.Contains("isn't making contact", (string)(await Parse(b.Tools.Fault("hide", pin: "C1.A")))["note"]!);
         Assert.Contains("backwards", await Error(b.Tools.Fault("hide", pin: "R1.A", kind: "reversed")));
         Assert.Contains("C1", (string)(await Parse(b.Tools.Fault("reveal")))["fault"]!);
-        Assert.Contains("hide, hint, guess", await Error(b.Tools.Fault("find")));
+        Assert.Contains("hide, hint, measure, guess", await Error(b.Tools.Fault("find")));
+
+        // On a PCB, routed and matching; and measure reads the faulty circuit, as a meter would.
+        var pcb = await Parse(b.Tools.ArrangeProtoboard(board: "pcb"));
+        Assert.True((bool)pcb["matches"]!);
+        Assert.Contains("Have the printed circuit board made", string.Join(" ", (await Parse(b.Tools.BuildGuide()))["steps"]!.AsArray().Select(x => (string)x!)));
+        await Parse(b.Tools.Fault("hide", pin: "C1.A"));
+        var reading = await Parse(b.Tools.Fault("measure", pin: "R1.B"));
+        Assert.Equal("R1.B", (string)reading["pin"]!);
+        Assert.NotNull(reading["volts"]);
+        Assert.Contains("say which pin", await Error(b.Tools.Fault("measure")), StringComparison.OrdinalIgnoreCase);
     }
 }

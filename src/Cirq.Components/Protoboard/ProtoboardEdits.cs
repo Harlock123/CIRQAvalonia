@@ -35,9 +35,12 @@ public static class ProtoboardEdits
         ArgumentNullException.ThrowIfNull(layout);
         if (layout.Find(part) is not { } placed) return BoardEdit.No($"{part?.Name} isn't on the board.");
 
-        var rows = placed.Package.Form == BoardForm.Dip ? 0 : to.Row - grab.Row;
+        var soldered = layout.Kind != BoardKind.Breadboard;
+        var rows = placed.Package.Form == BoardForm.Dip && !soldered ? 0 : to.Row - grab.Row;
         var holes = placed.Holes.Select(h => new BoardHole(h.Board + to.Board - grab.Board, h.Row + rows, h.Column + to.Column - grab.Column)).ToList();
         if (holes.SequenceEqual(placed.Holes)) return BoardEdit.No($"{part.Name} is already there.");
+        if (soldered)
+            return holes.Any(h => h.Row < 1 || h.Column < 1) ? BoardEdit.No($"{part.Name} would hang off the board there.") : Try(circuit, layout, part, Pins(placed, holes));
         if (holes.Any(h => !Breadboard.Exists(h) || (placed.Package.Form != BoardForm.TwoLead && !Breadboard.IsTerminalRow(h.Row))))
             return BoardEdit.No($"{part.Name} would hang off the board there.");
         if (placed.Package.Form == BoardForm.Inline && holes.Select(h => Breadboard.IsTopHalf(h.Row)).Distinct().Count() > 1)
@@ -55,11 +58,14 @@ public static class ProtoboardEdits
         if (placed.Package.Form != BoardForm.TwoLead) return BoardEdit.No($"{part.Name}'s pins move together: move the part instead.");
         var index = placed.Package.Pins.ToList().IndexOf(lead);
         if (index < 0) return BoardEdit.No($"{lead} isn't one of {part.Name}'s leads.");
-        if (!Breadboard.Exists(to)) return BoardEdit.No("There's no hole there.");
+        var soldered = layout.Kind != BoardKind.Breadboard;
+        if (soldered ? to.Row < 1 || to.Column < 1 : !Breadboard.Exists(to)) return BoardEdit.No("There's no hole there.");
         var holes = placed.Holes.ToList();
-        if (holes[index] == to) return BoardEdit.No($"{lead} is already in {Breadboard.Name(to)}.");
+        if (holes[index] == to) return BoardEdit.No($"{lead} is already in {layout.HoleName(to)}.");
         holes[index] = to;
-        if (Breadboard.Distance(holes[0], holes[1]) > 15) return BoardEdit.No($"{part.Name}'s leads won't stretch that far.");
+        var (ax, ay) = layout.Position(holes[0]);
+        var (bx, by) = layout.Position(holes[1]);
+        if (Math.Sqrt(((ax - bx) * (ax - bx)) + ((ay - by) * (ay - by))) > 15) return BoardEdit.No($"{part.Name}'s leads won't stretch that far.");
         return Try(circuit, layout, part, Pins(placed, holes));
     }
 
@@ -69,6 +75,8 @@ public static class ProtoboardEdits
         ArgumentNullException.ThrowIfNull(circuit);
         ArgumentNullException.ThrowIfNull(layout);
         ArgumentNullException.ThrowIfNull(wire);
+        if (layout.Kind != BoardKind.Breadboard)
+            return BoardEdit.No("Links and back wiring on a soldered board follow the parts: move a part and they're worked out again.");
         var end = fromEnd ? wire.From : wire.To;
         if (end == to) return BoardEdit.No("The wire's end is already there.");
         if (!Breadboard.Exists(to) || Breadboard.StripOf(to) != Breadboard.StripOf(end))
@@ -127,7 +135,7 @@ public static class ProtoboardEdits
 
         // The moved part goes first, so it is the one checked against everything else.
         var others = frozen.Parts.Where(p => p.Key != part.Id).ToList();
-        var ordered = new BoardArrangement();
+        var ordered = new BoardArrangement { Kind = frozen.Kind };
         foreach (var (key, (from, to)) in frozen.Wires) ordered.SetWire(key, from, to);
         ordered.SetPart(part.Id, new BoardPlacement(pins));
         foreach (var (id, placement) in others) ordered.SetPart(id, placement);

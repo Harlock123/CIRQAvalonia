@@ -49,6 +49,15 @@ public sealed class ProtoboardCanvas : Control
     /// <summary>What a terminal's net is at in the running simulation, or null when nothing is solved: the meter's reading.</summary>
     public Func<Terminal, double?>? VoltageAt { get; set; }
 
+    /// <summary>The current into a part through a pin, from the running simulation: the meter's current range.</summary>
+    public Func<Terminal, double?>? CurrentInto { get; set; }
+
+    /// <summary>Whether the circuit is running: resistance is measured with it off, as on a real bench.</summary>
+    public Func<bool>? IsRunning { get; set; }
+
+    /// <summary>The meter's range: 0 volts, 1 ohms, 2 continuity, 3 amps. Clicking the meter turns the dial.</summary>
+    public int MeterRange { get; private set; }
+
     /// <summary>Raised when the board is laid out afresh, so the build guide can follow.</summary>
     public event EventHandler? LayoutChanged;
 
@@ -313,6 +322,16 @@ public sealed class ProtoboardCanvas : Control
                     Begin(Grab.Probe, e, $"The {(red ? "red" : "black")} probe");
                     return;
                 }
+
+            // The meter itself: the dial turns to the next range.
+            if (meter.Contains(x, y))
+            {
+                MeterRange = (MeterRange + 1) % MeterView.Units.Length;
+                _ohms = null;
+                StatusChanged?.Invoke(this, $"Meter on {MeterView.Units[MeterRange]}. {MeterSays(layout)}");
+                InvalidateVisual();
+                return;
+            }
         }
 
         if (point.Properties.IsRightButtonPressed)
@@ -335,16 +354,6 @@ public sealed class ProtoboardCanvas : Control
             return;
         }
 
-        // Stripboard and perfboard are laid out automatically: a part can be picked, and worked, but not moved.
-        if (layout.Kind != BoardKind.Breadboard)
-        {
-            SelectedComponent = part;
-            if (part is not null)
-                StatusChanged?.Invoke(this, $"{part.Name}: the {layout.Kind.ToString().ToLowerInvariant()} is laid out automatically; parts are moved by hand on breadboards (View › Board).");
-            Begin(Grab.Pan, e);
-            return;
-        }
-
         // A lead's end or a jumper's end, before the part they belong to.
         if (hole is { } at)
         {
@@ -358,7 +367,8 @@ public sealed class ProtoboardCanvas : Control
                 return;
             }
 
-            if (layout.Wires.FirstOrDefault(w => w.From == at || w.To == at) is { } wire)
+            // A soldered board's links and back wires follow the parts, so only a breadboard's jumpers are picked up.
+            if (layout.Kind == BoardKind.Breadboard && layout.Wires.FirstOrDefault(w => w.From == at || w.To == at) is { } wire)
             {
                 (_grabbedWire, _grabbedFromEnd, _grabHole) = (wire, wire.From == at, at);
                 Begin(Grab.WireEnd, e, "Move a wire's end");
@@ -428,7 +438,10 @@ public sealed class ProtoboardCanvas : Control
 
         // Try the move where the pointer is now, and show the board as it would be.
         BoardEdit? edit = null;
-        var to = Breadboard.Nearest(x, y, Math.Max(layout.Boards, _grabHole.Board) + (_grab == Grab.Part ? 1 : 0));
+        // On a soldered board a part may be dragged past the edge: the board grows to hold it.
+        var to = layout.Kind == BoardKind.Breadboard
+            ? Breadboard.Nearest(x, y, Math.Max(layout.Boards, _grabHole.Board) + (_grab == Grab.Part ? 1 : 0))
+            : new BoardHole(1, (int)Math.Round(y - 1.5), (int)Math.Round(x - 2.5)) is { Row: >= 1, Column: >= 1 } onBoard ? onBoard : null;
         switch (_grab)
         {
             case Grab.Part when to is { } hole && hole != _grabHole && _grabbedPart is { } part:
@@ -582,6 +595,7 @@ public sealed class ProtoboardCanvas : Control
     private static HashSet<object> Visible(ProtoboardLayout layout, IReadOnlyList<BuildStep> steps, int index)
     {
         var visible = new HashSet<object>();
+        foreach (var trace in layout.Wires.Where(w => w.IsTrace)) visible.Add(trace);
         foreach (var step in steps.Take(index + 1))
         {
             if (step.Part is { } part) visible.Add(part);
@@ -589,7 +603,7 @@ public sealed class ProtoboardCanvas : Control
             if (step.Kind == BuildStepKind.Cut) foreach (var hole in step.Holes ?? []) visible.Add(hole);
             if (step.Wire is { } wire)
             {
-                // A perfboard step wires a whole net at once.
+                // A perfboard step wires a whole net at once; a PCB's traces are there from the start, with the board.
                 if (layout.Kind == BoardKind.Perfboard) foreach (var w in layout.Wires.Where(w => ReferenceEquals(w.Net, wire.Net))) visible.Add(w);
                 else visible.Add(wire);
             }
@@ -618,7 +632,7 @@ public sealed class ProtoboardCanvas : Control
             : hole is { } h ? layout.Position(h)
             : (x + (red ? 8.0 : 3.0), y - 2.0);
         var (reading, note) = Reading(layout);
-        return new MeterView(x, y, Tip(_redTip, true), Tip(_blackTip, false), reading, note);
+        return new MeterView(x, y, Tip(_redTip, true), Tip(_blackTip, false), reading, note, MeterRange, MeterRange == 2 && reading == "0.00" || _beep);
     }
 
     private static BoardHole? GroundHole(ProtoboardLayout layout)
@@ -633,10 +647,16 @@ public sealed class ProtoboardCanvas : Control
         return layout.HoleNets.Where(h => h.Value.IsGround).Select(h => h.Key).OrderByDescending(h => h.Row).ThenBy(h => h.Column).Cast<BoardHole?>().FirstOrDefault();
     }
 
-    /// <summary>Volts between the probes, as the running simulation has them.</summary>
+    private (BoardHole Red, BoardHole Black, int Range, ProtoboardLayout Layout, double? Ohms)? _ohms;
+    private bool _beep;
+
+    /// <summary>What the meter reads on its range: volts or amps from the running simulation, ohms with it off.</summary>
     private (string Reading, string Note) Reading(ProtoboardLayout layout)
     {
+        _beep = false;
+        if (MeterRange == 3) return Amps(layout);
         if (_redTip is not { } red || _blackTip is not { } black) return ("- - - -", "Drag the probes onto holes");
+        if (MeterRange is 1 or 2) return Ohms(layout, red, black);
         var (vr, vb) = (Volts(layout, red), Volts(layout, black));
         if (vr is null || vb is null)
             return ("- - - -", layout.NetAt(red) is null || layout.NetAt(black) is null ? "A probe is on nothing" : "Run the circuit (F5)");
@@ -645,6 +665,49 @@ public sealed class ProtoboardCanvas : Control
             : Math.Abs(volts) >= 10 ? volts.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)
             : volts.ToString("0.000", System.Globalization.CultureInfo.InvariantCulture);
         return (shown, $"{layout.HoleName(red)} to {layout.HoleName(black)}");
+    }
+
+    /// <summary>Resistance between the probes, on the circuit with its power off: computed once for where they are.</summary>
+    private (string Reading, string Note) Ohms(ProtoboardLayout layout, BoardHole red, BoardHole black)
+    {
+        if (IsRunning?.Invoke() == true) return ("- - - -", "Stop the run (F5) to measure Ω");
+        if (layout.NetAt(red) is not { } a || layout.NetAt(black) is not { } b) return ("OL", "A probe is on nothing");
+        if (_ohms is not { } cached || cached.Red != red || cached.Black != black || !ReferenceEquals(cached.Layout, layout))
+        {
+            var ta = Contact(a);
+            var tb = Contact(b);
+            double? ohms = ta is null || tb is null || Circuit is null ? null : Ohmmeter.Between(Circuit, ta, tb);
+            _ohms = cached = (red, black, MeterRange, layout, ohms);
+        }
+
+        if (cached.Ohms is not { } value) return ("- - - -", "Can't measure here");
+        _beep = MeterRange == 2 && value < Ohmmeter.Continuity;
+        return MeterRange == 2
+            ? (_beep ? "0.00" : value < Ohmmeter.Open ? Ohmmeter.Display(value) : "OL", _beep ? $"{layout.HoleName(red)} and {layout.HoleName(black)} are joined" : $"{layout.HoleName(red)} to {layout.HoleName(black)}: no continuity")
+            : (Ohmmeter.Display(value), $"{layout.HoleName(red)} to {layout.HoleName(black)}, power off");
+    }
+
+    /// <summary>
+    /// Current through the lead the red probe is on: what the meter reads wired in series with that lead. It wants a
+    /// two-lead part's lead, where "the current" means one thing.
+    /// </summary>
+    private (string Reading, string Note) Amps(ProtoboardLayout layout)
+    {
+        if (_redTip is not { } red) return ("- - - -", "Put the red probe on a part's lead");
+        if (layout.PartAt(red) is not { Package.Form: BoardForm.TwoLead } part || part.HoleOf(part.Package.Pins[0]!) is not { } first)
+            return ("- - - -", "On A, the red probe goes on a resistor's, LED's or capacitor's lead");
+        var pin = part.Holes[0] == red ? part.Package.Pins[0]! : part.Package.Pins[1]!;
+        if (CurrentInto?.Invoke(pin) is not { } amps) return ("- - - -", "Run the circuit (F5)");
+        var milli = amps * 1000;
+        var shown = Math.Abs(milli) >= 100 ? milli.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) : milli.ToString("0.000", System.Globalization.CultureInfo.InvariantCulture);
+        return (shown, $"Through {part.Part.Name}, into its {pin.Name} lead");
+    }
+
+    /// <summary>A pin on a net that is making contact (not a hidden open fault), to measure the net at.</summary>
+    private Terminal? Contact(Net net)
+    {
+        var open = Circuit?.Faults.Where(f => f.Kind == FaultKind.Open).Select(f => f.First).ToHashSet() ?? [];
+        return net.Terminals.FirstOrDefault(t => t.Owner is { } o && BoardPackages.IsBuilt(o) && !open.Contains(t)) ?? net.Terminals.FirstOrDefault();
     }
 
     /// <summary>
@@ -663,7 +726,8 @@ public sealed class ProtoboardCanvas : Control
     public string MeterSays(ProtoboardLayout layout)
     {
         var (reading, note) = Reading(layout);
-        return reading.StartsWith('-') && reading.Contains(' ', StringComparison.Ordinal) ? $"Meter: {note}" : $"Meter: {reading} V, {note}";
+        var unit = MeterRange switch { 1 => " Ω", 2 => _beep ? " (beep)" : "", 3 => " mA", _ => " V" };
+        return reading.StartsWith('-') && reading.Contains(' ', StringComparison.Ordinal) ? $"Meter: {note}" : $"Meter: {reading}{unit}, {note}";
     }
 
     /// <summary>The part under a point: on the bench, a chip's body, a part's pins, a two-lead part's body.</summary>

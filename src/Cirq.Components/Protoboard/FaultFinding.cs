@@ -163,6 +163,37 @@ public static class FaultFinding
         }
     }
 
+    /// <summary>
+    /// What a pin's net is at with the hidden fault in the circuit, at its operating point (its DC state): what a meter on
+    /// the bench would read. It solves a copy, so the circuit and its run are untouched. Null when it can't be solved.
+    /// </summary>
+    public static double? Measure(Circuit circuit, Terminal pin)
+    {
+        ArgumentNullException.ThrowIfNull(circuit);
+        ArgumentNullException.ThrowIfNull(pin);
+        var copy = Serialization.CircuitSerializer.FromJson(Serialization.CircuitSerializer.ToJson(circuit)).Circuit;
+        copy.RestoreFaults(circuit.FaultMarks());
+        var at = pin.Owner is { } owner ? Flattening.Flatten(copy.Components).FirstOrDefault(c => c.Id == owner.Id)?.Terminals.FirstOrDefault(t => t.Id == pin.Id) : null;
+        if (at is null) return null;
+        try
+        {
+            var simulator = new Cirq.Engine.Simulation.CircuitSimulator(copy, new Cirq.Core.Simulation.SimulationSettings());
+            simulator.Reset();
+            simulator.SolveOperatingPoint();
+            return simulator.NodeVoltage(at);
+        }
+        catch (Exception e) when (e is not OutOfMemoryException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// A fault found, scored out of 100: fifteen off for each wrong guess, ten for each hint, two for each minute it took.
+    /// </summary>
+    public static int Score(int guesses, int hints, TimeSpan time) =>
+        Math.Clamp(100 - (15 * Math.Max(0, guesses - 1)) - (10 * hints) - (2 * (int)time.TotalMinutes), 0, 100);
+
     /// <summary>Whether a guess is right: the part, or one of the two parts, the fault is at.</summary>
     public static bool IsFaultAt(Circuit circuit, CircuitComponent part) =>
         circuit is not null && part is not null && circuit.Faults.Any(f => f.Parts.Contains(part));

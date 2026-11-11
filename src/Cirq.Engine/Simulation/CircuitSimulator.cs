@@ -28,6 +28,11 @@ public sealed class CircuitSimulator
     private double? _suggestedStep;
     private bool _errorMeasured;
     private double _lastProbeSampleTime = double.NegativeInfinity;
+
+    // The last point decimation skipped, with every probe's value there: recorded before the next sample that comes
+    // after a gap, so a long step (stepping from event to event) still shows the state that held across it.
+    private double _heldTime = double.NaN;
+    private double[] _held = [];
     private LuSolver? _lu;
 
     public CircuitSimulator(Circuit circuit, SimulationSettings? settings = null)
@@ -165,6 +170,7 @@ public sealed class CircuitSimulator
         LastIterationCount = 0;
         LastDeltaCycles = 0;
         _lastProbeSampleTime = double.NegativeInfinity;
+        _heldTime = double.NaN;
     }
 
     /// <summary>
@@ -247,6 +253,13 @@ public sealed class CircuitSimulator
 
         return Math.Clamp(_suggestedStep ?? Settings.TimeStep, Settings.MinTimeStep, Settings.MaxTimeStep);
     }
+
+    /// <summary>
+    /// Whether anything in the circuit integrates (a capacitor, an inductor, a part with charge or flux of its own), and
+    /// so needs its steps kept short for accuracy. A circuit with nothing that does changes only when its logic does,
+    /// and can step from one event to the next.
+    /// </summary>
+    public bool HasIntegratingParts => _integrating.Count > 0;
 
     /// <summary>Advances one time point of at most <paramref name="requestedStep"/> seconds.</summary>
     public double Step(double requestedStep)
@@ -759,13 +772,24 @@ public sealed class CircuitSimulator
     /// </summary>
     public void SampleProbes()
     {
+        var probes = Circuit.Probes;
         if (Settings.ProbeSampleInterval > 0 &&
             State.Time - _lastProbeSampleTime < Settings.ProbeSampleInterval)
+        {
+            if (_held.Length != probes.Count) _held = new double[probes.Count];
+            for (var i = 0; i < probes.Count; i++) _held[i] = SampleProbe(probes[i]);
+            _heldTime = State.Time;
             return;
+        }
+
+        // The point skipped just before a long step: what held across it, or its edges would be lost.
+        if (!double.IsNaN(_heldTime) && _held.Length == probes.Count && State.Time - _heldTime > Settings.ProbeSampleInterval / 2)
+            for (var i = 0; i < probes.Count; i++) probes[i].Record(_heldTime, _held[i]);
+        _heldTime = double.NaN;
 
         _lastProbeSampleTime = State.Time;
 
-        foreach (var probe in Circuit.Probes)
+        foreach (var probe in probes)
         {
             var value = SampleProbe(probe);
             probe.Record(State.Time, value);

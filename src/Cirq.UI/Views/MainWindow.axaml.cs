@@ -164,8 +164,11 @@ public partial class MainWindow : Window
         _board.InteractiveEditEnded += (_, _) => viewModel.EndInteractiveEdit();
         _board.BoardEdited += (_, _) => viewModel.MarkModified();
         _board.VoltageAt = terminal => viewModel.Simulation.VoltageAt(terminal);
+        _board.CurrentInto = terminal => viewModel.Simulation.CurrentInto(terminal);
+        _board.IsRunning = () => viewModel.Simulation.IsRunning;
         _board.LayoutChanged += (_, _) => viewModel.SetBuildSteps(_board.BuildSteps);
         viewModel.RequestBuildSheet += async (_, _) => await SaveBuildSheetAsync();
+        WireUpLessons(viewModel);
         viewModel.RequestArrangeProtoboard += (_, _) => _board.ArrangeAutomatically();
         viewModel.PropertyChanged += (_, e) =>
         {
@@ -185,6 +188,47 @@ public partial class MainWindow : Window
                 {
                     _canvas?.Focus();
                 }
+            });
+        };
+    }
+
+    /// <summary>
+    /// Fault finding's lessons in the Simulate menu, each with its best score, kept in the settings; and Coach Me, which
+    /// opens the AI Chat and asks Claude to guide the person to the fault.
+    /// </summary>
+    private void WireUpLessons(MainWindowViewModel viewModel)
+    {
+        if (Application.Current is App app)
+        {
+            viewModel.FaultScores = app.Settings.FaultScores;
+            viewModel.SaveSettings = () => app.SettingsStore.Save(app.Settings);
+        }
+
+        if (this.FindControl<MenuItem>("LessonsMenu") is { } menu)
+        {
+            void Fill()
+            {
+                menu.Items.Clear();
+                foreach (var lesson in FaultLessons.All)
+                {
+                    var item = new MenuItem { Header = viewModel.LessonHeader(lesson), Command = viewModel.StartLessonCommand, CommandParameter = lesson };
+                    ToolTip.SetTip(item, lesson.Symptom);
+                    menu.Items.Add(item);
+                }
+            }
+
+            Fill();
+            menu.SubmenuOpened += (_, _) => Fill();
+        }
+
+        viewModel.RequestCoach += (_, prompt) =>
+        {
+            viewModel.IsChatOpen = true;
+            Dispatcher.UIThread.Post(() =>
+            {
+                if (_chat is null) return;
+                _chat.Input.Text = prompt;
+                _chat.Send();
             });
         };
     }

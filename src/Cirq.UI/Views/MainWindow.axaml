@@ -41,6 +41,8 @@
         <Separator />
         <MenuItem Header="_Export..." InputGesture="Ctrl+E" Command="{Binding ExportCommand}"
                   ToolTip.Tip="Write the schematic and the traces out as PNG, JPEG, BMP, SVG or PDF" />
+        <MenuItem Header="Export _Gerber Files for a PCB..." Command="{Binding ExportGerbersCommand}"
+                  ToolTip.Tip="The circuit on a single-sided printed circuit board, as a board house takes it: copper, solder mask, silkscreen, outline and drill files, zipped" />
         <Separator />
         <MenuItem Header="_Examples..." InputGesture="Ctrl+Shift+E"
                   Command="{Binding ShowExamplesCommand}"
@@ -122,9 +124,11 @@
           <MenuItem Header="_Breadboard" ToggleType="Radio" IsChecked="{Binding IsBreadboard, Mode=TwoWay}"
                     ToolTip.Tip="Solderless breadboards: parts and wires can be arranged by hand" />
           <MenuItem Header="_Stripboard" ToggleType="Radio" IsChecked="{Binding IsStripboard, Mode=TwoWay}"
-                    ToolTip.Tip="Copper strips, cut where two nets part and joined by wire links, laid out automatically" />
+                    ToolTip.Tip="Copper strips, cut where two nets part and joined by wire links" />
           <MenuItem Header="_Perfboard" ToggleType="Radio" IsChecked="{Binding IsPerfboard, Mode=TwoWay}"
-                    ToolTip.Tip="A pad at every hole, wired on the back, laid out automatically" />
+                    ToolTip.Tip="A pad at every hole, wired on the back" />
+          <MenuItem Header="P_CB" ToggleType="Radio" IsChecked="{Binding IsPcb, Mode=TwoWay}"
+                    ToolTip.Tip="A single-sided printed circuit board: traces routed on the back, ready for Gerber export" />
         </MenuItem>
         <MenuItem Header="Build _Guide..." Command="{Binding OpenBuildGuideCommand}"
                   ToolTip.Tip="The board as numbered steps to build it from, shown on the board one at a time" />
@@ -174,6 +178,10 @@
                     ToolTip.Tip="Each hint says more: what kind of fault, then where to look, then the part" />
           <MenuItem Header="_Is the Selected Part the Fault?" Command="{Binding GuessFaultCommand}"
                     ToolTip.Tip="Select the part you suspect on the schematic or the board, then ask" />
+          <MenuItem Header="Coach _Me (AI Chat)" Command="{Binding CoachMeCommand}"
+                    ToolTip.Tip="Claude guides you to the fault without giving it away: what to measure next, and what it shows" />
+          <MenuItem Header="_Lessons" Name="LessonsMenu"
+                    ToolTip.Tip="Puzzles on the examples, each with a symptom to start from; scored, with your best kept" />
           <MenuItem Header="_Reveal the Fault" Command="{Binding RevealFaultCommand}" />
           <MenuItem Header="_Clear the Fault" Command="{Binding ClearFaultCommand}" />
         </MenuItem>
@@ -514,6 +522,8 @@
                     Command="{Binding SetBoardKindCommand}" CommandParameter="Stripboard" ToolTip.Tip="Copper strips, cut and linked" />
             <Button Classes="sheet" Classes.current="{Binding IsPerfboard}" Content="Perfboard" CornerRadius="4" FontSize="11" Padding="8,3"
                     Command="{Binding SetBoardKindCommand}" CommandParameter="Perfboard" ToolTip.Tip="Pads, wired on the back" />
+            <Button Classes="sheet" Classes.current="{Binding IsPcb}" Content="PCB" CornerRadius="4" FontSize="11" Padding="8,3"
+                    Command="{Binding SetBoardKindCommand}" CommandParameter="Pcb" ToolTip.Tip="A printed circuit board, its traces routed" />
             <Border Width="1" Margin="3,2" Background="{DynamicResource PanelBorder}" />
             <Button Name="BuildGuideButton" Classes="sheet" Classes.current="{Binding IsBuildGuideOpen}" Content="Build Guide" CornerRadius="4" FontSize="11" Padding="8,3"
                     Command="{Binding OpenBuildGuideCommand}" ToolTip.Tip="Step by step, as you'd build it" />

@@ -29,7 +29,11 @@ public sealed record StripSegment(int Column, int From, int To, Net? Net);
 /// <summary>A jumper wire between two holes, carrying one net.</summary>
 /// <param name="Key">Which two strips it joins: the same key while the layout keeps that wire, so a moved end can be remembered.</param>
 /// <param name="Route">Where it runs, in pitches, from <paramref name="From"/> to <paramref name="To"/>: kept off the parts where it can be.</param>
-public sealed record BoardWire(string Key, Net Net, BoardHole From, BoardHole To, WireRole Role, int Colour, bool ByHand, IReadOnlyList<(double X, double Y)> Route);
+public sealed record BoardWire(string Key, Net Net, BoardHole From, BoardHole To, WireRole Role, int Colour, bool ByHand, IReadOnlyList<(double X, double Y)> Route)
+{
+    /// <summary>A printed circuit board's copper trace, on the back; its jumpers and every other board's wires are not.</summary>
+    public bool IsTrace { get; init; }
+}
 
 /// <summary>A lead from a bench part's terminal to a hole.</summary>
 /// <param name="Route">Where it runs, in pitches, from the equipment to its hole: kept off the parts where it can be.</param>
@@ -166,7 +170,7 @@ public sealed class ProtoboardLayout
     {
         ArgumentNullException.ThrowIfNull(circuit);
         ArgumentNullException.ThrowIfNull(hand);
-        return hand.Kind == BoardKind.Breadboard ? new Arranger(circuit, hand, first).Run() : SolderedLayout.Arrange(circuit, hand.Kind);
+        return hand.Kind == BoardKind.Breadboard ? new Arranger(circuit, hand, first).Run() : SolderedLayout.Arrange(circuit, hand, first);
     }
 
     /// <summary>The net in a hole, when its strip carries one.</summary>
@@ -196,7 +200,7 @@ public sealed class ProtoboardLayout
     /// </summary>
     public BoardArrangement Freeze(BoardArrangement? wires = null)
     {
-        var frozen = new BoardArrangement();
+        var frozen = new BoardArrangement { Kind = Kind };
         foreach (var part in Parts)
         {
             var pins = new Dictionary<string, BoardHole>(StringComparer.Ordinal);

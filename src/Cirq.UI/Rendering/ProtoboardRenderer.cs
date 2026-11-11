@@ -32,8 +32,13 @@ public sealed record ProtoboardRenderOptions(
 /// <param name="Black">Where the black probe's tip is.</param>
 /// <param name="Reading">The display: "4.982", or dashes when it reads nothing.</param>
 /// <param name="Note">Under the display: what it is measuring.</param>
-public sealed record MeterView(double X, double Y, (double X, double Y) Red, (double X, double Y) Black, string Reading, string Note)
+/// <param name="Range">What it measures: 0 volts, 1 ohms, 2 continuity, 3 amps.</param>
+/// <param name="Beep">Continuity: the probes are joined, and it is beeping.</param>
+public sealed record MeterView(double X, double Y, (double X, double Y) Red, (double X, double Y) Black, string Reading, string Note, int Range = 0, bool Beep = false)
 {
+    /// <summary>The ranges round the dial, in order: what each reads in, as its display labels it.</summary>
+    public static readonly string[] Units = ["V DC", "Ω", "•))) continuity", "mA"];
+
     public const double Width = 11.0;
     public const double Height = 16.0;
 
@@ -128,7 +133,10 @@ public static class ProtoboardRenderer
             // The wires lie on the board and the parts stand on top of them, as they do on a real one: a wire is never
             // drawn over a part, and the layout routes them round the parts where it can, so they stay in sight too.
             // Perfboard's are on the back, seen through the board.
-            foreach (var wire in layout.Wires.Where(Shown)) DrawWire(canvas, wire, ReferenceEquals(wire, options.Wire), back: layout.Kind == BoardKind.Perfboard);
+            // A PCB's traces are on the back too, its jumpers on top.
+            foreach (var wire in layout.Wires.Where(Shown))
+                if (wire.IsTrace) DrawTrace(canvas, wire, ReferenceEquals(wire, options.Wire));
+                else DrawWire(canvas, wire, ReferenceEquals(wire, options.Wire), back: layout.Kind == BoardKind.Perfboard);
             foreach (var item in layout.Bench.Where(Shown))
                 foreach (var lead in item.Leads) DrawLead(canvas, lead);
 
@@ -274,11 +282,12 @@ public static class ProtoboardRenderer
     private static void DrawSoldered(ISymbolCanvas canvas, ProtoboardLayout layout, ProtoboardRenderOptions options, Func<object, bool> shown)
     {
         var strips = layout.Kind == BoardKind.Stripboard;
+        var pcb = layout.Kind == BoardKind.Pcb;
         var width = SolderedLayout.Width(layout.Columns);
         var height = SolderedLayout.Height(layout.Rows);
         var body = new Rect(P(0, 0), P(width, height));
         canvas.DrawRectangle(Shadow, null, new RoundedRect(body.Translate(new Vector(0.35 * Unit, 0.45 * Unit)), 0.4 * Unit));
-        canvas.DrawRectangle(Brush(strips ? "#C9A36B" : "#3C7A55"), Pen(strips ? "#9C7A48" : "#2A5A3E", 0.08), new RoundedRect(body, 0.4 * Unit));
+        canvas.DrawRectangle(Brush(strips ? "#C9A36B" : pcb ? "#1E6B3C" : "#3C7A55"), Pen(strips ? "#9C7A48" : pcb ? "#134A29" : "#2A5A3E", 0.08), new RoundedRect(body, pcb ? 0.15 * Unit : 0.4 * Unit));
 
         if (strips)
             foreach (var segment in layout.Segments)
@@ -294,6 +303,25 @@ public static class ProtoboardRenderer
             {
                 var hole = new BoardHole(1, row, column);
                 var centre = P(SolderedLayout.Position(hole));
+
+                // A PCB is drilled only where something goes: a tinned pad, the rest solder mask.
+                if (pcb)
+                {
+                    if (!layout.HoleNets.ContainsKey(hole) && layout.PartAt(hole) is null)
+                    {
+                        if (lit.Contains(hole)) canvas.DrawEllipse(Lit, null, centre, 0.25 * Unit, 0.25 * Unit);
+                        continue;
+                    }
+
+                    var square = layout.PartAt(hole) is { Package.Form: BoardForm.Dip or BoardForm.Inline } owner && owner.Holes[0] == hole;
+                    var radius = PcbRouter.PadDiameter / PcbRouter.Pitch / 2;
+                    if (square) canvas.FillRectangle(Brush("#D8C9A0"), new Rect(centre - new Point(radius * Unit, radius * Unit), new Size(2 * radius * Unit, 2 * radius * Unit)));
+                    else canvas.DrawEllipse(Brush("#D8C9A0"), null, centre, radius * Unit, radius * Unit);
+                    if (lit.Contains(hole)) canvas.DrawEllipse(Lit, null, centre, 0.4 * Unit, 0.4 * Unit);
+                    canvas.DrawEllipse(Drill, null, centre, PcbRouter.DrillDiameter / PcbRouter.Pitch / 2 * Unit, PcbRouter.DrillDiameter / PcbRouter.Pitch / 2 * Unit);
+                    continue;
+                }
+
                 if (!strips) canvas.DrawEllipse(Pad, null, centre, 0.34 * Unit, 0.34 * Unit);
                 if (lit.Contains(hole)) canvas.DrawEllipse(Lit, null, centre, 0.4 * Unit, 0.4 * Unit);
                 canvas.DrawEllipse(Drill, null, centre, 0.15 * Unit, 0.15 * Unit);
@@ -308,7 +336,7 @@ public static class ProtoboardRenderer
             canvas.DrawLine(cross, new Point(centre.X - (0.3 * Unit), centre.Y + (0.3 * Unit)), new Point(centre.X + (0.3 * Unit), centre.Y - (0.3 * Unit)));
         }
 
-        var print = Brush(strips ? "#6E5530" : "#CFE3D6");
+        var print = Brush(strips ? "#6E5530" : pcb ? "#9CC9AB" : "#CFE3D6");
         for (var column = 1; column <= layout.Columns; column++)
             canvas.DrawText(SolderedLayout.Letters(column), P(SolderedLayout.Position(new BoardHole(1, 0, column)).X, 1.2), 0.5 * Unit, print, SymbolTextAlign.Centre);
         for (var row = 1; row <= layout.Rows; row++)
@@ -350,14 +378,24 @@ public static class ProtoboardRenderer
         var display = new Rect(inner.X + (0.5 * Unit), inner.Y + (0.6 * Unit), inner.Width - (1.0 * Unit), 3.4 * Unit);
         canvas.DrawRectangle(Brush("#B9C7A8"), Pen("#5A6650", 0.06), new RoundedRect(display, 0.3 * Unit));
         canvas.DrawText(meter.Reading, new Point(display.Right - (0.4 * Unit), display.Center.Y), 1.7 * Unit, Brush("#1C2414"), SymbolTextAlign.Right);
-        canvas.DrawText("V DC", new Point(display.Left + (0.4 * Unit), display.Bottom - (0.55 * Unit)), 0.55 * Unit, Brush("#1C2414"), SymbolTextAlign.Left);
+        canvas.DrawText(MeterView.Units[meter.Range], new Point(display.Left + (0.4 * Unit), display.Bottom - (0.55 * Unit)), 0.55 * Unit, Brush("#1C2414"), SymbolTextAlign.Left);
         canvas.DrawText(meter.Note, new Point(inner.Center.X, display.Bottom + (0.9 * Unit)), 0.55 * Unit, Brush("#D9D9D9"), SymbolTextAlign.Centre);
 
-        // The dial, at volts.
+        // The dial, pointing at the range: V, Ω, continuity and A round its top.
         var dial = new Point(inner.Center.X, inner.Y + (8.6 * Unit));
         canvas.DrawEllipse(Brush("#3A3A3E"), Pen("#121214", 0.08), dial, 2.2 * Unit, 2.2 * Unit);
-        canvas.DrawLine(Pen("#E6E6E6", 0.22), dial, new Point(dial.X - (1.3 * Unit), dial.Y - (1.3 * Unit)));
-        canvas.DrawText("V⎓", new Point(dial.X - (2.6 * Unit), dial.Y - (2.4 * Unit)), 0.6 * Unit, Brush("#E6E6E6"), SymbolTextAlign.Centre);
+        string[] marks = ["V⎓", "Ω", "•)))", "A"];
+        for (var i = 0; i < marks.Length; i++)
+        {
+            var angle = (-135 + (i * 90)) * Math.PI / 180 / 1.5;
+            var at = new Point(dial.X + (Math.Sin(angle) * 3.0 * Unit), dial.Y - (Math.Cos(angle) * 3.0 * Unit));
+            canvas.DrawText(marks[i], at, 0.55 * Unit, Brush(i == meter.Range ? "#FFFFFF" : "#9A9A9E"), SymbolTextAlign.Centre);
+        }
+
+        var pointer = (-135 + (meter.Range * 90)) * Math.PI / 180 / 1.5;
+        canvas.DrawLine(Pen("#E6E6E6", 0.22), dial, new Point(dial.X + (Math.Sin(pointer) * 1.6 * Unit), dial.Y - (Math.Cos(pointer) * 1.6 * Unit)));
+        if (meter.Beep)
+            canvas.DrawText("♪ beep", new Point(display.Left + (0.4 * Unit), display.Top + (0.6 * Unit)), 0.6 * Unit, Brush("#1C2414"), SymbolTextAlign.Left);
 
         foreach (var (jack, colour, label) in new[] { (meter.BlackJack, "#111111", "COM"), (meter.RedJack, "#C62828", "V") })
         {
@@ -367,6 +405,22 @@ public static class ProtoboardRenderer
     }
 
     // ───────────────────────────── wires ─────────────────────────────
+
+    /// <summary>A PCB's copper trace on the back, seen through the board and its solder mask, as a lighter green.</summary>
+    private static void DrawTrace(ISymbolCanvas canvas, BoardWire wire, bool picked)
+    {
+        var path = new SymbolPath();
+        using (var ctx = path.Open())
+        {
+            ctx.BeginFigure(P(wire.Route[0]), false);
+            foreach (var point in wire.Route.Skip(1)) ctx.LineTo(P(point));
+            ctx.EndFigure(false);
+        }
+
+        var width = (wire.Role == WireRole.Signal ? PcbRouter.SignalWidth : PcbRouter.PowerWidth) / PcbRouter.Pitch;
+        canvas.DrawGeometry(null, Pen("#7FD39A", width), path);
+        if (picked) canvas.DrawGeometry(null, Pen("#802F80ED", width + 0.4), path);
+    }
 
     private static void DrawWire(ISymbolCanvas canvas, BoardWire wire, bool picked, bool back = false)
     {

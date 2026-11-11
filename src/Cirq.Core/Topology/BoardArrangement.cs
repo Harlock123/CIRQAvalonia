@@ -21,6 +21,9 @@ public enum BoardKind
 
     /// <summary>Perfboard: a pad at every hole and nothing joined, wired on the back.</summary>
     Perfboard,
+
+    /// <summary>A single-sided printed circuit board: pads where the pins go, joined by routed copper traces on the back.</summary>
+    Pcb,
 }
 
 /// <summary>Where one part was put by hand: a hole for each of its pins, or a spot on the bench beside the boards.</summary>
@@ -60,7 +63,7 @@ public sealed class BoardArrangement
 
     private BoardKind _kind;
 
-    /// <summary>What the circuit is built on. Places made by hand are on breadboards; the others are laid out automatically.</summary>
+    /// <summary>What the circuit is built on. Parts can be put by hand on any of them; the rest are laid out automatically.</summary>
     public BoardKind Kind
     {
         get => _kind;

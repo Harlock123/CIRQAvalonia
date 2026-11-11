@@ -457,7 +457,13 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         set { if (value) SetBoardKind(nameof(BoardKind.Perfboard)); }
     }
 
-    /// <summary>Builds the protoboard view on breadboards, stripboard or perfboard: an undo step, saved with the circuit.</summary>
+    public bool IsPcb
+    {
+        get => Circuit.Board.Kind == BoardKind.Pcb;
+        set { if (value) SetBoardKind(nameof(BoardKind.Pcb)); }
+    }
+
+    /// <summary>Builds the protoboard view on breadboards, stripboard, perfboard or a PCB: an undo step, saved with the circuit.</summary>
     [RelayCommand]
     private void SetBoardKind(string? kind)
     {
@@ -472,9 +478,13 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         IsModified = true;
         IsProtoboardView = true;
         RefreshBoardKind();
-        StatusMessage = wanted == BoardKind.Breadboard
-            ? "On breadboards: drag parts, leads and wire ends to arrange them by hand"
-            : $"On {wanted.ToString().ToLowerInvariant()}, laid out automatically{(wanted == BoardKind.Stripboard ? ": the strips run down the board, cut where two nets part (✕), joined by wire links" : ": a pad at every hole, wired on the back")}";
+        StatusMessage = wanted switch
+        {
+            BoardKind.Breadboard => "On breadboards: drag parts, leads and wire ends to arrange them by hand",
+            BoardKind.Stripboard => "On stripboard: the strips run down the board, cut where two nets part (✕), joined by wire links; drag parts to move them",
+            BoardKind.Perfboard => "On perfboard: a pad at every hole, wired on the back; drag parts to move them",
+            _ => "On a printed circuit board: the traces routed on the back, a jumper where one can't get through; drag parts to move them, File › Export Gerber Files for the board house",
+        };
         RequestRedraw?.Invoke(this, EventArgs.Empty);
     }
 
@@ -484,6 +494,42 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(IsBreadboard));
         OnPropertyChanged(nameof(IsStripboard));
         OnPropertyChanged(nameof(IsPerfboard));
+        OnPropertyChanged(nameof(IsPcb));
+    }
+
+    /// <summary>
+    /// Writes the Gerber and drill files for the circuit on a printed circuit board, zipped: the board as it is when the
+    /// view is on PCB, laid out afresh as one otherwise.
+    /// </summary>
+    public string ExportGerbers(string path)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+        var layout = Circuit.Board.Kind == BoardKind.Pcb ? Cirq.Components.Protoboard.ProtoboardLayout.Arrange(Circuit) : Cirq.Components.Protoboard.SolderedLayout.Arrange(Circuit, BoardKind.Pcb);
+        if (layout.Parts.Count == 0) throw new InvalidOperationException("There's nothing on the board to make a PCB of.");
+        using (var stream = File.Create(path))
+            Cirq.Components.Protoboard.PcbGerber.WriteZip(layout, stream, Path.GetFileNameWithoutExtension(path));
+        var jumpers = layout.Wires.Count(w => !w.IsTrace);
+        return $"Gerber files written to {Path.GetFileName(path)}: {layout.Columns} × {layout.Rows} holes, {layout.Wires.Count(w => w.IsTrace)} traces" +
+               (jumpers > 0 ? $", {jumpers} wire jumper{(jumpers == 1 ? "" : "s")} on the component side" : "") +
+               (layout.Matches ? "" : $". Check it first: {string.Join(" ", layout.Problems)}");
+    }
+
+    [RelayCommand]
+    private async Task ExportGerbersAsync()
+    {
+        if (FileDialogs is null) return;
+        var title = Circuit.Title.Length > 0 ? Circuit.Title : "circuit";
+        var path = await FileDialogs.PickSavePathAsync($"{title} gerbers.zip");
+        if (path is null) return;
+        if (!path.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)) path = Path.ChangeExtension(path, ".zip");
+        try
+        {
+            StatusMessage = ExportGerbers(path);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            await FileDialogs.ReportAsync("Gerber files", $"Could not write the Gerber files: {ex.Message}");
+        }
     }
 
     // ---- the multimeter ----
@@ -576,6 +622,71 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
     private int _faultGuesses;
     private int _faultHints;
+    private DateTime _faultStarted;
+
+    /// <summary>The lesson under way, or null for a fault hidden at random.</summary>
+    public FaultLesson? CurrentLesson { get; private set; }
+
+    /// <summary>Best scores by lesson, from the settings; set by the window.</summary>
+    public IDictionary<string, int>? FaultScores { get; set; }
+
+    /// <summary>Saves the settings when a best score changes; set by the window.</summary>
+    public Action? SaveSettings { get; set; }
+
+    /// <summary>A lesson's menu line: its name, and the best score so far.</summary>
+    public string LessonHeader(FaultLesson lesson) =>
+        FaultScores?.TryGetValue(lesson.Name, out var best) == true ? $"{lesson.Name}  (best {best})" : lesson.Name;
+
+    /// <summary>Starts a lesson: its example loaded, its fault hidden, the clock started.</summary>
+    [RelayCommand]
+    private void StartLesson(FaultLesson? lesson)
+    {
+        if (lesson is null) return;
+        var example = ViewModels.Examples.All.FirstOrDefault(e => e.Name == lesson.Example);
+        if (example is null) return;
+        LoadExample(example);
+        try
+        {
+            Cirq.Components.Protoboard.FaultFinding.Hide(Circuit, lesson.Kind, Pin(lesson.Pin), lesson.Second is null ? null : Pin(lesson.Second));
+        }
+        catch (ArgumentException e)
+        {
+            StatusMessage = $"That lesson can't be set up: {e.Message}";
+            return;
+        }
+
+        CurrentLesson = lesson;
+        _faultGuesses = 0;
+        _faultHints = 0;
+        _faultStarted = DateTime.UtcNow;
+        Simulation.InvalidateTopology();
+        OnPropertyChanged(nameof(HasHiddenFault));
+        StatusMessage = $"Lesson: {lesson.Name}. {lesson.Symptom} Run it (F5), probe and measure, then select the part you suspect and choose Is the Selected Part the Fault?";
+    }
+
+    private Terminal Pin(string name)
+    {
+        var dot = name.IndexOf('.', StringComparison.Ordinal);
+        return Circuit.Components.First(c => c.Name == name[..dot]).TerminalByName(name[(dot + 1)..]);
+    }
+
+    /// <summary>Raised to ask Claude, in the AI Chat, to coach the person through finding the fault without giving it away.</summary>
+    public event EventHandler<string>? RequestCoach;
+
+    [RelayCommand]
+    private void CoachMe()
+    {
+        if (!HasHiddenFault)
+        {
+            StatusMessage = "There's no fault hidden to be coached on: start a lesson, or Hide a Fault, first.";
+            return;
+        }
+
+        var symptom = CurrentLesson is { } lesson ? $" The symptom: {lesson.Symptom}" : "";
+        RequestCoach?.Invoke(this, $"Coach me through finding the fault hidden in this circuit.{symptom} Don't tell me where it is: ask me what I'd measure or look at next, " +
+                                   "tell me what that measurement would show (use the fault tool's measure action, which reads the faulty circuit), and nudge me if I'm stuck. " +
+                                   "Only use the fault tool's hint action if I ask for a hint, and never reveal it unless I give up.");
+    }
 
     public bool HasHiddenFault => Circuit.Faults.Count > 0;
 
@@ -587,6 +698,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         var fault = Cirq.Components.Protoboard.FaultFinding.Hide(Circuit);
         _faultGuesses = 0;
         _faultHints = 0;
+        _faultStarted = DateTime.UtcNow;
+        CurrentLesson = null;
         Simulation.InvalidateTopology();
         OnPropertyChanged(nameof(HasHiddenFault));
         StatusMessage = fault is null
@@ -631,8 +744,22 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         }
 
         var fault = Circuit.Faults[0];
+        var score = Cirq.Components.Protoboard.FaultFinding.Score(_faultGuesses, _faultHints, DateTime.UtcNow - _faultStarted);
+        var best = "";
+        if (CurrentLesson is { } lesson && FaultScores is { } scores)
+        {
+            if (!scores.TryGetValue(lesson.Name, out var before) || score > before)
+            {
+                scores[lesson.Name] = score;
+                SaveSettings?.Invoke();
+                best = " A new best.";
+            }
+            else best = $" Your best is {before}.";
+        }
+
         EndFault();
-        StatusMessage = $"Found it in {_faultGuesses} guess{(_faultGuesses == 1 ? "" : "es")}{(_faultHints > 0 ? $" and {_faultHints} hint{(_faultHints == 1 ? "" : "s")}" : "")}: {fault.Describe()} It's fixed now.";
+        CurrentLesson = null;
+        StatusMessage = $"Found it in {_faultGuesses} guess{(_faultGuesses == 1 ? "" : "es")}{(_faultHints > 0 ? $" and {_faultHints} hint{(_faultHints == 1 ? "" : "s")}" : "")}: {fault.Describe()} It's fixed now. Score {score} out of 100.{best}";
     }
 
     [RelayCommand]
@@ -647,6 +774,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         var fault = Circuit.Faults[0];
         SelectedComponent = fault.First.Owner;
         EndFault();
+        CurrentLesson = null;
         StatusMessage = $"The fault: {fault.Describe()} It's fixed now.";
     }
 
@@ -2209,9 +2337,31 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     {
         if (FileDialogs is null) return;
 
+        if (SelectedComponent is Cirq.Components.Processors.Atmega328p chip)
+        {
+            var firmware = await FileDialogs.PickMemoryImageAsync(chip.Name);
+            if (firmware is null) return;
+            try
+            {
+                var image = MemoryImage.Read(firmware.Path, firmware.Offset);
+                string loaded;
+                using (History.Gesture(Circuit, $"Load {Path.GetFileName(firmware.Path)} into {chip.Name}"))
+                    loaded = chip.Load(image);
+                StatusMessage = $"Loaded {Path.GetFileName(firmware.Path)} into {chip.Name}: {loaded}. Run (F5) to start it.";
+                IsModified = true;
+                Simulation.InvalidateTopology();
+            }
+            catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException or ArgumentException)
+            {
+                await FileDialogs.ReportAsync("Could not load that firmware", ex.Message);
+            }
+
+            return;
+        }
+
         if (SelectedComponent is not ParallelMemory memory)
         {
-            StatusMessage = "Select a memory part first — a ROM, an EEPROM or a RAM. This loads a file into one.";
+            StatusMessage = "Select a memory part first — a ROM, an EEPROM or a RAM, or an ATmega328P for its firmware. This loads a file into one.";
             return;
         }
 

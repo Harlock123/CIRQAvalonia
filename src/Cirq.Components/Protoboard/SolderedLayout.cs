@@ -20,8 +20,8 @@ namespace Cirq.Components.Protoboard;
 /// </para>
 /// <para>
 /// Either way the connections are rebuilt from the board alone (copper, cuts, links, wires, leads) and held against the
-/// schematic's netlist, as the breadboard's are. They are laid out automatically; moving parts by hand is the
-/// breadboard's.
+/// schematic's netlist, as the breadboard's are. Parts put somewhere by hand (<see cref="Circuit.Board"/>) go there
+/// first, checked against the copper as they go; the rest are laid out round them.
 /// </para>
 /// </summary>
 public static class SolderedLayout
@@ -44,15 +44,66 @@ public static class SolderedLayout
     /// <summary>A hole as strip and number: <c>C12</c>.</summary>
     public static string Name(BoardHole hole) => $"{Letters(hole.Column)}{hole.Row.ToString(CultureInfo.InvariantCulture)}";
 
-    /// <summary>Lays <paramref name="circuit"/> out on a <paramref name="kind"/>.</summary>
-    public static ProtoboardLayout Arrange(Circuit circuit, BoardKind kind)
+    /// <summary>A hole from its name as <see cref="Name"/> prints it (<c>C12</c>: strip C, hole 12), or null.</summary>
+    public static BoardHole? Parse(string? text)
     {
-        ArgumentNullException.ThrowIfNull(circuit);
-        return new Builder(circuit, kind).Run();
+        var name = text?.Trim().ToUpperInvariant() ?? "";
+        var letters = name.TakeWhile(char.IsAsciiLetterUpper).Count();
+        if (letters is 0 or > 2 || !int.TryParse(name[letters..], NumberStyles.None, CultureInfo.InvariantCulture, out var row) || row < 1) return null;
+        var column = 0;
+        foreach (var c in name[..letters]) column = (column * 26) + (c - 'A' + 1);
+        return new BoardHole(1, row, column);
     }
 
-    private sealed class Builder(Circuit circuit, BoardKind kind)
+    /// <summary>Lays <paramref name="circuit"/> out on a <paramref name="kind"/>.</summary>
+    public static ProtoboardLayout Arrange(Circuit circuit, BoardKind kind) => Arrange(circuit, new BoardArrangement { Kind = kind });
+
+    /// <summary>
+    /// Lays <paramref name="circuit"/> out on the board <paramref name="hand"/> names, keeping what was put somewhere by
+    /// hand in it (<paramref name="first"/>, the part being moved, checked before the others).
+    /// </summary>
+    public static ProtoboardLayout Arrange(Circuit circuit, BoardArrangement hand, Guid? first = null)
     {
+        ArgumentNullException.ThrowIfNull(circuit);
+        ArgumentNullException.ThrowIfNull(hand);
+        return new Builder(circuit, hand.Kind, hand, first).Run();
+    }
+
+    /// <summary>
+    /// The holes a package takes with one pin (<paramref name="index"/>) in <paramref name="at"/>, and the holes its body
+    /// covers: a chip with pin 1 bottom left, its pins counted round anticlockwise; an inline part along a row.
+    /// </summary>
+    public static (List<BoardHole> Holes, List<BoardHole> Covered) Shape(BoardPackage package, int index, BoardHole at)
+    {
+        ArgumentNullException.ThrowIfNull(package);
+        var count = package.Pins.Count;
+        if (package.Form == BoardForm.Dip)
+        {
+            var half = count / 2;
+            var n = index + 1;
+            var (column, top) = n <= half ? (at.Column - (n - 1), at.Row - package.Span) : (at.Column - (count - n), at.Row);
+            return Dip(package, column, top);
+        }
+
+        return ([.. Enumerable.Range(0, count).Select(i => at with { Column = at.Column + i - index })], []);
+    }
+
+    private static (List<BoardHole> Holes, List<BoardHole> Covered) Dip(BoardPackage package, int column, int top)
+    {
+        var count = package.Pins.Count;
+        var half = count / 2;
+        var holes = Enumerable.Range(1, count).Select(n => n <= half
+            ? new BoardHole(1, top + package.Span, column + n - 1)
+            : new BoardHole(1, top, column + count - n)).ToList();
+        var covered = new List<BoardHole>();
+        for (var c = column; c < column + half; c++)
+            for (var r = top + 1; r < top + package.Span; r++) covered.Add(new BoardHole(1, r, c));
+        return (holes, covered);
+    }
+
+    private sealed class Builder(Circuit circuit, BoardKind kind, BoardArrangement hand, Guid? first)
+    {
+        private readonly Dictionary<Guid, string> _refused = [];
         private bool Strips => kind == BoardKind.Stripboard;
 
         private Netlist _netlist = null!;
@@ -85,6 +136,19 @@ public static class SolderedLayout
             }
 
             ChooseSupplies(built);
+
+            // What was put somewhere by hand goes there first, the part being moved before the rest.
+            var placedByHand = new HashSet<CircuitComponent>();
+            _columns = 24;
+            _rows = 16;
+            foreach (var (part, package) in built.OrderBy(p => p.Part.Id == first ? 0 : 1))
+            {
+                if (package.Form == BoardForm.Bench || !hand.Parts.TryGetValue(part.Id, out var placement) || placement.Pins.Count == 0) continue;
+                if (PlaceByHand(part, package, placement) is { } why) _refused[part.Id] = why;
+                else placedByHand.Add(part);
+            }
+
+            built = [.. built.Where(p => !placedByHand.Contains(p.Part))];
             var dips = built.Where(p => p.Package.Form == BoardForm.Dip).OrderBy(p => p.Part.X).ThenBy(p => p.Part.Y).ToList();
             var small = built.Where(p => p.Package.Form is BoardForm.TwoLead or BoardForm.Inline).ToList();
             var bench = built.Where(p => p.Package.Form == BoardForm.Bench).ToList();
@@ -110,7 +174,7 @@ public static class SolderedLayout
 
             var cuts = Strips ? Cut() : [];
             var segments = Strips ? Segment(cuts) : [];
-            var wires = Strips ? Link(segments) : Wire();
+            var wires = Strips ? Link(segments) : kind == BoardKind.Pcb ? Traces() : Wire();
             var problems = Check(segments, wires);
 
             var holeNets = new Dictionary<BoardHole, Net>();
@@ -122,7 +186,7 @@ public static class SolderedLayout
             }
 
             return new ProtoboardLayout(1, _parts, _bench, wires, new Dictionary<BoardStrip, Net>(), new Dictionary<int, Net>(),
-                new Dictionary<Guid, string>(), problems, _unplaced, _captions)
+                _refused, problems, _unplaced, _captions)
             {
                 Kind = kind,
                 Columns = _columns,
@@ -264,7 +328,7 @@ public static class SolderedLayout
                 width += half + gap;
             }
 
-            _columns = Math.Max(24, Math.Max(bands.Max(b => margin + b.Sum(d => (d.Package.Pins.Count / 2) + gap)) + margin, 12 + (int)Math.Ceiling(Math.Sqrt(smallParts) * 4)));
+            _columns = Math.Max(_columns, Math.Max(bands.Max(b => margin + b.Sum(d => (d.Package.Pins.Count / 2) + gap)) + margin, 12 + (int)Math.Ceiling(Math.Sqrt(smallParts) * 4)));
             var row = 5;
             foreach (var band in bands)
             {
@@ -274,21 +338,102 @@ public static class SolderedLayout
                 {
                     var half = package.Pins.Count / 2;
                     var top = row + span - package.Span;
-                    var holes = Enumerable.Range(1, package.Pins.Count).Select(n => n <= half
-                        ? new BoardHole(1, top + package.Span, column + n - 1)
-                        : new BoardHole(1, top, column + package.Pins.Count - n)).ToList();
-                    for (var i = 0; i < holes.Count; i++) Take(holes[i], package.Pins[i] is { } pin ? NetOf(pin) : null);
-                    for (var c = column; c < column + half; c++)
-                        for (var r = top + 1; r < top + package.Span; r++) _blocked.Add(new BoardHole(1, r, c));
-                    _parts.Add(new BoardPart(part, package, holes, false));
-                    _boxes.Add(ProtoboardLayout.DipBox([.. holes.Select(Position)]));
+
+                    // Along the band past anything put there by hand.
+                    _rows = Math.Max(_rows, top + package.Span + 2);
+                    _columns = Math.Max(_columns, column + half + margin);
+                    var (holes, covered) = Dip(package, column, top);
+                    for (var tries = 0; tries < 400 && !DipFits(package, holes, covered); tries++)
+                    {
+                        column++;
+                        if (column + half + margin > _columns) _columns = column + half + margin;
+                        (holes, covered) = Dip(package, column, top);
+                    }
+
+                    CommitDip(part, package, holes, covered, byHand: false);
                     column += half + gap;
                 }
 
                 row += span + 10;
             }
 
-            _rows = Math.Max(row + 2, 16);
+            _rows = Math.Max(_rows, row + 2);
+        }
+
+        private bool DipFits(BoardPackage package, List<BoardHole> holes, List<BoardHole> covered)
+        {
+            for (var i = 0; i < holes.Count; i++)
+                if (!Allows(holes[i], package.Pins[i] is { } pin ? NetOf(pin) : null)) return false;
+            return covered.All(Free) && !Clashes(ProtoboardLayout.DipBox([.. holes.Select(Position)]));
+        }
+
+        private void CommitDip(CircuitComponent part, BoardPackage package, List<BoardHole> holes, List<BoardHole> covered, bool byHand)
+        {
+            for (var i = 0; i < holes.Count; i++) Take(holes[i], package.Pins[i] is { } pin ? NetOf(pin) : null);
+            foreach (var hole in covered) _blocked.Add(hole);
+            _parts.Add(new BoardPart(part, package, holes, byHand));
+            _boxes.Add(ProtoboardLayout.DipBox([.. holes.Select(Position)]));
+        }
+
+        // ---- by hand ----
+
+        /// <summary>Puts a part where it was put by hand, or says why it can't go there.</summary>
+        private string? PlaceByHand(CircuitComponent part, BoardPackage package, BoardPlacement placement)
+        {
+            List<BoardHole> holes;
+            List<BoardHole> covered = [];
+            if (package.Form == BoardForm.TwoLead)
+            {
+                holes = [];
+                foreach (var pin in package.Pins)
+                {
+                    if (pin is null || !placement.Pins.TryGetValue(pin.Id, out var hole)) return $"{part.Name}'s place on the board is missing a pin; it was laid out afresh.";
+                    holes.Add(hole with { Board = 1 });
+                }
+            }
+            else
+            {
+                var index = Enumerable.Range(0, package.Pins.Count).FirstOrDefault(i => package.Pins[i] is { } p && placement.Pins.ContainsKey(p.Id), -1);
+                if (index < 0) return $"{part.Name}'s place on the board names none of its pins; it was laid out afresh.";
+                (holes, covered) = Shape(package, index, placement.Pins[package.Pins[index]!.Id] with { Board = 1 });
+            }
+
+            if (holes.Concat(covered).Any(h => h.Row < 1 || h.Column < 1 || h.Row > 400 || h.Column > 400)) return $"{part.Name} would hang off the board.";
+            _columns = Math.Max(_columns, holes.Concat(covered).Max(h => h.Column) + 3);
+            _rows = Math.Max(_rows, holes.Concat(covered).Max(h => h.Row) + 3);
+
+            var nets = package.Pins.Select(p => p is null ? null : (Net?)NetOf(p)).ToList();
+            for (var i = 0; i < holes.Count; i++)
+            {
+                if (!Free(holes[i])) return $"{Name(holes[i])} is taken.";
+                if (!Allows(holes[i], nets[i]))
+                    return $"{Name(holes[i])} is too close to a pin of another net on strip {Letters(holes[i].Column)}: there's no room to cut the copper between them.";
+                for (var j = 0; j < i; j++)
+                    if (Strips && holes[i].Column == holes[j].Column && !ReferenceEquals(nets[i], nets[j]) && Math.Abs(holes[i].Row - holes[j].Row) < 2)
+                        return $"{part.Name}'s pins would be on strip {Letters(holes[i].Column)} with no room for a cut between them.";
+            }
+
+            if (covered.FirstOrDefault(h => !Free(h)) is { Row: > 0 } under) return $"{part.Name}'s body would sit on {Name(under)}, which is in use.";
+            var points = holes.Select(Position).ToList();
+            var clash = package.Form switch
+            {
+                BoardForm.TwoLead => Clashes(ProtoboardLayout.Discs(part, package, points[0], points[1])),
+                BoardForm.Dip => Clashes(ProtoboardLayout.DipBox([.. points])),
+                _ => Clashes(ProtoboardLayout.InlineBox(package.Look, points, up: true)),
+            };
+            if (clash) return $"{part.Name} would sit on another part there.";
+
+            if (package.Form == BoardForm.Dip)
+            {
+                CommitDip(part, package, holes, covered, byHand: true);
+                return null;
+            }
+
+            for (var i = 0; i < holes.Count; i++) Take(holes[i], nets[i]);
+            _parts.Add(new BoardPart(part, package, holes, true));
+            if (package.Form == BoardForm.TwoLead) _discs.AddRange(ProtoboardLayout.Discs(part, package, points[0], points[1]));
+            else _boxes.Add(ProtoboardLayout.InlineBox(package.Look, points, up: true));
+            return null;
         }
 
         private static (double X, double Y) Position(BoardHole hole) => SolderedLayout.Position(hole);
@@ -408,8 +553,9 @@ public static class SolderedLayout
             {
                 var width = package.Look == BoardLook.DevBoard ? 20.0 : 15.0;
                 var height = Math.Max(6.0, 4.0 + (package.Pins.Count * 1.8));
-                var (x, top) = (-width - 8.0, y);
-                y += height + 2.0;
+                var byHand = hand.Parts.TryGetValue(part.Id, out var placed) && placed.BenchX is not null && placed.BenchY is not null;
+                var (x, top) = byHand ? (placed!.BenchX!.Value, placed.BenchY!.Value) : (-width - 8.0, y);
+                if (!byHand) y += height + 2.0;
 
                 var leads = new List<BenchLead>();
                 for (var i = 0; i < package.Pins.Count; i++)
@@ -428,7 +574,7 @@ public static class SolderedLayout
                     leads.Add(new BenchLead(pin, net, at, Role(net), Colour(net), [start, (Math.Min(start.Item1 + 3, end.X - 1), start.Item2), end]));
                 }
 
-                _bench.Add(new BenchPart(part, package, x, top, width, height, leads, false));
+                _bench.Add(new BenchPart(part, package, x, top, width, height, leads, byHand));
             }
         }
 
@@ -622,6 +768,30 @@ public static class SolderedLayout
             }
 
             return wires;
+        }
+
+        // ---- printed circuit board: routed traces ----
+
+        /// <summary>Each net's pads joined by copper traces on the back, routed round each other; a jumper where one can't be.</summary>
+        private List<BoardWire> Traces()
+        {
+            var nets = _netHoles.OrderBy(n => n.Key.IsGround ? -1 : n.Key.Index).Select(n => new PcbRouter.NetPads(n.Key, n.Value.Distinct().ToList())).ToList();
+            var loose = _pins.Where(p => p.Value is null).Select(p => p.Key);
+
+            // Where a jumper's ends can't go: under a part's body on the component side.
+            var under = new HashSet<BoardHole>(_blocked);
+            for (var row = 1; row <= _rows; row++)
+                for (var column = 1; column <= _columns; column++)
+                {
+                    var hole = new BoardHole(1, row, column);
+                    var (x, y) = Position(hole);
+                    if (_discs.Any(d => Distance((x, y), (d.X, d.Y)) < d.R + 0.3) || _boxes.Any(b => x > b.L - 0.3 && x < b.R + 0.3 && y > b.T - 0.3 && y < b.B + 0.3))
+                        under.Add(hole);
+                }
+
+            return PcbRouter.Route(nets, loose, under, _columns, _rows, (net, a, b, route) => route is null
+                ? new BoardWire($"jumper:{Name(a)}-{Name(b)}", net, a, b, Role(net), Colour(net), false, [Position(a), Position(b)])
+                : new BoardWire($"trace:{Name(a)}-{Name(b)}", net, a, b, Role(net), Colour(net), false, route) { IsTrace = true });
         }
 
         // ---- the check ----

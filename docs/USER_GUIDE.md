@@ -56,16 +56,17 @@ the [README](../README.md), and what changed between releases is in the
 44. [A 6809 computer](#a-6809-computer)
 45. [A Z80 computer](#a-z80-computer)
 46. [An 8085 computer](#an-8085-computer)
-47. [Saving and loading](#saving-and-loading)
-48. [Printing](#printing)
-49. [Exporting](#exporting)
-50. [The command line](#the-command-line)
-51. [AI: the chat and agents](#ai-the-chat-and-agents)
-52. [Appearance](#appearance)
-53. [What version is this](#what-version-is-this)
-54. [Closing a dialog](#closing-a-dialog)
-55. [Keyboard reference](#keyboard-reference)
-56. [When a circuit will not simulate](#when-a-circuit-will-not-simulate)
+47. [An ATmega328P](#an-atmega328p)
+48. [Saving and loading](#saving-and-loading)
+49. [Printing](#printing)
+50. [Exporting](#exporting)
+51. [The command line](#the-command-line)
+52. [AI: the chat and agents](#ai-the-chat-and-agents)
+53. [Appearance](#appearance)
+54. [What version is this](#what-version-is-this)
+55. [Closing a dialog](#closing-a-dialog)
+56. [Keyboard reference](#keyboard-reference)
+57. [When a circuit will not simulate](#when-a-circuit-will-not-simulate)
 
 This guide is also attached to every [release](../../releases) as a PDF, with a contents page and
 the screenshots in place — the same document, laid out for reading away from the machine. Build it
@@ -173,11 +174,11 @@ Three of those are worth separating, because they are easy to confuse:
 
 ## Placing components
 
-![The component palette: a Find a part box at the top, "335 parts in 17 groups" under it, and the seventeen categories with their counts — passive 11, switches 5, sources 16, semiconductors 13, transistors 13, LEDs and displays 11, power 10, analog ICs 13, logic gates 14, 74xx series 79, 40xx series 47, buses 19, digital I/O 9, memory and CPUs 38, sensors and actuators 20, switching and isolation 11, dev boards 6 — every group closed, so all seventeen headings fit on screen at once](images/02-palette.png)
+![The component palette: a Find a part box at the top, "336 parts in 17 groups" under it, and the seventeen categories with their counts — passive 11, switches 5, sources 16, semiconductors 13, transistors 13, LEDs and displays 11, power 10, analog ICs 13, logic gates 14, 74xx series 79, 40xx series 47, buses 19, digital I/O 9, memory and CPUs 39, sensors and actuators 20, switching and isolation 11, dev boards 6 — every group closed, so all seventeen headings fit on screen at once](images/02-palette.png)
 
 Click a palette entry, then click the canvas. The part lands where you click, snapped to the grid.
 
-The palette holds **335 components in 17 categories**:
+The palette holds **336 components in 17 categories**:
 
 | Category | Count | Contents |
 | --- | --- | --- |
@@ -194,7 +195,7 @@ The palette holds **335 components in 17 categories**:
 | 40xx Series | 47 | CMOS gates and the **4049 / 4050 level converters**; flip-flops and latches; counters including the **4026 and 4033 with their own display drivers**, the **4029, 4510 and 4516 up/down counters** and the **4518 / 4520**; the **4028** and **4543 LCD driver**; shift registers to the **4094**; the **4051, 4052, 4053 and 4067 analog multiplexers**; the **4047, 4528 and 4538** timers; a **4046 phase-locked loop** — see [below](#the-40xx-series) |
 | Buses | 19 | **Bus tap** and **bus line**, I2C master, EEPROM, port expander, DS1307 clock, ADS1115 ADC, MCP4725 DAC and INA219 current sensor, SPI master and **MCP3008 ADC**, 1-Wire master and DS18B20 thermometer, serial terminal and device, **RS-485**, **CAN** and **RS-232 (MAX232)** transceivers, level shifter — see [below](#making-its-own-rails) |
 | Digital I/O | 9 | Logic toggle, clock, **pattern generator**, rotary encoder, oscillator module, ADC and DAC bridges, and a **2K × 8 SRAM and ROM** — see [below](#something-worth-addressing) |
-| Memory & CPUs | 38 | The **2716, 2732, 2764 and 27C256 EPROMs**, the **28C256 EEPROM**, the **6116 and 62256 static RAMs** — each loadable from a binary, Intel HEX or S-record file — and the **65C02**, **6502**, **6510** and **8500** processors, **6522 VIA**, **6551 ACIA**, **6526 CIA** and the **6581 and 8580 SIDs**, the **68000**, **68681 DUART**, **68230 PI/T** and **68901 MFP**, the **6809**, **6809E**, **6821** and **6520 PIAs** and **6850 ACIA**, and the **Z80**, **Z80 PIO**, **Z80 CTC**, **Z80 SIO/0** and **Z80 DART**, and the **8085**, **8155**, **8156**, **8255A**, **8251A**, **8253**, **8254** and **8259A** — see [below](#memories-by-their-part-numbers), [the 6502 computer](#a-6502-computer), [the 6809 computer](#a-6809-computer), [the Z80 computer](#a-z80-computer) and [the 8085 computer](#an-8085-computer) |
+| Memory & CPUs | 39 | The **2716, 2732, 2764 and 27C256 EPROMs**, the **28C256 EEPROM**, the **6116 and 62256 static RAMs** — each loadable from a binary, Intel HEX or S-record file — and the **65C02**, **6502**, **6510** and **8500** processors, **6522 VIA**, **6551 ACIA**, **6526 CIA** and the **6581 and 8580 SIDs**, the **68000**, **68681 DUART**, **68230 PI/T** and **68901 MFP**, the **6809**, **6809E**, **6821** and **6520 PIAs** and **6850 ACIA**, and the **Z80**, **Z80 PIO**, **Z80 CTC**, **Z80 SIO/0** and **Z80 DART**, and the **8085**, **8155**, **8156**, **8255A**, **8251A**, **8253**, **8254** and **8259A**, and the **ATmega328P** microcontroller — see [below](#memories-by-their-part-numbers), [the 6502 computer](#a-6502-computer), [the 6809 computer](#a-6809-computer), [the Z80 computer](#a-z80-computer), [the 8085 computer](#an-8085-computer) and [the ATmega328P](#an-atmega328p) |
 | Sensors & Actuators | 20 | DC motor, LDR, thermistors, **LM35 and TMP36** analog thermometers, buzzers, speaker, microphone, servo, stepper in **unipolar and bipolar** wirings, thermocouple, load cell, HC-SR04 ranger, Hall switch, phototransistor, **reed switch** and **PIR motion sensor** — see [below](#sensors-and-actuators) |
 | Switching & Isolation | 11 | Relay, fuses and a **resettable PPTC**, optocouplers, ULN2003, H-bridge, **A4988 microstepping driver**, **solid-state relay**, **MOSFET gate driver** — see [below](#regulating-a-current-instead-of-applying-a-voltage) |
 | Dev Boards | 6 | Raspberry Pi, Arduino Uno / Nano / Mega, **Raspberry Pi Pico** and **ESP32 DevKit** — see [below](#development-boards) |
@@ -859,6 +860,20 @@ something whose answers people check by eye. Turn it on for converters, oscillat
 both a fast edge and a slow envelope; leave it off when stepping through an edge by hand with `F6`,
 where a step you can predict is the point. The setting is saved with the circuit, so a design that
 needs it keeps it.
+
+### Stepping from event to event
+
+A slow digital circuit, a counter on a 2 Hz clock or a microcontroller blinking an LED, spends nearly
+all its time with nothing changing. On a fixed step it still solves every point, so a second of it
+can take many seconds to run.
+
+So when a circuit has **nothing that integrates** (no capacitors, inductors or other parts with a
+memory of their own), **no source that moves continuously** (a function generator's sine, a
+microphone, a motor, a waveform source) and the solver's own step is off, the simulator steps from
+event to event instead: a long step across the quiet stretches, landing exactly on every clock edge,
+every queued logic transition and every edge a processor's firmware makes. The status bar says
+**stepping from event to event** when it does. Nothing about the answer changes, only how long it
+takes; a circuit with a capacitor anywhere in it is solved the ordinary way.
 
 ---
 
@@ -5665,9 +5680,55 @@ switch, builds the same circuit on a soldered board instead. The choice is saved
 - **Perfboard** has a pad at every hole and nothing joined. The parts go in as on stripboard, and
   each net's pads are wired together on the back, drawn faintly as seen through the board.
 
-Both are laid out automatically and checked against the schematic, as the breadboard is.
-Moving parts by hand is for breadboards. Hover over a hole to light the run of copper it's on (or,
-on perfboard, every pad of its net) and see its name and what's on it.
+Both are laid out automatically and checked against the schematic, as the breadboard is. Hover over
+a hole to light the run of copper it's on (or, on perfboard, every pad of its net) and see its name
+and what's on it.
+
+Parts move by hand on them too. Drag a part, or one lead of a two-lead part, as on a breadboard;
+the rest stays put and the cuts, the links and the back wiring are worked out again round it. A chip
+can go anywhere, not just along a channel, and dragging a part past the edge grows the board to hold
+it. A move is refused, with the reason, if a pin would land in a hole that's taken, on a part's body,
+or on stripboard so close to another net's pin on the same strip that there's no room to cut the
+copper between them. Links and back wires follow the parts, so they aren't dragged on their own.
+**Let the Layout Place** and **Arrange the Board Automatically** work as they do on breadboards.
+
+### A printed circuit board
+
+**PCB** (in **View > Board**, or the button beside **Perfboard**) builds the circuit on a
+single-sided printed circuit board: a pad where each pin goes, pin 1 of each chip and header square,
+and the copper on the back routed from pad to pad. The board is drawn green, as solder mask is, with
+the traces showing through in a lighter green, wider for ground and the supply.
+
+The traces are routed by a maze router on a grid at half the hole pitch, so one trace fits between two
+neighbouring pads, as between a chip's pins. Traces of different nets never touch, cross or run over
+another net's pad. Each net grows from pad to pad, aimed at the nearest pad already joined, and a
+little extra is charged for each bend and for running right beside another net, so the traces come
+out straight and spaced. Where a trace is walled in, it may **hop**: a short wire jumper on the
+component side, straight over whatever copper is in the way, between two free holes that aren't
+under a part. Only if even that fails does a pad get a jumper straight to the rest of its net. The
+nets are routed shortest first, and if any needed a jumper the routing is tried again with those
+first, keeping whichever try needed fewer.
+
+Small boards usually route with no jumpers at all: the LED chaser, the regulated supply and the
+rectifiers do. A computer with a data and an address bus is another matter on one layer, since
+buses have to cross; expect a jumper for most crossings. The board is checked against the schematic
+as the others are, and parts move by hand on it the same way, the traces routed again round them.
+
+**File > Export Gerber Files for a PCB...** writes the board as a board house takes it, zipped:
+
+| File | What |
+|---|---|
+| `name-B_Cu.gbl` | The copper on the back: pads and traces |
+| `name-B_Mask.gbs` | The solder mask, open over each pad |
+| `name-F_SilkS.gto` | The silkscreen: each part's outline and designator, and a line for each jumper |
+| `name-Edge_Cuts.gm1` | The board's outline |
+| `name.drl` | The Excellon drill file: a 0.9 mm hole at every pad |
+
+They are Gerber RS-274X with X2 attributes, in millimetres, the origin at the board's bottom left
+corner seen from the component side. Pads are 1.6 mm, signal traces 0.4 mm and power traces
+0.6 mm. If the view is on another board, the export lays out a PCB for it on the spot; the board you
+see is the board you get when the view is on **PCB**. The build guide for a PCB is the board to
+have made, the parts, and any jumpers to fit.
 
 ### The build guide
 
@@ -5680,7 +5741,7 @@ step on screen ringed in amber and the holes it uses marked.
   modules, the resistors, capacitors, diodes and LEDs, the rest of the jumpers net by net (ground,
   then the supply, then the signals), and the bench connections.
 - On **stripboard** the cuts and wire links come first, while the board is bare; on **perfboard**
-  the wiring on the back comes after the parts.
+  the wiring on the back comes after the parts; on a **PCB**, the parts and then any jumpers.
 - Each step says what is particular about it. A resistor gets its colour bands ("R1, 10kΩ (brown,
   black, orange, gold): from a12 to a16"), an LED which leg is which, an electrolytic the side of
   its stripe, a chip which way its notch faces and where pin 1 goes, and a wire its colour.
@@ -5697,6 +5758,25 @@ circuit runs (`F5`) the display reads the volts between them. The status bar say
 when you drop a probe. A probe on a pin reads the strip or copper that pin is in, as a real meter
 would. A pin that isn't making contact (see the next section) reads what its strip is at, not what
 the pin is doing.
+
+Click the meter's body to turn its dial to the next range:
+
+| Range | Reads | How |
+|---|---|---|
+| **V DC** | Volts between the probes | While the circuit runs |
+| **Ω** | Resistance between the probes | With the power off: stop the simulation first |
+| **•))) continuity** | Resistance, and a beep (**♪ beep** on the display) below 30 Ω | With the power off |
+| **mA** | Current through a part's lead | While it runs: put the red probe on a lead |
+
+Resistance is measured the way a real meter does it: with the supplies, batteries and generators off
+the bench, a 1 mA test current is pushed between the probes and the voltage it takes is read back.
+So a diode in the way reads its forward drop's worth, parts in parallel read together, and anything
+over 40 MΩ reads **OL**. A hidden fault is in the measurement too: a pin that isn't making contact
+reads open.
+
+Current is read as a real meter reads it, by breaking the connection and putting the meter in it:
+put the red probe on a resistor's, capacitor's, diode's or LED's lead and the display reads the
+current flowing into the part through that lead.
 
 ### Finding a fault
 
@@ -5721,6 +5801,35 @@ reading it. Hiding one only ever picks a fault the circuit still simulates with,
 stopped the simulation with an error would give itself away. Claude can set a puzzle too, with
 `fault`, at random or at a pin you name, and give hints. Its own runs solve the circuit as drawn,
 so it can't find the fault by simulating either.
+
+#### Lessons
+
+**Simulate > Fault Finding > Lessons** has puzzles set on the examples, each starting from a symptom,
+the way a fault comes to you:
+
+| Lesson | On | The symptom |
+|---|---|---|
+| The switch that does nothing | Transistor Switch | Pressing SW1 should light LED1. It doesn't. |
+| A timer that won't tick | 555 Astable | The 555 should make a square wave on OUT. It doesn't. |
+| One LED never lights | LED Chaser | Ten LEDs should take their turn. One of them never does. |
+| Two at once | LED Chaser | Each LED should light on its own. Two of them come on together. |
+| No gain | Inverting Amplifier | It should invert the input and amplify it ten times. It doesn't. |
+| Ripple | Full-Wave Rectifier | The output should be smooth DC. It's lumpy. |
+| Half the wave | Full-Wave Rectifier | The output ripples at the input's frequency, not twice it. |
+| A regulator that won't regulate | Regulated Supply | The output should be a steady 5 V. It isn't. |
+
+Choosing one opens its example with the fault hidden and the symptom in the status bar, and starts a
+clock. Finding it scores out of 100: 15 off for each wrong guess, 10 for each hint and 2 for each
+minute. Your best score on each is kept in your settings and shown beside it in the menu. A fault
+hidden with **Hide a Fault** is scored the same way, but not kept.
+
+#### Coach Me
+
+**Simulate > Fault Finding > Coach Me (AI Chat)** opens the AI Chat and asks Claude to coach you to
+the fault without giving it away: to ask what you'd measure next, tell you what that measurement
+would show, and nudge you when you're stuck. It measures the faulty circuit with the `fault` tool's
+`measure` action, which reads a pin's voltage in the circuit with the fault in it, as your meter
+would, and it gives hints only when you ask for one.
 
 ---
 
@@ -9091,6 +9200,87 @@ and they count down.
 - The 8251A's synchronous modes are not modelled, and nor are the 8279 keyboard and display
   controller or the 8355 and 8755 ROM and EPROM with I/O; the simplifications of the processor and
   of each peripheral are listed above.
+
+---
+
+## An ATmega328P
+
+The **Memory & CPUs** group has the **ATmega328P**, the chip on an Arduino Uno, in its 28-pin DIP,
+running real firmware: the Intel HEX file avr-gcc writes (`avr-objcopy -O ihex`), or the one the
+Arduino IDE's **Sketch > Export Compiled Binary** leaves beside your sketch. **File > Examples >
+Development Boards > ATmega328P Blink** is the chip on its own, its Timer1 interrupt blinking an LED on PB5
+(the Uno's pin 13) at 1 Hz.
+
+### Loading firmware
+
+Select the chip and use **Edit > Load Memory Image...** (or Claude's `load_memory`) with a `.hex`
+file, or a raw binary, which goes in at address 0. The firmware is kept in the `.cirq` file as
+Intel HEX, in the chip's **Firmware** property, so the circuit opens running the same program. Its
+label shows where the program counter is (`PC $0034`), or **no firmware**.
+
+### The ATmega328P's pins
+
+The pins are the datasheet's: **PB0-PB5**, **PC0-PC5** and **PD0-PD7** as GPIO, each with its
+internal pull-up (35 kΩ) when the firmware turns it on; **PD0** and **PD1** as RXD and TXD when the
+USART takes them; the six PWM outputs on their timers' pins (OC0A on PD6, OC0B on PD5, OC1A on PB1,
+OC1B on PB2, OC2A on PB3, OC2B on PD3); **ADC0-ADC5** on port C; **INT0** and **INT1** on PD2 and
+PD3; and **RESET** on pin 1, pulled up, which holds the chip in reset while it's low. **VCC**,
+**AVCC** and **AREF** are read for the supply and the ADC's reference. The crystal is taken as
+read: the clock is the chip's **Clock Frequency** property (16 MHz, an Uno's crystal; 8 MHz for the
+internal oscillator), and XTAL1 and XTAL2 are left alone.
+
+### What runs
+
+The whole AVR instruction set, with the datasheet's cycle counts; 32 KB of flash, 2 KB of SRAM and
+1 KB of EEPROM; the three ports; timers 0, 1 and 2 with their normal, CTC and PWM modes; the USART;
+the ADC; the external and pin-change interrupts; and sleep. Not modelled: SPI, the two-wire
+interface (I2C), the watchdog, the analog comparator and Timer1's input capture.
+
+At each time point the circuit is solved at, the chip samples its pins (their logic levels, and the
+voltages on the ADC inputs), then runs on from where it had got to, up to 200 µs ahead with those
+inputs held (an eighth of a bit while the serial receiver is listening). The moment an output pin
+changes it stops and asks for that change at that exact moment, and the simulator lands a time point
+there. So every edge the firmware makes is where it put it, to the cycle, and what it reads is at
+most that window old. A circuit like the example, with no capacitors in it, steps
+[from event to event](#stepping-from-event-to-event), so a second of blinking takes about a second.
+
+### The blink example's firmware
+
+The example's firmware is this program, assembled. Timer1 counts the 16 MHz clock divided by 256 up to
+`PERIOD` and back to zero (CTC mode), interrupting each time; the interrupt writes a 1 to PINB5,
+which on an AVR toggles the pin.
+
+```asm
+.equ PERIOD = 31249        ; 16 MHz / 256 / 31250 = 2 compares a second
+rjmp start
+.org 22                ; TIMER1_COMPA
+rjmp toggle
+start:
+ldi r16, 0x08
+out 0x3E, r16          ; SP = 0x08FF
+ldi r16, 0xFF
+out 0x3D, r16
+sbi 0x04, 5            ; PB5 an output
+ldi r16, hi8(PERIOD)
+sts 0x89, r16          ; OCR1AH
+ldi r16, lo8(PERIOD)
+sts 0x88, r16          ; OCR1AL
+ldi r16, 0x0C
+sts 0x81, r16          ; TCCR1B: CTC, clk/256
+ldi r16, 0x02
+sts 0x6F, r16          ; TIMSK1: OCIE1A
+sei
+loop:
+rjmp loop
+toggle:
+sbi 0x03, 5            ; writing PINB5 toggles PORTB5
+reti
+```
+
+With avr-gcc the same thing is `TCCR1B = _BV(WGM12) | _BV(CS12); OCR1A = 31249; TIMSK1 =
+_BV(OCIE1A); sei();` and an `ISR(TIMER1_COMPA_vect) { PINB = _BV(PB5); }`; an Arduino sketch's
+exported HEX runs the same way: `delay()` and `millis()` count on Timer0's overflow interrupt, and
+`digitalWrite` and `analogWrite` on the ports and the PWM timers, all of which are modelled.
 
 ---
 

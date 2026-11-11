@@ -192,6 +192,31 @@ public sealed partial class SimulationController : ObservableObject, IDisposable
         }
     }
 
+    private readonly Dictionary<Terminal, double> _lastAmps = [];
+
+    /// <summary>
+    /// The current into a part through one of its pins, for the multimeter's current range: what a meter wired in series
+    /// with that lead would read. Null when nothing is solved or the part doesn't report its current.
+    /// </summary>
+    public double? CurrentInto(Terminal terminal)
+    {
+        ArgumentNullException.ThrowIfNull(terminal);
+        if (terminal.Owner is not Cirq.Core.Probing.ICurrentReporting reporting) return null;
+        if (!_gate.TryEnter()) return _lastAmps.TryGetValue(terminal, out var last) ? last : null;
+        try
+        {
+            if (Simulator is not { } simulator || _topologyDirty || !simulator.Netlist.Contains(terminal)) return null;
+            var amps = reporting.TerminalCurrent(terminal, simulator.System, simulator.State);
+            if (!double.IsFinite(amps)) return null;
+            _lastAmps[terminal] = amps;
+            return amps;
+        }
+        finally
+        {
+            _gate.Exit();
+        }
+    }
+
     /// <summary>Marks the topology as changed so the next run recompiles the netlist.</summary>
     public void InvalidateTopology()
     {
@@ -214,12 +239,19 @@ public sealed partial class SimulationController : ObservableObject, IDisposable
                 Settings.AdaptiveTimeStep = Circuit.AdaptiveTimeStep;
 
                 Simulator = new CircuitSimulator(Circuit, Settings);
+
+                // A circuit with nothing that integrates and no waveform to follow changes only when its logic does:
+                // it steps from one event to the next, landing on every one, instead of plodding at a step sized
+                // for a filter. A 3-digit counter went from a seventh of real time to thirty times it.
+                SteppingByEvents = !Circuit.AdaptiveTimeStep && SteppableByEvents(Circuit, Simulator);
+                if (SteppingByEvents) Settings.AdaptiveTimeStep = true;
+
                 Simulator.Reset();
                 Simulator.SolveOperatingPoint();
                 _topologyDirty = false;
                 SimulationTime = 0;
                 HasError = false;
-                Status = $"Ready - {Simulator.Netlist.NodeCount} nodes, {Simulator.System.Size} unknowns";
+                Status = $"Ready - {Simulator.Netlist.NodeCount} nodes, {Simulator.System.Size} unknowns{(SteppingByEvents ? ", stepping from event to event" : "")}";
                 return true;
             }
             catch (Exception ex)
@@ -230,6 +262,25 @@ public sealed partial class SimulationController : ObservableObject, IDisposable
                 return false;
             }
         }
+    }
+
+    /// <summary>The live run steps from one logic event to the next (see <see cref="Rebuild"/>).</summary>
+    public bool SteppingByEvents { get; private set; }
+
+    /// <summary>Waveforms that need fine steps between their breakpoints: a sine is smooth, not a sequence of events.</summary>
+    private static readonly HashSet<string> Continuous = new(StringComparer.Ordinal)
+    {
+        "FunctionGenerator", "WaveformSource", "NoiseSource", "BehaviouralSource", "Microphone", "DcMotor", "Servo", "StepperMotor",
+        "Speaker", "Thermocouple", "SolarCell", "LoadCell", "TransmissionLine",
+    };
+
+    /// <summary>Whether a circuit changes only when its logic does: nothing integrating, no continuous waveform.</summary>
+    public static bool SteppableByEvents(Circuit circuit, CircuitSimulator simulator)
+    {
+        ArgumentNullException.ThrowIfNull(circuit);
+        ArgumentNullException.ThrowIfNull(simulator);
+        return !simulator.HasIntegratingParts
+               && !Flattening.Flatten(circuit.Components).Any(c => Continuous.Contains(c.GetType().Name));
     }
 
     public void Play()

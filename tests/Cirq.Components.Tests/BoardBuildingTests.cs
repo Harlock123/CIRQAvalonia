@@ -217,4 +217,210 @@ public class BoardBuildingTests
         Assert.Contains(perf, s => s.Kind == BuildStepKind.Wire && s.Text.StartsWith("On the back", StringComparison.Ordinal));
         Assert.Contains("1.", BuildGuide.Text(perf));
     }
+    // ───────────────────────────── soldered boards by hand ─────────────────────────────
+
+    [Theory]
+    [InlineData(BoardKind.Stripboard)]
+    [InlineData(BoardKind.Perfboard)]
+    public void A_part_on_a_soldered_board_moves_by_hand_and_the_board_still_matches(BoardKind kind)
+    {
+        var circuit = GateCircuit();
+        circuit.Board.Kind = kind;
+        var layout = ProtoboardLayout.Arrange(circuit);
+        var chip = layout.Parts.Single(p => p.Package.Form == BoardForm.Dip);
+
+        // The chip moved down and right, into clear board (it grows to hold it): its shape kept, the rest laid out round it, the copper worked out again.
+        var grab = chip.Holes[0];
+        var to = new BoardHole(1, grab.Row + 15, grab.Column + 5);
+        var edit = ProtoboardEdits.MovePart(circuit, layout, chip.Part, grab, to);
+        Assert.True(edit.Succeeded, edit.Problem);
+        Assert.Equal(kind, edit.Arrangement!.Kind);
+        circuit.Board.CopyFrom(edit.Arrangement);
+        var moved = ProtoboardLayout.Arrange(circuit);
+        var now = moved.Find(chip.Part)!;
+        Assert.True(now.ByHand);
+        Assert.Equal(to, now.Holes[0]);
+        Assert.Equal(chip.Holes.Select(h => (h.Row + 15, h.Column + 5)), now.Holes.Select(h => (h.Row, h.Column)));
+        Assert.True(moved.Matches, string.Join(" ", moved.Problems));
+        Assert.Empty(moved.Refused);
+
+        // What was put where by hand survives a save, named as the board names its holes.
+        var json = CircuitSerializer.ToJson(circuit);
+        Assert.Contains($"\"{SolderedLayout.Name(to)}\"", json);
+        var reopened = CircuitSerializer.FromJson(json);
+        Assert.Empty(reopened.Warnings);
+        var again = ProtoboardLayout.Arrange(reopened.Circuit);
+        Assert.Equal(to, again.Parts.Single(p => p.Part.Id == chip.Part.Id).Holes[0]);
+
+        // A resistor's lead moved somewhere free; and a part dropped on the chip's pins is refused, with the reason.
+        var resistor = moved.Parts.First(p => p.Package.Form == BoardForm.TwoLead);
+        var free = Enumerable.Range(1, 40).Select(r => new BoardHole(1, r, 1)).First(h => moved.PartAt(h) is null && !moved.Wires.Any(w => w.From == h || w.To == h)
+            && ProtoboardEdits.MoveLead(circuit, moved, resistor.Part, resistor.Package.Pins[1]!, h).Succeeded);
+        Assert.True(ProtoboardEdits.MoveLead(circuit, moved, resistor.Part, resistor.Package.Pins[1]!, free).Layout!.Matches);
+        var onChip = ProtoboardEdits.MovePart(circuit, moved, resistor.Part, resistor.Holes[0], now.Holes[2]);
+        Assert.False(onChip.Succeeded);
+        Assert.False(string.IsNullOrWhiteSpace(onChip.Problem));
+
+        // Links and back wiring follow the parts: they aren't moved on their own.
+        if (moved.Wires.Count > 0) Assert.False(ProtoboardEdits.MoveWireEnd(circuit, moved, moved.Wires[0], true, new BoardHole(1, 1, 1)).Succeeded);
+
+        // Released, it is laid out automatically again.
+        var released = ProtoboardEdits.Release(circuit, moved, chip.Part);
+        Assert.False(released.Layout!.Find(chip.Part)!.ByHand);
+        Assert.True(released.Layout.Matches);
+    }
+
+    [Fact]
+    public void Soldered_hole_names_read_back()
+    {
+        Assert.Equal(new BoardHole(1, 12, 3), SolderedLayout.Parse("C12"));
+        Assert.Equal(new BoardHole(1, 4, 27), SolderedLayout.Parse("aa4"));
+        Assert.Equal("AA4", SolderedLayout.Name(SolderedLayout.Parse("AA4")!.Value));
+        Assert.Null(SolderedLayout.Parse("12"));
+        Assert.Null(SolderedLayout.Parse("C0"));
+    }
+
+    // ───────────────────────────── the meter's other ranges, and lessons ─────────────────────────────
+
+    [Fact]
+    public void The_ohmmeter_reads_resistance_continuity_and_open_with_the_power_off()
+    {
+        var circuit = new Circuit();
+        var battery = circuit.Add(new Battery());
+        var r1 = circuit.Add(new Resistor(4.7e3));
+        var r2 = circuit.Add(new Resistor(10e3));
+        var ground = circuit.Add(new Ground());
+        circuit.Connect(battery.Terminals[0], r1.Terminals[0]);
+        circuit.Connect(r1.Terminals[1], r2.Terminals[0]);
+        circuit.Connect(r2.Terminals[1], ground.Terminals[0]);
+        circuit.Connect(battery.Terminals[1], ground.Terminals[0]);
+
+        // Across R1 alone: the battery is off the bench, so R2 is no parallel path.
+        Assert.Equal(4.7e3, Ohmmeter.Between(circuit, r1.Terminals[0], r1.Terminals[1])!.Value, 4.7e3 * 1e-3);
+        Assert.Equal(14.7e3, Ohmmeter.Between(circuit, r1.Terminals[0], r2.Terminals[1])!.Value, 14.7e3 * 1e-3);
+        Assert.Equal(0, Ohmmeter.Between(circuit, r2.Terminals[1], battery.Terminals[1]));
+        Assert.Equal("4.70k", Ohmmeter.Display(4.7e3));
+
+        // A pin that isn't making contact reads open.
+        FaultFinding.Hide(circuit, FaultKind.Open, r1.Terminals[1]);
+        Assert.True(double.IsPositiveInfinity(Ohmmeter.Between(circuit, r1.Terminals[0], r2.Terminals[1])!.Value));
+        Assert.Equal("OL", Ohmmeter.Display(double.PositiveInfinity));
+    }
+
+    [Fact]
+    public void Fault_finding_measures_the_faulty_circuit_and_scores_the_find()
+    {
+        var (circuit, resistor, led) = LedCircuit();
+        var before = FaultFinding.Measure(circuit, led.Terminals[0])!.Value;
+        Assert.InRange(before, 1.5, 2.5);
+        FaultFinding.Hide(circuit, FaultKind.Open, led.Terminals[0]);
+
+        // With the LED's anode open no current flows, so the resistor's far end sits at the battery's voltage.
+        Assert.InRange(FaultFinding.Measure(circuit, resistor.Terminals[1])!.Value, 8.5, 9.5);
+
+        Assert.Equal(100, FaultFinding.Score(1, 0, TimeSpan.FromSeconds(20)));
+        Assert.Equal(100 - 15 - 10 - 6, FaultFinding.Score(2, 1, TimeSpan.FromMinutes(3)));
+        Assert.Equal(0, FaultFinding.Score(20, 5, TimeSpan.FromHours(1)));
+    }
+    // ───────────────────────────── printed circuit board ─────────────────────────────
+
+    [Fact]
+    public void A_pcb_is_routed_with_traces_that_never_touch_another_net()
+    {
+        var circuit = GateCircuit();
+        circuit.Board.Kind = BoardKind.Pcb;
+        var layout = ProtoboardLayout.Arrange(circuit);
+        Assert.Equal(BoardKind.Pcb, layout.Kind);
+        Assert.True(layout.Matches, string.Join(" ", layout.Problems));
+        Assert.Empty(layout.Cuts);
+        Assert.Contains(layout.Wires, w => w.IsTrace);
+
+        // Every trace starts on a pad of its own net, and the cells of different nets' traces (at half the pitch) never meet,
+        // nor do they meet another net's pad.
+        var netlist = circuit.BuildNetlist();
+        var pads = layout.Parts.SelectMany(p => p.Package.Pins.Select((t, i) => (t, h: p.Holes[i]))).Where(x => x.t is not null)
+            .ToDictionary(x => ((int)(2 * SolderedLayout.Position(x.h).X), (int)(2 * SolderedLayout.Position(x.h).Y)), x => netlist.NetOf(x.t!));
+        var owner = new Dictionary<(int, int), Net>();
+        foreach (var trace in layout.Wires.Where(w => w.IsTrace))
+        {
+            Assert.Same(trace.Net, layout.NetAt(trace.From));
+            for (var i = 1; i < trace.Route.Count; i++)
+            {
+                var (a, b) = (trace.Route[i - 1], trace.Route[i]);
+                var steps = (int)Math.Round(Math.Max(Math.Abs(b.X - a.X), Math.Abs(b.Y - a.Y)) * 2);
+                for (var k = 0; k <= steps; k++)
+                {
+                    var cell = ((int)Math.Round(2 * (a.X + ((b.X - a.X) * k / Math.Max(1, steps)))), (int)Math.Round(2 * (a.Y + ((b.Y - a.Y) * k / Math.Max(1, steps)))));
+                    if (pads.TryGetValue(cell, out var padNet)) Assert.Equal(trace.Net.Index, padNet.Index);
+                    if (owner.TryGetValue(cell, out var other)) Assert.Same(trace.Net, other);
+                    owner[cell] = trace.Net;
+                }
+            }
+        }
+
+        var steps2 = BuildGuide.Steps(layout);
+        Assert.StartsWith("Have the printed circuit board made", steps2[0].Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_board_routes_round_a_crowded_chip_and_jumps_what_it_cannot()
+    {
+        // Every one of a 7400's inputs tied to the pin across the chip from it: traces must find their way between pins.
+        var circuit = GateCircuit();
+        var gate = circuit.Components.OfType<Ic7400>().Single();
+        circuit.Connect(gate.TerminalByName("2A"), gate.TerminalByName("4B"));
+        circuit.Connect(gate.TerminalByName("2B"), gate.TerminalByName("3A"));
+        circuit.Connect(gate.TerminalByName("2Y"), gate.TerminalByName("3B"));
+        circuit.Connect(gate.TerminalByName("3Y"), gate.TerminalByName("4A"));
+        circuit.Board.Kind = BoardKind.Pcb;
+        var layout = ProtoboardLayout.Arrange(circuit);
+        Assert.True(layout.Matches, string.Join(" ", layout.Problems));
+        Assert.All(layout.Wires.Where(w => !w.IsTrace), w => Assert.Equal(2, w.Route.Count));
+    }
+
+    [Fact]
+    public void Gerber_files_hold_the_copper_mask_silkscreen_outline_and_drill()
+    {
+        var circuit = GateCircuit();
+        circuit.Board.Kind = BoardKind.Pcb;
+        var layout = ProtoboardLayout.Arrange(circuit);
+        var files = PcbGerber.Files(layout, "gate board");
+        Assert.Equal(["gate_board-B_Cu.gbl", "gate_board-B_Mask.gbs", "gate_board-Edge_Cuts.gm1", "gate_board-F_SilkS.gto", "gate_board.drl"], files.Keys.Order(StringComparer.Ordinal));
+
+        var pins = layout.Parts.SelectMany(p => p.Holes).Distinct().Count();
+        var copper = files["gate_board-B_Cu.gbl"];
+        Assert.StartsWith("%TF.GenerationSoftware,CirqAvalonia*%", copper, StringComparison.Ordinal);
+        Assert.Contains("%FSLAX46Y46*%", copper);
+        Assert.Contains("%MOMM*%", copper);
+        Assert.Contains("%TF.FileFunction,Copper,L1,Bot*%", copper);
+        Assert.Equal(pins, copper.Split('\n').Count(l => l.EndsWith("D03*", StringComparison.Ordinal)));
+        Assert.Equal(layout.Wires.Count(w => w.IsTrace), copper.Split('\n').Count(l => l.EndsWith("D02*", StringComparison.Ordinal)));
+        Assert.EndsWith("M02*\n", copper, StringComparison.Ordinal);
+        Assert.Contains("%TF.FilePolarity,Negative*%", files["gate_board-B_Mask.gbs"]);
+        Assert.Contains("%TF.FileFunction,Profile,NP*%", files["gate_board-Edge_Cuts.gm1"]);
+        Assert.True(files["gate_board-F_SilkS.gto"].Split('\n').Count(l => l.EndsWith("D01*", StringComparison.Ordinal)) > 20);
+
+        // Every coordinate lies on the board.
+        var (w, h) = (SolderedLayout.Width(layout.Columns) * 2.54e6, SolderedLayout.Height(layout.Rows) * 2.54e6);
+        foreach (var file in files.Where(f => f.Key.EndsWith(".gbl", StringComparison.Ordinal) || f.Key.EndsWith(".gto", StringComparison.Ordinal)))
+            foreach (System.Text.RegularExpressions.Match m in System.Text.RegularExpressions.Regex.Matches(file.Value, "X(-?[0-9]+)Y(-?[0-9]+)"))
+            {
+                Assert.InRange(long.Parse(m.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture), 0, (long)w);
+                Assert.InRange(long.Parse(m.Groups[2].Value, System.Globalization.CultureInfo.InvariantCulture), 0, (long)h);
+            }
+
+        var drill = files["gate_board.drl"];
+        Assert.StartsWith("M48", drill, StringComparison.Ordinal);
+        Assert.Contains("METRIC", drill);
+        Assert.Equal(pins, drill.Split('\n').Count(l => l.StartsWith('X')));
+
+        using var zip = new MemoryStream();
+        PcbGerber.WriteZip(layout, zip, "gate board");
+        zip.Position = 0;
+        using var archive = new System.IO.Compression.ZipArchive(zip);
+        Assert.Equal(5, archive.Entries.Count);
+
+        circuit.Board.Kind = BoardKind.Perfboard;
+        Assert.Throws<ArgumentException>(() => PcbGerber.Files(ProtoboardLayout.Arrange(circuit), "x"));
+    }
 }

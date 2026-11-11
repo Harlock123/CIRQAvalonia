@@ -48,10 +48,14 @@ public sealed class AppSettings
     /// <summary>About how many dollars an AI Chat may spend before it stops and asks (null: no limit).</summary>
     public double? ChatBudget { get; set; }
 
+    /// <summary>The best score on each fault-finding lesson, by its name.</summary>
+    public Dictionary<string, int> FaultScores { get; set; } = [];
+
     public AppSettings Clone()
     {
         var copy = (AppSettings)MemberwiseClone();
         copy.ChatPrices = ChatPrices.ToDictionary(kv => kv.Key, kv => (double[])kv.Value.Clone());
+        copy.FaultScores = new Dictionary<string, int>(FaultScores);
         return copy;
     }
 }

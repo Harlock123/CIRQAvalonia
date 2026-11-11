@@ -279,6 +279,7 @@ public static class CircuitSerializer
         if (circuit.Board.IsDefault) return null;
         var present = Flattening.Flatten(circuit.Components).Select(c => c.Id).ToHashSet();
         var record = new ProtoboardRecord { Kind = circuit.Board.Kind == BoardKind.Breadboard ? null : circuit.Board.Kind.ToString() };
+        string Name(BoardHole hole) => HoleName(circuit.Board.Kind, hole);
         foreach (var (id, placement) in circuit.Board.Parts.OrderBy(p => p.Key))
         {
             if (!present.Contains(id)) continue;
@@ -286,7 +287,7 @@ public static class CircuitSerializer
             {
                 Id = id,
                 Pins = placement.Pins.Count == 0 ? null
-                    : placement.Pins.OrderBy(p => p.Key, StringComparer.Ordinal).ToDictionary(p => p.Key, p => Protoboard.Breadboard.Name(p.Value), StringComparer.Ordinal),
+                    : placement.Pins.OrderBy(p => p.Key, StringComparer.Ordinal).ToDictionary(p => p.Key, p => Name(p.Value), StringComparer.Ordinal),
                 BenchX = placement.BenchX,
                 BenchY = placement.BenchY,
             });
@@ -296,12 +297,19 @@ public static class CircuitSerializer
             record.Wires = [.. circuit.Board.Wires.OrderBy(w => w.Key, StringComparer.Ordinal).Select(w => new BoardWireRecord
             {
                 Key = w.Key,
-                From = Protoboard.Breadboard.Name(w.Value.From),
-                To = Protoboard.Breadboard.Name(w.Value.To),
+                From = Name(w.Value.From),
+                To = Name(w.Value.To),
             })];
 
         return record.Parts.Count == 0 && record.Wires is null && record.Kind is null ? null : record;
     }
+
+    /// <summary>A hole as the board it is on names it: <c>e12</c> on a breadboard, <c>C12</c> (strip and number) on the soldered ones.</summary>
+    private static string HoleName(BoardKind kind, BoardHole hole) =>
+        kind == BoardKind.Breadboard ? Protoboard.Breadboard.Name(hole) : Protoboard.SolderedLayout.Name(hole);
+
+    private static BoardHole? ParseHole(BoardKind kind, string name) =>
+        kind == BoardKind.Breadboard ? Protoboard.Breadboard.Parse(name) : Protoboard.SolderedLayout.Parse(name);
 
     /// <summary>Reads the hand-made board back; a hole that doesn't parse is a warning, and that part is laid out afresh.</summary>
     private static void RestoreBoard(ProtoboardRecord record, Circuit circuit, ICollection<string> warnings)
@@ -318,7 +326,7 @@ public static class CircuitSerializer
             var bad = false;
             foreach (var (pin, name) in part.Pins ?? [])
             {
-                if (Protoboard.Breadboard.Parse(name) is { } hole) pins[pin] = hole;
+                if (ParseHole(circuit.Board.Kind, name) is { } hole) pins[pin] = hole;
                 else bad = true;
             }
 
@@ -332,7 +340,7 @@ public static class CircuitSerializer
         }
 
         foreach (var wire in record.Wires ?? [])
-            if (Protoboard.Breadboard.Parse(wire.From) is { } from && Protoboard.Breadboard.Parse(wire.To) is { } to && wire.Key.Length > 0)
+            if (ParseHole(circuit.Board.Kind, wire.From) is { } from && ParseHole(circuit.Board.Kind, wire.To) is { } to && wire.Key.Length > 0)
                 circuit.Board.SetWire(wire.Key, from, to);
     }
 

@@ -305,7 +305,8 @@ public static partial class BoardPackages
 
         // A 0.6 inch package from 24 pins (memories, processors, the 74154), 0.9 for the 64-pin 68000; the 7-segment
         // display's rows are 0.6 inch apart too.
-        var span = pins >= 64 ? 9 : pins >= 24 || part.GetType().Name == "SevenSegmentDisplay" ? 6 : 3;
+        // The ATmega328P-PU is a "skinny" 28-pin DIP, 0.3 inch like the small chips.
+        var span = pins >= 64 ? 9 : part.GetType().Name == "Atmega328p" ? 3 : pins >= 24 || part.GetType().Name == "SevenSegmentDisplay" ? 6 : 3;
         var drawn = part.GetType().Name == "SevenSegmentDisplay" ? BoardLook.SevenSegment : look;
         return new BoardPackage(BoardForm.Dip, drawn, order, span, label);
     }

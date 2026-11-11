@@ -69,6 +69,10 @@ public static class BuildGuide
                 foreach (var link in layout.Wires.OrderBy(w => w.From.Column).ThenBy(w => w.From.Row))
                     Add(BuildStepKind.Link, $"Fit a wire link from {Hole(link.From)} to {Hole(link.To)} ({layout.Caption(link.Net)}).", wire: link);
                 break;
+            case BoardKind.Pcb:
+                var traces = layout.Wires.Count(w => w.IsTrace);
+                Add(BuildStepKind.Board, $"Have the printed circuit board made from its Gerber files (File › Export Gerber Files for a PCB…): single-sided, {layout.Columns} by {layout.Rows} holes at 2.54 mm, {traces} trace{(traces == 1 ? "" : "s")} on the copper side. Holes are lettered across and numbered down, as on the drawing.");
+                break;
             default:
                 Add(BuildStepKind.Board, $"Cut a piece of perfboard {layout.Columns} holes across and {layout.Rows} down; columns are lettered from the left and holes numbered from the top.");
                 break;
@@ -91,6 +95,11 @@ public static class BuildGuide
             foreach (var wire in layout.Wires.Where(w => !(Breadboard.IsRail(w.From.Row) && Breadboard.IsRail(w.To.Row)))
                          .OrderBy(w => w.Role).ThenBy(w => w.Colour).ThenBy(w => w.From.Column))
                 Add(BuildStepKind.Wire, $"A {WireColour(wire.Role, wire.Colour)} wire from {Hole(wire.From)} to {Hole(wire.To)} ({layout.Caption(wire.Net)}).", wire: wire);
+        }
+        else if (layout.Kind == BoardKind.Pcb)
+        {
+            foreach (var jumper in layout.Wires.Where(w => !w.IsTrace).OrderBy(w => w.From.Column))
+                Add(BuildStepKind.Link, $"A wire jumper on the component side from {Hole(jumper.From)} to {Hole(jumper.To)} ({layout.Caption(jumper.Net)}): the traces couldn't get through there.", wire: jumper);
         }
         else if (layout.Kind == BoardKind.Perfboard)
         {

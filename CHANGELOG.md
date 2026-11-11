@@ -8,6 +8,52 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-10
+
+From the bench to a board you can order: the protoboard view now builds the circuit on a
+single-sided printed circuit board, its traces routed by a maze router, and exports the Gerber and
+drill files a board house takes. An ATmega328P runs real Arduino and avr-gcc firmware. Slow digital
+circuits step from event to event and run in about real time. The multimeter measures resistance,
+continuity and current, fault finding gains scored lessons and coaching from Claude, and parts move
+by hand on stripboard and perfboard too. 336 components in 17 categories, 117 worked examples,
+41 MCP tools, 5363 tests.
+
+### Added
+
+**A printed circuit board.** **PCB** in `View > Board` (or the button beside **Perfboard**) builds
+the circuit on a single-sided board: a pad where each pin goes, pin 1 square, and the copper on the
+back routed by a maze router on a half-pitch grid, one trace between neighbouring pads, never
+touching another net. Where a trace is walled in it hops over on a short wire jumper; small boards
+usually need none. `File > Export Gerber Files for a PCB...` writes the copper, solder mask,
+silkscreen (outlines, designators and jumpers), outline and Excellon drill files, zipped, in
+millimetres, ready to upload.
+
+**An ATmega328P.** The chip on an Arduino Uno, in its 28-pin DIP, running the Intel HEX file avr-gcc
+or the Arduino IDE writes, loaded with `Edit > Load Memory Image...` and kept in the circuit: the whole
+AVR instruction set with its cycle counts, the ports and their pull-ups, timers 0, 1 and 2 with their
+PWM modes, the USART, the ADC, the external and pin-change interrupts and sleep. Every edge it makes
+lands exactly where the firmware put it. `File > Examples > Development Boards > ATmega328P Blink` blinks an
+LED from Timer1's interrupt, and the guide prints its source.
+
+**Event stepping.** A circuit with nothing that integrates and no continuously moving source steps
+from event to event, landing on every clock edge and firmware edge and striding across the quiet in
+between, so a slow counter or a blinking microcontroller runs in about real time.
+
+**More from the multimeter.** Click its body to turn the dial: **Ω** and **continuity** (with a beep)
+measured with the power off, by pushing a test current through the circuit as a real meter does, and
+**mA**, read through a part's lead as if the meter were put in the connection.
+
+**Fault-finding lessons and coaching.** `Simulate > Fault Finding > Lessons` has eight puzzles on the
+examples, each starting from a symptom. A find is scored out of 100 for guesses, hints and time, and
+your best is kept. **Coach Me (AI Chat)** asks Claude to guide you to the fault by asking what you'd
+measure next, without giving it away; the `fault` tool's new `measure` action lets it read the
+faulty circuit as your meter would.
+
+**Arranging soldered boards by hand.** Parts and leads drag on stripboard, perfboard and the PCB as
+on breadboards, the cuts, links, wiring or traces worked out again round them, a move refused (with
+the reason) if it would land on a taken hole or a part, or leave no room to cut a strip. Claude can
+do the same with `arrange_protoboard`, naming holes as the board does (`C12`).
+
 ## [1.0.1] - 2026-11-10
 
 From breadboard to the bench: the protoboard view builds the circuit on stripboard or perfboard too,
@@ -2894,7 +2940,8 @@ First public build of CirqAvalonia — an electronic circuit analyzer and mixed-
 
 **501 tests** measure the solver against closed-form answers rather than recorded output.
 
-[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/Harlock123/CIRQAvalonia/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.48.0...v1.0.0
 [0.48.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.47.0...v0.48.0
