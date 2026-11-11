@@ -154,6 +154,32 @@ public sealed class Ic4093 : SchmittGateIc
 }
 
 /// <summary>
+/// A 40106 hex Schmitt-trigger inverter: the 4069's pinout with hysteresis on every input, the CMOS 74HC14 and the
+/// one-gate RC oscillator's usual home.
+/// </summary>
+public sealed class Ic40106 : SchmittGateIc
+{
+    private static readonly GateDefinition[] Pinout =
+    [
+        new([1], 2),
+        new([3], 4),
+        new([5], 6),
+        new([9], 8),
+        new([11], 10),
+        new([13], 12),
+    ];
+
+    public Ic40106()
+        : base(14, GateFunction.Not, vccPin: 14, gndPin: 7, Pinout) =>
+        PropagationDelay = 140e-9;
+
+    public override string PartNumber => "40106";
+
+    /// <summary>The input and output pins of one of the six inverters, indexed from 0.</summary>
+    public (Terminal A, Terminal Y) Inverter(int index) => (GateInputs(index)[0], GateOutput(index));
+}
+
+/// <summary>
 /// The dual four-input pinout of the 4002 and 4012: gate one's output on pin 1 and its inputs on
 /// 2-5, gate two mirrored on the other side with its output on 13, and pins 6 and 8 not connected.
 /// </summary>

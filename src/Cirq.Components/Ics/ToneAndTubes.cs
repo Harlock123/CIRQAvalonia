@@ -461,7 +461,8 @@ public sealed partial class Triode : CircuitComponent
 
     public override string DesignatorPrefix => "V";
 
-    public override string ValueLabel => "12AX7";
+    /// <summary>Which double triode its constants are: μ near 100 a 12AX7, near 60 a 12AT7, near 20 a 12AU7.</summary>
+    public override string ValueLabel => Mu >= 80 ? "12AX7" : Mu >= 40 ? "12AT7" : "12AU7";
 
     public override bool IsNonlinear => true;
 

@@ -150,6 +150,8 @@ public static partial class Examples
             new("Ring Oscillator", "Three inverters with unequal delays", LoadRingOscillator),
             new("Tri-State Bus", "Two tri-state buffers taking turns on one wire, with a pull-down for when neither drives it",
                 LoadTriStateBus),
+            new("Priority Encoder", "A 74148: press buttons 2 and 5 and only 5 is encoded — the highest wins", LoadPriorityEncoder),
+            new("Address Decoder", "A 74688 comparing a counter's byte with switches set to 0x5A: /P=Q low once each time round", LoadAddressDecoder),
         ]),
 
         new("Counting & Arithmetic",
@@ -166,6 +168,8 @@ public static partial class Examples
                 LoadComparator),
             new("Two-Digit Counter", "Two 4026s counting to 99 on two displays — counter, decoder and drivers in one chip each",
                 LoadTwoDigitCounter),
+            new("Debounced Switch", "A 74279 S-R latch turning a chattering changeover contact into one clean edge", LoadDebouncedSwitch),
+            new("GAL Counter", "A GAL16V8 programmed with equations as a 2-bit counter and its carry", LoadGalCounter),
         ]),
 
         new("Timers & Oscillators",
@@ -182,6 +186,9 @@ public static partial class Examples
             new("XR2206 Generator", "A function generator chip at 1/RC: a sine on STO and its square on SYNCO, at 1 kHz from 10 kΩ and 100 nF", LoadXr2206Generator),
             new("NE567 Tone Decoder", "A PLL tone decoder set to 909 Hz — it lights the LED while the tone is at its frequency. Change the generator's frequency and watch it let go", LoadNe567ToneDecoder),
             new("556 Tone Bursts", "Both halves of a 556: a 69 Hz astable gating a 6.9 kHz one through its RESET", LoadNe556Bursts),
+            new("UJT Oscillator", "A 2N2646 relaxation oscillator: the capacitor charges to the peak point, the UJT fires and dumps it through B1", LoadUjtOscillator),
+            new("PUT Oscillator", "A 2N6027 programmable UJT: two gate resistors set the voltage it fires at", LoadPutOscillator),
+            new("Schmitt Oscillator", "One 40106 gate, a resistor and a capacitor: about a kilohertz from the hysteresis alone", LoadSchmittOscillator),
         ]),
 
         new("Buses & Interfaces",
@@ -253,6 +260,9 @@ public static partial class Examples
                 LoadHighSideSensing),
             new("IR Remote Frame", "A TSOP38238 putting out an NEC frame: the leader, then 32 bits as short and long spaces. Double-click it to press again", LoadIrRemoteFrame),
             new("DDS Generator", "An AD9833 told 1 kHz over SPI: a 28-bit frequency word in two halves, then out of reset", LoadDdsGenerator),
+            new("Digital Voltmeter", "An ICL7107 reading a pot against a 1.000 V reference on four LED displays: a 1.999 V panel meter", LoadDigitalVoltmeter),
+            new("Current Monitor", "An ACS712 in a lamp's 12 V feed: OUT at half its supply plus 185 mV an amp, the lamp's inrush and all", LoadCurrentMonitor),
+            new("ADC0804 Converter", "A pot's voltage converted ten times a second and shown in binary on eight LEDs", LoadAdc0804),
         ]),
 
         new("Signal Integrity & RF",
@@ -267,6 +277,9 @@ public static partial class Examples
                 LoadCommonModeFilter),
             new("Varactor Tuning", "An LC tank tuned by a voltage — move RV1 and sweep it in Frequency Response",
                 LoadVaractorTuning),
+            new("Crystal Radio", "An AM station, a tuned LC tank, a 1N34A germanium detector: the 1 kHz tone comes out of the carrier", LoadCrystalRadio),
+            new("Superhet Mixer", "An NE602 mixing 110 kHz with a 100 kHz oscillator, a filter keeping the 10 kHz difference", LoadSuperhetMixer),
+            new("Balanced Modulator", "An MC1496 multiplying a tone by a carrier: double sideband, the carrier itself suppressed", LoadBalancedModulator),
         ]),
 
         new("Audio",
@@ -275,6 +288,11 @@ public static partial class Examples
                 LoadAudioAmplifier),
             new("Valve Preamp", "Half a 12AX7 on 250 V: a 100 mV signal comes out at about 6 V, inverted", LoadValvePreamp),
             new("AY-3-8910 Tone", "An Arduino Uno writing the sound chip's registers over its bus — 440 Hz on channel A", LoadUnoAyTone),
+            new("OTA Amplifier", "An LM13700 as a voltage-controlled amplifier: turn the pot to change the bias current and so the gain", LoadOtaAmplifier),
+            new("Valve Amplifier", "A single-ended amp: a 12AX7 driving an EL84 through a 5 kΩ : 8 Ω output transformer into a speaker", LoadValveAmplifier),
+            new("Fuzz Face", "Two AC128 germanium transistors on a positive-ground 9 V: a clean note squared off into a fuzz", LoadFuzzFace),
+            new("Spectrum Analyser", "An MSGEQ7 hearing 160 Hz and 2.5 kHz, a strobe stepping its OUT through the seven bands", LoadSpectrumAnalyser),
+            new("SN76489 Tone", "An Arduino Uno writing TI's sound chip a byte at a time: 440 Hz on its first channel", LoadUnoSn76489),
         ]),
 
         new("Displays",
@@ -292,6 +310,22 @@ public static partial class Examples
             new("OLED Display", "The I2C master sets up an SSD1306 and draws a frame and a word on its 128 × 64 pixels", LoadOledDisplay),
             new("LED Matrix", "The SPI master writes a MAX7219's registers: on, scan limit, brightness, then a face a row at a time", LoadLedMatrix),
             new("TM1637 Display", "12:34 on a four-digit TM1637 module, its two-wire bus — LSB first, not I2C — played by a pattern generator", LoadTm1637Display),
+            new("Nokia 5110", "The 84 × 48 PCD8544 set up over SPI and given a word, D/C from a pattern generator", LoadNokia5110),
+            new("TIL311 Hex Display", "A 74193 counting a 2 Hz clock, shown 0 to F on a TIL311 that decodes its own digits", LoadHexDisplay),
+            new("Multiplexed Display", "1234 on a four-digit display lit one digit at a time through a 74139, fast enough to look steady", LoadMultiplexedDisplay),
+        ]),
+
+        new("Modules",
+        [
+            new("Weather Station", "A BME280 read over I2C: its ID, a forced measurement, then the raw pressure, temperature and humidity", LoadWeatherStation),
+            new("Servo Driver", "A PCA9685 set to 50 Hz holding a servo at its centre with a 1.5 ms pulse", LoadServoDriver),
+            new("I/O Expander", "An MCP23017 lighting LEDs on port A and reading a switch on port B through its pull-ups", LoadIoExpander),
+            new("CAN Network", "Two MCP2515s at 125 kbit/s: one frame sent, acknowledged in the ACK slot and stored by the other", LoadCanNetwork),
+            new("Thermocouple Meter", "A MAX6675 read over SPI: a type-K thermocouple at 300 °C in quarter degrees", LoadThermocoupleMeter),
+            new("Relay Module", "A relay board switching a 12 V lamp from a logic pin, 10 ms behind it", LoadRelayModule),
+            new("Boost Converter", "An MT3608 board making 12 V from 5 V, and drawing the current to pay for it", LoadBoostConverter),
+            new("TB6612 Motor Driver", "A MOSFET H-bridge running a motor forwards at three-quarter PWM", LoadTb6612Motor),
+            new("DAC Staircase", "A 74393 counting into a DAC0808, an op-amp turning its current into a 256-step staircase", LoadDacStaircase),
         ]),
 
         new("Development Boards",

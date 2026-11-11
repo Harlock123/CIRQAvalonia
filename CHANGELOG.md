@@ -8,6 +8,54 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-11
+
+Fifty-four more parts, from the modules on every hobbyist's bench to the chips of the 1970s: a CAN controller that
+really arbitrates, sensors and drivers on I2C and SPI, converters, mixers and an OTA, an EL84 and its output
+transformer, UJTs and germanium, and the SN76489, the 6532 RIOT, the 4116 DRAM, the MC14500B and a GAL16V8 programmed
+from equations. Thirty new examples and a Modules category. 428 components in 17 categories, 164 worked examples,
+41 MCP tools, 5766 tests.
+
+### Added
+
+**Modules.** The **MCP2515** CAN controller (standard frames with bit stuffing and CRC-15, arbitration, the ACK slot,
+masks and filters, loopback), the **BME280/BMP280** (with Bosch's trimming registers, so a library's compensation gives
+back what's set), the **PCA9685** 16-channel PWM driver, the **MCP23017** expander, the **MAX6675** thermocouple
+converter, the **HX711** load-cell amplifier, the **ACS712** current sensor, the **TB6612FNG** motor driver, a
+**relay module** and an **MT3608 boost module**.
+
+**Analog chips.** The **LM13700** OTA, the **TL072/TL074**, **NE5532** and **OP07**, the **ADC0804** and **DAC0808**,
+the **ICL7107** 3½-digit voltmeter driving LED segments directly, the **MSGEQ7** spectrum analyser, the **NE602**
+mixer and the **MC1496** balanced modulator.
+
+**Valves and vintage.** An **EL84** pentode, a **5Y3** rectifier, a **12AU7**, an **output transformer**; the **2N2646
+UJT** and **2N6027 PUT**; the **1N34A** germanium diode and **AC128**/**OC71** germanium PNPs.
+
+**Transistors.** **BC337/BC327**, **2N5551/2N5401**, **TIP42C** and the P-channel **IRF4905**.
+
+**Logic.** The **74148**, **74688**, **74259**, **74190/74191** and **74279**, the **40106** and the **ULN2803**.
+
+**Displays.** A **10-segment bar graph**, a **multiplexed four-digit display** that averages its segments as an eye
+does, the **Nokia 5110** (PCD8544) and the **TIL311** hex display.
+
+**1970s chips.** The **SN76489** sound chip (D0 the top bit, as TI numbered it), the **6532 RIOT**, the **2114** and the
+**4116** — which forgets a row left unrefreshed for 2 ms — the **MC14500B** one-bit industrial control unit and the
+**GAL16V8**, programmed with equations (combinational, registered, with output enables) rather than a fuse map.
+
+**Thirty examples**, among them a CAN network, a weather station, a servo driver, a digital voltmeter, a crystal radio,
+a superhet mixer, a balanced modulator, a single-ended valve amplifier, a Fuzz Face, a spectrum analyser, an Arduino
+Uno playing the SN76489 (its firmware printed in the guide), UJT and PUT oscillators, a multiplexed display and a GAL
+counter, in a new **Modules** category and the old ones.
+
+### Changed
+
+The SPI and I2C masters take `wait 2ms` lines between transfers.
+
+### Fixed
+
+The pattern generator's `z` and `-` now release their line as the guide always said, so a pull-up takes it high; they
+drove it to half the supply.
+
 ## [1.3.0] - 2026-11-11
 
 The parts drawer fills up. Thirty-seven new parts: displays that show what they're sent, modules that
@@ -3050,7 +3098,8 @@ First public build of CirqAvalonia — an electronic circuit analyzer and mixed-
 
 **501 tests** measure the solver against closed-form answers rather than recorded output.
 
-[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v1.0.1...v1.1.0

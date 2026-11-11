@@ -29,34 +29,44 @@ namespace Cirq.Components.Digital;
 /// Pinout: 1-7 = inputs 1B to 7B, 8 = GND, 9 = COM, 10-16 = outputs 7C down to 1C.
 /// </para>
 /// </summary>
-public sealed partial class Uln2003 : DigitalIc
+public partial class Uln2003 : DigitalIc
 {
-    private const int Channels = 7;
+    private readonly int Channels;
 
-    private readonly Terminal[] _inputs = new Terminal[Channels];
-    private readonly Terminal[] _outputs = new Terminal[Channels];
+    private readonly Terminal[] _inputs;
+    private readonly Terminal[] _outputs;
 
-    private readonly double[] _previousClamp = new double[Channels];
+    private readonly double[] _previousClamp;
     private bool _limitedThisIteration;
 
-    public Uln2003() : base(16)
+    public Uln2003() : this(7)
     {
+    }
+
+    /// <summary>The ULN2003's seven channels in a DIP-16, or the ULN2803's eight in a DIP-18.</summary>
+    protected Uln2003(int channels) : base((channels * 2) + 2)
+    {
+        Channels = channels;
+        _inputs = new Terminal[channels];
+        _outputs = new Terminal[channels];
+        _previousClamp = new double[channels];
+        var pinCount = (channels * 2) + 2;
         PropagationDelay = 1e-6;        // a Darlington is slow; microseconds, not nanoseconds
 
 
-        var pins = new Terminal[17];
+        var pins = new Terminal[pinCount + 1];
 
         Terminal Pin(int number, string name, TerminalType type) =>
-            pins[number] = new Terminal($"p{number}", name, type, DipPackage.PinOffset(number, 16));
+            pins[number] = new Terminal($"p{number}", name, type, DipPackage.PinOffset(number, pinCount));
 
         for (var i = 0; i < Channels; i++)
         {
             _inputs[i] = Pin(i + 1, $"{i + 1}B", TerminalType.Input);
-            _outputs[i] = Pin(16 - i, $"{i + 1}C", TerminalType.Output);
+            _outputs[i] = Pin(pinCount - i, $"{i + 1}C", TerminalType.Output);
         }
 
-        Gnd = Pin(8, "GND", TerminalType.Ground);
-        Common = Pin(9, "COM", TerminalType.Passive);
+        Gnd = Pin(channels + 1, "GND", TerminalType.Ground);
+        Common = Pin(channels + 2, "COM", TerminalType.Passive);
 
         // There is genuinely no Vcc pin on a ULN2003: the part is powered by whatever it is
         // sinking from. Pointing Vcc at the ground pin and asking for no minimum supply is how
@@ -88,7 +98,7 @@ public sealed partial class Uln2003 : DigitalIc
     [ObservableProperty]
     public partial double DarlingtonResistance { get; set; } = 2.0;
 
-    public override string PartNumber => "ULN2003";
+    public override string PartNumber => Channels == 8 ? "ULN2803" : "ULN2003";
 
     protected override double OutputImpedance => Math.Max(DarlingtonResistance, 1e-3);
 
@@ -164,5 +174,13 @@ public sealed partial class Uln2003 : DigitalIc
             // wired to it sees nothing at all rather than being pulled anywhere.
             context.Schedule(this, i, on ? LogicState.Low : LogicState.HighImpedance, delay);
         }
+    }
+}
+
+/// <summary>The ULN2803: the ULN2003's Darlingtons eight to a DIP-18, GND on pin 9 and COM on pin 10.</summary>
+public sealed partial class Uln2803 : Uln2003
+{
+    public Uln2803() : base(8)
+    {
     }
 }

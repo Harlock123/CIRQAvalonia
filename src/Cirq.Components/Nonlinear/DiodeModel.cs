@@ -97,13 +97,16 @@ public sealed record DiodeModel(
     /// about the part.
     /// </summary>
 
+    /// <summary>The 1N34A germanium point-contact diode: about 0.3 V at a milliamp, the crystal radio's detector.</summary>
+    public static readonly DiodeModel D1N34A = new("1N34A", 2.0e-7, 1.3, 7.0, 60.0, EnergyGap: 0.67, TemperatureExponent: 2.0);
+
     /// <summary>Builds a Zener model with the requested breakdown voltage.</summary>
     public static DiodeModel Zener(double breakdownVoltage) =>
         new($"Zener {breakdownVoltage:0.#}V", 1e-14, 1.0, 1.0, breakdownVoltage);
 
     private static readonly IReadOnlyList<DiodeModel> BuiltIn =
     [
-        D1N4148, D1N4001, D1N5817,
+        D1N4148, D1N4001, D1N5817, D1N34A,
         LedRed, LedAmber, LedYellow, LedGreen, LedBlue, LedWhite, LedInfrared,
         Zener(3.3), Zener(5.1), Zener(9.1), Zener(12.0),
     ];

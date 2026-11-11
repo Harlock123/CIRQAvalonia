@@ -59,8 +59,26 @@ public sealed record BjtModel(
     /// <summary>The TO-3 power classic: big, slow, low gain, 15 A.</summary>
     public static readonly BjtModel N2N3055 = new("2N3055", BjtPolarity.Npn, 9.7e-12, 50, 1, 100);
 
+    /// <summary>The 800 mA TO-92 pair, the BC547's bigger cousins for driving relays and small motors.</summary>
+    public static readonly BjtModel Bc337 = new("BC337", BjtPolarity.Npn, 4.0e-14, 300, 6, 100);
+    public static readonly BjtModel Bc327 = new("BC327", BjtPolarity.Pnp, 4.0e-14, 250, 6, 70);
+
+    /// <summary>The high-voltage TO-92 pair: 160 V and 150 V, for valve-supply and mains-adjacent work.</summary>
+    public static readonly BjtModel N2N5551 = new("2N5551", BjtPolarity.Npn, 2.5e-14, 120, 3, 100);
+    public static readonly BjtModel P2N5401 = new("2N5401", BjtPolarity.Pnp, 2.5e-14, 120, 3, 100);
+
+    /// <summary>The TIP41C's PNP partner: 6 A in TO-220.</summary>
+    public static readonly BjtModel Tip42C = new("TIP42C", BjtPolarity.Pnp, 1.5e-13, 75, 2, 100);
+
+    /// <summary>
+    /// Germanium PNPs, the AC128 and the OC71: a junction that turns on at about 0.2 V rather than 0.6 V, the gap of
+    /// germanium (0.67 eV) setting how its drop moves with temperature. The Fuzz Face's transistors.
+    /// </summary>
+    public static readonly BjtModel Ac128 = new("AC128", BjtPolarity.Pnp, 5.0e-7, 90, 2, 40, EnergyGap: 0.67, TemperatureExponent: 2.0);
+    public static readonly BjtModel Oc71 = new("OC71", BjtPolarity.Pnp, 3.0e-7, 47, 2, 30, EnergyGap: 0.67, TemperatureExponent: 2.0);
+
     private static readonly IReadOnlyList<BjtModel> BuiltIn =
-        [N2N3904, N2N2222, Bc547, Tip31C, P2N3906, Bc557, Tip32C, Bd139, Bd140, N2N3055];
+        [N2N3904, N2N2222, Bc547, Tip31C, P2N3906, Bc557, Tip32C, Bd139, Bd140, N2N3055, Bc337, Bc327, N2N5551, P2N5401, Tip42C, Ac128, Oc71];
 
     /// <summary>Models brought in from SPICE cards, which shadow a built-in of the same name.</summary>
     private static readonly List<BjtModel> ImportedModels = [];

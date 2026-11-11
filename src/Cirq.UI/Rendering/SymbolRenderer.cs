@@ -58,8 +58,16 @@ public static partial class SymbolRenderer
         {
             case Resistor: DrawResistor(context, pen); break;
             case var module when IsModule(module): DrawModule(context, pen, zoom, module); break;
-            case MultiLed multi: DrawMultiLed(context, pen, zoom, multi); break;
             case var dip when NamedDip(dip) is { } package: DrawNamedDip(context, pen, zoom, dip, package.Pins, package.Name); break;
+            case MultiLed multi: DrawMultiLed(context, pen, zoom, multi); break;
+            case Unijunction: DrawUjt(context, pen, false); break;
+            case ProgrammableUnijunction: DrawUjt(context, pen, true); break;
+            case Pentode: DrawPentode(context, pen); break;
+            case ValveRectifier: DrawValveRectifier(context, pen); break;
+            case Til311 hex:
+                DrawDip(context, pen, zoom, 14, "", null);
+                DrawCenteredText(context, hex.Shown is { } v ? v.ToString("X", System.Globalization.CultureInfo.InvariantCulture) : "", new Point(0, 0), 28, 1, new SolidColorBrush(Color.FromRgb(0xFF, 0x30, 0x20)));
+                break;
             case Ds3231 rtc: DrawPackage(context, pen, zoom, rtc, "DS3231"); break;
             case Mpu6050 imu: DrawPackage(context, pen, zoom, imu, "MPU-6050"); break;
             case NixieTube nixie: DrawNixie(context, pen, zoom, nixie); break;
@@ -2981,6 +2989,9 @@ public static partial class SymbolRenderer
     public static double LabelOffset(CircuitComponent component) => component switch
     {
         var module when IsModule(module) => ModuleLabelOffset(module),
+        var dip when NamedDip(dip) is { } package => DipPackage.BodyHeight(package.Pins) / 2 + 16,
+        Pentode => 64.0,
+        ValveRectifier or Unijunction or ProgrammableUnijunction => 52.0,
         DeveloperBoard board => BoardPackage.BodyHeight(board.Profile) / 2 + 16,
         Cirq.Components.Processors.ArduinoUnoFirmware => BoardPackage.BodyHeight(BoardProfile.ArduinoUno) / 2 + 16,
 
@@ -3037,7 +3048,6 @@ public static partial class SymbolRenderer
         // Eleven pins reaching 52 either side of centre.
         LevelShifter => 84.0,
         NixieTube => 74.0,
-        var dip when NamedDip(dip) is { } package => DipPackage.BodyHeight(package.Pins) / 2 + 16,
         Triode => 50.0,
         OscillatorModule => 44.0,
         Ne555 => DipPackage.BodyHeight(8) / 2 + 16,

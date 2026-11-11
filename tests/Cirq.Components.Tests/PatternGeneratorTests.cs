@@ -64,8 +64,27 @@ public class PatternGeneratorTests
         var pattern = new PatternGenerator { Pattern = "1-01", StepRate = 1000.0, Repeats = false };
 
         Assert.Equal(LogicState.High, pattern.StateAt(0.5e-3, 0));
-        Assert.Equal(LogicState.Unknown, pattern.StateAt(1.5e-3, 0));
+        Assert.Equal(LogicState.HighImpedance, pattern.StateAt(1.5e-3, 0));
         Assert.Equal(LogicState.Low, pattern.StateAt(2.5e-3, 0));
+    }
+
+    /// <summary>Released means released: a line with a pull-up on it goes to the pull-up's rail, not to mid-supply.</summary>
+    [Fact]
+    public void AReleasedLineFollowsItsPullUp()
+    {
+        var circuit = new Cirq.Core.Topology.Circuit();
+        var supply = circuit.Add(new Cirq.Components.Sources.DcVoltageSource(5));
+        var ground = circuit.Add(new Cirq.Components.Sources.Ground());
+        circuit.Connect(supply.Terminals[1], ground.Terminals[0]);
+        var pattern = circuit.Add(new PatternGenerator { Pattern = "z", StepRate = 1000.0 });
+        var pullUp = circuit.Add(new Cirq.Components.Passive.Resistor(10e3));
+        circuit.Connect(supply.Terminals[0], pullUp.Terminals[0]);
+        circuit.Connect(pullUp.Terminals[1], pattern.Terminals[0]);
+        var simulator = new Cirq.Engine.Simulation.CircuitSimulator(circuit);
+        simulator.Reset();
+        simulator.SolveOperatingPoint();
+        simulator.Run(0.5e-3);
+        Assert.Equal(5.0, simulator.NodeVoltage(pattern.Terminals[0]), 2);
     }
 
     /// <summary>

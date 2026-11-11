@@ -161,6 +161,13 @@ public sealed partial class I2cMaster : I2cDevice, IBreakpointSource
 
         foreach (var line in Transactions.Split([';', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries))
         {
+            // "wait 5ms": a pause between transactions, the bus idle.
+            if (line.Trim().StartsWith("wait", StringComparison.OrdinalIgnoreCase))
+            {
+                if (Cirq.Core.Units.SiPrefix.TryParse(line.Trim()[4..].Trim().TrimEnd('s', 'S'), out var pause) && pause > 0) t += pause;
+                continue;
+            }
+
             var parts = line.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
             if (parts.Length < 2) continue;
 

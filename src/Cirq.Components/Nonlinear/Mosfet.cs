@@ -73,8 +73,11 @@ public sealed record MosfetModel(
     /// <summary>The IRF540N, the N version of the standard-gate IRF540: wants 10 V on its gate.</summary>
     public static readonly MosfetModel Irf540N = new("IRF540N", MosfetChannel.NChannel, 3.0, 2.5, 0.01);
 
+    /// <summary>The IRF4905: a P-channel power MOSFET, −55 V and 74 A, the usual high-side switch on a 12 V rail.</summary>
+    public static readonly MosfetModel Irf4905 = new("IRF4905", MosfetChannel.PChannel, 3.0, 3.0, 0.01);
+
     private static readonly IReadOnlyList<MosfetModel> BuiltIn =
-        [N2N7000, IrlZ44N, Irf540, Bs250, Irf9540, Bs170, Irf540N];
+        [N2N7000, IrlZ44N, Irf540, Bs250, Irf9540, Bs170, Irf540N, Irf4905];
 
     /// <summary>Models brought in from SPICE cards, which shadow a built-in of the same name.</summary>
     private static readonly List<MosfetModel> ImportedModels = [];

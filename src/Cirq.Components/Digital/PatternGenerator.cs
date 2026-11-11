@@ -217,7 +217,7 @@ public partial class PatternGenerator : DigitalComponent, IBreakpointSource
                 {
                     case '0': states.Add(LogicState.Low); break;
                     case '1': states.Add(LogicState.High); break;
-                    case '-' or 'z' or 'Z': states.Add(LogicState.Unknown); break;
+                    case '-' or 'z' or 'Z': states.Add(LogicState.HighImpedance); break;
 
                     // Anything else — spaces, underscores, the vertical bars people draw timing
                     // diagrams with — is grouping rather than a step. A pattern long enough to

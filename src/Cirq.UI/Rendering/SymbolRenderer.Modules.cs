@@ -32,6 +32,15 @@ public static partial class SymbolRenderer
         IrReceiver => new Rect(-28, -26, 56, 54),
         DhtSensor => new Rect(-40, -18, 80, 56),
         BuckModule => new Rect(-28, -26, 56, 54),
+        BoostModule => new Rect(-28, -26, 56, 54),
+        Cirq.Components.Electromechanical.Acs712 => new Rect(-28, -30, 56, 84),
+        Hx711 => new Rect(-28, -50, 56, 120),
+        Max6675 => new Rect(-28, -40, 56, 80),
+        Pca9685 => new Rect(-28, -160, 56, 320),
+        Cirq.Components.Electromechanical.Tb6612Module => new Rect(-38, -80, 76, 160),
+        Cirq.Components.Electromechanical.RelayModule => new Rect(-38, -32, 76, 64),
+        Pcd8544 => new Rect(-80, -48, 160, 96),
+        QuadSevenSegment => new Rect(-84, -28, 168, 56),
         L298nModule => null,
         _ => null,
     };
@@ -129,6 +138,8 @@ public static partial class SymbolRenderer
             case Ssd1306 oled: DrawOledScreen(context, zoom, oled, body); break;
             case Max7219Matrix matrix: DrawMatrix(context, matrix, body); break;
             case Tm1637Display tm: DrawTm1637Digits(context, pen, tm, body); break;
+            case Pcd8544 lcd: DrawNokiaScreen(context, zoom, lcd, body); break;
+            case QuadSevenSegment quad: DrawQuadDigits(context, pen, quad, body); break;
             default:
                 var title = component is DigitalIc chip ? chip.PartNumber : component.ComponentType;
                 DrawCenteredText(context, title, TitlePlace(points, sides, body), 8, zoom, CanvasTheme.SymbolBrush);
@@ -174,8 +185,112 @@ public static partial class SymbolRenderer
         Lm3914 => (18, "LM3914"),
         Ne567 => (8, "NE567"),
         Xr2206 => (16, "XR2206"),
+        DualOpAmp dual => (8, dual.Model.Name),
+        Lm13700 => (16, "LM13700"),
+        Cirq.Components.Digital.Dac0808 => (16, "DAC0808"),
+        Icl7107 => (40, "ICL7107"),
+        Msgeq7 => (8, "MSGEQ7"),
+        Ne602 => (8, "NE602"),
+        Mc1496 => (14, "MC1496"),
+        LedBarGraph => (20, "BAR GRAPH"),
+        Mcp23017 => (28, "MCP23017"),
         _ => null,
     };
+
+    /// <summary>The Nokia's 84 × 48 glass, its pixels dark on grey-green.</summary>
+    private static void DrawNokiaScreen(ISymbolCanvas context, double zoom, Pcd8544 lcd, Rect body)
+    {
+        var glass = new Rect(-42 * 1.5, body.Top + 16, 84 * 1.5, 48 * 1.5);
+        context.FillRectangle(new SolidColorBrush(Color.FromRgb(0xA8, 0xBF, 0x8E)), glass);
+        if (lcd.PoweredDown)
+        {
+            DrawCenteredText(context, "PCD8544", glass.Center, 8, zoom, new SolidColorBrush(Color.FromRgb(0x6B, 0x80, 0x55)));
+            return;
+        }
+
+        var ink = new SolidColorBrush(Color.FromRgb(0x1C, 0x24, 0x18));
+        for (var y = 0; y < 48; y++)
+            for (var x = 0; x < 84; x++)
+                if (lcd.Pixel(x, y)) context.FillRectangle(ink, new Rect(glass.Left + (x * 1.5), glass.Top + (y * 1.5), 1.5, 1.5));
+    }
+
+    /// <summary>The multiplexed display's four digits, each segment as bright as the eye's average says.</summary>
+    private static void DrawQuadDigits(ISymbolCanvas context, IPen pen, QuadSevenSegment quad, Rect body)
+    {
+        var window = new Rect(body.Left + 8, body.Top + 10, body.Width - 16, body.Height - 20);
+        context.FillRectangle(new SolidColorBrush(Color.FromRgb(0x10, 0x08, 0x08)), window);
+        var thickness = Math.Max(pen.Thickness * 1.4, 2.2);
+        for (var d = 0; d < 4; d++)
+        {
+            var cx = window.Left + 18 + (d * (window.Width - 24) / 4);
+            var (w, h, top) = (10.0, 13.0, window.Center.Y - 13);
+            Point A(double x, double y) => new(cx + x, top + y);
+            (Point, Point)[] lines =
+            [
+                (A(0, 0), A(w, 0)), (A(w, 0), A(w, h)), (A(w, h), A(w, 2 * h)), (A(0, 2 * h), A(w, 2 * h)),
+                (A(0, h), A(0, 2 * h)), (A(0, 0), A(0, h)), (A(0, h), A(w, h)),
+            ];
+            for (var s = 0; s < 7; s++)
+            {
+                var glow = quad.Glow(d, s);
+                context.DrawLine(new Pen(Wash(MatrixColour, 0.1 + (0.9 * Math.Clamp(glow * 2, 0, 1))), thickness, lineCap: PenLineCap.Round), lines[s].Item1, lines[s].Item2);
+            }
+
+            context.DrawEllipse(Wash(MatrixColour, 0.1 + (0.9 * Math.Clamp(quad.Glow(d, 7) * 2, 0, 1))), null, A(w + 4, 2 * h), 1.6, 1.6);
+        }
+    }
+
+    /// <summary>A unijunction: the bar between its bases, the emitter's arrow slanting into it.</summary>
+    private static void DrawUjt(ISymbolCanvas context, IPen pen, bool programmable)
+    {
+        if (programmable)
+        {
+            // A PUT: a diode anode to cathode, the gate off the anode side.
+            context.DrawLine(pen, new Point(0, -40), new Point(0, -10));
+            context.DrawGeometry(CanvasTheme.SymbolFill, pen, SymbolPath.Polyline([new Point(-11, -10), new Point(11, -10), new Point(0, 9)], true));
+            context.DrawLine(pen, new Point(-11, 9), new Point(11, 9));
+            context.DrawLine(pen, new Point(0, 9), new Point(0, 40));
+            context.DrawLine(pen, new Point(-40, -10), new Point(-18, -10));
+            context.DrawLine(pen, new Point(-18, -10), new Point(-6, -2));
+            return;
+        }
+
+        context.DrawEllipse(CanvasTheme.SymbolFill, pen, new Point(4, 0), 24, 24);
+        context.DrawLine(pen, new Point(10, -16), new Point(10, 16));
+        context.DrawLine(pen, new Point(10, -14), new Point(10, -40));
+        context.DrawLine(pen, new Point(10, 14), new Point(10, 40));
+        context.DrawLine(pen, new Point(-40, 10), new Point(10, -2));
+        context.DrawGeometry(pen.Brush, pen, SymbolPath.Polyline([new Point(10, -2), new Point(0, -4), new Point(3, 4)], true));
+    }
+
+    /// <summary>A pentode: the plate, three grids (the screen and suppressor's grid lines), the cathode, in the envelope.</summary>
+    private static void DrawPentode(ISymbolCanvas context, IPen pen)
+    {
+        context.DrawEllipse(CanvasTheme.SymbolFill, pen, new Point(0, 0), 32, 32);
+        context.DrawLine(pen, new Point(0, -50), new Point(0, -20));
+        context.DrawLine(pen, new Point(-14, -20), new Point(14, -20));
+        var dashed = new Pen(pen.Brush, pen.Thickness, new DashStyle([2, 2], 0));
+        foreach (var y in new[] { -10.0, 0.0, 10.0 }) context.DrawLine(dashed, new Point(-16, y), new Point(16, y));
+        context.DrawLine(pen, new Point(-40, 10), new Point(-16, 10));
+        context.DrawLine(pen, new Point(16, 0), new Point(28, 0));
+        context.DrawLine(pen, new Point(28, 0), new Point(40, -20));
+        context.DrawGeometry(null, pen, SymbolPath.Polyline([new Point(-14, 24), new Point(-14, 20), new Point(14, 20), new Point(14, 24)], false));
+        context.DrawLine(pen, new Point(0, 20), new Point(0, 50));
+    }
+
+    /// <summary>A rectifier valve: two plates and the filament between them.</summary>
+    private static void DrawValveRectifier(ISymbolCanvas context, IPen pen)
+    {
+        context.DrawEllipse(CanvasTheme.SymbolFill, pen, new Point(0, 0), 26, 26);
+        foreach (var y in new[] { -20.0, 20.0 })
+        {
+            context.DrawLine(pen, new Point(-40, y), new Point(-12, y));
+            context.DrawLine(pen, new Point(-12, y - 8), new Point(-12, y + 8));
+        }
+
+        context.DrawGeometry(null, pen, SymbolPath.Polyline([new Point(10, -12), new Point(4, 0), new Point(10, 12)], false));
+        context.DrawLine(pen, new Point(10, 0), new Point(40, 0));
+    }
 
     /// <summary>The OLED's 128 × 64 glass, a unit to a pixel, each row's lit runs drawn as one bar.</summary>
     private static void DrawOledScreen(ISymbolCanvas context, double zoom, Ssd1306 oled, Rect body)

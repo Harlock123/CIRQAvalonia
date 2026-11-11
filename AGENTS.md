@@ -71,7 +71,9 @@ dotnet run --project src/Cirq.UI -- --mcp      # the MCP server on stdio, headle
     registers and uses its one-word vectors). The AT89C2051 is `I8051Core` (the MCS-51 instruction set, timers, UART
     and interrupts, no circuit) inside `At89c2051` (the DIP-20 part, run ahead by a window like the ATmega); test it
     with the test-side `Assembler8051`. Both kinds of microcontroller are `IFirmwareChip`, which is what Load Memory
-    Image and `load_memory` load. `Ay38910` is the sound chip, its generators ticked up to each evaluation.
+    Image and `load_memory` load. `Ay38910` and `Sn76489` are the sound chips, their generators ticked up to each
+    evaluation; `Riot6532` the RIOT on the 6502's bus; `Mc14500` the one-bit ICU. `Gal16v8` compiles its `Equations`
+    into expression trees on each change.
   - And the 8085: `I8085Core` (two partial files: the T-states, interrupts, HOLD and reset; the
     instructions), `Opcodes8085` (the disassembler and the patterns the test-side assembler is
     built from), `Cpu8085` (the DIP-40 part, X1 at twice CLK OUT), `Cpu8085BusDecoder`, and Intel's
@@ -166,6 +168,13 @@ dotnet run --project src/Cirq.UI -- --mcp      # the MCP server on stdio, headle
 - **Modules drawn as modules.** A part whose pins aren't a DIP's (the OLED, the matrix, the SD card) is drawn by
   `SymbolRenderer.Modules.cs`: list it in `ModuleMinimum` and the body is sized to its pins, each named inside it.
   A non-`DigitalIc` chip in a DIP (the L293D, the 556) goes in `NamedDip` there. Its caption offset follows.
+- **Small parts, shared pieces.** `JunctionStamp` is a pn junction with SPICE's limiting for parts with a diode
+  inside (the UJT, the PUT, the LM13700's linearising diodes); `PinTableIc` builds a 74-series part from a pin table
+  and gives `Pin(name)`, `High` and `Drive` (the 74148, 74688, 74259, 74190/74191, 74279). A non-`DigitalIc` chip in a
+  DIP goes in `SymbolRenderer.Modules.cs`'s `NamedDip` to be drawn with its pins named.
+- **The pattern generator's z lets go.** `z` and `-` are `HighImpedance`, released, so a pull-up decides the line;
+  they used to be `Unknown`, which drives half the supply. A CMOS input fed from it at 5 V wants that and a pull-up,
+  since its TTL high (3.4 V) is short of 3.5 V.
 - **The TM1637 isn't I2C.** It takes bytes LSB first with no address, so the I2C master can't drive it;
   `Tm1637Display.PatternFor` writes CLK and DIO for a pattern generator, as `NeoPixelStrip.PatternFor` does.
 - **Waveforms for a NeoPixel.** Nothing in the library runs code, so a WS2812 strip is driven by a pattern

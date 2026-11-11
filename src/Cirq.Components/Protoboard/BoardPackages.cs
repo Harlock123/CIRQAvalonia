@@ -187,6 +187,7 @@ public static partial class BoardPackages
         ["LM741"] = (8, new() { [2] = "in-", [3] = "in+", [4] = "v-", [6] = "out", [7] = "v+" }),
         ["TL081"] = (8, new() { [2] = "in-", [3] = "in+", [4] = "v-", [6] = "out", [7] = "v+" }),
         ["TLV3501"] = (8, new() { [2] = "in-", [3] = "in+", [4] = "v-", [6] = "out", [7] = "v+" }),
+        ["OP07"] = (8, new() { [2] = "in-", [3] = "in+", [4] = "v-", [6] = "out", [7] = "v+" }),
         // Duals, the first half used.
         ["LM358"] = (8, new() { [1] = "out", [2] = "in-", [3] = "in+", [4] = "v-", [8] = "v+" }),
         ["MCP6002"] = (8, new() { [1] = "out", [2] = "in-", [3] = "in+", [4] = "v-", [8] = "v+" }),
@@ -232,6 +233,15 @@ public static partial class BoardPackages
         ["BD139"] = (BoardLook.To220, ["e", "c", "b"]),
         ["BD140"] = (BoardLook.To220, ["e", "c", "b"]),
         ["2N3055"] = (BoardLook.To220, ["b", "e", "c"]),
+
+        ["BC337"] = (BoardLook.To92, ["c", "b", "e"]),
+        ["BC327"] = (BoardLook.To92, ["c", "b", "e"]),
+        ["2N5551"] = (BoardLook.To92, ["e", "b", "c"]),
+        ["2N5401"] = (BoardLook.To92, ["e", "b", "c"]),
+        ["TIP42C"] = (BoardLook.To220, ["b", "c", "e"]),
+        ["AC128"] = (BoardLook.To92, ["e", "b", "c"]),
+        ["OC71"] = (BoardLook.To92, ["e", "b", "c"]),
+        ["IRF4905"] = (BoardLook.To220, ["g", "d", "s"]),
 
         // A 78L05 in TO-92 reads OUT, GND, IN: the other way round from a 7805.
         ["78L05"] = (BoardLook.To92, ["out", "com", "in"]),
@@ -377,6 +387,8 @@ public static partial class BoardPackages
             "HallSensor" => (BoardLook.To92, ["vcc", "gnd", "out"]),
             "Ds18b20" => (BoardLook.To92, ["gnd", "dq", "vdd"]),
             "IrReceiver" => (BoardLook.To92, ["out", "gnd", "vs"]),
+            "Unijunction" => (BoardLook.To92, ["e", "b1", "b2"]),
+            "ProgrammableUnijunction" => (BoardLook.To92, ["a", "g", "k"]),
             _ => null,
         };
 

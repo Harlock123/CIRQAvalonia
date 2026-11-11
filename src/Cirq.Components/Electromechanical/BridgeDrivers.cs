@@ -62,16 +62,22 @@ public abstract partial class HalfBridgeDriver : CircuitComponent
         for (var i = 0; i < halves.Count; i++)
         {
             var h = halves[i];
-            var enabled = High(h.Enable);
-            var on = High(h.Input);
-            _high[i] = enabled && on;
-            _low[i] = enabled && !on;
+            (_high[i], _low[i]) = Decide(i, High);
             var output = system.Node(Terminals[h.Output]);
             system.StampConductance(supply, output, 1.0 / (_high[i] ? OnResistance : 1e9));
             system.StampConductance(output, gnd, 1.0 / (_low[i] ? OnResistance : 1e9));
             Clamp(system, state, 2 * i, gnd, output);
             Clamp(system, state, (2 * i) + 1, output, supply);
         }
+    }
+
+    /// <summary>Whether a half drives high or low (neither: let go), from its pins' levels; by default its input while enabled.</summary>
+    protected virtual (bool High, bool Low) Decide(int half, Func<int, bool> high)
+    {
+        var h = Halves[half];
+        var enabled = high(h.Enable);
+        var on = high(h.Input);
+        return (enabled && on, enabled && !on);
     }
 
     private void Clamp(MnaSystem system, SimulationState state, int index, int anode, int cathode)
@@ -184,4 +190,60 @@ public sealed partial class L298nModule : HalfBridgeDriver
     public override string ComponentType => "L298N Module";
 
     public override string ValueLabel => "L298N";
+}
+
+/// <summary>
+/// A TB6612FNG dual motor driver breakout: two H-bridges of MOSFETs (about 0.5 Ω a switch, so little lost), up to 1.2 A
+/// each from VM, logic on VCC. Each motor's IN1 and IN2 choose the direction and PWM switches it: IN1 high and IN2 low
+/// drive O1 high and O2 low while PWM is high (IN2 high and IN1 low the other way), both inputs high or PWM low brake it
+/// (both outputs low), both inputs low let it coast. STBY low turns everything off.
+/// </summary>
+public sealed partial class Tb6612Module : HalfBridgeDriver
+{
+    public Tb6612Module() : base(4)
+    {
+        Terminal T(string id, string name, TerminalType type, double x, double y) => new(id, name, type, new Point(x, y));
+        Terminals =
+        [
+            T("vm", "VM", TerminalType.Power, 50, -70),           // 0
+            T("vcc", "VCC", TerminalType.Power, -50, -70),        // 1
+            T("gnd", "GND", TerminalType.Ground, -50, 70),        // 2
+            T("ao1", "AO1", TerminalType.Output, 50, -40),        // 3
+            T("ao2", "AO2", TerminalType.Output, 50, -20),        // 4
+            T("bo2", "BO2", TerminalType.Output, 50, 20),         // 5
+            T("bo1", "BO1", TerminalType.Output, 50, 40),         // 6
+            T("pwma", "PWMA", TerminalType.Input, -50, -50),      // 7
+            T("ain2", "AIN2", TerminalType.Input, -50, -30),      // 8
+            T("ain1", "AIN1", TerminalType.Input, -50, -10),      // 9
+            T("stby", "STBY", TerminalType.Input, -50, 10),       // 10
+            T("bin1", "BIN1", TerminalType.Input, -50, 30),       // 11
+            T("bin2", "BIN2", TerminalType.Input, -50, 50),       // 12
+            T("pwmb", "PWMB", TerminalType.Input, -50, 60),       // 13
+        ];
+        OnResistance = 0.5;
+    }
+
+    // Each half: its own input, the motor's PWM as the enable, its output.
+    protected override IReadOnlyList<Half> Halves { get; } = [new(9, 7, 3), new(8, 7, 4), new(12, 13, 5), new(11, 13, 6)];
+
+    protected override (bool High, bool Low) Decide(int half, Func<int, bool> high)
+    {
+        if (!high(10)) return (false, false);
+        var (in1, in2, pwm) = half < 2 ? (high(9), high(8), high(7)) : (high(11), high(12), high(13));
+        if (!in1 && !in2) return (false, false);              // coast
+        var first = half is 0 or 3;                           // AO1 and BO1
+        var drive = pwm && in1 != in2;
+        var up = drive && (first ? in1 : in2);
+        return (up, !up);                                     // brake: both low
+    }
+
+    protected override Terminal MotorSupply => Terminals[0];
+
+    protected override IReadOnlyList<Terminal> Grounds => [Terminals[2]];
+
+    protected override IReadOnlyList<Terminal> Inputs => [.. Terminals.Skip(7)];
+
+    public override string ComponentType => "TB6612FNG Module";
+
+    public override string ValueLabel => "TB6612FNG";
 }

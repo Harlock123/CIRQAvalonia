@@ -64,7 +64,7 @@ public sealed partial class SpiMaster : DigitalComponent, IBreakpointSource
 
     public Terminal Gnd { get; }
 
-    /// <summary>Bytes to send, hex, one transfer per line or semicolon.</summary>
+    /// <summary>Bytes to send, hex, one transfer per line or semicolon; a line "wait 2ms" pauses between transfers.</summary>
     [ObservableProperty]
     public partial string Transactions { get; set; } = "AA 55";
 
@@ -158,6 +158,13 @@ public sealed partial class SpiMaster : DigitalComponent, IBreakpointSource
 
         foreach (var line in Transactions.Split([';', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries))
         {
+            // "wait 2ms": a pause between transfers, the select left high.
+            if (line.Trim().StartsWith("wait", StringComparison.OrdinalIgnoreCase))
+            {
+                if (Cirq.Core.Units.SiPrefix.TryParse(line.Trim()[4..].Trim().TrimEnd('s', 'S'), out var pause) && pause > 0) t += pause;
+                continue;
+            }
+
             var bytes = line.Trim()
                 .Split(' ', StringSplitOptions.RemoveEmptyEntries)
                 .Select(token => int.TryParse(token, System.Globalization.NumberStyles.HexNumber,

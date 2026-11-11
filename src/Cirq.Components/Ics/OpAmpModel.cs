@@ -165,7 +165,33 @@ public sealed record OpAmpModel(
     /// </summary>
     public static readonly OpAmpModel Lm324 = Lm358 with { Name = "LM324" };
 
-    public static readonly IReadOnlyList<OpAmpModel> Library = [Lm741, Tl081, Lm358, Lm324, Mcp6002];
+    /// <summary>The TL081 two to a package and four: the same JFET-input amplifier.</summary>
+    public static readonly OpAmpModel Tl072 = Tl081 with { Name = "TL072" };
+
+    public static readonly OpAmpModel Tl074 = Tl081 with { Name = "TL074" };
+
+    /// <summary>
+    /// The NE5532, the audio dual: bipolar inputs, 10 MHz, 9 V/µs, an output that drives 600 Ω, and 5 nV/√Hz, which is
+    /// why it's in half the mixing desks ever made.
+    /// </summary>
+    public static readonly OpAmpModel Ne5532 = new(
+        "NE5532", 100_000, 10e6, 9e6, 300e3, 0.3, 1.5, 0.5e-3, 200e-9, 4e-3,
+        OffsetDriftPerKelvin: 5e-6,
+        VoltageNoiseDensity: 5e-9,
+        CurrentNoiseDensity: 0.7e-12,
+        VoltageNoiseCornerHz: 100,
+        CurrentNoiseCornerHz: 200);
+
+    /// <summary>The OP07, the precision bipolar: 30 µV of offset drifting 0.3 µV a degree, a gain of five million, and slow.</summary>
+    public static readonly OpAmpModel Op07 = new(
+        "OP07", 5_000_000, 0.6e6, 0.3e6, 50e6, 60, 1.5, 30e-6, 1e-9, 2.5e-3,
+        OffsetDriftPerKelvin: 0.3e-6,
+        VoltageNoiseDensity: 10e-9,
+        CurrentNoiseDensity: 0.1e-12,
+        VoltageNoiseCornerHz: 10,
+        CurrentNoiseCornerHz: 50);
+
+    public static readonly IReadOnlyList<OpAmpModel> Library = [Lm741, Tl081, Lm358, Lm324, Mcp6002, Tl072, Tl074, Ne5532, Op07];
 
     /// <summary>Input-stage transconductance. Fixed; the other values scale around it.</summary>
     public double Transconductance => 1e-4;

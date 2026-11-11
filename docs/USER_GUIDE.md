@@ -174,30 +174,30 @@ Three of those are worth separating, because they are easy to confuse:
 
 ## Placing components
 
-![The component palette: a Find a part box at the top, "374 parts in 17 groups" under it, and the seventeen categories with their counts — passive 11, switches 5, sources 16, semiconductors 13, transistors 19, LEDs and displays 18, power 13, analog ICs 20, logic gates 14, 74xx series 79, 40xx series 47, buses 25, digital I/O 9, memory and CPUs 42, sensors and actuators 22, switching and isolation 14, dev boards 7 — every group closed, so all seventeen headings fit on screen at once](images/02-palette.png)
+![The component palette: a Find a part box at the top, "428 parts in 17 groups" under it, and the seventeen categories with their counts — passive 11, switches 5, sources 16, semiconductors 16, transistors 27, LEDs and displays 22, power 14, analog ICs 35, logic gates 14, 74xx series 85, 40xx series 48, buses 31, digital I/O 9, memory and CPUs 48, sensors and actuators 23, switching and isolation 17, dev boards 7 — every group closed, so all seventeen headings fit on screen at once](images/02-palette.png)
 
 Click a palette entry, then click the canvas. The part lands where you click, snapped to the grid.
 
-The palette holds **374 components in 17 categories**:
+The palette holds **428 components in 17 categories**:
 
 | Category | Count | Contents |
 | --- | --- | --- |
 | Passive | 11 | Resistor, capacitor, electrolytic capacitor, inductor, transformer, centre-tapped transformer, potentiometer, crystal, ferrite bead, **common-mode choke** and transmission line — see [below](#common-mode-chokes) |
 | Switches | 5 | SPST, SPDT, push button, **8-way DIP switch**, **4×4 matrix keypad** |
 | Sources | 16 | Ground, **net label**, **loop probe**, DC voltage, DC current, **voltage- and current-controlled sources**, the **behavioural source** whose output is a formula, function generator, **waveform source**, battery, solar cell, **noise source**, and the three **annotations** — note, heading and area — see [below](#feeding-it-a-real-waveform) |
-| Semiconductors | 13 | 1N4148, 1N4001, Schottky, zeners, **varactor**, **photodiode**, bridge rectifier, SCR, triac, diac, TVS and varistor — see [below](#three-ways-to-measure-light) |
-| Transistors | 19 | NPN and PNP bipolars including the **2N2222**, **BC557**, the **BD139/BD140** pair and the **2N3055**, a **TIP120 Darlington**, N- and P-channel MOSFETs with the **BS170** and **IRF540N**, three JFETs and an **IGBT** — see [below](#the-igbt) and [more transistors](#more-transistors-and-regulators) |
-| LEDs & Displays | 18 | Six LED colours and an **infrared** one, **RGB** and **bicolour** LEDs, an **incandescent lamp**, a **WS2812B NeoPixel strip**, seven-segment displays, **HD44780 character LCD**, an **SSD1306 OLED**, a **MAX7219 LED matrix**, a **TM1637 four-digit display** and a **Nixie tube** — see [below](#the-character-lcd) and [displays on a bus](#displays-on-a-bus) |
-| Power | 13 | Fixed and adjustable regulators with the **LM337** and **78L05**, an **LM2596 buck module**, TL431 shunt reference, ICL7660 charge pump, MC34063 switching controller, **TP4056 lithium charger** — see [below](#charging-a-lithium-cell) |
-| Analog ICs | 20 | LM741, TL081, LM358, MCP6002 rail-to-rail, the **LM324 quad**, NE555, the **7555** and **556**, LM311, LM339, LM386 audio amp, INA126 instrumentation amp, an **AD633 analog multiplier**, the **LM3914** bar driver, the **NE567** tone decoder, the **XR2206** function generator, the **74141** Nixie driver and a **12AX7** triode — see [below](#four-in-one-package) and [timers, tones and waveforms](#timers-tones-and-waveforms) |
+| Semiconductors | 16 | 1N4148, 1N4001, Schottky, the **1N34A germanium** diode, zeners, **varactor**, **photodiode**, bridge rectifier, SCR, triac, diac, TVS and varistor, and the **2N2646 UJT** and **2N6027 PUT** — see [below](#three-ways-to-measure-light) and [relaxation oscillators](#relaxation-oscillators) |
+| Transistors | 27 | NPN and PNP bipolars including the **2N2222**, **BC557**, the **BD139/BD140** pair and the **2N3055**, the **BC337/BC327** and **2N5551/2N5401** pairs, the **TIP42C**, the **AC128** and **OC71** germanium PNPs, a **TIP120 Darlington**, N- and P-channel MOSFETs with the **BS170**, **IRF540N** and the P-channel **IRF4905**, three JFETs and an **IGBT** — see [below](#the-igbt) and [more transistors](#more-transistors-and-regulators) |
+| LEDs & Displays | 22 | Six LED colours and an **infrared** one, **RGB** and **bicolour** LEDs, an **incandescent lamp**, a **WS2812B NeoPixel strip**, seven-segment displays, **HD44780 character LCD**, an **SSD1306 OLED**, a **MAX7219 LED matrix**, a **TM1637 four-digit display** a **Nixie tube**, a **10-segment bar graph**, a **multiplexed four-digit display**, the **Nokia 5110** LCD and the **TIL311** hex display — see [below](#the-character-lcd) and [displays on a bus](#displays-on-a-bus) |
+| Power | 14 | Fixed and adjustable regulators with the **LM337** and **78L05**, an **LM2596 buck module** and an **MT3608 boost module**, TL431 shunt reference, ICL7660 charge pump, MC34063 switching controller, **TP4056 lithium charger** — see [below](#charging-a-lithium-cell) |
+| Analog ICs | 35 | LM741, TL081, the **TL072** and **TL074**, the **NE5532**, the **OP07**, LM358, MCP6002 rail-to-rail, the **LM324 quad**, NE555, the **7555** and **556**, LM311, LM339, LM386 audio amp, INA126 instrumentation amp, an **AD633 analog multiplier**, the **LM3914** bar driver, the **NE567** tone decoder, the **XR2206** function generator, the **74141** Nixie driver the **LM13700** OTA, the **ADC0804** and **DAC0808**, the **ICL7107** voltmeter, the **MSGEQ7**, the **NE602** mixer and **MC1496** modulator, **12AX7** and **12AU7** triodes, an **EL84** pentode, a **5Y3** rectifier and an output transformer — see [below](#four-in-one-package) [timers, tones and waveforms](#timers-tones-and-waveforms), [valves](#a-valve) and [converters and mixers](#converters-mixers-and-the-ota) |
 | Logic Gates | 14 | AND, OR, NAND, NOR, XOR, XNOR, NOT, buffer and **tri-state buffer**, and the generic **D, JK and T flip-flops** and **SR and D latches** |
-| 74xx Series | 79 | Gates including the **open-collector 7403, 7406 and 7407**, the **74132 Schmitt NAND** and the **74125 / 74126 tri-state buffers**; JK and D flip-flops, latches and registers; ripple and synchronous counters (**7490, 7493, 74160-74163, 74192 / 74193, 74390, 74393**); decoders and multiplexers including the **74154** and the tri-state **74251 and 74257**; the **74181 ALU**, **74182 look-ahead**, **7485 comparator**, **7483 / 74283 adders** and **74280 parity**; shift registers to the **74299**; bus buffers and registers; the **74121, 74123 and 74221 one-shots**; **7447, 7448 and 74247** display drivers; the **74189 RAM** and **74670 register file** — see [below](#the-rest-of-the-74-series) |
-| 40xx Series | 47 | CMOS gates and the **4049 / 4050 level converters**; flip-flops and latches; counters including the **4026 and 4033 with their own display drivers**, the **4029, 4510 and 4516 up/down counters** and the **4518 / 4520**; the **4028** and **4543 LCD driver**; shift registers to the **4094**; the **4051, 4052, 4053 and 4067 analog multiplexers**; the **4047, 4528 and 4538** timers; a **4046 phase-locked loop** — see [below](#the-40xx-series) |
-| Buses | 25 | **Bus tap** and **bus line**, I2C master, EEPROM, port expander, DS1307 clock, the **DS3231** clock and **MPU-6050** accelerometer, ADS1115 ADC, MCP4725 DAC and INA219 current sensor, SPI master and **MCP3008 ADC**, the **W25Q32 flash**, an **SD card**, the **MCP4131** digital pot and an **AD9833** DDS module, 1-Wire master and DS18B20 thermometer, serial terminal and device, **RS-485**, **CAN** and **RS-232 (MAX232)** transceivers, level shifter — see [below](#making-its-own-rails) and [modules on I2C and SPI](#modules-on-i2c-and-spi) |
+| 74xx Series | 85 | Gates including the **open-collector 7403, 7406 and 7407**, the **74132 Schmitt NAND** and the **74125 / 74126 tri-state buffers**; JK and D flip-flops, latches and registers; ripple and synchronous counters (**7490, 7493, 74160-74163, 74192 / 74193, 74390, 74393**); decoders and multiplexers including the **74154** and the tri-state **74251 and 74257**; the **74181 ALU**, **74182 look-ahead**, **7485 comparator**, **7483 / 74283 adders** and **74280 parity**; shift registers to the **74299**; bus buffers and registers; the **74121, 74123 and 74221 one-shots**; **7447, 7448 and 74247** display drivers; the **74189 RAM** and **74670 register file** — see [below](#the-rest-of-the-74-series); and the **74148** priority encoder, **74688** comparator, **74259** addressable latch, **74190/74191** single-clock up/down counters and **74279** S-R latches — see [more logic](#more-logic) |
+| 40xx Series | 48 | CMOS gates and the **4049 / 4050 level converters**; flip-flops and latches; counters including the **4026 and 4033 with their own display drivers**, the **4029, 4510 and 4516 up/down counters** and the **4518 / 4520**; the **4028** and **4543 LCD driver**; shift registers to the **4094**; the **4051, 4052, 4053 and 4067 analog multiplexers**; the **4047, 4528 and 4538** timers; a **4046 phase-locked loop** — see [below](#the-40xx-series); and the **40106** Schmitt inverter |
+| Buses | 31 | **Bus tap** and **bus line**, I2C master, EEPROM, port expander, DS1307 clock, the **DS3231** clock, **MPU-6050** accelerometer, **BME280** environment sensor, **PCA9685** PWM driver and **MCP23017** expander, ADS1115 ADC, MCP4725 DAC and INA219 current sensor, SPI master and **MCP3008 ADC**, the **W25Q32 flash**, an **SD card**, the **MCP4131** digital pot and an **AD9833** DDS module, the **MCP2515** CAN controller, the **MAX6675** thermocouple converter, the **HX711** load-cell amplifier, 1-Wire master and DS18B20 thermometer, serial terminal and device, **RS-485**, **CAN** and **RS-232 (MAX232)** transceivers, level shifter — see [below](#making-its-own-rails) and [modules on I2C and SPI](#modules-on-i2c-and-spi) |
 | Digital I/O | 9 | Logic toggle, clock, **pattern generator**, rotary encoder, oscillator module, ADC and DAC bridges, and a **2K × 8 SRAM and ROM** — see [below](#something-worth-addressing) |
-| Memory & CPUs | 42 | The **2716, 2732, 2764 and 27C256 EPROMs**, the **28C256 EEPROM**, the **6116 and 62256 static RAMs** — each loadable from a binary, Intel HEX or S-record file — and the **65C02**, **6502**, **6510** and **8500** processors, **6522 VIA**, **6551 ACIA**, **6526 CIA** and the **6581 and 8580 SIDs**, the **68000**, **68681 DUART**, **68230 PI/T** and **68901 MFP**, the **6809**, **6809E**, **6821** and **6520 PIAs** and **6850 ACIA**, and the **Z80**, **Z80 PIO**, **Z80 CTC**, **Z80 SIO/0** and **Z80 DART**, and the **8085**, **8155**, **8156**, **8255A**, **8251A**, **8253**, **8254** and **8259A**, the **ATmega328P** and **ATtiny85** microcontrollers, the **AT89C2051** (an 8051) and the **AY-3-8910** sound chip — see [below](#memories-by-their-part-numbers), [the 6502 computer](#a-6502-computer), [the 6809 computer](#a-6809-computer), [the Z80 computer](#a-z80-computer), [the 8085 computer](#an-8085-computer) [the ATmega328P](#an-atmega328p), [the AT89C2051](#an-at89c2051) and [the AY-3-8910](#the-ay-3-8910) |
-| Sensors & Actuators | 22 | DC motor, LDR, thermistors, **LM35 and TMP36** analog thermometers, buzzers, speaker, microphone, servo, stepper in **unipolar and bipolar** wirings, thermocouple, load cell, HC-SR04 ranger, Hall switch, phototransistor, **reed switch**, **PIR motion sensor**, the **DHT22** and a **TSOP38238 IR receiver** — see [below](#sensors-and-actuators) and [one wire and the infrared](#on-one-wire-and-in-the-infrared) |
-| Switching & Isolation | 14 | Relay, fuses and a **resettable PPTC**, optocouplers, ULN2003, H-bridge, the **L293D** and an **L298N module**, **A4988** and **DRV8825** microstepping drivers, **solid-state relay**, **MOSFET gate driver** — see [below](#regulating-a-current-instead-of-applying-a-voltage) and [motor drivers](#motor-drivers) |
+| Memory & CPUs | 48 | The **2716, 2732, 2764 and 27C256 EPROMs**, the **28C256 EEPROM**, the **6116 and 62256 static RAMs** — each loadable from a binary, Intel HEX or S-record file — and the **65C02**, **6502**, **6510** and **8500** processors, **6522 VIA**, **6551 ACIA**, **6526 CIA** and the **6581 and 8580 SIDs**, the **68000**, **68681 DUART**, **68230 PI/T** and **68901 MFP**, the **6809**, **6809E**, **6821** and **6520 PIAs** and **6850 ACIA**, and the **Z80**, **Z80 PIO**, **Z80 CTC**, **Z80 SIO/0** and **Z80 DART**, and the **8085**, **8155**, **8156**, **8255A**, **8251A**, **8253**, **8254** and **8259A**, the **ATmega328P** and **ATtiny85** microcontrollers, the **AT89C2051** (an 8051) the **AY-3-8910** and **SN76489** sound chips, the **6532 RIOT**, the **2114** and **4116** memories, the **MC14500B** one-bit processor and the **GAL16V8** — see [below](#memories-by-their-part-numbers), [the 6502 computer](#a-6502-computer), [the 6809 computer](#a-6809-computer), [the Z80 computer](#a-z80-computer), [the 8085 computer](#an-8085-computer) [the ATmega328P](#an-atmega328p), [the AT89C2051](#an-at89c2051) [the AY-3-8910](#the-ay-3-8910) and [the 1970s chips](#the-1970s-chips) |
+| Sensors & Actuators | 23 | DC motor, LDR, thermistors, **LM35 and TMP36** analog thermometers, buzzers, speaker, microphone, servo, stepper in **unipolar and bipolar** wirings, thermocouple, load cell, HC-SR04 ranger, Hall switch, phototransistor, **reed switch**, **PIR motion sensor**, the **DHT22** and a **TSOP38238 IR receiver** and the **ACS712** current sensor — see [below](#sensors-and-actuators) and [one wire and the infrared](#on-one-wire-and-in-the-infrared) |
+| Switching & Isolation | 17 | Relay, fuses and a **resettable PPTC**, optocouplers, ULN2003 and **ULN2803**, H-bridge, the **L293D** and an **L298N module**, a **TB6612FNG module**, a **relay module**, **A4988** and **DRV8825** microstepping drivers, **solid-state relay**, **MOSFET gate driver** — see [below](#regulating-a-current-instead-of-applying-a-voltage) and [motor drivers](#motor-drivers) |
 | Dev Boards | 7 | Raspberry Pi, Arduino Uno / Nano / Mega, **Raspberry Pi Pico** and **ESP32 DevKit** — see [below](#development-boards) — and an **Arduino Uno (Firmware)** that runs a real sketch ([an Arduino Uno](#an-arduino-uno)) |
 
 Click a category header to open it — and whichever was open closes, so **one category is open at a
@@ -5734,6 +5734,119 @@ round from a 7805; and the **Buck Module LM2596**, the step-down board: its **Ou
 trimmer, held to within its dropout of the input, 88% efficient, so it draws from the input the
 output's power over 0.88 plus a few milliamps of its own.
 
+## Relaxation oscillators
+
+Before the 555 there was the unijunction. The **2N2646 UJT** in **Semiconductors** is a bar of silicon between
+base 1 and base 2 (7 kΩ) with its emitter's junction part-way along, at the stand-off ratio η of 0.65. The emitter
+stays off until it's a diode drop above η·VBB, then the bar between it and B1 collapses and it fires, dumping the
+emitter's capacitor into B1 until the current falls below the valley current (4 mA). A resistor charging a capacitor
+on the emitter makes an oscillator at about 1 / (R·C·ln(1/(1−η))), with a pulse across a small resistor in B1.
+
+The **2N6027 PUT** — the programmable unijunction — is really a small thyristor gated at its anode: it fires when
+the anode passes the gate by a diode drop, so two resistors on the gate set the firing voltage, and it conducts
+until the current falls below its valley current (70 µA here), which the charging resistor mustn't supply: 470 kΩ
+from 12 V is little enough, 100 kΩ isn't, and the PUT latches on. **File > Examples > Timers & Oscillators** has
+**UJT Oscillator**, **PUT Oscillator** and **Schmitt Oscillator** (one **40106** gate, which is the CMOS 74HC14:
+hex Schmitt inverters with the 4069's pinout).
+
+## Converters, mixers and the OTA
+
+- **ADC0804**: the 8-bit converter made for an 8080's bus. /WR rising with /CS low starts a conversion and sends
+  /INTR high; about 70 clocks later (its **Clock Frequency**, 640 kHz) /INTR falls. /RD low with /CS low puts the
+  result on DB0-DB7, 256 · (VIN+ − VIN−) / VREF, VREF being twice VREF/2 — which, left open, sits at half the supply.
+- **DAC0808**: the 8-bit multiplying DAC. IOUT sinks IREF · (A1/2 + … + A8/256), A1 the top bit; IREF is the current
+  into VREF+, which the chip holds at VREF−'s voltage, so a resistor from a reference sets it (10 V through 5 kΩ,
+  2 mA). An op-amp's virtual ground on IOUT with 5 kΩ of feedback turns it into 0 to 10 V.
+- **ICL7107**: the 3½-digit panel-meter chip. It reads 1000 · (IN HI − IN LO) / (REF HI − REF LO), −1999 to 1999,
+  three times a second (**Readings Per Second**), and sinks 8 mA into each lit segment of common-anode displays tied
+  to V+; past full scale it shows a lone 1. COMMON sits 2.8 V below V+. The integrator, auto-zero and reference
+  capacitors are taken as fitted.
+- **MSGEQ7**: the spectrum-analyser chip. Seven band-pass filters (63 Hz to 16 kHz) and peak detectors on IN, one OUT
+  multiplexed between them: RESET high starts again, each STROBE falling edge moves to the next band. OUT runs from
+  0.5 V up. The filters run on the circuit's time points, so keep the step to a few microseconds.
+- **LM13700**: two operational transconductance amplifiers. Each half's output is a current,
+  Iabc · tanh((V+ − V−) / 2VT) — about 19.2 · Iabc siemens for a small signal — where Iabc is the current into AMP
+  BIAS (two diode drops above V−). With a voltage on AMP BIAS through a resistor, it's a voltage-controlled
+  amplifier; each half's Darlington buffer (BUF OUT about 1.4 V below BUF IN) wants a resistor to V−.
+- **NE602**: the double-balanced mixer of a thousand homebrew receivers. The signal on IN A and IN B (1.5 kΩ each),
+  the local oscillator injected into OSC B through a capacitor, the products — sum and difference — on OUT A and
+  OUT B at about 14 dB of gain. The oscillator transistor is taken as driven from outside.
+- **MC1496**: a Gilbert cell. The difference in its output currents is (2·V_SIG / R_E) · tanh(V_CARRIER / 2VT), R_E
+  between pins 2 and 3: with a carrier of a few hundred millivolts, the signal times the carrier's sign — double
+  sideband with the carrier suppressed. Pin 5's current sets the bias; the outputs want load resistors to V+.
+
+**File > Examples > Measurement** has **Digital Voltmeter**, **Current Monitor** and **ADC0804 Converter**;
+**Signal Integrity & RF** has **Crystal Radio** (a tuned tank and a **1N34A** germanium detector), **Superhet
+Mixer** and **Balanced Modulator**; **Audio** has **OTA Amplifier** and **Spectrum Analyser**.
+
+## More valves
+
+**12AU7 Triode** is the 12AX7's low-μ cousin (μ of 21.5): drivers and cathode followers; the triode's label says
+which it is from its μ. **EL84 Pentode** is the output valve of a thousand small amplifiers, on Koren's pentode
+model, its constants fitted to the datasheet's class A point (250 V, −7.3 V: 48 mA, and 5.5 mA of screen). **5Y3
+Rectifier** is a full-wave valve rectifier, each plate following the three-halves power law, about 60 V lost at
+125 mA. **Output Transformer** is the palette's transformer set as 5 kΩ to 8 Ω (25 : 1) with a 10 H primary.
+**File > Examples > Audio > Valve Amplifier** puts them together: a 12AX7 stage into an EL84 into the transformer
+and a speaker. **Fuzz Face** is the other kind of vintage: two **AC128** germanium PNPs (a 0.2 V base) on a
+positive-ground 9 V supply.
+
+## More logic
+
+The **74148** encodes the highest of its eight active-low inputs onto A2-A0 (inverted), GS low while any is, EO for
+the next encoder down a chain, EI to turn it off. The **74688** is the 8-bit comparator of a thousand address
+decoders: /P=Q low while /G is low and the P and Q bytes match. The **74259** is an addressable latch — D into the
+output S2-S0 picks while /E is low — or with /CLR low a 1-of-8 demultiplexer. The **74190** and **74191** count up
+and down on one clock (D/U picks), with MAX/MIN and /RCO to cascade them. The **74279** is four /S-/R latches, the
+switch debouncer. The **ULN2803** is the ULN2003 with eight Darlingtons in a DIP-18. **File > Examples > Digital
+Logic** has **Priority Encoder** and **Address Decoder**; **Counting & Arithmetic** has **Debounced Switch** and
+**GAL Counter**.
+
+## Modules
+
+The 1.4.0 modules, in **Buses**, **Sensors & Actuators**, **Switching & Isolation** and **Power**:
+
+- **I2C Sensor BME280** (0x76): temperature, pressure and humidity, with the datasheet's register map and Bosch's
+  trimming parameters, so a library's compensation of the raw readings gives back the **Temperature**,
+  **Pressure** and **Humidity** you set. It measures while ctrl_meas (0xF4) says forced or normal mode. **Bmp280**
+  makes it a BMP280: no humidity, chip ID 0x58.
+- **I2C PWM PCA9685** (0x40): sixteen 12-bit PWM channels at 25 MHz / (4096 · (PRE_SCALE + 1)), 50 Hz for servos at
+  121. MODE1 powers up asleep; PRE_SCALE only takes a write while it is; each channel's ON and OFF counts are four
+  registers from 0x06.
+- **I2C Expander MCP23017** (0x20): sixteen I/O pins with direction (IODIR), 100 kΩ pull-ups (GPPU), polarity and
+  interrupt on change onto INTA and INTB, in the power-up register map (BANK 0).
+- **SPI CAN MCP2515**: a CAN controller for a CAN Transceiver: standard frames sent with their bit stuffing and
+  CRC-15, arbitration, the ACK slot, masks and filters into two receive buffers, loopback and listen-only modes, its
+  bit time from CNF1-CNF3 and its crystal (8 MHz). Extended identifiers and error frames aren't modelled.
+- **SPI Thermocouple MAX6675**: a type-K thermocouple on T+ and T− (to ground), read as one 16-bit word: the
+  temperature in quarter degrees in bits 14-3, bit 2 for an open thermocouple. It compensates its own cold junction.
+- **Load Cell Amp HX711**: a 24-bit ADC at a gain of 128 on channel A, the bridge's excitation on E+. DOUT goes low
+  when a reading's ready (10 or 80 a second); 25 to 27 clocks on SCK read the 24 bits and pick the next channel and gain.
+- **Current Sensor ACS712**: a Hall-effect sensor, isolated, OUT at half its supply plus 185 mV an amp (100 mV for
+  the 20 A part, 66 mV for the 30 A; its **Range**).
+- **TB6612FNG Module**: a MOSFET dual H-bridge, about 0.5 Ω a switch: IN1, IN2 and PWM per motor, brake with both
+  inputs high or PWM low, coast with both low, STBY low for everything off.
+- **Relay Module**: a relay with its transistor, diode and LED on a board; IN low (or high, set **Active High**)
+  energises it, and the contact follows 10 ms later.
+- **Boost Module MT3608**: the step-up partner of the buck module, its output above its input, its input current
+  paying for the output's power.
+
+**File > Examples > Modules** has an example for each: **Weather Station**, **Servo Driver**, **I/O Expander**, **CAN
+Network**, **Thermocouple Meter**, **Relay Module**, **Boost Converter**, **TB6612 Motor Driver** and **DAC
+Staircase**.
+
+## More displays
+
+**LED Bar Graph** is ten LEDs in a DIP-20, anodes 1-10 and cathodes 20-11. **4-Digit 7-Segment** is a display made to
+be multiplexed: eight shared segment lines and a common pin a digit. Light one digit at a time and the eye averages it
+— and so does the display here, over its **Persistence** (20 ms), so four digits each lit a quarter of the time all
+look lit. **Nokia 5110 LCD** is the 84 × 48 PCD8544 on SPI: while CE is low each byte goes in on CLK's rising edges,
+DC saying command (low) or data (high), and data bytes go down the columns of the current bank. **TIL311 Hex
+Display** shows a latched hex digit, 0 to F, decoding it itself. **File > Examples > Displays** has **Nokia 5110**,
+**TIL311 Hex Display** and **Multiplexed Display**.
+
+The pattern generator's `z` (and `-`) now really lets go of its line, so a pull-up takes it high — as a bus shared
+with the pattern needs. It used to drive the line to half the supply.
+
 ## The protoboard
 
 `View > Protoboard`, `F11`, or the **Protoboard** button at the top right of the canvas shows the
@@ -9787,6 +9900,52 @@ out 0x08, r16
 ret
 ```
 
+### The SN76489
+
+**SN76489**, in **Memory & CPUs**, is Texas Instruments' sound chip, the BBC Micro's, the ColecoVision's and the
+Master System's: three square tone channels and a noise channel, each with a 4-bit attenuator (2 dB a step, 15 off),
+added onto one AUDIO OUT, a volt at full on each behind 1 kΩ. It's only ever written: a byte on D0-D7 is taken as /CE
+and /WE are both low — and TI numbered its bus the other way round, so **D0 is the most significant bit**. A latch byte
+(top bit 1) holds the register in bits 6-4 and four bits of data; a data byte (top bit 0) gives a tone its top six bits
+of a 10-bit period N, f = clock / (32 · N). The noise register picks white or periodic noise and its rate. The clock is
+its **Clock Frequency** (3.579545 MHz, a colourburst crystal); READY stays high. **File > Examples > Audio > SN76489
+Tone** has a Uno playing 440 Hz on it:
+
+```asm
+; Arduino Uno playing A (440 Hz) on an SN76489's first tone channel.
+; Its data bus on PORTD, wired D7 to TI's D0 (TI's D0 is the top bit), /WE on PC0 (A0), /CE tied low.
+ldi r16, 0x08
+out 0x3E, r16          ; SPH
+ldi r16, 0xFF
+out 0x3D, r16          ; SPL
+ldi r16, 0xFF
+out 0x0A, r16          ; DDRD: the data bus
+ldi r16, 0x01
+out 0x07, r16          ; DDRC: /WE
+out 0x08, r16          ; /WE high
+ldi r20, 0x8E          ; latch tone 0, low four bits: 1110
+rcall write
+ldi r20, 0x0F          ; data: the top six bits, period 254: 3.579545 MHz / (32 x 254) = 440 Hz
+rcall write
+ldi r20, 0x90          ; tone 0's attenuation: 0, full level
+rcall write
+ldi r20, 0xBF          ; channel 1 off
+rcall write
+ldi r20, 0xDF          ; channel 2 off
+rcall write
+ldi r20, 0xFF          ; the noise off
+rcall write
+done:
+rjmp done
+write:
+out 0x0B, r20          ; the byte on the bus
+cbi 0x08, 0            ; /WE low
+nop
+nop
+sbi 0x08, 0            ; /WE high: taken
+ret
+```
+
 ## An AT89C2051
 
 **AT89C2051**, in **Memory & CPUs**, is an 8051 in a 20-pin DIP with 2 KB of flash. P1.0-P1.7 and
@@ -9827,6 +9986,28 @@ DONE: CLR P1.0         ; light the LED: sent
 HERE: SJMP HERE
 TEXT: DB "HELLO 8051", 13, 10, 0
 ```
+
+## The 1970s chips
+
+- **6532 RIOT**: MOS's RAM, I/O and timer, the Atari 2600's and the KIM-1's. 128 bytes of RAM (/RS low), two ports
+  with their direction registers, an interval timer counting every 1, 8, 64 or 1024 cycles and then on past zero
+  once a cycle, and an edge detector on PA7, on a 6502's bus like the 6522 (CS1 high, /CS2 low, the access as Φ2
+  falls). Port A is pulled up. /IRQ is open drain.
+- **2114**: 1K × 4 static RAM, two to a byte: /CS and /WE, and no /OE.
+- **4116**: 16K × 1 dynamic RAM. The 14-bit address goes in on seven pins twice, the row as /RAS falls and the column
+  as /CAS falls; with /WE low then it writes DIN, otherwise DOUT drives the bit while /CAS is low. A row not accessed
+  or refreshed (/RAS alone) for its **Retention Time** (2 ms) loses its data. It wants +12 V (VDD), +5 V (VCC) and
+  −5 V (VBB), and forgets everything without them.
+- **TIL311**: the hex display with its own latch and decoder (above).
+- **MC14500B**: Motorola's one-bit industrial control unit, made to replace relay ladders. A counter steps through a
+  ROM whose words are a four-bit instruction on I0-I3 and an I/O address for the outside to decode; LD, AND, OR,
+  XNOR and their complements combine DATA into the result register RR (DATA counting only once IEN is set); STO and
+  STOC put RR on DATA and pulse WRITE (once OEN is set); SKZ and RTN skip the next instruction; JMP, RTN, NOPO and
+  NOPF pulse their flag pins. It's CMOS: at 5 V its inputs want 3.5 V for a high, more than a TTL part gives.
+- **GAL16V8**: programmable logic, programmed here with equations rather than a JEDEC fuse map: `pin 2 = A` names a
+  pin, `Y = A & B | !C` is a combinational output, `Q.R = Q ^ T` a registered one (a D flip-flop on pin 1's rising
+  edge, pin 11 then its /OE), `Y.OE = EN` an output's own enable. Each output gets the chip's eight product terms
+  (seven with .OE), counted as written. **Counting & Arithmetic > GAL Counter** is a two-bit counter in it.
 
 ---
 
