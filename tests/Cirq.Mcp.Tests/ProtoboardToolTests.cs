@@ -52,4 +52,48 @@ public class ProtoboardToolTests
         Assert.True(b.Circuit.Board.IsEmpty);
         Assert.DoesNotContain("by hand", (string)reset["board"]!);
     }
+
+    [Fact]
+    public async Task The_board_type_the_build_guide_and_a_fault_to_find_are_there_for_an_agent()
+    {
+        using var b = new Bench();
+        await b.BuildRc();
+
+        // The build guide, numbered, ending with the check.
+        var guide = await Parse(b.Tools.BuildGuide());
+        Assert.Equal("breadboard", (string)guide["board"]!);
+        var steps = guide["steps"]!.AsArray().Select(x => (string)x!).ToList();
+        Assert.StartsWith("1. ", steps[0]);
+        Assert.Contains(steps, x => x.Contains("R1, 10kΩ (brown, black, orange, gold)", StringComparison.Ordinal));
+        Assert.Contains("matches the schematic", steps[^1]);
+
+        // Onto stripboard, an undo step; moves are for breadboards.
+        var strip = await Parse(b.Tools.ArrangeProtoboard(board: "stripboard"));
+        Assert.True((bool)strip["matches"]!);
+        Assert.Contains("A stripboard", (string)strip["board"]!);
+        Assert.Contains("laid out automatically", await Error(b.Tools.ArrangeProtoboard([new() { Part = "R1", To = "C5" }])));
+        Assert.Contains("breadboard, stripboard or perfboard", await Error(b.Tools.ArrangeProtoboard(board: "veroboard")));
+        Assert.Contains(steps.Count > 0 ? "Cut" : "", string.Join(" ", (await Parse(b.Tools.BuildGuide()))["steps"]!.AsArray().Select(x => (string)x!)));
+        await b.Tools.Undo();
+        Assert.Equal(Cirq.Core.Topology.BoardKind.Breadboard, b.Circuit.Board.Kind);
+
+        // A fault: hidden without saying where, hinted at, guessed wrong, then right.
+        var hidden = await Parse(b.Tools.Fault("hide"));
+        Assert.True((bool)hidden["hidden"]!);
+        Assert.DoesNotContain("R1", (string)hidden["note"]!);
+        Assert.True((bool)(await Parse(b.Tools.Fault("status")))["hidden"]!);
+        Assert.StartsWith("Hint:", (string)(await Parse(b.Tools.Fault("hint", level: 3)))["hint"]!);
+        var at = b.Circuit.Faults[0].Parts.First();
+        var other = b.Circuit.Components.First(c => c.Name != at.Name && Cirq.Components.Protoboard.BoardPackages.IsBuilt(c));
+        Assert.False((bool)(await Parse(b.Tools.Fault("guess", part: other.Name)))["right"]!);
+        var found = await Parse(b.Tools.Fault("guess", part: at.Name));
+        Assert.True((bool)found["right"]!);
+        Assert.Empty(b.Circuit.Faults);
+
+        // One chosen, and one that can't be.
+        Assert.Contains("isn't making contact", (string)(await Parse(b.Tools.Fault("hide", pin: "C1.A")))["note"]!);
+        Assert.Contains("backwards", await Error(b.Tools.Fault("hide", pin: "R1.A", kind: "reversed")));
+        Assert.Contains("C1", (string)(await Parse(b.Tools.Fault("reveal")))["fault"]!);
+        Assert.Contains("hide, hint, guess", await Error(b.Tools.Fault("find")));
+    }
 }

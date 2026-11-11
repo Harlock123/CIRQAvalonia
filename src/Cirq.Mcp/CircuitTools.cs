@@ -515,16 +515,26 @@ public sealed partial class CircuitTools(ICircuitHost host)
     }
 
     [McpServerTool(Name = "arrange_protoboard", Destructive = true)]
-    [Description("Moves parts on the protoboard by hand, in one undo step; everything else stays where it is and the jumper wires are worked out again. A move is refused, with the reason, if a pin would go in a hole that's taken or a strip carrying another net (that would join the two). reset lays the whole board out automatically again. Returns where everything now is, as render_protoboard's text does. It changes only the board, never the circuit.")]
+    [Description("Chooses what the protoboard is built on (board) and moves parts on breadboards by hand, in one undo step; everything else stays where it is and the jumper wires are worked out again. A move is refused, with the reason, if a pin would go in a hole that's taken or a strip carrying another net (that would join the two). reset lays the whole board out automatically again. Returns where everything now is, as render_protoboard's text does. It changes only the board, never the circuit.")]
     public Task<string> ArrangeProtoboard(
         [Description("The moves, in order, e.g. [{\"part\": \"U1\", \"to\": \"f20\"}, {\"part\": \"R1\", \"to\": \"a14\", \"pin\": \"B\"}]. Optional.")] BoardMove[]? moves = null,
         [Description("Parts to hand back to the automatic layout, e.g. [\"R3\"]. Optional.")] string[]? release = null,
         [Description("Forget every place made by hand first, so the board is laid out afresh.")] bool reset = false,
+        [Description("What to build it on: \"breadboard\", \"stripboard\" (copper strips, cut and linked) or \"perfboard\" (pads wired on the back). Stripboard and perfboard are laid out automatically; moves are for breadboards. Optional.")] string? board = null,
         CancellationToken cancel = default) =>
         Edit("Arrange the protoboard", s =>
         {
-            if (!reset && (moves is null || moves.Length == 0) && (release is null || release.Length == 0))
-                throw new ArgumentException("Give moves, release or reset: there's nothing to do.");
+            if (!reset && (moves is null || moves.Length == 0) && (release is null || release.Length == 0) && board is null)
+                throw new ArgumentException("Give moves, release, reset or board: there's nothing to do.");
+            if (board is not null)
+            {
+                if (!Enum.TryParse<BoardKind>(board.Trim(), true, out var kind) || !Enum.IsDefined(kind) || int.TryParse(board, out _))
+                    throw new ArgumentException($"board is breadboard, stripboard or perfboard, not \"{board}\".");
+                s.Circuit.Board.Kind = kind;
+            }
+
+            if (s.Circuit.Board.Kind != BoardKind.Breadboard && ((moves?.Length ?? 0) > 0 || (release?.Length ?? 0) > 0))
+                throw new ArgumentException($"The {s.Circuit.Board.Kind.ToString().ToLowerInvariant()} is laid out automatically; parts are moved by hand on breadboards (board \"breadboard\").");
             if (reset) s.Circuit.Board.Clear();
 
             foreach (var name in release ?? [])
@@ -554,6 +564,85 @@ public sealed partial class CircuitTools(ICircuitHost host)
 
             var now = Cirq.Components.Protoboard.ProtoboardLayout.Arrange(s.Circuit);
             return new JsonObject { ["board"] = now.Describe(), ["matches"] = now.Matches };
+        }, cancel);
+
+    [McpServerTool(Name = "build_guide", ReadOnly = true, Idempotent = true)]
+    [Description("The protoboard as numbered steps to build it from, in the order a person would: on breadboards the rail jumpers, chips, transistors and modules, resistors, capacitors, diodes and LEDs (with colour bands, which leg is which, which way round), the jumpers net by net and the bench connections; on stripboard the strip cuts and wire links first; on perfboard the wiring on the back after the parts. The editor shows the same steps one at a time (View › Build Guide).")]
+    public Task<string> BuildGuide(CancellationToken cancel = default) =>
+        Read("wrote the build guide", s =>
+        {
+            if (s.Circuit.Components.Count == 0) throw new InvalidOperationException("The circuit is empty: there's nothing to build yet.");
+            var layout = Cirq.Components.Protoboard.ProtoboardLayout.Arrange(s.Circuit);
+            var steps = Cirq.Components.Protoboard.BuildGuide.Steps(layout);
+            return new JsonObject
+            {
+                ["board"] = layout.Kind.ToString().ToLowerInvariant(),
+                ["steps"] = new JsonArray(steps.Select(st => (JsonNode)$"{st.Number}. {st.Text}").ToArray()),
+                ["matches"] = layout.Matches,
+            };
+        }, cancel);
+
+    [McpServerTool(Name = "fault", Destructive = true)]
+    [Description("Fault finding, for teaching: hides a fault in the circuit that only the simulation sees (a pin not making contact, two neighbouring chip pins bridged, an LED, diode or electrolytic in backwards), for the person to find with the scope and the multimeter, as Simulate › Fault Finding does. hide picks one at random unless pin (and kind, second) say which; hint gives a hint, each more telling (the kind, then the net, then the part); guess says whether a part is the one; reveal says what it was and clears it; clear clears it; status says whether one is hidden. Your own runs (run_transient, operating_point) solve the circuit as drawn, without the fault, so they won't find it either.")]
+    public Task<string> Fault(
+        [Description("hide, hint, guess, reveal, clear or status.")] string action,
+        [Description("For hide: the pin to put the fault at, e.g. \"R2.B\". Optional; at random without it.")] string? pin = null,
+        [Description("For hide with a pin: open (not making contact), bridged (to the pin given as second) or reversed (a polarised part backwards). Default open.")] string? kind = null,
+        [Description("For a bridged fault: the neighbouring pin it is bridged to, e.g. \"U1.p3\".")] string? second = null,
+        [Description("For guess: the part's designator, e.g. \"R3\".")] string? part = null,
+        [Description("For hint: how telling, 1 to 3. Default 1.")] int level = 1,
+        CancellationToken cancel = default) =>
+        Edit("Fault finding", s =>
+        {
+            var circuit = s.Circuit;
+            switch (action?.Trim().ToLowerInvariant())
+            {
+                case "hide":
+                    Cirq.Core.Topology.CircuitFault? hidden;
+                    if (pin is null) hidden = Cirq.Components.Protoboard.FaultFinding.Hide(circuit);
+                    else
+                    {
+                        var faultKind = kind?.Trim().ToLowerInvariant() switch
+                        {
+                            null or "" or "open" => FaultKind.Open,
+                            "bridged" or "bridge" => FaultKind.Bridged,
+                            "reversed" or "backwards" => FaultKind.Reversed,
+                            _ => throw new ArgumentException($"kind is open, bridged or reversed, not \"{kind}\"."),
+                        };
+                        hidden = Cirq.Components.Protoboard.FaultFinding.Hide(circuit, faultKind, Pins.Find(circuit, pin), second is null ? null : Pins.Find(circuit, second));
+                    }
+
+                    if (hidden is null) throw new InvalidOperationException("There's nothing in this circuit a fault could be hidden in.");
+                    return new JsonObject
+                    {
+                        ["hidden"] = true,
+                        ["note"] = pin is null
+                            ? "A fault is hidden; which one isn't said here, so the person can look for it. Use hint for clues."
+                            : $"Hidden: {hidden.Describe()}",
+                    };
+                case "hint":
+                    return new JsonObject { ["hint"] = Cirq.Components.Protoboard.FaultFinding.Hint(circuit, level) };
+                case "guess":
+                    if (circuit.Faults.Count == 0) throw new InvalidOperationException("There's no fault hidden.");
+                    var suspect = Pins.Part(circuit, part ?? throw new ArgumentException("Say which part: part, e.g. \"R3\"."));
+                    if (!Cirq.Components.Protoboard.FaultFinding.IsFaultAt(circuit, suspect)) return new JsonObject { ["right"] = false, ["note"] = $"Not {suspect.Name}." };
+                    var found = circuit.Faults[0];
+                    circuit.Faults.Clear();
+                    return new JsonObject { ["right"] = true, ["fault"] = found.Describe(), ["note"] = "Cleared: the circuit is as drawn again." };
+                case "reveal":
+                    if (circuit.Faults.Count == 0) throw new InvalidOperationException("There's no fault hidden.");
+                    var was = circuit.Faults[0];
+                    circuit.Faults.Clear();
+                    return new JsonObject { ["fault"] = was.Describe(), ["note"] = "Cleared: the circuit is as drawn again." };
+                case "clear":
+                    var any = circuit.Faults.Count > 0;
+                    circuit.Faults.Clear();
+                    return new JsonObject { ["cleared"] = any };
+                case "status":
+                    return new JsonObject { ["hidden"] = circuit.Faults.Count > 0 };
+                default:
+                    throw new ArgumentException($"action is hide, hint, guess, reveal, clear or status, not \"{action}\".");
+            }
         }, cancel);
 
     [McpServerTool(Name = "get_spice_netlist", ReadOnly = true)]

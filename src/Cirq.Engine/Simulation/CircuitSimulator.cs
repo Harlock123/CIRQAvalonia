@@ -96,7 +96,7 @@ public sealed class CircuitSimulator
         // everything else, and in the same order they were drawn.
         _components.AddRange(Flattening.Flatten(Circuit.Components));
 
-        Netlist = Circuit.BuildNetlist();
+        Netlist = Circuit.BuildSimulationNetlist();
         if (Netlist.GroundNet is null && Netlist.NodeCount > 0)
             throw new CircuitTopologyException(
                 "The circuit has no ground reference. Place a Ground symbol and connect it to the return path.");

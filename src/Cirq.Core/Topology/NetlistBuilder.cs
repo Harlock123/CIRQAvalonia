@@ -5,8 +5,26 @@ namespace Cirq.Core.Topology;
 /// </summary>
 public static class NetlistBuilder
 {
-    public static Netlist Build(IEnumerable<CircuitComponent> components, IEnumerable<WireSegment> wires)
+    public static Netlist Build(IEnumerable<CircuitComponent> components, IEnumerable<WireSegment> wires) =>
+        Build(components, wires, null);
+
+    /// <summary>
+    /// The netlist with <paramref name="faults"/> applied, as a circuit on the bench would be with them in it: an open
+    /// pin joined to nothing (what it was wired to stays joined to each other), a bridge joining two nets, a reversed
+    /// part with its two pins' connections exchanged.
+    /// </summary>
+    public static Netlist Build(IEnumerable<CircuitComponent> components, IEnumerable<WireSegment> wires, IReadOnlyCollection<CircuitFault>? faults)
     {
+        var open = faults?.Where(f => f.Kind == FaultKind.Open).Select(f => f.First).ToHashSet() ?? [];
+        var swapped = new Dictionary<Terminal, Terminal>();
+        foreach (var fault in faults?.Where(f => f.Kind == FaultKind.Reversed && f.Second is not null) ?? [])
+        {
+            swapped[fault.First] = fault.Second!;
+            swapped[fault.Second!] = fault.First;
+        }
+
+        Terminal Seen(Terminal t) => swapped.TryGetValue(t, out var other) ? other : t;
+
         // Blocks are opened out before anything else happens. From here down there is no
         // hierarchy: a subcircuit's contents are simply more components and more wires, which is
         // exactly what makes a block as accurate as the same parts drawn loose.
@@ -39,6 +57,7 @@ public static class NetlistBuilder
             if (!ReferenceEquals(ra, rb)) parent[ra] = rb;
         }
 
+        var meeting = new Dictionary<Terminal, Terminal>();
         var wireList = wires.ToList();
         foreach (var w in wireList)
         {
@@ -49,8 +68,24 @@ public static class NetlistBuilder
             if (!parent.ContainsKey(w.TargetTerminal))
                 throw new CircuitTopologyException(
                     $"Wire {w.Id} references terminal '{w.TargetTerminal}' whose component is not in the circuit.");
-            Union(w.SourceTerminal, w.TargetTerminal);
+            var (from, to) = (Seen(w.SourceTerminal), Seen(w.TargetTerminal));
+
+            // An open pin is left out, but what it was wired to stays joined: the rest of its net still meets.
+            if (open.Contains(from) || open.Contains(to))
+            {
+                var other = open.Contains(from) ? to : from;
+                var pin = open.Contains(from) ? from : to;
+                if (open.Contains(other)) continue;
+                if (meeting.TryGetValue(pin, out var first)) Union(first, other);
+                else meeting[pin] = other;
+                continue;
+            }
+
+            Union(from, to);
         }
+
+        foreach (var fault in faults?.Where(f => f.Kind == FaultKind.Bridged && f.Second is not null) ?? [])
+            if (parent.ContainsKey(fault.First) && parent.ContainsKey(fault.Second!)) Union(fault.First, fault.Second!);
 
         // Each port joins its pin on the outside to its terminal on the inside. They are the same
         // point; the block is only a line drawn round part of the drawing.

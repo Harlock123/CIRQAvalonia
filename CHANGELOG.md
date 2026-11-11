@@ -8,6 +8,32 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+### Added
+
+**Stripboard and perfboard.** `View > Board`, or the buttons below the view switch, builds the
+protoboard view on stripboard (copper strips lettered across and numbered down, cut where two nets
+part, joined by wire links) or perfboard (a pad at every hole, wired on the back) instead of
+breadboards, laid out automatically and checked against the schematic. The choice is saved with the
+circuit.
+
+**A build guide.** `View > Build Guide...` turns the board into numbered steps, in the order you'd
+build it: on breadboards the rail jumpers, chips, transistors, the small parts with their colour
+bands and which way round, then the jumpers net by net and the bench. On stripboard the cuts and
+links come first. The board shows only what the steps so far have fitted, the step on screen picked
+out, and **Save Build Sheet...** writes it all, with the board's picture and the parts, as a page to
+print.
+
+**A multimeter on the bench.** `View > Multimeter on the Bench`, or **Meter**: a meter whose probes
+you drag onto holes, reading the volts between them as the circuit runs.
+
+**Fault finding.** `Simulate > Fault Finding` hides a fault only the simulation sees (a pin not
+making contact, two chip pins bridged, an LED, diode or electrolytic in backwards) for you to find
+with the scope and the meter, with hints, a guess at the part, and a reveal. It's never saved, and
+only faults the circuit still simulates with are chosen.
+
+The AI Chat and outside agents get two new tools, `build_guide` and `fault` (41 in all), and
+`arrange_protoboard` chooses the board.
+
 ## [1.0.0] - 2026-11-10
 
 1.0. The circuit can now be seen built on breadboards as well as drawn: a protoboard view (`F11`)

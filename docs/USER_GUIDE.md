@@ -5649,6 +5649,79 @@ To keep a picture of it, `File > Export...` has **Protoboard** under *What to ex
 BMP, SVG or PDF). Claude can look at the board and move parts on it too, with `render_protoboard`
 and `arrange_protoboard` (see [AI: the chat and agents](#ai-the-chat-and-agents)).
 
+### Stripboard and perfboard
+
+**View > Board**, or the **Breadboard**, **Stripboard** and **Perfboard** buttons below the view
+switch, builds the same circuit on a soldered board instead. The choice is saved with the circuit.
+
+![The LED chaser on stripboard: copper strips running down a tan board, lettered A to S across the top, the 4017 with a strip for each pin, the strips cut where two nets meet (each cut a red cross), black and coloured wire links joining the runs of copper, and the resistors and LEDs lying across the strips, with the supply and clock on the bench at the left](images/65-stripboard.png)
+
+- **Stripboard** has copper strips running the length of the board, lettered **A**, **B**, **C**
+  across and numbered down, so a hole is called `C12`. A pin is on whatever net its strip carries,
+  so two pins of different nets on one strip need the copper cut between them; the cuts are marked
+  with a red cross. Chips sit with every pin on a strip of its own, cut under the body. Parts lie
+  across the strips. Where a net ends up on more than one run of copper, a wire link joins them.
+  The copper is drawn as if seen through the board.
+- **Perfboard** has a pad at every hole and nothing joined. The parts go in as on stripboard, and
+  each net's pads are wired together on the back, drawn faintly as seen through the board.
+
+Both are laid out automatically and checked against the schematic, as the breadboard is.
+Moving parts by hand is for breadboards. Hover over a hole to light the run of copper it's on (or,
+on perfboard, every pad of its net) and see its name and what's on it.
+
+### The build guide
+
+**View > Build Guide...**, or the **Build Guide** button, turns the board into numbered steps in
+the order you'd build it. The panel at the bottom left shows one step at a time, with **Next**,
+**Back** and **All Steps**. The board shows only what the steps so far have fitted, with the
+step on screen ringed in amber and the holes it uses marked.
+
+- On **breadboards**: the wires that join the rails, the chips, the transistors, regulators and
+  modules, the resistors, capacitors, diodes and LEDs, the rest of the jumpers net by net (ground,
+  then the supply, then the signals), and the bench connections.
+- On **stripboard** the cuts and wire links come first, while the board is bare; on **perfboard**
+  the wiring on the back comes after the parts.
+- Each step says what is particular about it. A resistor gets its colour bands ("R1, 10kΩ (brown,
+  black, orange, gold): from a12 to a16"), an LED which leg is which, an electrolytic the side of
+  its stripe, a chip which way its notch faces and where pin 1 goes, and a wire its colour.
+
+**Save Build Sheet...** writes the guide as one HTML page to print and take to the bench. It holds
+a picture of the finished board, the parts with where each goes, and every step with a box to tick.
+Claude can read the steps with `build_guide`.
+
+### The multimeter
+
+**View > Multimeter on the Bench**, or the **Meter** button, puts a meter on the bench below the
+board. Its black probe starts on ground; drag the red one (or either) onto any hole, and while the
+circuit runs (`F5`) the display reads the volts between them. The status bar says what it reads
+when you drop a probe. A probe on a pin reads the strip or copper that pin is in, as a real meter
+would. A pin that isn't making contact (see the next section) reads what its strip is at, not what
+the pin is doing.
+
+### Finding a fault
+
+**Simulate > Fault Finding > Hide a Fault** hides a fault somewhere in the circuit for you to find,
+the way a board that doesn't work is fixed on the bench. It can be:
+
+- a pin not making contact,
+- two neighbouring chip pins bridged,
+- an LED, a diode or an electrolytic in backwards.
+
+The drawing, the board and the rule check all still show the circuit as it was meant. Only the
+simulation sees the fault, so you find it the real way: run it, watch the scope, and measure with
+the multimeter.
+
+When you have a suspect, select it on the schematic or the board and choose **Is the Selected Part
+the Fault?**. **Give Me a Hint** says a little more each time: what kind of fault, then the net to
+look at, then the part. **Reveal the Fault** says what it was, and **Clear the Fault** takes it
+away. Guessing right fixes it.
+
+The fault is never saved: a file holds the circuit as drawn, so a puzzle can't be spoiled by
+reading it. Hiding one only ever picks a fault the circuit still simulates with, because one that
+stopped the simulation with an error would give itself away. Claude can set a puzzle too, with
+`fault`, at random or at a pin you name, and give hints. Its own runs solve the circuit as drawn,
+so it can't find the fault by simulating either.
+
 ---
 
 ## Development boards
@@ -9486,7 +9559,7 @@ it is told to.
 | Find parts | `list_parts`, `describe_part` (pins and settings), `list_examples`, `load_example` |
 | Build | `add_parts`, `set_part`, `remove_parts`, `connect`, `disconnect`, `add_probe`, `remove_probe`, `set_parameter`, `set_conditions` |
 | Check | `get_circuit`, `get_part`, `check_circuit`, `explain_circuit`, `render_schematic`, `get_spice_netlist` |
-| The protoboard | `render_protoboard` (the board as a picture, with every part's holes), `arrange_protoboard` (move parts or leads to holes by name, `e12`, `T+5`; or lay it out afresh) |
+| The protoboard | `render_protoboard` (the board as a picture, with every part's holes), `arrange_protoboard` (build on breadboard, stripboard or perfboard; move parts or leads to holes by name, `e12`, `T+5`; or lay it out afresh), `build_guide` (the steps to build it), `fault` (hide a fault to find, hint, guess, reveal) |
 | Run | `operating_point`, `run_transient`, `ac_sweep`, `dc_sweep`, `get_trace` |
 | Memories and processors | `load_memory` (an image as Intel HEX, S-records, hex bytes, base64 or a file, all its bytes or one lane of a 68000's pair), `read_memory`, `cpu_state` (registers, flags, recent bus cycles, a 6510's port; a 68000's D0-D7, A0-A7, USP, SSP, SR and wait states; a 6809's; a Z80's main and alternate registers, IX, IY, I, R, IFF1 and IFF2 and its mode; an 8085's registers, flags with V and K, interrupt enable, masks and latches, SID and SOD), `disassemble` (6502, 6809, Z80 or 8085 code, or 68000 code across a ROM pair), `sid_state` (a SID's voices, envelopes, filter and volume), `peripheral_state` (a 6821's, 6850's, 68681's, 68230's or 68901's registers, channels and timers, a Z80 PIO's, CTC's, SIO's or DART's, with what is pending and under service in the daisy chain, and an 8155's or 8156's, 8255A's, 8251A's, 8253's or 8254's, or 8259A's) |
 | The editor | `transport` (Run, Pause, Reset; Run picks a speed and timebase the circuit's clocks can be seen at, or takes the `speed` it is given), `set_scope`, `undo`, `redo` |

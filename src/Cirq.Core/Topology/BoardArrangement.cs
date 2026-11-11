@@ -10,6 +10,19 @@ namespace Cirq.Core.Topology;
 /// </summary>
 public readonly record struct BoardHole(int Board, int Row, int Column);
 
+/// <summary>What the circuit is built on in the protoboard view.</summary>
+public enum BoardKind
+{
+    /// <summary>Solderless breadboards: five-hole strips either side of a channel, and rails.</summary>
+    Breadboard,
+
+    /// <summary>Stripboard: copper strips the whole length, cut where two nets must part, joined by wire links.</summary>
+    Stripboard,
+
+    /// <summary>Perfboard: a pad at every hole and nothing joined, wired on the back.</summary>
+    Perfboard,
+}
+
 /// <summary>Where one part was put by hand: a hole for each of its pins, or a spot on the bench beside the boards.</summary>
 /// <param name="Pins">The hole each pin is in, by terminal id. Empty for a part that sits on the bench.</param>
 /// <param name="BenchX">Where a bench part's top-left corner is, in board pitches, when it was moved there.</param>
@@ -39,8 +52,25 @@ public sealed class BoardArrangement
     /// <summary>Nothing arranged by hand: the board is laid out automatically.</summary>
     public bool IsEmpty => _parts.Count == 0 && _wires.Count == 0;
 
+    /// <summary>Nothing to save: laid out automatically, on breadboards.</summary>
+    public bool IsDefault => IsEmpty && _kind == BoardKind.Breadboard;
+
     /// <summary>Counts every change, so a view can tell its drawing is out of date without comparing contents.</summary>
     public int Version { get; private set; }
+
+    private BoardKind _kind;
+
+    /// <summary>What the circuit is built on. Places made by hand are on breadboards; the others are laid out automatically.</summary>
+    public BoardKind Kind
+    {
+        get => _kind;
+        set
+        {
+            if (_kind == value) return;
+            _kind = value;
+            Version++;
+        }
+    }
 
     public void SetPart(Guid part, BoardPlacement placement)
     {
@@ -79,6 +109,13 @@ public sealed class BoardArrangement
         Version++;
     }
 
+    /// <summary>Back to how a new circuit starts: nothing placed by hand, on breadboards.</summary>
+    public void Reset()
+    {
+        Clear();
+        Kind = BoardKind.Breadboard;
+    }
+
     /// <summary>Takes another arrangement's contents in place of this one's.</summary>
     public void CopyFrom(BoardArrangement other)
     {
@@ -88,6 +125,7 @@ public sealed class BoardArrangement
         _wires.Clear();
         foreach (var (id, placement) in other._parts) _parts[id] = placement;
         foreach (var (key, wire) in other._wires) _wires[key] = wire;
+        _kind = other._kind;
         Version++;
     }
 }

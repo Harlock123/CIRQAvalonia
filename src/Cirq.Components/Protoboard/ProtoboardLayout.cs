@@ -23,6 +23,9 @@ public sealed record BoardPart(CircuitComponent Part, BoardPackage Package, IRea
     }
 }
 
+/// <summary>A run of a stripboard's copper, from one cut (or the end) to the next, in one column.</summary>
+public sealed record StripSegment(int Column, int From, int To, Net? Net);
+
 /// <summary>A jumper wire between two holes, carrying one net.</summary>
 /// <param name="Key">Which two strips it joins: the same key while the layout keeps that wire, so a moved end can be remembered.</param>
 /// <param name="Route">Where it runs, in pitches, from <paramref name="From"/> to <paramref name="To"/>: kept off the parts where it can be.</param>
@@ -79,6 +82,43 @@ public sealed class ProtoboardLayout
 
     private readonly IReadOnlyDictionary<Net, string> _captions;
 
+    /// <summary>What it is built on: breadboards, or a stripboard or perfboard laid out by <see cref="SolderedLayout"/>.</summary>
+    public BoardKind Kind { get; init; } = BoardKind.Breadboard;
+
+    /// <summary>A stripboard's or perfboard's size in holes (columns across, rows down); zero for breadboards.</summary>
+    public int Columns { get; init; }
+
+    public int Rows { get; init; }
+
+    /// <summary>Where a stripboard's strips are cut, a hole each: the copper drilled away so two nets part.</summary>
+    public IReadOnlyList<BoardHole> Cuts { get; init; } = [];
+
+    /// <summary>A stripboard's strips as the cuts leave them: each run of copper, and the net it carries if any.</summary>
+    public IReadOnlyList<StripSegment> Segments { get; init; } = [];
+
+    /// <summary>The net at each hole in use, on a stripboard or perfboard (a breadboard's come from its strips).</summary>
+    public IReadOnlyDictionary<BoardHole, Net> HoleNets { get; init; } = new Dictionary<BoardHole, Net>();
+
+    /// <summary>Where a hole's centre is, in pitches, on whatever this is built on.</summary>
+    public (double X, double Y) Position(BoardHole hole) =>
+        Kind == BoardKind.Breadboard ? Breadboard.Position(hole) : SolderedLayout.Position(hole);
+
+    /// <summary>The hole nearest a point in pitches, within <paramref name="within"/>.</summary>
+    public BoardHole? Nearest(double x, double y, double within = 0.75)
+    {
+        if (Kind == BoardKind.Breadboard) return Breadboard.Nearest(x, y, Boards, within);
+        var hole = new BoardHole(1, (int)Math.Round(y - 1.5), (int)Math.Round(x - 2.5));
+        if (hole.Row < 1 || hole.Row > Rows || hole.Column < 1 || hole.Column > Columns) return null;
+        var (hx, hy) = SolderedLayout.Position(hole);
+        return Math.Sqrt(((hx - x) * (hx - x)) + ((hy - y) * (hy - y))) <= within ? hole : null;
+    }
+
+    /// <summary>A hole's name: as a breadboard prints it (<c>e12</c>), or a stripboard's strip letter and hole number (<c>C12</c>).</summary>
+    public string HoleName(BoardHole hole) => Kind == BoardKind.Breadboard ? Breadboard.Name(hole) : SolderedLayout.Name(hole);
+
+    /// <summary>Whether a part's body stands on the side of its pins towards the top of the board.</summary>
+    public bool Up(BoardHole hole) => Kind != BoardKind.Breadboard || Breadboard.IsTopHalf(hole.Row);
+
     /// <summary>What a rail is labelled with: the supply's voltage when a source sets it (+5V), else the net's name.</summary>
     public string Caption(Net net) => net.Label is { Length: > 0 } label ? label : _captions.TryGetValue(net, out var caption) ? caption : NetName(net);
 
@@ -126,11 +166,22 @@ public sealed class ProtoboardLayout
     {
         ArgumentNullException.ThrowIfNull(circuit);
         ArgumentNullException.ThrowIfNull(hand);
-        return new Arranger(circuit, hand, first).Run();
+        return hand.Kind == BoardKind.Breadboard ? new Arranger(circuit, hand, first).Run() : SolderedLayout.Arrange(circuit, hand.Kind);
     }
 
     /// <summary>The net in a hole, when its strip carries one.</summary>
-    public Net? NetAt(BoardHole hole) => Strips.GetValueOrDefault(Breadboard.StripOf(hole));
+    public Net? NetAt(BoardHole hole)
+    {
+        if (Kind == BoardKind.Breadboard) return Strips.GetValueOrDefault(Breadboard.StripOf(hole));
+        if (HoleNets.TryGetValue(hole, out var net)) return net;
+        return Kind == BoardKind.Stripboard
+            ? Segments.FirstOrDefault(s => s.Column == hole.Column && hole.Row >= s.From && hole.Row <= s.To)?.Net
+            : null;
+    }
+
+    /// <summary>The run of copper a stripboard hole is on, or null on any other board.</summary>
+    public StripSegment? SegmentAt(BoardHole hole) =>
+        Kind == BoardKind.Stripboard ? Segments.FirstOrDefault(s => s.Column == hole.Column && hole.Row >= s.From && hole.Row <= s.To) : null;
 
     /// <summary>The part with a pin in a hole.</summary>
     public BoardPart? PartAt(BoardHole hole) => Parts.FirstOrDefault(p => p.Holes.Contains(hole));
@@ -170,8 +221,8 @@ public sealed class ProtoboardLayout
         {
             var left = 0.0;
             var top = 0.0;
-            var right = Breadboard.Width;
-            var bottom = Breadboard.Top(Boards) + Breadboard.Height;
+            var right = Kind == BoardKind.Breadboard ? Breadboard.Width : SolderedLayout.Width(Columns);
+            var bottom = Kind == BoardKind.Breadboard ? Breadboard.Top(Boards) + Breadboard.Height : SolderedLayout.Height(Rows);
             foreach (var item in Bench)
             {
                 left = Math.Min(left, item.X);
@@ -200,17 +251,25 @@ public sealed class ProtoboardLayout
         var text = new System.Text.StringBuilder();
         text.Append(CultureInfo.InvariantCulture, $"{Boards} board{(Boards == 1 ? "" : "s")}, {Parts.Count} part{(Parts.Count == 1 ? "" : "s")} on the board, ");
         text.Append(CultureInfo.InvariantCulture, $"{Bench.Count} on the bench, {Wires.Count} jumper wire{(Wires.Count == 1 ? "" : "s")}.");
-        foreach (var (row, net) in Rails.OrderBy(r => r.Key))
-            text.Append(CultureInfo.InvariantCulture, $" The {Breadboard.RailName(row)} rails carry {NetName(net)}.");
+        if (Kind == BoardKind.Breadboard)
+            foreach (var (row, net) in Rails.OrderBy(r => r.Key))
+                text.Append(CultureInfo.InvariantCulture, $" The {Breadboard.RailName(row)} rails carry {NetName(net)}.");
+        else
+        {
+            text.Append(CultureInfo.InvariantCulture, $" A {Kind.ToString().ToLowerInvariant()} {Columns} holes across and {Rows} down");
+            text.Append(Kind == BoardKind.Stripboard ? $", strips A to {SolderedLayout.Letters(Columns)} running down, {Cuts.Count} cut{(Cuts.Count == 1 ? "" : "s")}." : ".");
+            foreach (var (column, net) in Rails.OrderBy(r => r.Key))
+                text.Append(CultureInfo.InvariantCulture, $" Strip {SolderedLayout.Letters(column)} carries {Caption(net)}.");
+        }
         text.AppendLine();
         foreach (var part in Parts)
         {
-            var pins = part.Package.Pins.Select((t, i) => t is null ? null : $"{t.Name}={Breadboard.Name(part.Holes[i])}").Where(s => s is not null);
+            var pins = part.Package.Pins.Select((t, i) => t is null ? null : $"{t.Name}={HoleName(part.Holes[i])}").Where(s => s is not null);
             text.AppendLine(CultureInfo.InvariantCulture, $"{part.Part.Name} ({part.Package.Label}): {string.Join(" ", pins)}{(part.ByHand ? " (placed by hand)" : "")}");
         }
 
         foreach (var item in Bench)
-            text.AppendLine(CultureInfo.InvariantCulture, $"{item.Part.Name} on the bench: {string.Join(" ", item.Leads.Select(l => $"{l.Terminal.Name}→{Breadboard.Name(l.To)}"))}");
+            text.AppendLine(CultureInfo.InvariantCulture, $"{item.Part.Name} on the bench: {string.Join(" ", item.Leads.Select(l => $"{l.Terminal.Name}→{HoleName(l.To)}"))}");
         foreach (var name in Unplaced) text.AppendLine(CultureInfo.InvariantCulture, $"No room for {name}.");
         text.Append(Matches ? "The board matches the schematic." : "It doesn't match the schematic: " + string.Join(" ", Problems));
         return text.ToString();
@@ -274,10 +333,13 @@ public sealed class ProtoboardLayout
     }
 
     /// <summary>What a two-lead part's body covers seen from above, as discs in pitches: a row of them along a resistor, one for an LED.</summary>
-    internal static List<(double X, double Y, double R)> Discs(CircuitComponent part, BoardPackage package, BoardHole a, BoardHole b)
+    internal static List<(double X, double Y, double R)> Discs(CircuitComponent part, BoardPackage package, BoardHole a, BoardHole b) =>
+        Discs(part, package, Breadboard.Position(a), Breadboard.Position(b));
+
+    internal static List<(double X, double Y, double R)> Discs(CircuitComponent part, BoardPackage package, (double X, double Y) pa, (double X, double Y) pb)
     {
-        var (ax, ay) = Breadboard.Position(a);
-        var (bx, by) = Breadboard.Position(b);
+        var (ax, ay) = pa;
+        var (bx, by) = pb;
         var span = Math.Sqrt(((bx - ax) * (bx - ax)) + ((by - ay) * (by - ay)));
         var (mx, my) = ((ax + bx) / 2, (ay + by) / 2);
         if (!BoardPackages.IsAxial(package.Look)) return [(mx, my, BoardPackages.BodyRadius(part, package.Look))];
@@ -294,16 +356,20 @@ public sealed class ProtoboardLayout
     }
 
     /// <summary>A DIP's body, in pitches.</summary>
-    internal static (double L, double T, double R, double B) DipBox(IReadOnlyList<BoardHole> holes)
+    internal static (double L, double T, double R, double B) DipBox(IReadOnlyList<BoardHole> holes) =>
+        DipBox([.. holes.Select(Breadboard.Position)]);
+
+    internal static (double L, double T, double R, double B) DipBox(IReadOnlyList<(double X, double Y)> points)
     {
-        var points = holes.Select(Breadboard.Position).ToList();
         return (points.Min(p => p.X) - 0.45, points.Min(p => p.Y) + 0.25, points.Max(p => p.X) + 0.45, points.Max(p => p.Y) - 0.25);
     }
 
     /// <summary>An inline part's body, in pitches: mostly on the side away from the channel.</summary>
-    internal static (double L, double T, double R, double B) InlineBox(BoardLook look, IReadOnlyList<BoardHole> holes)
+    internal static (double L, double T, double R, double B) InlineBox(BoardLook look, IReadOnlyList<BoardHole> holes) =>
+        InlineBox(look, [.. holes.Select(Breadboard.Position)], Breadboard.IsTopHalf(holes[0].Row));
+
+    internal static (double L, double T, double R, double B) InlineBox(BoardLook look, IReadOnlyList<(double X, double Y)> points, bool up)
     {
-        var points = holes.Select(Breadboard.Position).ToList();
         var y = points[0].Y;
         var outward = look switch
         {
@@ -314,7 +380,7 @@ public sealed class ProtoboardLayout
             _ => 1.3,
         };
         var (left, right) = (points.Min(p => p.X) - 0.6, points.Max(p => p.X) + 0.6);
-        return Breadboard.IsTopHalf(holes[0].Row) ? (left, y - outward, right, y + 0.4) : (left, y - 0.4, right, y + outward);
+        return up ? (left, y - outward, right, y + 0.4) : (left, y - 0.4, right, y + outward);
     }
 
     /// <summary>The key a jumper between two strips is remembered by.</summary>

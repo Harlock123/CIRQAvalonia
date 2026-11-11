@@ -276,9 +276,9 @@ public static class CircuitSerializer
     /// <summary>What was put somewhere by hand on the protoboard, for parts still in the circuit; null when nothing was.</summary>
     private static ProtoboardRecord? BoardRecord(Circuit circuit)
     {
-        if (circuit.Board.IsEmpty) return null;
+        if (circuit.Board.IsDefault) return null;
         var present = Flattening.Flatten(circuit.Components).Select(c => c.Id).ToHashSet();
-        var record = new ProtoboardRecord();
+        var record = new ProtoboardRecord { Kind = circuit.Board.Kind == BoardKind.Breadboard ? null : circuit.Board.Kind.ToString() };
         foreach (var (id, placement) in circuit.Board.Parts.OrderBy(p => p.Key))
         {
             if (!present.Contains(id)) continue;
@@ -300,12 +300,18 @@ public static class CircuitSerializer
                 To = Protoboard.Breadboard.Name(w.Value.To),
             })];
 
-        return record.Parts.Count == 0 && record.Wires is null ? null : record;
+        return record.Parts.Count == 0 && record.Wires is null && record.Kind is null ? null : record;
     }
 
     /// <summary>Reads the hand-made board back; a hole that doesn't parse is a warning, and that part is laid out afresh.</summary>
     private static void RestoreBoard(ProtoboardRecord record, Circuit circuit, ICollection<string> warnings)
     {
+        if (record.Kind is { } kind)
+        {
+            if (Enum.TryParse<BoardKind>(kind, ignoreCase: true, out var parsed)) circuit.Board.Kind = parsed;
+            else warnings.Add($"The protoboard is a \"{kind}\", which this version doesn't know; it is shown on breadboards.");
+        }
+
         foreach (var part in record.Parts)
         {
             var pins = new Dictionary<string, BoardHole>(StringComparer.Ordinal);

@@ -7,6 +7,8 @@ using Cirq.Components.Passive;
 using Cirq.Components.Protoboard;
 using Cirq.Core.Topology;
 using Cirq.Core.Units;
+using BuildStep = Cirq.Components.Protoboard.BuildStep;
+using BuildStepKind = Cirq.Components.Protoboard.BuildStepKind;
 using CoreColor = Cirq.Core.Primitives.Color;
 
 namespace Cirq.UI.Rendering;
@@ -15,7 +17,33 @@ namespace Cirq.UI.Rendering;
 /// <param name="Selected">The part to ring, as the schematic rings the selected one.</param>
 /// <param name="Strip">A strip to light up: the one under the pointer, so you can see what a hole is joined to.</param>
 /// <param name="Wire">A jumper to pick out.</param>
-public sealed record ProtoboardRenderOptions(CircuitComponent? Selected = null, BoardStrip? Strip = null, BoardWire? Wire = null);
+/// <param name="Lit">Holes to light up, on a stripboard or perfboard: those joined to the one under the pointer.</param>
+/// <param name="Visible">With the build guide open, only what the steps so far have fitted (parts, wires, bench equipment, cuts).</param>
+/// <param name="Current">The build guide's step on screen, picked out.</param>
+/// <param name="Meter">The multimeter on the bench, when it is out.</param>
+public sealed record ProtoboardRenderOptions(
+    CircuitComponent? Selected = null, BoardStrip? Strip = null, BoardWire? Wire = null, IReadOnlySet<BoardHole>? Lit = null,
+    IReadOnlySet<object>? Visible = null, BuildStep? Current = null, MeterView? Meter = null);
+
+/// <summary>The multimeter as drawn: where it stands on the bench, where its probe tips are, and what it reads.</summary>
+/// <param name="X">Its top-left corner, in pitches.</param>
+/// <param name="Y">See <paramref name="X"/>.</param>
+/// <param name="Red">Where the red probe's tip is, in pitches.</param>
+/// <param name="Black">Where the black probe's tip is.</param>
+/// <param name="Reading">The display: "4.982", or dashes when it reads nothing.</param>
+/// <param name="Note">Under the display: what it is measuring.</param>
+public sealed record MeterView(double X, double Y, (double X, double Y) Red, (double X, double Y) Black, string Reading, string Note)
+{
+    public const double Width = 11.0;
+    public const double Height = 16.0;
+
+    /// <summary>Where the red and black leads leave the meter.</summary>
+    public (double X, double Y) RedJack => (X + 7.6, Y + Height - 1.6);
+
+    public (double X, double Y) BlackJack => (X + 3.4, Y + Height - 1.6);
+
+    public bool Contains(double x, double y) => x >= X && x <= X + Width && y >= Y && y <= Y + Height;
+}
 
 /// <summary>
 /// Draws a <see cref="ProtoboardLayout"/>: white breadboards with their rails and numbered columns, the parts as
@@ -73,28 +101,66 @@ public static class ProtoboardRenderer
         _ => Color.Parse(SignalColours[colour % SignalColours.Length]),
     };
 
+    /// <summary>The layout being drawn, whose geometry places the holes: breadboard, stripboard or perfboard.</summary>
+    [ThreadStatic]
+    private static ProtoboardLayout? _drawing;
+
+    private static (double X, double Y) Pos(BoardHole hole) => _drawing?.Position(hole) ?? Breadboard.Position(hole);
+
+    private static bool Up(BoardHole hole) => _drawing?.Up(hole) ?? Breadboard.IsTopHalf(hole.Row);
+
     /// <summary>Draws the whole layout.</summary>
     public static void Draw(ISymbolCanvas canvas, ProtoboardLayout layout, ProtoboardRenderOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(canvas);
         ArgumentNullException.ThrowIfNull(layout);
         options ??= new ProtoboardRenderOptions();
+        var previous = _drawing;
+        _drawing = layout;
+        try
+        {
+            bool Shown(object item) => options.Visible is not { } visible || visible.Contains(item);
 
-        for (var board = 1; board <= layout.Boards; board++) DrawBoard(canvas, layout, board, options);
+            if (layout.Kind == BoardKind.Breadboard)
+                for (var board = 1; board <= layout.Boards; board++) DrawBoard(canvas, layout, board, options);
+            else DrawSoldered(canvas, layout, options, Shown);
 
-        // The wires lie on the board and the parts stand on top of them, as they do on a real one: a wire is never
-        // drawn over a part, and the layout routes them round the parts where it can, so they stay in sight too.
-        foreach (var wire in layout.Wires) DrawWire(canvas, wire, ReferenceEquals(wire, options.Wire));
-        foreach (var item in layout.Bench)
-            foreach (var lead in item.Leads) DrawLead(canvas, lead);
+            // The wires lie on the board and the parts stand on top of them, as they do on a real one: a wire is never
+            // drawn over a part, and the layout routes them round the parts where it can, so they stay in sight too.
+            // Perfboard's are on the back, seen through the board.
+            foreach (var wire in layout.Wires.Where(Shown)) DrawWire(canvas, wire, ReferenceEquals(wire, options.Wire), back: layout.Kind == BoardKind.Perfboard);
+            foreach (var item in layout.Bench.Where(Shown))
+                foreach (var lead in item.Leads) DrawLead(canvas, lead);
 
-        foreach (var part in layout.Parts.Where(p => p.Package.Form == BoardForm.Dip)) DrawDip(canvas, part);
-        foreach (var part in layout.Parts.Where(p => p.Package.Form == BoardForm.Inline)) DrawInline(canvas, part);
-        foreach (var part in layout.Parts.Where(p => p.Package.Form == BoardForm.TwoLead)) DrawTwoLead(canvas, part);
-        foreach (var item in layout.Bench) DrawBench(canvas, item);
+            foreach (var part in layout.Parts.Where(p => p.Package.Form == BoardForm.Dip && Shown(p))) DrawDip(canvas, part);
+            foreach (var part in layout.Parts.Where(p => p.Package.Form == BoardForm.Inline && Shown(p))) DrawInline(canvas, part);
+            foreach (var part in layout.Parts.Where(p => p.Package.Form == BoardForm.TwoLead && Shown(p))) DrawTwoLead(canvas, part);
+            foreach (var item in layout.Bench.Where(Shown)) DrawBench(canvas, item);
 
-        if (options.Selected is { } selected && Bounds(layout, selected) is { } box)
-            canvas.DrawRectangle(null, Selection, new RoundedRect(box.Inflate(0.5 * Unit), 0.6 * Unit));
+            if (options.Current is { } step) DrawStep(canvas, layout, step);
+            if (options.Meter is { } meter) DrawMeter(canvas, meter);
+
+            if (options.Selected is { } selected && Bounds(layout, selected) is { } box)
+                canvas.DrawRectangle(null, Selection, new RoundedRect(box.Inflate(0.5 * Unit), 0.6 * Unit));
+        }
+        finally
+        {
+            _drawing = previous;
+        }
+    }
+
+    private static readonly ImmutablePen StepRing = Pen("#E0FF9800", 0.3);
+
+    /// <summary>The build guide's step on screen: its part or wire ringed in amber, and the holes it goes in marked.</summary>
+    private static void DrawStep(ISymbolCanvas canvas, ProtoboardLayout layout, BuildStep step)
+    {
+        if (step.Part is { } part && Bounds(layout, part.Part) is { } box)
+            canvas.DrawRectangle(null, StepRing, new RoundedRect(box.Inflate(0.8 * Unit), 0.8 * Unit));
+        if (step.Bench is { } bench && Bounds(layout, bench.Part) is { } benchBox)
+            canvas.DrawRectangle(null, StepRing, new RoundedRect(benchBox.Inflate(0.8 * Unit), 1.0 * Unit));
+        if (step.Wire is { } wire) canvas.DrawGeometry(null, Pen("#80FF9800", 0.9), Along(wire.Route));
+        foreach (var hole in step.Holes ?? [])
+            canvas.DrawEllipse(null, Pen("#FF9800", 0.14), P(Pos(hole)), 0.55 * Unit, 0.55 * Unit);
     }
 
     /// <summary>What a part covers on the drawing, in drawing units: for picking it with the pointer, and ringing it.</summary>
@@ -103,7 +169,21 @@ public static class ProtoboardRenderer
         if (layout.FindOnBench(part) is { } bench) return new Rect(P(bench.X, bench.Y), P(bench.X + bench.Width, bench.Y + bench.Height));
         if (layout.Find(part) is not { } placed) return null;
 
-        var points = placed.Holes.Select(Breadboard.Position).ToList();
+        var previous = _drawing;
+        _drawing = layout;
+        try
+        {
+            return BoundsOf(placed);
+        }
+        finally
+        {
+            _drawing = previous;
+        }
+    }
+
+    private static Rect BoundsOf(BoardPart placed)
+    {
+        var points = placed.Holes.Select(Pos).ToList();
         var (left, top) = (points.Min(p => p.X), points.Min(p => p.Y));
         var (right, bottom) = (points.Max(p => p.X), points.Max(p => p.Y));
         switch (placed.Package.Form)
@@ -112,7 +192,7 @@ public static class ProtoboardRenderer
                 return new Rect(P(left - 0.5, top - 0.3), P(right + 0.5, bottom + 0.3));
             case BoardForm.Inline:
                 var rows = ProtoboardLayout.BodyRows(placed.Package.Look) + 0.9;
-                var up = Breadboard.IsTopHalf(placed.Holes[0].Row);
+                var up = Up(placed.Holes[0]);
                 return new Rect(P(left - 0.7, up ? top - rows : top - 0.7), P(right + 0.7, up ? bottom + 0.7 : bottom + rows));
             default:
                 var thick = Math.Max(0.8, Radius(placed) + 0.2);
@@ -180,18 +260,133 @@ public static class ProtoboardRenderer
         }
     }
 
+    // ───────────────────────────── stripboard and perfboard ─────────────────────────────
+
+    private static readonly ImmutableSolidColorBrush Copper = Brush("#B0D9894A");
+    private static readonly ImmutableSolidColorBrush Pad = Brush("#D9894A");
+    private static readonly ImmutableSolidColorBrush Drill = Brush("#2A2420");
+
+    /// <summary>
+    /// A stripboard or perfboard seen from the component side, the copper shown through: a stripboard's strips with
+    /// their cuts (the copper drilled away, marked with a cross), a perfboard's pad at every hole. Strips or columns are
+    /// lettered across the top and holes numbered down the side.
+    /// </summary>
+    private static void DrawSoldered(ISymbolCanvas canvas, ProtoboardLayout layout, ProtoboardRenderOptions options, Func<object, bool> shown)
+    {
+        var strips = layout.Kind == BoardKind.Stripboard;
+        var width = SolderedLayout.Width(layout.Columns);
+        var height = SolderedLayout.Height(layout.Rows);
+        var body = new Rect(P(0, 0), P(width, height));
+        canvas.DrawRectangle(Shadow, null, new RoundedRect(body.Translate(new Vector(0.35 * Unit, 0.45 * Unit)), 0.4 * Unit));
+        canvas.DrawRectangle(Brush(strips ? "#C9A36B" : "#3C7A55"), Pen(strips ? "#9C7A48" : "#2A5A3E", 0.08), new RoundedRect(body, 0.4 * Unit));
+
+        if (strips)
+            foreach (var segment in layout.Segments)
+            {
+                var (x, top) = SolderedLayout.Position(new BoardHole(1, segment.From, segment.Column));
+                var (_, bottom) = SolderedLayout.Position(new BoardHole(1, segment.To, segment.Column));
+                canvas.FillRectangle(Copper, new Rect(P(x - 0.4, top - 0.45), P(x + 0.4, bottom + 0.45)));
+            }
+
+        var lit = options.Lit ?? new HashSet<BoardHole>();
+        for (var row = 1; row <= layout.Rows; row++)
+            for (var column = 1; column <= layout.Columns; column++)
+            {
+                var hole = new BoardHole(1, row, column);
+                var centre = P(SolderedLayout.Position(hole));
+                if (!strips) canvas.DrawEllipse(Pad, null, centre, 0.34 * Unit, 0.34 * Unit);
+                if (lit.Contains(hole)) canvas.DrawEllipse(Lit, null, centre, 0.4 * Unit, 0.4 * Unit);
+                canvas.DrawEllipse(Drill, null, centre, 0.15 * Unit, 0.15 * Unit);
+            }
+
+        foreach (var cut in layout.Cuts.Where(c => shown(c)))
+        {
+            var centre = P(SolderedLayout.Position(cut));
+            canvas.DrawEllipse(Brush(strips ? "#C9A36B" : "#3C7A55"), null, centre, 0.42 * Unit, 0.42 * Unit);
+            var cross = Pen("#C62828", 0.1);
+            canvas.DrawLine(cross, new Point(centre.X - (0.3 * Unit), centre.Y - (0.3 * Unit)), new Point(centre.X + (0.3 * Unit), centre.Y + (0.3 * Unit)));
+            canvas.DrawLine(cross, new Point(centre.X - (0.3 * Unit), centre.Y + (0.3 * Unit)), new Point(centre.X + (0.3 * Unit), centre.Y - (0.3 * Unit)));
+        }
+
+        var print = Brush(strips ? "#6E5530" : "#CFE3D6");
+        for (var column = 1; column <= layout.Columns; column++)
+            canvas.DrawText(SolderedLayout.Letters(column), P(SolderedLayout.Position(new BoardHole(1, 0, column)).X, 1.2), 0.5 * Unit, print, SymbolTextAlign.Centre);
+        for (var row = 1; row <= layout.Rows; row++)
+            if (row == 1 || row % 5 == 0)
+                canvas.DrawText(row.ToString(System.Globalization.CultureInfo.InvariantCulture), P(1.6, SolderedLayout.Position(new BoardHole(1, row, 0)).Y), 0.5 * Unit, print, SymbolTextAlign.Centre);
+    }
+
+    // ───────────────────────────── the multimeter ─────────────────────────────
+
+    /// <summary>A handheld meter on the bench, its display reading the probes, and its red and black leads to their tips.</summary>
+    private static void DrawMeter(ISymbolCanvas canvas, MeterView meter)
+    {
+        foreach (var (jack, tip, colour) in new[] { (meter.BlackJack, meter.Black, "#1E1E1E"), (meter.RedJack, meter.Red, "#D7261E") })
+        {
+            var a = P(jack);
+            var b = P(tip);
+            var path = new SymbolPath();
+            using (var ctx = path.Open())
+            {
+                ctx.BeginFigure(a, false);
+                ctx.CubicBezierTo(new Point(a.X, a.Y + (4 * Unit)), new Point(b.X, b.Y + (3 * Unit)), b);
+                ctx.EndFigure(false);
+            }
+
+            canvas.DrawGeometry(null, Pen("#33000000", 0.55), Shifted(path));
+            canvas.DrawGeometry(null, Pen(colour, 0.36), path);
+
+            // The probe: a handle and a steel point at the tip.
+            canvas.DrawEllipse(Brush(colour), Pen("#000000", 0.05), new Point(b.X, b.Y + (0.9 * Unit)), 0.35 * Unit, 0.7 * Unit);
+            canvas.DrawLine(Pen("#C9CDD2", 0.12), new Point(b.X, b.Y + (0.3 * Unit)), b);
+            canvas.DrawEllipse(Brush("#E6E8EA"), null, b, 0.12 * Unit, 0.12 * Unit);
+        }
+
+        var body = new Rect(P(meter.X, meter.Y), P(meter.X + MeterView.Width, meter.Y + MeterView.Height));
+        canvas.DrawRectangle(Shadow, null, new RoundedRect(body.Translate(new Vector(0.35 * Unit, 0.45 * Unit)), 1.2 * Unit));
+        canvas.DrawRectangle(Brush("#F2B705"), Pen("#B88900", 0.1), new RoundedRect(body, 1.2 * Unit));
+        var inner = body.Deflate(0.6 * Unit);
+        canvas.DrawRectangle(Brush("#2B2B2E"), null, new RoundedRect(inner, 0.8 * Unit));
+        var display = new Rect(inner.X + (0.5 * Unit), inner.Y + (0.6 * Unit), inner.Width - (1.0 * Unit), 3.4 * Unit);
+        canvas.DrawRectangle(Brush("#B9C7A8"), Pen("#5A6650", 0.06), new RoundedRect(display, 0.3 * Unit));
+        canvas.DrawText(meter.Reading, new Point(display.Right - (0.4 * Unit), display.Center.Y), 1.7 * Unit, Brush("#1C2414"), SymbolTextAlign.Right);
+        canvas.DrawText("V DC", new Point(display.Left + (0.4 * Unit), display.Bottom - (0.55 * Unit)), 0.55 * Unit, Brush("#1C2414"), SymbolTextAlign.Left);
+        canvas.DrawText(meter.Note, new Point(inner.Center.X, display.Bottom + (0.9 * Unit)), 0.55 * Unit, Brush("#D9D9D9"), SymbolTextAlign.Centre);
+
+        // The dial, at volts.
+        var dial = new Point(inner.Center.X, inner.Y + (8.6 * Unit));
+        canvas.DrawEllipse(Brush("#3A3A3E"), Pen("#121214", 0.08), dial, 2.2 * Unit, 2.2 * Unit);
+        canvas.DrawLine(Pen("#E6E6E6", 0.22), dial, new Point(dial.X - (1.3 * Unit), dial.Y - (1.3 * Unit)));
+        canvas.DrawText("V⎓", new Point(dial.X - (2.6 * Unit), dial.Y - (2.4 * Unit)), 0.6 * Unit, Brush("#E6E6E6"), SymbolTextAlign.Centre);
+
+        foreach (var (jack, colour, label) in new[] { (meter.BlackJack, "#111111", "COM"), (meter.RedJack, "#C62828", "V") })
+        {
+            canvas.DrawEllipse(Brush(colour), Pen("#000000", 0.06), P(jack), 0.5 * Unit, 0.5 * Unit);
+            canvas.DrawText(label, new Point(P(jack).X, P(jack).Y - (0.95 * Unit)), 0.45 * Unit, Brush("#D9D9D9"), SymbolTextAlign.Centre);
+        }
+    }
+
     // ───────────────────────────── wires ─────────────────────────────
 
-    private static void DrawWire(ISymbolCanvas canvas, BoardWire wire, bool picked)
+    private static void DrawWire(ISymbolCanvas canvas, BoardWire wire, bool picked, bool back = false)
     {
         var colour = WireColour(wire.Role, wire.Colour);
         var path = Along(wire.Route);
+        if (back)
+        {
+            // On the back of a perfboard, seen through it: thinner and fainter than a wire on top.
+            canvas.DrawGeometry(null, Pen(Color.FromArgb(150, colour.R, colour.G, colour.B), 0.2), path);
+            foreach (var end in new[] { wire.From, wire.To })
+                canvas.DrawEllipse(Brush("#C0C9CDD2"), null, P(Pos(end)), 0.22 * Unit, 0.22 * Unit);
+            return;
+        }
+
         canvas.DrawGeometry(null, Pen("#33000000", 0.5), Shifted(path));
         canvas.DrawGeometry(null, Pen(Darker(colour, 0.45), 0.42), path);
         canvas.DrawGeometry(null, Pen(colour, 0.3), path);
         if (picked) canvas.DrawGeometry(null, Pen("#802F80ED", 0.7), path);
         foreach (var end in new[] { wire.From, wire.To })
-            canvas.DrawEllipse(Silver, Pen("#7D838A", 0.05), P(Breadboard.Position(end)), 0.2 * Unit, 0.2 * Unit);
+            canvas.DrawEllipse(Silver, Pen("#7D838A", 0.05), P(Pos(end)), 0.2 * Unit, 0.2 * Unit);
     }
 
     /// <summary>
@@ -268,14 +463,14 @@ public static class ProtoboardRenderer
     {
         var holes = part.Holes;
         var half = holes.Count / 2;
-        var (left, bottomY) = Breadboard.Position(holes[0]);
-        var (right, topY) = Breadboard.Position(holes[half - 1] with { Row = holes[^1].Row });
+        var (left, bottomY) = Pos(holes[0]);
+        var (right, topY) = Pos(holes[half - 1] with { Row = holes[^1].Row });
         var body = new Rect(P(left - 0.45, topY + 0.25), P(right + 0.45, bottomY - 0.25));
 
         // The legs, from the body's edge into each hole.
         foreach (var hole in holes)
         {
-            var (x, y) = Breadboard.Position(hole);
+            var (x, y) = Pos(hole);
             var toward = y < body.Center.Y / Unit ? body.Top : body.Bottom;
             canvas.FillRectangle(Silver, new Rect(new Point((x - 0.17) * Unit, Math.Min(y * Unit, toward)), new Point((x + 0.17) * Unit, Math.Max(y * Unit, toward))));
         }
@@ -303,7 +498,7 @@ public static class ProtoboardRenderer
         {
             for (var i = 0; i < half; i++)
             {
-                var (x, _) = Breadboard.Position(holes[i]);
+                var (x, _) = Pos(holes[i]);
                 var slot = new Rect(P(x - 0.25, (body.Top / Unit) + 0.35), P(x + 0.25, (body.Bottom / Unit) - 0.35));
                 canvas.FillRectangle(Brush("#7F1414"), slot);
                 var on = dip.IsClosed(i);
@@ -366,8 +561,8 @@ public static class ProtoboardRenderer
 
     private static void DrawInline(ISymbolCanvas canvas, BoardPart part)
     {
-        var points = part.Holes.Select(h => P(Breadboard.Position(h))).ToList();
-        var up = Breadboard.IsTopHalf(part.Holes[0].Row);
+        var points = part.Holes.Select(h => P(Pos(h))).ToList();
+        var up = Up(part.Holes[0]);
         var sign = up ? -1 : 1;
         var (left, right, y) = (points[0].X, points[^1].X, points[0].Y);
         var centre = (left + right) / 2;
@@ -465,7 +660,7 @@ public static class ProtoboardRenderer
 
     private static void DrawTwoLead(ISymbolCanvas canvas, BoardPart part)
     {
-        var (a, b) = (P(Breadboard.Position(part.Holes[0])), P(Breadboard.Position(part.Holes[1])));
+        var (a, b) = (P(Pos(part.Holes[0])), P(Pos(part.Holes[1])));
         var (dx, dy) = (b.X - a.X, b.Y - a.Y);
         var length = Math.Sqrt((dx * dx) + (dy * dy));
         var angle = Math.Atan2(dy, dx);
@@ -703,7 +898,7 @@ public static class ProtoboardRenderer
         canvas.DrawGeometry(null, Pen("#33000000", 0.5), Shifted(path));
         canvas.DrawGeometry(null, Pen(Darker(colour, 0.45), 0.42), path);
         canvas.DrawGeometry(null, Pen(colour, 0.3), path);
-        canvas.DrawEllipse(Silver, Pen("#7D838A", 0.05), P(Breadboard.Position(lead.To)), 0.2 * Unit, 0.2 * Unit);
+        canvas.DrawEllipse(Silver, Pen("#7D838A", 0.05), P(Pos(lead.To)), 0.2 * Unit, 0.2 * Unit);
     }
 
     private static void DrawBench(ISymbolCanvas canvas, BenchPart item)

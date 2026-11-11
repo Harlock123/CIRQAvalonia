@@ -26,6 +26,32 @@ public sealed class ProtoboardCanvas : Control
     public static readonly StyledProperty<CircuitComponent?> SelectedComponentProperty =
         AvaloniaProperty.Register<ProtoboardCanvas, CircuitComponent?>(nameof(SelectedComponent), defaultBindingMode: Avalonia.Data.BindingMode.TwoWay);
 
+    public static readonly StyledProperty<bool> MeterShownProperty =
+        AvaloniaProperty.Register<ProtoboardCanvas, bool>(nameof(MeterShown));
+
+    public static readonly StyledProperty<int> BuildStepProperty =
+        AvaloniaProperty.Register<ProtoboardCanvas, int>(nameof(BuildStep), -1);
+
+    /// <summary>Whether the multimeter is out on the bench.</summary>
+    public bool MeterShown
+    {
+        get => GetValue(MeterShownProperty);
+        set => SetValue(MeterShownProperty, value);
+    }
+
+    /// <summary>The build guide's step on screen, from 0, or -1 with the guide closed: only what the steps so far fit is shown.</summary>
+    public int BuildStep
+    {
+        get => GetValue(BuildStepProperty);
+        set => SetValue(BuildStepProperty, value);
+    }
+
+    /// <summary>What a terminal's net is at in the running simulation, or null when nothing is solved: the meter's reading.</summary>
+    public Func<Terminal, double?>? VoltageAt { get; set; }
+
+    /// <summary>Raised when the board is laid out afresh, so the build guide can follow.</summary>
+    public event EventHandler? LayoutChanged;
+
     public Circuit? Circuit
     {
         get => GetValue(CircuitProperty);
@@ -61,7 +87,7 @@ public sealed class ProtoboardCanvas : Control
     private long _signature;
 
     // A move in progress: what was grabbed, where, and the board as it would be if dropped now.
-    private enum Grab { None, Pan, Part, Lead, WireEnd, Bench }
+    private enum Grab { None, Pan, Part, Lead, WireEnd, Bench, Probe }
 
     private Grab _grab;
     private Point _lastPointer;
@@ -79,7 +105,7 @@ public sealed class ProtoboardCanvas : Control
 
     static ProtoboardCanvas()
     {
-        AffectsRender<ProtoboardCanvas>(CircuitProperty, SelectedComponentProperty);
+        AffectsRender<ProtoboardCanvas>(CircuitProperty, SelectedComponentProperty, MeterShownProperty, BuildStepProperty);
     }
 
     public ProtoboardCanvas()
@@ -97,8 +123,12 @@ public sealed class ProtoboardCanvas : Control
             var signature = Signature(circuit);
             if (_layout is null || signature != _signature)
             {
+                var kind = _layout?.Kind;
                 _layout = ProtoboardLayout.Arrange(circuit);
                 _signature = signature;
+                _steps = null;
+                if (kind is not null && kind != _layout.Kind) (_redTip, _blackTip) = (null, null);
+                Avalonia.Threading.Dispatcher.UIThread.Post(() => LayoutChanged?.Invoke(this, EventArgs.Empty));
             }
 
             return _layout;
@@ -127,6 +157,11 @@ public sealed class ProtoboardCanvas : Control
 
         return ((long)circuit.Wires.Count << 32) ^ (uint)hash.ToHashCode();
     }
+
+    private IReadOnlyList<BuildStep>? _steps;
+
+    /// <summary>The board's build guide, step by step.</summary>
+    public IReadOnlyList<BuildStep> BuildSteps => _steps ??= Layout is { } layout ? BuildGuide.Steps(layout) : [];
 
     /// <summary>Makes the next drawing lay the board out afresh.</summary>
     public void Refresh()
@@ -166,6 +201,11 @@ public sealed class ProtoboardCanvas : Control
     {
         if (Layout is not { } layout) return;
         var (left, top, right, bottom) = layout.Extent;
+        if (MeterShown && Meter(layout) is { } meter)
+        {
+            left = Math.Min(left, meter.X - 1);
+            bottom = Math.Max(bottom, meter.Y + MeterView.Height + 1);
+        }
         var unit = ProtoboardRenderer.Unit;
         var width = (right - left) * unit;
         var height = (bottom - top) * unit;
@@ -190,9 +230,13 @@ public sealed class ProtoboardCanvas : Control
     /// <summary>Where a hole is on the control, for a test to put the pointer on it.</summary>
     internal Point ScreenOf(BoardHole hole)
     {
-        var (x, y) = Breadboard.Position(hole);
+        var (x, y) = Layout?.Position(hole) ?? Breadboard.Position(hole);
         return new Point((x * ProtoboardRenderer.Unit * _zoom) + _pan.X, (y * ProtoboardRenderer.Unit * _zoom) + _pan.Y);
     }
+
+    /// <summary>Where a point in pitches is on the control.</summary>
+    internal Point ScreenOfPitches(double x, double y) =>
+        new((x * ProtoboardRenderer.Unit * _zoom) + _pan.X, (y * ProtoboardRenderer.Unit * _zoom) + _pan.Y);
 
     private Point ToWorld(Point screen) => new((screen.X - _pan.X) / _zoom, (screen.Y - _pan.Y) / _zoom);
 
@@ -214,7 +258,11 @@ public sealed class ProtoboardCanvas : Control
         var canvas = new AvaloniaSymbolCanvas(context);
         using (canvas.PushTransform(Matrix.CreateScale(_zoom, _zoom) * Matrix.CreateTranslation(_pan.X, _pan.Y)))
         {
-            ProtoboardRenderer.Draw(canvas, shown, new ProtoboardRenderOptions(SelectedComponent, _hoverStrip, _grabbedWire));
+            var steps = BuildStep >= 0 && _candidate is null ? BuildSteps : [];
+            var current = BuildStep >= 0 && BuildStep < steps.Count ? steps[BuildStep] : null;
+            ProtoboardRenderer.Draw(canvas, shown, new ProtoboardRenderOptions(
+                SelectedComponent, _hoverStrip, _grabbedWire, _lit, current is null ? null : Visible(shown, steps, BuildStep), current,
+                MeterShown ? Meter(shown) : null));
 
             // A move that can't be made: the part ringed in red where it was, until it's let go.
             if (_refusal is not null && _grabbedPart is { } part && ProtoboardRenderer.Bounds(shown, part) is { } box)
@@ -253,7 +301,19 @@ public sealed class ProtoboardCanvas : Control
         }
 
         var (x, y) = ToPitches(point.Position);
-        var hole = Breadboard.Nearest(x, y, layout.Boards, 0.45);
+        var hole = layout.Nearest(x, y, 0.45);
+
+        // A probe tip of the meter, before anything on the board under it.
+        if (point.Properties.IsLeftButtonPressed && MeterShown && Meter(layout) is { } meter)
+        {
+            foreach (var (tip, red) in new[] { (meter.Red, true), (meter.Black, false) })
+                if (Distance(tip, (x, y)) < 0.9)
+                {
+                    _grabbedRed = red;
+                    Begin(Grab.Probe, e, $"The {(red ? "red" : "black")} probe");
+                    return;
+                }
+        }
 
         if (point.Properties.IsRightButtonPressed)
         {
@@ -272,6 +332,16 @@ public sealed class ProtoboardCanvas : Control
             interactive.Interact();
             StatusChanged?.Invoke(this, $"{part.Name}: {part.ValueLabel}");
             InvalidateVisual();
+            return;
+        }
+
+        // Stripboard and perfboard are laid out automatically: a part can be picked, and worked, but not moved.
+        if (layout.Kind != BoardKind.Breadboard)
+        {
+            SelectedComponent = part;
+            if (part is not null)
+                StatusChanged?.Invoke(this, $"{part.Name}: the {layout.Kind.ToString().ToLowerInvariant()} is laid out automatically; parts are moved by hand on breadboards (View › Board).");
+            Begin(Grab.Pan, e);
             return;
         }
 
@@ -309,7 +379,7 @@ public sealed class ProtoboardCanvas : Control
 
             if (layout.Find(part) is { } placed)
             {
-                _grabHole = placed.Holes.MinBy(h => Distance(Breadboard.Position(h), (x, y)));
+                _grabHole = placed.Holes.MinBy(h => Distance(layout.Position(h), (x, y)));
                 Begin(Grab.Part, e, $"Move {part.Name} on the board");
                 return;
             }
@@ -348,6 +418,12 @@ public sealed class ProtoboardCanvas : Control
             case Grab.None:
                 Hover(layout, x, y);
                 return;
+            case Grab.Probe:
+                _probeAt = (x, y);
+                var near = layout.Nearest(x, y, 0.6);
+                StatusChanged?.Invoke(this, near is { } h ? $"On {layout.HoleName(h)}" : "Drop it on a hole");
+                InvalidateVisual();
+                return;
         }
 
         // Try the move where the pointer is now, and show the board as it would be.
@@ -375,7 +451,7 @@ public sealed class ProtoboardCanvas : Control
             _candidate = edit;
             _refusal = null;
             if (edit.Layout is { Matches: false } bad) StatusChanged?.Invoke(this, string.Join(" ", bad.Problems));
-            else if (to is { } hole) StatusChanged?.Invoke(this, $"To {Breadboard.Name(hole)}");
+            else if (to is { } hole) StatusChanged?.Invoke(this, $"To {layout.HoleName(hole)}");
         }
         else
         {
@@ -393,6 +469,18 @@ public sealed class ProtoboardCanvas : Control
         var grab = _grab;
         _grab = Grab.None;
         e.Pointer.Capture(null);
+
+        if (grab == Grab.Probe && Layout is { } board)
+        {
+            var (x, y) = ToPitches(e.GetPosition(this));
+            var hole = board.Nearest(x, y, 0.6);
+            if (_grabbedRed) _redTip = hole;
+            else _blackTip = hole;
+            _probeAt = null;
+            StatusChanged?.Invoke(this, MeterSays(board));
+            InvalidateVisual();
+            return;
+        }
 
         if (grab is not (Grab.None or Grab.Pan) && _candidate is { Arrangement: { } arrangement } && Circuit is { } circuit)
         {
@@ -418,7 +506,15 @@ public sealed class ProtoboardCanvas : Control
 
     private void Hover(ProtoboardLayout layout, double x, double y)
     {
-        var hole = Breadboard.Nearest(x, y, layout.Boards, 0.45);
+        var hole = layout.Nearest(x, y, 0.45);
+        if (layout.Kind != BoardKind.Breadboard)
+        {
+            HoverSoldered(layout, hole);
+            if (hole is null && PartAt(layout, x, y, null) is { } over)
+                StatusChanged?.Invoke(this, $"{over.Name} {over.ValueLabel}{(over is IInteractiveComponent ? ": double-click to operate it" : "")}");
+            return;
+        }
+
         var strip = hole is { } h ? Breadboard.StripOf(h) : (BoardStrip?)null;
         if (strip != _hoverStrip)
         {
@@ -443,6 +539,131 @@ public sealed class ProtoboardCanvas : Control
 
         if (PartAt(layout, x, y, null) is { } part)
             StatusChanged?.Invoke(this, $"{part.Name} {part.ValueLabel}: drag to move it{(part is IInteractiveComponent ? ", double-click to operate it" : "")}; right-click for more");
+    }
+
+    /// <summary>
+    /// The pointer over a stripboard's or perfboard's hole: the copper it is on lit (the run of strip between cuts, or every
+    /// pad on its net), and what is there said in the status bar.
+    /// </summary>
+    private void HoverSoldered(ProtoboardLayout layout, BoardHole? hole)
+    {
+        HashSet<BoardHole>? lit = null;
+        if (hole is { } at)
+        {
+            var net = layout.NetAt(at);
+            var segment = layout.SegmentAt(at);
+            if (segment is not null)
+                lit = [.. Enumerable.Range(segment.From, segment.To - segment.From + 1).Select(r => new BoardHole(1, r, segment.Column))];
+            else if (net is not null)
+                lit = [.. layout.HoleNets.Where(h => ReferenceEquals(h.Value, net)).Select(h => h.Key)];
+
+            var cut = layout.Cuts.Contains(at) ? ", where the strip is cut" : "";
+            var where = segment is null ? layout.HoleName(at) : $"{layout.HoleName(at)}: strip {SolderedLayout.Letters(segment.Column)}, holes {segment.From}–{segment.To}{cut}";
+            if (net is null) StatusChanged?.Invoke(this, $"{where}, not joined to anything");
+            else
+            {
+                var pins = net.Terminals.Where(t => t.Owner is { } o && BoardPackages.IsBuilt(o)).Take(6).Select(t => t.ToString());
+                StatusChanged?.Invoke(this, $"{where}, on {layout.Caption(net)}: {string.Join(", ", pins)}");
+            }
+        }
+
+        if ((lit is null) != (_lit is null) || (lit is not null && _lit is not null && !lit.SetEquals(_lit)))
+        {
+            _lit = lit;
+            InvalidateVisual();
+        }
+    }
+
+    private HashSet<BoardHole>? _lit;
+
+    // ───────────────────────────── the build guide ─────────────────────────────
+
+    /// <summary>What the steps up to and including <paramref name="index"/> have fitted.</summary>
+    private static HashSet<object> Visible(ProtoboardLayout layout, IReadOnlyList<BuildStep> steps, int index)
+    {
+        var visible = new HashSet<object>();
+        foreach (var step in steps.Take(index + 1))
+        {
+            if (step.Part is { } part) visible.Add(part);
+            if (step.Bench is { } bench) visible.Add(bench);
+            if (step.Kind == BuildStepKind.Cut) foreach (var hole in step.Holes ?? []) visible.Add(hole);
+            if (step.Wire is { } wire)
+            {
+                // A perfboard step wires a whole net at once.
+                if (layout.Kind == BoardKind.Perfboard) foreach (var w in layout.Wires.Where(w => ReferenceEquals(w.Net, wire.Net))) visible.Add(w);
+                else visible.Add(wire);
+            }
+        }
+
+        return visible;
+    }
+
+    // ───────────────────────────── the multimeter ─────────────────────────────
+
+    private BoardHole? _redTip, _blackTip;
+    private bool _grabbedRed;
+    private (double X, double Y)? _probeAt;
+
+    /// <summary>
+    /// The meter as it stands: on the bench below the boards, its black probe on ground to start with (where anyone puts
+    /// it first), the red one waiting beside it, and the reading between them.
+    /// </summary>
+    private MeterView? Meter(ProtoboardLayout layout)
+    {
+        var (_, _, _, bottom) = layout.Extent;
+        var (x, y) = (2.0, bottom + 2.0);
+        _blackTip ??= GroundHole(layout);
+        (double, double) Tip(BoardHole? hole, bool red) =>
+            _grab == Grab.Probe && _grabbedRed == red && _probeAt is { } at ? at
+            : hole is { } h ? layout.Position(h)
+            : (x + (red ? 8.0 : 3.0), y - 2.0);
+        var (reading, note) = Reading(layout);
+        return new MeterView(x, y, Tip(_redTip, true), Tip(_blackTip, false), reading, note);
+    }
+
+    private static BoardHole? GroundHole(ProtoboardLayout layout)
+    {
+        if (layout.Kind == BoardKind.Breadboard)
+        {
+            if (!layout.Rails.ContainsKey(Breadboard.BottomMinus)) return null;
+            var used = layout.Wires.SelectMany(w => new[] { w.From, w.To }).Concat(layout.Bench.SelectMany(b => b.Leads.Select(l => l.To))).ToHashSet();
+            return Breadboard.RailColumns.Select(c => new BoardHole(layout.Boards, Breadboard.BottomMinus, c)).FirstOrDefault(h => !used.Contains(h), new BoardHole(layout.Boards, Breadboard.BottomMinus, 3));
+        }
+
+        return layout.HoleNets.Where(h => h.Value.IsGround).Select(h => h.Key).OrderByDescending(h => h.Row).ThenBy(h => h.Column).Cast<BoardHole?>().FirstOrDefault();
+    }
+
+    /// <summary>Volts between the probes, as the running simulation has them.</summary>
+    private (string Reading, string Note) Reading(ProtoboardLayout layout)
+    {
+        if (_redTip is not { } red || _blackTip is not { } black) return ("- - - -", "Drag the probes onto holes");
+        var (vr, vb) = (Volts(layout, red), Volts(layout, black));
+        if (vr is null || vb is null)
+            return ("- - - -", layout.NetAt(red) is null || layout.NetAt(black) is null ? "A probe is on nothing" : "Run the circuit (F5)");
+        var volts = vr.Value - vb.Value;
+        var shown = Math.Abs(volts) >= 100 ? volts.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)
+            : Math.Abs(volts) >= 10 ? volts.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)
+            : volts.ToString("0.000", System.Globalization.CultureInfo.InvariantCulture);
+        return (shown, $"{layout.HoleName(red)} to {layout.HoleName(black)}");
+    }
+
+    /// <summary>
+    /// The voltage at a hole: of the copper or strip it is on, measured at a pin there that is making contact (a pin
+    /// with a hidden open fault isn't, so the meter reads the strip, as a real one would).
+    /// </summary>
+    private double? Volts(ProtoboardLayout layout, BoardHole hole)
+    {
+        if (layout.NetAt(hole) is not { } net || VoltageAt is not { } at) return null;
+        var open = Circuit?.Faults.Where(f => f.Kind == FaultKind.Open).Select(f => f.First).ToHashSet() ?? [];
+        var pin = net.Terminals.FirstOrDefault(t => t.Owner is { } o && BoardPackages.IsBuilt(o) && !open.Contains(t)) ?? net.Terminals.FirstOrDefault();
+        return pin is null ? null : at(pin);
+    }
+
+    /// <summary>What the meter reads, for the status bar.</summary>
+    public string MeterSays(ProtoboardLayout layout)
+    {
+        var (reading, note) = Reading(layout);
+        return reading.StartsWith('-') && reading.Contains(' ', StringComparison.Ordinal) ? $"Meter: {note}" : $"Meter: {reading} V, {note}";
     }
 
     /// <summary>The part under a point: on the bench, a chip's body, a part's pins, a two-lead part's body.</summary>

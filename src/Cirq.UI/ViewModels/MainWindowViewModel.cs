@@ -437,6 +437,236 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void ShowProtoboard() => IsProtoboardView = true;
 
+    // ---- what it is built on ----
+
+    public bool IsBreadboard
+    {
+        get => Circuit.Board.Kind == BoardKind.Breadboard;
+        set { if (value) SetBoardKind(nameof(BoardKind.Breadboard)); }
+    }
+
+    public bool IsStripboard
+    {
+        get => Circuit.Board.Kind == BoardKind.Stripboard;
+        set { if (value) SetBoardKind(nameof(BoardKind.Stripboard)); }
+    }
+
+    public bool IsPerfboard
+    {
+        get => Circuit.Board.Kind == BoardKind.Perfboard;
+        set { if (value) SetBoardKind(nameof(BoardKind.Perfboard)); }
+    }
+
+    /// <summary>Builds the protoboard view on breadboards, stripboard or perfboard: an undo step, saved with the circuit.</summary>
+    [RelayCommand]
+    private void SetBoardKind(string? kind)
+    {
+        if (!Enum.TryParse<BoardKind>(kind, true, out var wanted) || Circuit.Board.Kind == wanted)
+        {
+            RefreshBoardKind();
+            return;
+        }
+
+        using (History.Gesture(Circuit, $"Build on {wanted.ToString().ToLowerInvariant()}"))
+            Circuit.Board.Kind = wanted;
+        IsModified = true;
+        IsProtoboardView = true;
+        RefreshBoardKind();
+        StatusMessage = wanted == BoardKind.Breadboard
+            ? "On breadboards: drag parts, leads and wire ends to arrange them by hand"
+            : $"On {wanted.ToString().ToLowerInvariant()}, laid out automatically{(wanted == BoardKind.Stripboard ? ": the strips run down the board, cut where two nets part (✕), joined by wire links" : ": a pad at every hole, wired on the back")}";
+        RequestRedraw?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>Tells the menu and the buttons what the board is now, after an undo or a file opened.</summary>
+    public void RefreshBoardKind()
+    {
+        OnPropertyChanged(nameof(IsBreadboard));
+        OnPropertyChanged(nameof(IsStripboard));
+        OnPropertyChanged(nameof(IsPerfboard));
+    }
+
+    // ---- the multimeter ----
+
+    /// <summary>The multimeter on the bench beside the protoboard (View › Multimeter on the Bench).</summary>
+    [ObservableProperty]
+    public partial bool IsMeterShown { get; set; }
+
+    partial void OnIsMeterShownChanged(bool value)
+    {
+        if (value) IsProtoboardView = true;
+        StatusMessage = value
+            ? "The multimeter is on the bench: its black probe is on ground; drag the red one onto any hole, and run the circuit (F5) to read volts"
+            : "Multimeter put away";
+    }
+
+    [RelayCommand]
+    private void ToggleMeter() => IsMeterShown = !IsMeterShown;
+
+    // ---- the build guide ----
+
+    /// <summary>The build guide's step on screen, from 0; -1 with the guide closed.</summary>
+    [ObservableProperty]
+    public partial int BuildGuideStep { get; set; } = -1;
+
+    private IReadOnlyList<Cirq.Components.Protoboard.BuildStep> _buildSteps = [];
+
+    public bool IsBuildGuideOpen => BuildGuideStep >= 0;
+
+    public string BuildGuideTitle => IsBuildGuideOpen && _buildSteps.Count > 0
+        ? $"Step {Math.Min(BuildGuideStep + 1, _buildSteps.Count)} of {_buildSteps.Count}"
+        : "Build guide";
+
+    public string BuildGuideText => IsBuildGuideOpen && BuildGuideStep < _buildSteps.Count ? _buildSteps[BuildGuideStep].Text : string.Empty;
+
+    /// <summary>The steps for the board as it is laid out now, from the protoboard view.</summary>
+    public void SetBuildSteps(IReadOnlyList<Cirq.Components.Protoboard.BuildStep> steps)
+    {
+        _buildSteps = steps ?? [];
+        if (BuildGuideStep >= _buildSteps.Count) BuildGuideStep = Math.Max(0, _buildSteps.Count - 1);
+        OnPropertyChanged(nameof(BuildGuideTitle));
+        OnPropertyChanged(nameof(BuildGuideText));
+    }
+
+    public IReadOnlyList<Cirq.Components.Protoboard.BuildStep> BuildSteps => _buildSteps;
+
+    partial void OnBuildGuideStepChanged(int value)
+    {
+        OnPropertyChanged(nameof(IsBuildGuideOpen));
+        OnPropertyChanged(nameof(BuildGuideTitle));
+        OnPropertyChanged(nameof(BuildGuideText));
+    }
+
+    [RelayCommand]
+    private void OpenBuildGuide()
+    {
+        IsProtoboardView = true;
+        BuildGuideStep = 0;
+        StatusMessage = "Build guide: Next and Back step through it; the board shows what each step has fitted, the step on screen ringed in amber";
+    }
+
+    [RelayCommand]
+    private void NextBuildStep()
+    {
+        if (IsBuildGuideOpen && BuildGuideStep < _buildSteps.Count - 1) BuildGuideStep++;
+    }
+
+    [RelayCommand]
+    private void PreviousBuildStep()
+    {
+        if (BuildGuideStep > 0) BuildGuideStep--;
+    }
+
+    [RelayCommand]
+    private void LastBuildStep()
+    {
+        if (IsBuildGuideOpen) BuildGuideStep = Math.Max(0, _buildSteps.Count - 1);
+    }
+
+    [RelayCommand]
+    private void CloseBuildGuide() => BuildGuideStep = -1;
+
+    /// <summary>Raised to save the build guide as a page to print, with the board's picture.</summary>
+    public event EventHandler? RequestBuildSheet;
+
+    [RelayCommand]
+    private void SaveBuildSheet() => RequestBuildSheet?.Invoke(this, EventArgs.Empty);
+
+    // ---- fault finding ----
+
+    private int _faultGuesses;
+    private int _faultHints;
+
+    public bool HasHiddenFault => Circuit.Faults.Count > 0;
+
+    /// <summary>Hides a fault at random for the person to find (Simulate › Fault Finding).</summary>
+    [RelayCommand]
+    private void HideFault()
+    {
+        Simulation.Pause();
+        var fault = Cirq.Components.Protoboard.FaultFinding.Hide(Circuit);
+        _faultGuesses = 0;
+        _faultHints = 0;
+        Simulation.InvalidateTopology();
+        OnPropertyChanged(nameof(HasHiddenFault));
+        StatusMessage = fault is null
+            ? "There's nothing in this circuit a fault could be hidden in: it needs parts on the board wired to something."
+            : "A fault is hidden somewhere in this circuit: the drawing doesn't show it. Run it (F5), probe and measure, then select the part you suspect and choose Is the Selected Part the Fault?";
+        RequestRedraw?.Invoke(this, EventArgs.Empty);
+    }
+
+    [RelayCommand]
+    private void FaultHint()
+    {
+        if (!HasHiddenFault)
+        {
+            StatusMessage = "There's no fault hidden: Simulate › Fault Finding › Hide a Fault starts one.";
+            return;
+        }
+
+        _faultHints = Math.Min(3, _faultHints + 1);
+        StatusMessage = Cirq.Components.Protoboard.FaultFinding.Hint(Circuit, _faultHints);
+    }
+
+    [RelayCommand]
+    private void GuessFault()
+    {
+        if (!HasHiddenFault)
+        {
+            StatusMessage = "There's no fault hidden: Simulate › Fault Finding › Hide a Fault starts one.";
+            return;
+        }
+
+        if (SelectedComponent is not { } part)
+        {
+            StatusMessage = "Select the part you think is at fault first, on the schematic or the board.";
+            return;
+        }
+
+        _faultGuesses++;
+        if (!Cirq.Components.Protoboard.FaultFinding.IsFaultAt(Circuit, part))
+        {
+            StatusMessage = $"Not {part.Name}. {_faultGuesses} guess{(_faultGuesses == 1 ? "" : "es")} so far: keep measuring, or ask for a hint.";
+            return;
+        }
+
+        var fault = Circuit.Faults[0];
+        EndFault();
+        StatusMessage = $"Found it in {_faultGuesses} guess{(_faultGuesses == 1 ? "" : "es")}{(_faultHints > 0 ? $" and {_faultHints} hint{(_faultHints == 1 ? "" : "s")}" : "")}: {fault.Describe()} It's fixed now.";
+    }
+
+    [RelayCommand]
+    private void RevealFault()
+    {
+        if (!HasHiddenFault)
+        {
+            StatusMessage = "There's no fault hidden.";
+            return;
+        }
+
+        var fault = Circuit.Faults[0];
+        SelectedComponent = fault.First.Owner;
+        EndFault();
+        StatusMessage = $"The fault: {fault.Describe()} It's fixed now.";
+    }
+
+    [RelayCommand]
+    private void ClearFault()
+    {
+        if (!HasHiddenFault) return;
+        EndFault();
+        StatusMessage = "The fault is cleared: the circuit is as drawn again.";
+    }
+
+    private void EndFault()
+    {
+        Simulation.Pause();
+        Circuit.Faults.Clear();
+        Simulation.InvalidateTopology();
+        OnPropertyChanged(nameof(HasHiddenFault));
+        RequestRedraw?.Invoke(this, EventArgs.Empty);
+    }
+
     /// <summary>Raised to lay the whole board out again, forgetting what was moved by hand.</summary>
     public event EventHandler? RequestArrangeProtoboard;
 
@@ -689,6 +919,10 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     private void ReplaceCircuitWith(Circuit loaded)
     {
         SelectedComponent = null;
+
+        // A hidden fault outlives an undo: it names its pins by part and pin id, and lands on the same ones in the circuit
+        // put back. A circuit with other parts (a file opened) leaves it nowhere to land, which ends it.
+        var faults = Circuit.FaultMarks();
         Circuit.Clear();
         Circuit.Title = loaded.Title;
 
@@ -709,6 +943,9 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         Circuit.Revision = loaded.Revision;
         Circuit.Author = loaded.Author;
         Circuit.Board.CopyFrom(loaded.Board);
+        Circuit.RestoreFaults(faults);
+        RefreshBoardKind();
+        OnPropertyChanged(nameof(HasHiddenFault));
 
         RefreshSheets();
     }

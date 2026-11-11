@@ -95,6 +95,10 @@ public sealed class CircuitDocument
 /// <summary>The protoboard view's hand-made choices, as the file holds them. Holes are named as the board prints them: <c>e12</c>, <c>T+5</c>, <c>2:a30</c>.</summary>
 public sealed class ProtoboardRecord
 {
+    /// <summary>"Stripboard" or "Perfboard"; absent for breadboards.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Kind { get; set; }
+
     public List<BoardPartRecord> Parts { get; set; } = [];
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

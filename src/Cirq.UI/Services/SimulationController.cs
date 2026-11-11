@@ -167,6 +167,31 @@ public sealed partial class SimulationController : ObservableObject, IDisposable
         _liveValues = Services.LiveValues.For(Circuit, Simulator);
     }
 
+    private readonly Dictionary<Terminal, double> _lastVolts = [];
+
+    /// <summary>
+    /// The voltage at a terminal's net in the solved circuit, for the multimeter; null when nothing is solved. It never
+    /// waits on a running slice: while one holds the solver it answers with the last reading it had.
+    /// </summary>
+    public double? VoltageAt(Terminal terminal)
+    {
+        ArgumentNullException.ThrowIfNull(terminal);
+        if (!_gate.TryEnter()) return _lastVolts.TryGetValue(terminal, out var last) ? last : null;
+        try
+        {
+            if (Simulator is not { } simulator || _topologyDirty || !simulator.Netlist.Contains(terminal)) return null;
+            var net = simulator.Netlist.NetOf(terminal);
+            var volts = net.IsGround ? 0.0 : simulator.System.NodeVoltage(net.Index);
+            if (!double.IsFinite(volts)) return null;
+            _lastVolts[terminal] = volts;
+            return volts;
+        }
+        finally
+        {
+            _gate.Exit();
+        }
+    }
+
     /// <summary>Marks the topology as changed so the next run recompiles the netlist.</summary>
     public void InvalidateTopology()
     {

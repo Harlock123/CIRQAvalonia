@@ -239,6 +239,8 @@ public static class Contents
     /// </summary>
     public static void Copy(Circuit from, Circuit into)
     {
+        // A hidden fault outlives a rollback or an undo, landing on the same parts in what is put back.
+        var faults = into.FaultMarks();
         into.Clear();
         into.Title = from.Title;
         foreach (var component in from.Components.ToList()) into.Components.Add(component);
@@ -253,6 +255,7 @@ public static class Contents
         into.Revision = from.Revision;
         into.Author = from.Author;
         into.Board.CopyFrom(from.Board);
+        into.RestoreFaults(faults);
     }
 }
 

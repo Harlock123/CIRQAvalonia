@@ -108,7 +108,7 @@ public class ChatTests
         var sent = api.Requests[0]["tools"]!.AsArray().Select(t => t!.AsObject()).ToList();
         var server = CircuitServer.Definitions();
         Assert.Equal(server.Select(t => t.Name), sent.Select(t => (string?)t["name"]));
-        Assert.Equal(39, sent.Count);
+        Assert.Equal(41, sent.Count);
         foreach (var (mcp, tool) in server.Zip(sent))
         {
             Assert.Equal(mcp.Description, (string?)tool["description"]);

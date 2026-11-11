@@ -295,9 +295,34 @@ public partial class Circuit : ObservableObject
         AdaptiveTimeStep = false;
         Revision = string.Empty;
         Author = string.Empty;
-        Board.Clear();
+        Board.Reset();
+        Faults.Clear();
     }
 
-    /// <summary>Resolves the current topology into a netlist.</summary>
+    /// <summary>Resolves the current topology into a netlist: the circuit as drawn.</summary>
     public Netlist BuildNetlist() => NetlistBuilder.Build(Components, Wires);
+
+    /// <summary>
+    /// Faults hidden for somebody to find (Simulate › Fault Finding). Never saved, and seen only by the simulation.
+    /// </summary>
+    public List<CircuitFault> Faults { get; } = [];
+
+    /// <summary>The hidden faults by part and pin id, to put back on a circuit rebuilt from a snapshot (an undo, a rollback).</summary>
+    public IReadOnlyList<(FaultKind Kind, (Guid Part, string Pin) First, (Guid Part, string Pin)? Second)> FaultMarks() =>
+        [.. Faults.Where(f => f.First.Owner is not null).Select(f => (f.Kind, (f.First.Owner!.Id, f.First.Id),
+            f.Second?.Owner is { } owner ? (owner.Id, f.Second.Id) : ((Guid, string)?)null))];
+
+    /// <summary>Puts back faults marked with <see cref="FaultMarks"/>, on the parts with those ids; one with nowhere to land is dropped.</summary>
+    public void RestoreFaults(IReadOnlyList<(FaultKind Kind, (Guid Part, string Pin) First, (Guid Part, string Pin)? Second)> marks)
+    {
+        ArgumentNullException.ThrowIfNull(marks);
+        Terminal? Find((Guid Part, string Pin) at) =>
+            Flattening.Flatten(Components).FirstOrDefault(c => c.Id == at.Part)?.Terminals.FirstOrDefault(t => t.Id == at.Pin);
+        foreach (var (kind, first, second) in marks)
+            if (Find(first) is { } a && (second is null || Find(second.Value) is not null))
+                Faults.Add(new CircuitFault(kind, a, second is null ? null : Find(second.Value)));
+    }
+
+    /// <summary>The netlist the simulator solves: the circuit as drawn, with any hidden <see cref="Faults"/> in it.</summary>
+    public Netlist BuildSimulationNetlist() => NetlistBuilder.Build(Components, Wires, Faults.Count == 0 ? null : Faults);
 }

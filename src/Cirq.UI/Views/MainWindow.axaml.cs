@@ -1,3 +1,4 @@
+using Cirq.Components.Protoboard;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -162,9 +163,15 @@ public partial class MainWindow : Window
         _board.InteractiveEditBegan += (_, label) => viewModel.BeginInteractiveEdit(label);
         _board.InteractiveEditEnded += (_, _) => viewModel.EndInteractiveEdit();
         _board.BoardEdited += (_, _) => viewModel.MarkModified();
+        _board.VoltageAt = terminal => viewModel.Simulation.VoltageAt(terminal);
+        _board.LayoutChanged += (_, _) => viewModel.SetBuildSteps(_board.BuildSteps);
+        viewModel.RequestBuildSheet += async (_, _) => await SaveBuildSheetAsync();
         viewModel.RequestArrangeProtoboard += (_, _) => _board.ArrangeAutomatically();
         viewModel.PropertyChanged += (_, e) =>
         {
+            if (e.PropertyName == nameof(MainWindowViewModel.BuildGuideStep) && viewModel.IsBuildGuideOpen && viewModel.BuildSteps.Count == 0)
+                viewModel.SetBuildSteps(_board.BuildSteps);
+            if (e.PropertyName == nameof(MainWindowViewModel.IsMeterShown)) Dispatcher.UIThread.Post(() => _board.RequestFit());
             if (e.PropertyName != nameof(MainWindowViewModel.IsProtoboardView)) return;
             Dispatcher.UIThread.Post(() =>
             {
@@ -180,6 +187,26 @@ public partial class MainWindow : Window
                 }
             });
         };
+    }
+
+    /// <summary>The build guide as a page to print: the board's picture, the parts, and every step.</summary>
+    private async Task SaveBuildSheetAsync()
+    {
+        if (_viewModel is null || _board?.Layout is not { } layout || _viewModel.FileDialogs is not { } dialogs) return;
+        var title = _viewModel.Circuit.Title.Length > 0 ? _viewModel.Circuit.Title : "circuit";
+        var path = await dialogs.PickSavePathAsync($"{title} build sheet.html");
+        if (path is null) return;
+        if (!path.EndsWith(".html", StringComparison.OrdinalIgnoreCase)) path = Path.ChangeExtension(path, ".html");
+
+        try
+        {
+            BuildSheet.Write(path, title, _viewModel.Circuit, layout, BuildGuide.Steps(layout));
+            _viewModel.StatusMessage = $"Build sheet written to {Path.GetFileName(path)}";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            await dialogs.ReportAsync("Build sheet", $"Could not write the build sheet: {ex.Message}");
+        }
     }
 
     private void WireUpCanvas(MainWindowViewModel viewModel)

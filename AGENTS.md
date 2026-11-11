@@ -75,7 +75,12 @@ dotnet run --project src/Cirq.UI -- --mcp      # the MCP server on stdio, headle
     places first, and the check that rebuilds the connections from the board alone and holds them against the
     netlist), `WireRouter` (each jumper's and lead's path round the part bodies: simple shapes first, then A*
     over a half-pitch grid, pulled tight) and `ProtoboardEdits` (moves by hand, each freezing the rest of the
-    board). The view is
+    board). `SolderedLayout` lays out stripboard and perfboard (`Circuit.Board.Kind`): parts placed so each pin
+    lands on copper already carrying its net where it can, the cuts worked out from where the pins are, wire links
+    or back wiring for the rest, and the same check. `BuildGuide` turns any layout into steps; `FaultFinding`
+    chooses, hints at and judges the faults hidden in `Circuit.Faults` (never saved), which only
+    `Circuit.BuildSimulationNetlist` (the simulator's) applies; everything else uses `BuildNetlist`, the circuit as
+    drawn. The meter reads through `SimulationController.VoltageAt`, which never waits on a running slice. The view is
     `Controls/ProtoboardCanvas.cs`, drawn by `Rendering/ProtoboardRenderer.cs` through `ISymbolCanvas`, so the
     export is the same drawing.
   - `Serialization/` reads and writes `.cirq` files (indented JSON).
