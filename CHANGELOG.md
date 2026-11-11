@@ -8,6 +8,13 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-11-10
+
+From breadboard to the bench: the protoboard view builds the circuit on stripboard or perfboard too,
+turns any board into a step-by-step build guide with a sheet to print, puts a multimeter on the bench
+to probe with, and can hide a fault in the circuit for you to find. 335 components in 17 categories,
+116 worked examples, 41 MCP tools, 5338 tests.
+
 ### Added
 
 **Stripboard and perfboard.** `View > Board`, or the buttons below the view switch, builds the
@@ -2887,7 +2894,8 @@ First public build of CirqAvalonia — an electronic circuit analyzer and mixed-
 
 **501 tests** measure the solver against closed-form answers rather than recorded output.
 
-[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/Harlock123/CIRQAvalonia/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.48.0...v1.0.0
 [0.48.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.47.0...v0.48.0
 [0.47.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.46.0...v0.47.0
