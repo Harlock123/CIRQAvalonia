@@ -8,6 +8,16 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-10
+
+1.0. The circuit can now be seen built on breadboards as well as drawn: a protoboard view (`F11`)
+lays the schematic out on white solderless boards, with chips across the channel, resistors in their
+real colour bands, LEDs that light as it runs, coloured jumpers routed round the parts and the bench
+equipment beside it, checked against the schematic and arranged by hand or by Claude. The AI Chat
+shows what it uses as it goes, tokens and an estimated cost per turn, with daily and monthly totals
+and a budget. And a live run now goes at a pace its clocks can be seen at, so a slow counter counts
+the moment it runs. 335 components in 17 categories, 116 worked examples, 39 MCP tools, 5329 tests.
+
 ### Added
 
 **The protoboard view.** `F11`, `View > Protoboard` or the switch at the top right of the canvas
@@ -2851,7 +2861,8 @@ First public build of CirqAvalonia — an electronic circuit analyzer and mixed-
 
 **501 tests** measure the solver against closed-form answers rather than recorded output.
 
-[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.48.0...HEAD
+[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.48.0...v1.0.0
 [0.48.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.47.0...v0.48.0
 [0.47.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.46.0...v0.47.0
 [0.46.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.45.0...v0.46.0
