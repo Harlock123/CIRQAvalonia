@@ -673,6 +673,8 @@ public static class ComponentCatalog
             new("Raspberry Pi", "40-pin header, 3.3V logic — not 5V tolerant",
                 () => new RaspberryPiBoard()),
             new("Arduino Uno R3", "14 digital, 6 analog, 5V logic", () => new ArduinoUnoBoard()),
+            new("Arduino Uno (Firmware)", "A Uno running a real sketch: its ATmega328P loaded with the sketch's .hex (Load Memory Image), pins by the names the sketch uses, D0-D13 and A0-A5, and the L LED on D13",
+                () => new Cirq.Components.Processors.ArduinoUnoFirmware()),
             new("Arduino Nano", "14 digital, 8 analog, 5V logic", () => new ArduinoNanoBoard()),
             new("Arduino Mega 2560", "54 digital, 16 analog, 5V logic", () => new ArduinoMegaBoard()),
             new("Raspberry Pi Pico", "RP2040 microcontroller board, 26 GPIO (3 ADC), 3.3V logic — not 5V tolerant",

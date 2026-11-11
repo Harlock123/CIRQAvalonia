@@ -278,7 +278,11 @@ public static class CircuitSerializer
     {
         if (circuit.Board.IsDefault) return null;
         var present = Flattening.Flatten(circuit.Components).Select(c => c.Id).ToHashSet();
-        var record = new ProtoboardRecord { Kind = circuit.Board.Kind == BoardKind.Breadboard ? null : circuit.Board.Kind.ToString() };
+        var record = new ProtoboardRecord
+        {
+            Kind = circuit.Board.Kind == BoardKind.Breadboard ? null : circuit.Board.Kind.ToString(),
+            GroundPour = circuit.Board.GroundPour ? null : false,
+        };
         string Name(BoardHole hole) => HoleName(circuit.Board.Kind, hole);
         foreach (var (id, placement) in circuit.Board.Parts.OrderBy(p => p.Key))
         {
@@ -301,7 +305,7 @@ public static class CircuitSerializer
                 To = Name(w.Value.To),
             })];
 
-        return record.Parts.Count == 0 && record.Wires is null && record.Kind is null ? null : record;
+        return record.Parts.Count == 0 && record.Wires is null && record.Kind is null && record.GroundPour is null ? null : record;
     }
 
     /// <summary>A hole as the board it is on names it: <c>e12</c> on a breadboard, <c>C12</c> (strip and number) on the soldered ones.</summary>
@@ -319,6 +323,8 @@ public static class CircuitSerializer
             if (Enum.TryParse<BoardKind>(kind, ignoreCase: true, out var parsed)) circuit.Board.Kind = parsed;
             else warnings.Add($"The protoboard is a \"{kind}\", which this version doesn't know; it is shown on breadboards.");
         }
+
+        if (record.GroundPour is { } pour) circuit.Board.GroundPour = pour;
 
         foreach (var part in record.Parts)
         {

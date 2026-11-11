@@ -463,6 +463,358 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         set { if (value) SetBoardKind(nameof(BoardKind.Pcb)); }
     }
 
+    public bool IsDoubleSidedPcb
+    {
+        get => Circuit.Board.Kind == BoardKind.DoubleSidedPcb;
+        set { if (value) SetBoardKind(nameof(BoardKind.DoubleSidedPcb)); }
+    }
+
+    /// <summary>A PCB's free copper poured as ground: an undo step, saved with the circuit.</summary>
+    public bool IsGroundPour
+    {
+        get => Circuit.Board.GroundPour;
+        set
+        {
+            if (Circuit.Board.GroundPour == value) return;
+            using (History.Gesture(Circuit, value ? "Pour ground" : "No ground pour"))
+                Circuit.Board.GroundPour = value;
+            IsModified = true;
+            OnPropertyChanged();
+            StatusMessage = value
+                ? "Ground pour on: a PCB's spare copper is filled and joined to ground, and ground needs fewer traces"
+                : "Ground pour off: ground is routed as traces like any other net";
+            RequestRedraw?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    /// <summary>What the last design rule check found, ringed on the board.</summary>
+    [ObservableProperty]
+    public partial IReadOnlyList<Cirq.Components.Protoboard.DrcIssue>? DrcIssues { get; set; }
+
+    /// <summary>The board as a PCB: as it is when it's on one, laid out as a single-sided one otherwise.</summary>
+    private Cirq.Components.Protoboard.ProtoboardLayout PcbLayout() =>
+        Circuit.Board.Kind.IsPcb() ? Cirq.Components.Protoboard.ProtoboardLayout.Arrange(Circuit) : Cirq.Components.Protoboard.SolderedLayout.Arrange(Circuit, BoardKind.Pcb);
+
+    /// <summary>Raised with something to show in a message, for the window to list: a design rule check's findings.</summary>
+    public event EventHandler<(string Title, string Text)>? RequestMessage;
+
+    /// <summary>Checks the PCB against a board house's rules (by <see cref="Cirq.Components.Protoboard.PcbRules.All"/> index), ringing what it finds.</summary>
+    [RelayCommand]
+    private void CheckDesignRules(string? which)
+    {
+        var rules = Cirq.Components.Protoboard.PcbRules.All[int.TryParse(which, out var i) && i >= 0 && i < Cirq.Components.Protoboard.PcbRules.All.Count ? i : 0];
+        if (!Circuit.Board.Kind.IsPcb()) SetBoardKind(nameof(BoardKind.Pcb));
+        var layout = Cirq.Components.Protoboard.ProtoboardLayout.Arrange(Circuit);
+        var issues = Cirq.Components.Protoboard.DesignRules.Check(layout, rules);
+        DrcIssues = issues;
+        IsProtoboardView = true;
+        StatusMessage = Cirq.Components.Protoboard.DesignRules.Summary(issues, rules);
+        if (issues.Count > 0)
+            RequestMessage?.Invoke(this, ("Design rule check", $"{rules.Name}: {issues.Count} problem{(issues.Count == 1 ? "" : "s")}.\n\n" +
+                string.Join("\n", issues.Take(40).Select(x => $"• {x.Message}")) + (issues.Count > 40 ? $"\n… and {issues.Count - 40} more." : "")));
+    }
+
+    // ---- guided builds ----
+
+    /// <summary>The guided build under way, or null.</summary>
+    public BuildLesson? CurrentBuild { get; private set; }
+
+    /// <summary>The build step to do next (an index into the build guide's steps), or -1 with no build under way.</summary>
+    [ObservableProperty]
+    public partial int BuildLessonStep { get; set; } = -1;
+
+    /// <summary>True while the holes are being clicked; false once it's built and being measured.</summary>
+    [ObservableProperty]
+    public partial bool IsBuildingLesson { get; set; }
+
+    /// <summary>The holes of the step on hand clicked so far, marked on the board.</summary>
+    [ObservableProperty]
+    public partial IReadOnlyList<BoardHole> BuildLessonMarks { get; set; } = [];
+
+    private IReadOnlyList<Cirq.Components.Protoboard.BuildStep> _buildSteps2 = [];
+    private Cirq.Components.Protoboard.ProtoboardLayout? _buildLayout;
+    private readonly HashSet<BoardHole> _clicked = [];
+    private int _wrongHoles, _wrongReadings, _measureIndex = -1;
+    private DateTime _buildStarted;
+
+    /// <summary>A guided build's menu line: its name and the best score so far.</summary>
+    public string BuildLessonHeader(BuildLesson lesson) =>
+        FaultScores?.TryGetValue("Build: " + lesson.Name, out var best) == true ? $"{lesson.Name}  (best {best})" : lesson.Name;
+
+    private static IReadOnlyList<BoardHole> HolesOf(Cirq.Components.Protoboard.BuildStep step) =>
+        step.Holes ?? step.Part?.Holes ?? (step.Wire is { } w ? [w.From, w.To] : step.Bench is { } b ? [.. b.Leads.Select(l => l.To)] : []);
+
+    /// <summary>
+    /// Starts a guided build: the example opened and built on breadboards, the board empty, and the first step to do in
+    /// the status bar. Each step is done by clicking the holes it names.
+    /// </summary>
+    [RelayCommand]
+    private void StartBuildLesson(BuildLesson? lesson)
+    {
+        if (lesson is null || ViewModels.Examples.All.FirstOrDefault(e => e.Name == lesson.Example) is not { } example) return;
+        LoadExample(example);
+        Circuit.Board.Reset();
+        _buildLayout = Cirq.Components.Protoboard.ProtoboardLayout.Arrange(Circuit);
+        _buildSteps2 = Cirq.Components.Protoboard.BuildGuide.Steps(_buildLayout);
+        CurrentBuild = lesson;
+        (_wrongHoles, _wrongReadings, _measureIndex) = (0, 0, -1);
+        _buildStarted = DateTime.UtcNow;
+        IsMeterShown = false;
+        IsProtoboardView = true;
+        IsBuildingLesson = true;
+        BuildLessonStep = -1;
+        NextBuildStep(0, $"{lesson.Name}: {lesson.Intro} Build it one step at a time by clicking the holes each step names. ");
+    }
+
+    private void NextBuildStep(int from, string lead = "")
+    {
+        _clicked.Clear();
+        BuildLessonMarks = [];
+        var next = from;
+        while (next < _buildSteps2.Count && HolesOf(_buildSteps2[next]).Count == 0) next++;
+        if (next >= _buildSteps2.Count)
+        {
+            BuildLessonStep = _buildSteps2.Count;
+            StartMeasuring();
+            return;
+        }
+
+        BuildLessonStep = next;
+        var step = _buildSteps2[next];
+        StatusMessage = $"{lead}Step {step.Number}: {step.Text}";
+    }
+
+    /// <summary>A hole clicked during a guided build: one of the step's, or a mistake, named so it can be found.</summary>
+    public void BuildLessonHole(BoardHole hole)
+    {
+        if (!IsBuildingLesson || CurrentBuild is null || _buildLayout is null || BuildLessonStep < 0 || BuildLessonStep >= _buildSteps2.Count) return;
+        var step = _buildSteps2[BuildLessonStep];
+        var holes = HolesOf(step);
+        if (!holes.Contains(hole))
+        {
+            _wrongHoles++;
+            StatusMessage = $"That's {_buildLayout.HoleName(hole)}, not one of this step's. Step {step.Number}: {step.Text}";
+            return;
+        }
+
+        _clicked.Add(hole);
+        BuildLessonMarks = [.. _clicked];
+        if (holes.All(_clicked.Contains)) NextBuildStep(BuildLessonStep + 1, "Done. ");
+        else StatusMessage = $"{_buildLayout.HoleName(hole)}, yes. {holes.Count - holes.Count(_clicked.Contains)} more for step {step.Number}: {step.Text}";
+    }
+
+    private void StartMeasuring()
+    {
+        IsBuildingLesson = false;
+        _measureIndex = 0;
+        IsMeterShown = true;
+        StatusMessage = $"Built: it matches the schematic. Now measure it. {CurrentBuild!.Measures[0].Prompt}";
+    }
+
+    /// <summary>The meter's red probe put down during a guided build's measuring: on the net asked for, reading what it should.</summary>
+    public void BuildLessonReading(BoardHole? red, double? volts)
+    {
+        if (CurrentBuild is not { } lesson || IsBuildingLesson || _measureIndex < 0 || _measureIndex >= lesson.Measures.Count || _buildLayout is null) return;
+        var task = lesson.Measures[_measureIndex];
+        if (red is not { } hole) return;
+        var dot = task.Pin.IndexOf('.', StringComparison.Ordinal);
+        var target = Circuit.Components.First(c => c.Name == task.Pin[..dot]).TerminalByName(task.Pin[(dot + 1)..]);
+        var netlist = Circuit.BuildNetlist();
+        if (_buildLayout.NetAt(hole) is not { } net || net.Index != netlist.NetOf(target).Index)
+        {
+            _wrongReadings++;
+            StatusMessage = $"That's {_buildLayout.HoleName(hole)}, on {Cirq.Components.Protoboard.ProtoboardLayout.NetName(_buildLayout.NetAt(hole) ?? netlist.NetOf(target))}: not the place. {task.Prompt}";
+            return;
+        }
+
+        if (volts is not { } v)
+        {
+            StatusMessage = $"The right place, but the meter reads nothing yet: run the circuit (F5). {task.Prompt}";
+            return;
+        }
+
+        if (v < task.Low || v > task.High)
+        {
+            _wrongReadings++;
+            StatusMessage = $"It reads {v:0.00} V there, which isn't right for a working circuit ({task.Low:0.##} to {task.High:0.##} V). Check the probes are where you think, and the circuit is running.";
+            return;
+        }
+
+        _measureIndex++;
+        if (_measureIndex < lesson.Measures.Count)
+        {
+            StatusMessage = $"{v:0.00} V: right. {lesson.Measures[_measureIndex].Prompt}";
+            return;
+        }
+
+        var score = BuildLessons.Score(_wrongHoles, _wrongReadings, DateTime.UtcNow - _buildStarted);
+        var best = "";
+        if (FaultScores is { } scores)
+        {
+            var key = "Build: " + lesson.Name;
+            if (!scores.TryGetValue(key, out var before) || score > before)
+            {
+                scores[key] = score;
+                SaveSettings?.Invoke();
+                best = " A new best.";
+            }
+            else best = $" Your best is {before}.";
+        }
+
+        StatusMessage = $"{v:0.00} V: right. Built and measured, with {_wrongHoles} wrong hole{(_wrongHoles == 1 ? "" : "s")} and {_wrongReadings} wrong reading{(_wrongReadings == 1 ? "" : "s")}. Score {score} out of 100.{best}";
+        EndBuildLesson();
+    }
+
+    /// <summary>Ends the guided build, leaving the board as it is.</summary>
+    [RelayCommand]
+    private void EndBuildLesson()
+    {
+        CurrentBuild = null;
+        IsBuildingLesson = false;
+        BuildLessonStep = -1;
+        BuildLessonMarks = [];
+        _measureIndex = -1;
+    }
+
+    // ---- the bench instruments ----
+
+    /// <summary>The logic analyser on the bench below the protoboard (View › Logic Analyser on the Bench).</summary>
+    [ObservableProperty]
+    public partial bool IsAnalyserShown { get; set; }
+
+    partial void OnIsAnalyserShownChanged(bool value)
+    {
+        if (value) IsProtoboardView = true;
+        else RemoveBenchProbes("LA ");
+        StatusMessage = value
+            ? "The logic analyser is on the bench: drag its D0-D7 probes onto holes and run the circuit; click it to choose a decoder"
+            : "Logic analyser put away";
+    }
+
+    /// <summary>The two-channel scope on the bench below the protoboard (View › Scope on the Bench).</summary>
+    [ObservableProperty]
+    public partial bool IsBenchScopeShown { get; set; }
+
+    partial void OnIsBenchScopeShownChanged(bool value)
+    {
+        if (value) IsProtoboardView = true;
+        else RemoveBenchProbes("Bench ");
+        StatusMessage = value
+            ? "The scope is on the bench: drag CH1 and CH2 onto holes and run the circuit"
+            : "Bench scope put away";
+    }
+
+    private void RemoveBenchProbes(string prefix)
+    {
+        foreach (var probe in Scope.Probes.Where(p => p.Label.StartsWith(prefix, StringComparison.Ordinal)).ToList()) Scope.RemoveProbe(probe);
+    }
+
+    /// <summary>
+    /// A bench instrument's probe clipped onto a pin's net (or, with no terminal, taken off): a probe of its own on the
+    /// scope, named for the channel, so the main scope shows it too.
+    /// </summary>
+    public void SetBenchProbe(string label, Cirq.Core.Probing.ProbeKind kind, Terminal? terminal)
+    {
+        foreach (var old in Scope.Probes.Where(p => p.Label == label).ToList()) Scope.RemoveProbe(old);
+        if (terminal is not null)
+        {
+            var colour = Cirq.Core.Primitives.Color.ProbePalette[Math.Abs(label.GetHashCode(StringComparison.Ordinal)) % Cirq.Core.Primitives.Color.ProbePalette.Count];
+            Scope.Probes.Add(new Cirq.Core.Probing.SignalProbe(label, terminal, colour) { Kind = kind });
+        }
+
+        Simulation.Simulator?.ResolveProbes();
+        RequestRedraw?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>A lead from the bench dragged onto another net: its wires taken off and the lead wired to the net instead, an undo step.</summary>
+    public void MoveBenchLead(Terminal lead, Terminal to)
+    {
+        ArgumentNullException.ThrowIfNull(lead);
+        ArgumentNullException.ThrowIfNull(to);
+        using (History.Gesture(Circuit, $"Wire {lead.Owner?.Name}'s {lead.Name} lead"))
+        {
+            foreach (var wire in Circuit.Wires.Where(w => ReferenceEquals(w.SourceTerminal, lead) || ReferenceEquals(w.TargetTerminal, lead)).ToList())
+                Circuit.Remove(wire);
+            Circuit.Connect(lead, to);
+        }
+
+        IsModified = true;
+        Simulation.InvalidateTopology();
+        RequestRedraw?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// A signal generator on the bench: a function generator added to the circuit, its GND on ground and its OUT on
+    /// nothing yet, to be dragged onto a hole on the protoboard.
+    /// </summary>
+    [RelayCommand]
+    private void AddBenchGenerator()
+    {
+        using (History.Gesture(Circuit, "Put a signal generator on the bench"))
+        {
+            var generator = new Cirq.Components.Sources.FunctionGenerator(Cirq.Components.Sources.Waveform.Square, 1e3, 5.0) { DcOffset = 2.5 };
+            var (left, top) = Circuit.Components.Count == 0 ? (0.0, 0.0) : (Circuit.Components.Min(c => c.X), Circuit.Components.Max(c => c.Y));
+            generator.X = left - 160;
+            generator.Y = top + 160;
+            Circuit.Add(generator);
+            var ground = new Cirq.Components.Sources.Ground { X = generator.X, Y = generator.Y + 100 };
+            Circuit.Add(ground);
+            Circuit.Connect(generator.Return, ground.Terminals[0]);
+        }
+
+        IsModified = true;
+        IsProtoboardView = true;
+        Simulation.InvalidateTopology();
+        StatusMessage = "A signal generator is on the bench, a 1 kHz square wave from 0 to 5 V: drag its OUT lead onto a hole to wire it there";
+        RequestRedraw?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>Raised to open the firmware debugger on a microcontroller.</summary>
+    public event EventHandler<Cirq.Components.Processors.Atmega328p>? RequestFirmwareDebugger;
+
+    /// <summary>The debugger for the selected ATmega328P or Arduino Uno, or the circuit's first.</summary>
+    [RelayCommand]
+    private void OpenFirmwareDebugger()
+    {
+        var chips = Cirq.Core.Topology.Flattening.Flatten(Circuit.Components).OfType<Cirq.Components.Processors.Atmega328p>().ToList();
+        var chip = SelectedComponent as Cirq.Components.Processors.Atmega328p ?? chips.FirstOrDefault();
+        if (chip is null)
+        {
+            StatusMessage = "There's no ATmega328P or Arduino Uno in the circuit to debug.";
+            return;
+        }
+
+        RequestFirmwareDebugger?.Invoke(this, chip);
+    }
+
+    /// <summary>Writes the bill of materials as CSV to <paramref name="path"/>, returning what it says in the status bar.</summary>
+    public string ExportBillOfMaterials(string path)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+        var lines = Cirq.Components.Protoboard.BillOfMaterials.Lines(Circuit);
+        if (lines.Count == 0) throw new InvalidOperationException("There are no parts to list.");
+        File.WriteAllText(path, Cirq.Components.Protoboard.BillOfMaterials.Csv(Circuit));
+        return $"Bill of materials written to {Path.GetFileName(path)}: {lines.Sum(l => l.Quantity)} parts in {lines.Count} lines";
+    }
+
+    [RelayCommand]
+    private async Task ExportBillOfMaterialsAsync()
+    {
+        if (FileDialogs is null) return;
+        var title = Circuit.Title.Length > 0 ? Circuit.Title : "circuit";
+        var path = await FileDialogs.PickSavePathAsync($"{title} BOM.csv");
+        if (path is null) return;
+        if (!path.EndsWith(".csv", StringComparison.OrdinalIgnoreCase)) path = Path.ChangeExtension(path, ".csv");
+        try
+        {
+            StatusMessage = ExportBillOfMaterials(path);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            await FileDialogs.ReportAsync("Bill of materials", $"Could not write the bill of materials: {ex.Message}");
+        }
+    }
+
     /// <summary>Builds the protoboard view on breadboards, stripboard, perfboard or a PCB: an undo step, saved with the circuit.</summary>
     [RelayCommand]
     private void SetBoardKind(string? kind)
@@ -483,8 +835,10 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             BoardKind.Breadboard => "On breadboards: drag parts, leads and wire ends to arrange them by hand",
             BoardKind.Stripboard => "On stripboard: the strips run down the board, cut where two nets part (✕), joined by wire links; drag parts to move them",
             BoardKind.Perfboard => "On perfboard: a pad at every hole, wired on the back; drag parts to move them",
-            _ => "On a printed circuit board: the traces routed on the back, a jumper where one can't get through; drag parts to move them, File › Export Gerber Files for the board house",
+            BoardKind.Pcb => "On a printed circuit board: the traces routed on the back, a jumper where one can't get through; drag parts to move them, File › Export Gerber Files for the board house",
+            _ => "On a double-sided printed circuit board: traces on both sides, joined through by vias; drag parts to move them, File › Export Gerber Files for the board house",
         };
+        DrcIssues = null;
         RequestRedraw?.Invoke(this, EventArgs.Empty);
     }
 
@@ -495,6 +849,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(IsStripboard));
         OnPropertyChanged(nameof(IsPerfboard));
         OnPropertyChanged(nameof(IsPcb));
+        OnPropertyChanged(nameof(IsDoubleSidedPcb));
+        OnPropertyChanged(nameof(IsGroundPour));
     }
 
     /// <summary>
@@ -504,14 +860,17 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     public string ExportGerbers(string path)
     {
         ArgumentNullException.ThrowIfNull(path);
-        var layout = Circuit.Board.Kind == BoardKind.Pcb ? Cirq.Components.Protoboard.ProtoboardLayout.Arrange(Circuit) : Cirq.Components.Protoboard.SolderedLayout.Arrange(Circuit, BoardKind.Pcb);
+        var layout = PcbLayout();
         if (layout.Parts.Count == 0) throw new InvalidOperationException("There's nothing on the board to make a PCB of.");
         using (var stream = File.Create(path))
             Cirq.Components.Protoboard.PcbGerber.WriteZip(layout, stream, Path.GetFileNameWithoutExtension(path));
         var jumpers = layout.Wires.Count(w => !w.IsTrace);
-        return $"Gerber files written to {Path.GetFileName(path)}: {layout.Columns} × {layout.Rows} holes, {layout.Wires.Count(w => w.IsTrace)} traces" +
+        var drc = Cirq.Components.Protoboard.DesignRules.Check(layout, Cirq.Components.Protoboard.PcbRules.BoardHouse);
+        return $"Gerber files written to {Path.GetFileName(path)}: {(layout.Layers == 2 ? "double-sided, " : "")}{layout.Columns} × {layout.Rows} holes, {layout.Wires.Count(w => w.IsTrace)} traces" +
+               (layout.Vias.Count > 0 ? $", {layout.Vias.Count} vias" : "") +
                (jumpers > 0 ? $", {jumpers} wire jumper{(jumpers == 1 ? "" : "s")} on the component side" : "") +
-               (layout.Matches ? "" : $". Check it first: {string.Join(" ", layout.Problems)}");
+               (layout.Matches ? "" : $". Check it first: {string.Join(" ", layout.Problems)}") +
+               (drc.Count > 0 ? $". The design rule check found {drc.Count} problem{(drc.Count == 1 ? "" : "s")}: View › Board › Check Design Rules" : "");
     }
 
     [RelayCommand]
@@ -645,6 +1004,12 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         var example = ViewModels.Examples.All.FirstOrDefault(e => e.Name == lesson.Example);
         if (example is null) return;
         LoadExample(example);
+        BeginLesson(lesson);
+    }
+
+    /// <summary>Hides a lesson's fault in the circuit as it now is, and starts its clock.</summary>
+    private void BeginLesson(FaultLesson lesson)
+    {
         try
         {
             Cirq.Components.Protoboard.FaultFinding.Hide(Circuit, lesson.Kind, Pin(lesson.Pin), lesson.Second is null ? null : Pin(lesson.Second));

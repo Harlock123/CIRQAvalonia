@@ -154,6 +154,7 @@ public static class SymbolRenderer
             case OperationalAmplifier: DrawOpAmp(context, pen, zoom); break;
             case Ne555: DrawDip(context, pen, zoom, 8, "NE555"); break;
             case NeoPixelStrip strip: DrawNeoPixelStrip(context, pen, zoom, strip); break;
+            case Cirq.Components.Processors.ArduinoUnoFirmware uno: DrawUno(context, pen, zoom, uno); break;
             case DigitalIc ic: DrawDip(context, pen, zoom, ic.PinCount, ic.PartNumber, ic.LabelsPins ? ic : null); break;
             case LogicGate gate: DrawLogicGate(context, pen, gate); break;
             case FlipFlopBlock block: DrawFlipFlop(context, pen, zoom, block); break;
@@ -2973,6 +2974,7 @@ public static class SymbolRenderer
     public static double LabelOffset(CircuitComponent component) => component switch
     {
         DeveloperBoard board => BoardPackage.BodyHeight(board.Profile) / 2 + 16,
+        Cirq.Components.Processors.ArduinoUnoFirmware => BoardPackage.BodyHeight(BoardProfile.ArduinoUno) / 2 + 16,
 
         // The triangle reaches 34 either side of centre, so the default would sit both captions
         // inside the body.
@@ -3056,9 +3058,25 @@ public static class SymbolRenderer
     /// inside the body rather than outside it, because the outside is where the wires go and a
     /// forty-pin header leaves no room for both.
     /// </summary>
-    private static void DrawBoard(ISymbolCanvas context, IPen pen, double zoom, DeveloperBoard board)
+    private static void DrawBoard(ISymbolCanvas context, IPen pen, double zoom, DeveloperBoard board) =>
+        DrawBoard(context, pen, zoom, board.Profile, $"{board.Profile.LogicVoltage:0.0}V logic");
+
+    /// <summary>An Arduino Uno running firmware: the Uno's board, its program counter, and its "L" LED on D13.</summary>
+    private static void DrawUno(ISymbolCanvas context, IPen pen, double zoom, Cirq.Components.Processors.ArduinoUnoFirmware uno)
     {
-        var profile = board.Profile;
+        var profile = BoardProfile.ArduinoUno;
+        DrawBoard(context, pen, zoom, profile, uno.ValueLabel);
+        var height = BoardPackage.BodyHeight(profile);
+        DrawCenteredText(context, "ATmega328P", new Point(0, -height / 2 + 14), 8, zoom, CanvasTheme.SymbolBrush);
+
+        // The board's own LED on D13, lit when the pin is high.
+        var led = new Point(12, -height / 2 + 30);
+        context.DrawEllipse(uno.LedLit ? new SolidColorBrush(Color.Parse("#FFB300")) : null, pen, led, 4, 4);
+        DrawCenteredText(context, "L", new Point(-2, -height / 2 + 30), 7, zoom, CanvasTheme.LabelBrush);
+    }
+
+    private static void DrawBoard(ISymbolCanvas context, IPen pen, double zoom, BoardProfile profile, string footer)
+    {
         var height = BoardPackage.BodyHeight(profile);
         var half = BoardPackage.HalfWidth - 18;
         var body = new Rect(-half, -height / 2, half * 2, height);
@@ -3076,8 +3094,7 @@ public static class SymbolRenderer
         DrawPinColumn(context, pen, zoom, profile, profile.LeftPins, body, left: true);
         DrawPinColumn(context, pen, zoom, profile, profile.RightPins, body, left: false);
 
-        DrawCenteredText(context, $"{profile.LogicVoltage:0.0}V logic", new Point(0, height / 2 - 12), 8, zoom,
-            CanvasTheme.ValueBrush);
+        DrawCenteredText(context, footer, new Point(0, height / 2 - 12), 8, zoom, CanvasTheme.ValueBrush);
 
         static IPen thinPenFor(IPen pen) => new Pen(pen.Brush, pen.Thickness * 0.6);
     }

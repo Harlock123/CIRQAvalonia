@@ -33,6 +33,9 @@ public interface ICircuitFileDialogs
     /// <summary>Reports a problem the user needs to know about, such as an unreadable file.</summary>
     Task ReportAsync(string title, string message);
 
+    /// <summary>Asks for a line of text, starting from <paramref name="initial"/>; null when cancelled.</summary>
+    Task<string?> PromptAsync(string title, string message, string initial) => Task.FromResult<string?>(initial);
+
     /// <summary>
     /// Asks whether to bring back a circuit that was being worked on when the application last
     /// stopped. False throws it away.

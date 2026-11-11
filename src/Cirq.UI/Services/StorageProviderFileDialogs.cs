@@ -533,6 +533,15 @@ public sealed class StorageProviderFileDialogs : ICircuitFileDialogs
     public async Task ReportAsync(string title, string message) =>
         await ShowDialogAsync(title, message, confirmText: "OK", cancelText: null);
 
+    public async Task<string?> PromptAsync(string title, string message, string initial)
+    {
+        var box = new TextBox { Text = initial, AcceptsReturn = false, TextWrapping = Avalonia.Media.TextWrapping.Wrap, MinHeight = 60 };
+        var built = BuildDialog(title, message, confirmText: "OK", cancelText: "Cancel");
+        if (built.Window.Content is Panel panel) panel.Children.Insert(Math.Max(0, panel.Children.Count - 1), box);
+        await built.Window.ShowModal(_owner);
+        return built.Answer() ? box.Text ?? "" : null;
+    }
+
     /// <summary>
     /// A small modal built in code. Two buttons at most, which is all the file flows need, and it
     /// saves carrying another XAML file around for it.

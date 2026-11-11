@@ -235,7 +235,7 @@ public static partial class BoardPackages
         var type = part.GetType().Name;
         var label = Label(part);
 
-        if (part is DeveloperBoard)
+        if (part is DeveloperBoard or Processors.ArduinoUnoFirmware)
             return Bench(part, BoardLook.DevBoard, label);
 
         if (BenchTypes.TryGetValue(type, out var bench))

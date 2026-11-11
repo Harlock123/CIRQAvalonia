@@ -53,8 +53,8 @@ public class ProtoboardTests(WindowSession session) : IDisposable
         Assert.True(bad.Count == 0, string.Join("\n", bad));
         Assert.True(over < wires / 10, $"{over} of {wires} wires pass over a part");
 
-        // And on stripboard, perfboard and a PCB, laid out automatically: every one matching its schematic too.
-        foreach (var kind in new[] { Cirq.Core.Topology.BoardKind.Stripboard, Cirq.Core.Topology.BoardKind.Perfboard, Cirq.Core.Topology.BoardKind.Pcb })
+        // And on stripboard, perfboard and both kinds of PCB, laid out automatically: every one matching its schematic too.
+        foreach (var kind in new[] { Cirq.Core.Topology.BoardKind.Stripboard, Cirq.Core.Topology.BoardKind.Perfboard, Cirq.Core.Topology.BoardKind.Pcb, Cirq.Core.Topology.BoardKind.DoubleSidedPcb })
             foreach (var example in library.Examples)
             {
                 var circuit = library.LoadExample(example.Name).Circuit;

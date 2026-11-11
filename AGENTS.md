@@ -61,9 +61,11 @@ dotnet run --project src/Cirq.UI -- --mcp      # the MCP server on stdio, headle
     cycle), `CpuZ80BusDecoder`, and the Z80 family in `Z80Peripheral` (the bus with no /WR and the
     interrupt daisy chain they share), `Z80Pio`, `Z80Ctc` and `Z80Sio.cs` (`Z80SerialController`,
     the `Z80Sio` and `Z80Dart` parts, on `SerialLine`).
-  - And the ATmega328P: `AvrCore` (the instruction set and peripherals, no circuit; its whole state in
-    `Registers`) and `Atmega328p` (the DIP-28 part, a breakpoint source that runs ahead of the circuit by a window and
-    stops at each output change). Test with `AtmegaTests` and the test-side `AssemblerAvr`; the blink example's
+  - And the ATmega328P: `AvrCore` (the instruction set and peripherals, SPI and TWI masters among them, no circuit;
+    its whole state in `Registers`), `Atmega328p` (the DIP-28 part, a breakpoint source that runs ahead of the circuit
+    by a window and stops at each output change; its breakpoints and single step for the debugger; it wants a time
+    point straight after powering up, or the circuit strides past its first edges), `ArduinoUnoFirmware` (the same
+    chip on the Uno's header, built by `Atmega328p`'s Uno layout, its rails stamped as sources) and `AvrDisassembler`. Test with `AtmegaTests` and the test-side `AssemblerAvr`; the blink example's
     firmware is a byte array in `Examples.Avr.cs`, checked against the guide's source by a UI test.
   - And the 8085: `I8085Core` (two partial files: the T-states, interrupts, HOLD and reset; the
     instructions), `Opcodes8085` (the disassembler and the patterns the test-side assembler is
@@ -82,13 +84,19 @@ dotnet run --project src/Cirq.UI -- --mcp      # the MCP server on stdio, headle
     board). `SolderedLayout` lays out stripboard, perfboard and a PCB (`Circuit.Board.Kind`): hand-made places first, parts
     placed so each pin lands on copper already carrying its net where it can, the cuts worked out from where the pins
     are, wire links or back wiring for the rest, and the same check. On a PCB `PcbRouter` routes the traces (A* on a
-    half-pitch grid, one owner per cell, short jumper hops, a pad-to-pad jumper as the last resort; ground's net index
-    is -1, so owners are `Index + 2`) and `PcbGerber` writes the Gerber and Excellon files. `BuildGuide` turns any layout into steps; `FaultFinding`
+    half-pitch grid per copper layer, one owner per cell and layer, vias on a double-sided board, short jumper hops on
+    a single-sided one, a pad-to-pad jumper as the last resort; ground's net index is -1, so owners are `Index + 2`),
+    `GroundPour` fills the free copper (a 1/8-pitch raster flooded from ground; with the pour on, ground is routed
+    last and the pads it joins count as joined), `DesignRules` checks a board against `PcbRules`, `BillOfMaterials`
+    lists the parts, and `PcbGerber` writes the Gerber and Excellon files. `BuildGuide` turns any layout into steps; `FaultFinding`
     chooses, hints at and judges the faults hidden in `Circuit.Faults` (never saved), which only
     `Circuit.BuildSimulationNetlist` (the simulator's) applies; everything else uses `BuildNetlist`, the circuit as
     drawn. The meter reads through `SimulationController.VoltageAt` and `CurrentInto`, which never wait on a running slice;
     its resistance range is `Ohmmeter`, which solves a powered-off copy. `FaultLessons` (UI) are the lessons, their
-    best scores in `AppSettings.FaultScores`. The view is
+    best scores in `AppSettings.FaultScores` (guided builds' too, keyed "Build: name"); `BuildLessons` (UI) are the
+    guided builds and `MainWindowViewModel.LessonFiles.cs` the `.cirqlesson` files. The bench instruments (logic
+    analyser, bench scope) are drawn by the renderer from `InstrumentView`s and add probes labelled `LA D0` and
+    `Bench CH1`; a bench lead dragged onto a hole rewires the circuit (`MoveBenchLead`). The view is
     `Controls/ProtoboardCanvas.cs`, drawn by `Rendering/ProtoboardRenderer.cs` through `ISymbolCanvas`, so the
     export is the same drawing.
   - `Serialization/` reads and writes `.cirq` files (indented JSON).

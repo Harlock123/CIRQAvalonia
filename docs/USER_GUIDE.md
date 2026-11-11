@@ -174,11 +174,11 @@ Three of those are worth separating, because they are easy to confuse:
 
 ## Placing components
 
-![The component palette: a Find a part box at the top, "336 parts in 17 groups" under it, and the seventeen categories with their counts — passive 11, switches 5, sources 16, semiconductors 13, transistors 13, LEDs and displays 11, power 10, analog ICs 13, logic gates 14, 74xx series 79, 40xx series 47, buses 19, digital I/O 9, memory and CPUs 39, sensors and actuators 20, switching and isolation 11, dev boards 6 — every group closed, so all seventeen headings fit on screen at once](images/02-palette.png)
+![The component palette: a Find a part box at the top, "337 parts in 17 groups" under it, and the seventeen categories with their counts — passive 11, switches 5, sources 16, semiconductors 13, transistors 13, LEDs and displays 11, power 10, analog ICs 13, logic gates 14, 74xx series 79, 40xx series 47, buses 19, digital I/O 9, memory and CPUs 39, sensors and actuators 20, switching and isolation 11, dev boards 7 — every group closed, so all seventeen headings fit on screen at once](images/02-palette.png)
 
 Click a palette entry, then click the canvas. The part lands where you click, snapped to the grid.
 
-The palette holds **336 components in 17 categories**:
+The palette holds **337 components in 17 categories**:
 
 | Category | Count | Contents |
 | --- | --- | --- |
@@ -198,7 +198,7 @@ The palette holds **336 components in 17 categories**:
 | Memory & CPUs | 39 | The **2716, 2732, 2764 and 27C256 EPROMs**, the **28C256 EEPROM**, the **6116 and 62256 static RAMs** — each loadable from a binary, Intel HEX or S-record file — and the **65C02**, **6502**, **6510** and **8500** processors, **6522 VIA**, **6551 ACIA**, **6526 CIA** and the **6581 and 8580 SIDs**, the **68000**, **68681 DUART**, **68230 PI/T** and **68901 MFP**, the **6809**, **6809E**, **6821** and **6520 PIAs** and **6850 ACIA**, and the **Z80**, **Z80 PIO**, **Z80 CTC**, **Z80 SIO/0** and **Z80 DART**, and the **8085**, **8155**, **8156**, **8255A**, **8251A**, **8253**, **8254** and **8259A**, and the **ATmega328P** microcontroller — see [below](#memories-by-their-part-numbers), [the 6502 computer](#a-6502-computer), [the 6809 computer](#a-6809-computer), [the Z80 computer](#a-z80-computer), [the 8085 computer](#an-8085-computer) and [the ATmega328P](#an-atmega328p) |
 | Sensors & Actuators | 20 | DC motor, LDR, thermistors, **LM35 and TMP36** analog thermometers, buzzers, speaker, microphone, servo, stepper in **unipolar and bipolar** wirings, thermocouple, load cell, HC-SR04 ranger, Hall switch, phototransistor, **reed switch** and **PIR motion sensor** — see [below](#sensors-and-actuators) |
 | Switching & Isolation | 11 | Relay, fuses and a **resettable PPTC**, optocouplers, ULN2003, H-bridge, **A4988 microstepping driver**, **solid-state relay**, **MOSFET gate driver** — see [below](#regulating-a-current-instead-of-applying-a-voltage) |
-| Dev Boards | 6 | Raspberry Pi, Arduino Uno / Nano / Mega, **Raspberry Pi Pico** and **ESP32 DevKit** — see [below](#development-boards) |
+| Dev Boards | 7 | Raspberry Pi, Arduino Uno / Nano / Mega, **Raspberry Pi Pico** and **ESP32 DevKit** — see [below](#development-boards) — and an **Arduino Uno (Firmware)** that runs a real sketch ([an Arduino Uno](#an-arduino-uno)) |
 
 Click a category header to open it — and whichever was open closes, so **one category is open at a
 time**. Four groups opened independently is already more than the sidebar is tall, and then
@@ -5671,6 +5671,8 @@ switch, builds the same circuit on a soldered board instead. The choice is saved
 
 ![The LED chaser on stripboard: copper strips running down a tan board, lettered A to S across the top, the 4017 with a strip for each pin, the strips cut where two nets meet (each cut a red cross), black and coloured wire links joining the runs of copper, and the resistors and LEDs lying across the strips, with the supply and clock on the bench at the left](images/65-stripboard.png)
 
+- **PCB** and **2-Layer PCB** are printed circuit boards, their traces routed (see
+  [A printed circuit board](#a-printed-circuit-board)).
 - **Stripboard** has copper strips running the length of the board, lettered **A**, **B**, **C**
   across and numbered down, so a hole is called `C12`. A pin is on whatever net its strip carries,
   so two pins of different nets on one strip need the copper cut between them; the cuts are marked
@@ -5722,13 +5724,58 @@ as the others are, and parts move by hand on it the same way, the traces routed 
 | `name-B_Mask.gbs` | The solder mask, open over each pad |
 | `name-F_SilkS.gto` | The silkscreen: each part's outline and designator, and a line for each jumper |
 | `name-Edge_Cuts.gm1` | The board's outline |
-| `name.drl` | The Excellon drill file: a 0.9 mm hole at every pad |
+| `name.drl` | The Excellon drill file: a 0.9 mm hole at every pad, and 0.5 mm at every via |
+| `name-F_Cu.gtl`, `name-F_Mask.gts` | On a double-sided board: the component side's copper and mask |
 
 They are Gerber RS-274X with X2 attributes, in millimetres, the origin at the board's bottom left
 corner seen from the component side. Pads are 1.6 mm, signal traces 0.4 mm and power traces
-0.6 mm. If the view is on another board, the export lays out a PCB for it on the spot; the board you
-see is the board you get when the view is on **PCB**. The build guide for a PCB is the board to
-have made, the parts, and any jumpers to fit.
+0.6 mm, vias 1.0 mm on a 0.5 mm drill, tented (the mask covers them). If the view is on another
+board, the export lays out a single-sided PCB for it on the spot; the board you see is the board you
+get when the view is on a PCB. The build guide for a PCB is the board to have made, the parts, and
+any jumpers to fit. The export runs the design rule check too, and says if it finds anything.
+
+#### Double-sided
+
+**PCB, Double-Sided** (or the **2-Layer PCB** button) routes on both sides of the board. A trace
+may change side at a **via**, a plated hole of its own at a hole position free on both sides, which
+costs the router as much as five steps of trace, so it takes one where the other side is clear and
+this one isn't. Every pad is plated through, so a trace can leave a pad on either side. That is
+how buses cross: the 68000 computer needs about 300 jumpers on one side and about 30 on two, with
+200 vias. The component side's traces are drawn brighter, the back's fainter, and the vias as small
+gold rings.
+
+#### Ground pour
+
+**View > Board > Ground Pour**, on by default, fills the board's spare copper and joins it to
+ground, on each side it has. It is kept 0.3 mm from every other net's copper and 0.5 mm from the
+edge, and only copper ground actually reaches is poured, so there are no floating islands. Ground is
+routed last, round everything else: pads the pour already joins count as joined, so ground's
+traces only bridge what the pour can't reach. Ground's pads join the pour solidly (there are no
+thermal reliefs, so give a ground pin a moment longer with the iron). The pour is drawn as a
+lighter green, and goes out in the Gerbers as copper regions under the pads and traces. The choice
+is saved with the circuit.
+
+#### Design rules
+
+**View > Board > Check Design Rules** holds the PCB to a board house's limits before it goes out:
+
+| Rules | Traces and gaps | Smallest hole | Copper round a hole | Board |
+|---|---|---|---|---|
+| **Board House (Standard)** | 0.127 mm | 0.3 mm | 0.13 mm | any size |
+| **Board House (Budget, 100 × 100 mm)** | 0.127 mm | 0.3 mm | 0.13 mm | 100 × 100 mm at most |
+| **Home Etching** | 0.3 mm | 0.6 mm | 0.3 mm | any size |
+
+It checks every trace's width, every hole, the ring of copper each pad and via leaves round its
+hole, the board's size, and the gap between every two pieces of copper of different nets on the
+same side, pads, vias and traces, edge to edge. What it finds is listed, and ringed in red on the
+board until the board changes. A trace half a pitch from another net's pad leaves 0.27 mm, so home
+etching flags those, while a board house's standard rules pass.
+
+#### A bill of materials
+
+**File > Export a Bill of Materials...** writes the parts to buy as CSV, a line for each part,
+value and package (`10kΩ`, `axial resistor`, with every designator that uses it, R2 before R10),
+and the bench equipment listed apart, since a power supply isn't bought for each board.
 
 ### The build guide
 
@@ -5777,6 +5824,30 @@ reads open.
 Current is read as a real meter reads it, by breaking the connection and putting the meter in it:
 put the red probe on a resistor's, capacitor's, diode's or LED's lead and the display reads the
 current flowing into the part through that lead.
+
+### The logic analyser and the bench scope
+
+**View > Logic Analyser on the Bench** puts an eight-channel logic analyser on the bench beside the
+meter. Drag its **D0-D7** probes onto holes, as the meter's, and run the circuit: its display shows
+each channel's level over the last ten divisions of the scope's timebase, one under another. Each
+probe clipped on is a logic probe of its own on the scope too (`LA D0` and so on), so the main
+scope shows the same traces at full size; drag a probe off the board to unclip it. Click the
+analyser to choose its decoder: **UART** at 9600 or 115,200 baud on D0, **I2C** with SDA on D0 and
+SCL on D1, or **SPI** with SCK on D0, MOSI on D1 and MISO on D2. What it decodes is shown under the
+display.
+
+**View > Scope on the Bench** is a two-channel scope beside it: **CH1** and **CH2** clip onto holes
+and show the voltages there, scaled from 0 to the highest either reaches, so a signal can be looked
+at without leaving the board.
+
+### A signal generator on the bench
+
+**View > Add a Signal Generator to the Bench** adds a function generator to the circuit (a 1 kHz
+square wave from 0 to 5 V, its GND on ground) and puts it on the bench. Drag the end of its **OUT**
+lead onto a hole and it's wired to whatever that hole is on, as an undo step. Any lead from the
+bench moves the same way, a supply's or a dev board's: dropped on a hole of another net, the lead's
+old wires are taken off and it's wired to the new net. Change the generator's waveform and
+frequency in its properties, as for any part.
 
 ### Finding a fault
 
@@ -5830,6 +5901,33 @@ the fault without giving it away: to ask what you'd measure next, tell you what 
 would show, and nudge you when you're stuck. It measures the faulty circuit with the `fault` tool's
 `measure` action, which reads a pin's voltage in the circuit with the fault in it, as your meter
 would, and it gives hints only when you ask for one.
+
+#### Lessons of your own
+
+**Simulate > Fault Finding > Save as a Lesson...** saves the circuit, the fault hidden in it and a
+symptom you write (what the person will see go wrong, not why) as a `.cirqlesson` file to hand out.
+Hide the fault first, at random or at the pin you choose (Claude's `fault` tool can put one exactly
+where you say). **Open a Lesson...** opens one: its circuit, its fault hidden, its symptom in the
+status bar and the clock started, scored and kept like the built-in lessons. The fault travels as the
+pin it's at, not inside the circuit, so the file's circuit opens clean anywhere.
+
+### Build lessons
+
+**Simulate > Fault Finding > Build Lessons** builds an example on a breadboard step by step. The
+board starts empty and shows only what you've fitted; the status bar gives the build guide's next
+step ("R1, 10kΩ (brown, black, orange, gold): from a12 to a16"), and you click the holes it names.
+Get one wrong and it says which hole you clicked, so you learn to read the board. Once it's built
+come measurements: run it (`F5`), put the meter's red probe where the lesson asks, and it checks
+the place and the reading.
+
+| Lesson | Builds | Then measures |
+|---|---|---|
+| Build a transistor switch | Transistor Switch | the supply, and the transistor's emitter on ground |
+| Build a 555 astable | 555 Astable | the 555's supply (pin 8), and pin 5 at two-thirds of it |
+| Build a regulated supply | Regulated Supply | the 7805's 12 V input, and its 5 V output |
+
+Each is scored out of 100: 5 off for each wrong hole, 10 for each wrong reading, 2 for each minute.
+Your best is kept, and shown beside it in the menu. **End the Build Lesson** stops one part way.
 
 ---
 
@@ -9218,6 +9316,17 @@ file, or a raw binary, which goes in at address 0. The firmware is kept in the `
 Intel HEX, in the chip's **Firmware** property, so the circuit opens running the same program. Its
 label shows where the program counter is (`PC $0034`), or **no firmware**.
 
+### An Arduino Uno
+
+**Arduino Uno (Firmware)**, in the **Dev Boards** group, is the same chip on a Uno's board, its pins
+named as a sketch names them: **D0-D13** and **A0-A5** on the headers in the Uno's order, so
+`digitalWrite(13, HIGH)` is the pin marked D13. It feeds the circuit round it from **5V**, **IOREF**
+and **3V3**, as a Uno on USB does (VIN isn't modelled), and its own **L** LED, on D13, lights on the
+symbol. D0 and D1 are RX and TX, D11, D12 and D13 SPI's MOSI, MISO and SCK, and A4 and A5 I2C's SDA
+and SCL. Load a sketch the same way, with **Edit > Load Memory Image...**: the Arduino IDE's
+**Sketch > Export Compiled Binary** writes the `.hex` (and a `with_bootloader` one, which loads as
+well) into the sketch's folder. On the protoboard it sits on the bench, as the other boards do.
+
 ### The ATmega328P's pins
 
 The pins are the datasheet's: **PB0-PB5**, **PC0-PC5** and **PD0-PD7** as GPIO, each with its
@@ -9233,8 +9342,21 @@ internal oscillator), and XTAL1 and XTAL2 are left alone.
 
 The whole AVR instruction set, with the datasheet's cycle counts; 32 KB of flash, 2 KB of SRAM and
 1 KB of EEPROM; the three ports; timers 0, 1 and 2 with their normal, CTC and PWM modes; the USART;
-the ADC; the external and pin-change interrupts; and sleep. Not modelled: SPI, the two-wire
-interface (I2C), the watchdog, the analog comparator and Timer1's input capture.
+SPI as a master; the two-wire interface (I2C) as a master; the ADC; the external and pin-change
+interrupts; and sleep. Its inputs switch at the datasheet's levels: high from 0.6·VCC (3.0 V at 5 V),
+so a TTL part's 3.4 V high reads high, as it does on a real board. Not modelled: SPI and I2C as a
+slave, the watchdog, the analog comparator and Timer1's input capture.
+
+- **SPI** (SPCR, SPSR, SPDR) sends a byte at the clock SPR1:0 and SPI2X choose, in any of the four
+  modes and either bit order, on MOSI (PB3, the Uno's D11) and SCK (PB5, D13), reading MISO (PB4,
+  D12) as it goes; SPIF, WCOL and the interrupt work as on the chip, and SS (PB2) as an input pulled
+  low drops it out of master mode, as the datasheet says. Make MOSI, SCK and SS outputs first.
+- **I2C** (TWBR, TWSR, TWDR, TWCR) makes a START, a repeated START and a STOP, sends an address or a
+  data byte and reads the acknowledge, or reads a byte and acknowledges it (or doesn't), each time
+  leaving the datasheet's status code in TWSR (0x08, 0x10, 0x18, 0x28, 0x40, 0x50, 0x58 and the
+  rest) and setting TWINT. SDA (PC4, A4) and SCL (PC5, A5) are open drain, pulled up by resistors
+  on the board or by the pins' own pull-ups, and it waits for a slave holding SCL low. The bit rate
+  is the datasheet's F_CPU / (16 + 2·TWBR·4^TWPS): TWBR 72 is 100 kHz at 16 MHz.
 
 At each time point the circuit is solved at, the chip samples its pins (their logic levels, and the
 voltages on the ADC inputs), then runs on from where it had got to, up to 200 µs ahead with those
@@ -9281,6 +9403,158 @@ With avr-gcc the same thing is `TCCR1B = _BV(WGM12) | _BV(CS12); OCR1A = 31249; 
 _BV(OCIE1A); sei();` and an `ISR(TIMER1_COMPA_vect) { PINB = _BV(PB5); }`; an Arduino sketch's
 exported HEX runs the same way: `delay()` and `millis()` count on Timer0's overflow interrupt, and
 `digitalWrite` and `analogWrite` on the ports and the PWM timers, all of which are modelled.
+
+### SPI and I2C examples
+
+**File > Examples > Development Boards > Arduino Uno SPI Counter** counts in binary on eight LEDs:
+each count goes out over SPI into a **74595** shift register, and a pulse on D9 latches it onto the
+LEDs, ten times a second.
+
+```asm
+; An 8-bit count on eight LEDs through a 74595, by SPI.
+; D13 (SCK) to SRCLK, D11 (MOSI) to SER, D9 to RCLK, the latch.
+.equ DELAY = 6             ; 6 x 65,536 x 4 cycles: about 100 ms at 16 MHz
+rjmp start
+start:
+ldi r16, 0x08
+out 0x3E, r16          ; SP = 0x08FF
+ldi r16, 0xFF
+out 0x3D, r16
+ldi r16, 0x2E          ; D9 (PB1), D10 (SS), D11 (MOSI), D13 (SCK) outputs
+out 0x04, r16
+ldi r16, 0x51          ; SPCR: SPE, MSTR, fosc/16 (1 MHz)
+out 0x2C, r16
+clr r20                ; the count
+loop:
+out 0x2E, r20          ; SPDR: shift the count out, MSB first
+wait:
+in r16, 0x2D           ; SPSR: until SPIF
+sbrs r16, 7
+rjmp wait
+in r16, 0x2E           ; reading SPDR clears SPIF
+sbi 0x05, 1            ; a pulse on RCLK: the count onto the LEDs
+cbi 0x05, 1
+inc r20
+ldi r18, DELAY
+outer:
+clr r24
+clr r25
+inner:
+sbiw r24, 1            ; 65,536 times round, four cycles each
+brne inner
+dec r18
+brne outer
+rjmp loop
+```
+
+**File > Examples > Development Boards > Arduino Uno I2C EEPROM** writes "HI!" into a **24LC256** at
+address 0, reads it back (a repeated START between the address and the read), and prints it on the
+**Serial Terminal** at 9600 baud. The scope shows SDA, SCL and TX.
+
+```asm
+; "HI!" written to a 24LC256 over I2C at 100 kHz, read back, and printed
+; at 9600 baud. A4 is SDA, A5 is SCL; D1 (TX) goes to the terminal.
+rjmp start
+start:
+ldi r16, 0x08
+out 0x3E, r16          ; SP = 0x08FF
+ldi r16, 0xFF
+out 0x3D, r16
+ldi r16, 0
+sts 0xC5, r16          ; UBRR0 = 103: 9600 baud at 16 MHz
+ldi r16, 103
+sts 0xC4, r16
+ldi r16, 0x08          ; UCSR0B: TXEN
+sts 0xC1, r16
+ldi r16, 72            ; TWBR = 72: 100 kHz at 16 MHz
+sts 0xB8, r16
+rcall start_bit        ; write: the address 0x0000, then the bytes
+ldi r24, 0xA0
+rcall send
+ldi r24, 0
+rcall send
+rcall send
+ldi r24, 'H'
+rcall send
+ldi r24, 'I'
+rcall send
+ldi r24, '!'
+rcall send
+rcall stop
+rcall start_bit        ; read: the address again, a repeated START, then three bytes
+ldi r24, 0xA0
+rcall send
+ldi r24, 0
+rcall send
+rcall send
+rcall start_bit
+ldi r24, 0xA1
+rcall send
+ldi r16, 0xC4          ; TWINT, TWEA, TWEN: a byte, acknowledged
+rcall go
+lds r24, 0xBB
+rcall print
+ldi r16, 0xC4
+rcall go
+lds r24, 0xBB
+rcall print
+ldi r16, 0x84          ; the last, not acknowledged
+rcall go
+lds r24, 0xBB
+rcall print
+rcall stop
+ldi r24, 13
+rcall print
+ldi r24, 10
+rcall print
+done:
+rjmp done
+start_bit:
+ldi r16, 0xA4          ; TWINT, TWSTA, TWEN
+rjmp go
+send:
+sts 0xBB, r24          ; TWDR
+ldi r16, 0x84          ; TWINT, TWEN
+go:
+sts 0xBC, r16          ; TWCR
+twi_wait:
+lds r16, 0xBC          ; until TWINT
+sbrs r16, 7
+rjmp twi_wait
+ret
+stop:
+ldi r16, 0x94          ; TWINT, TWSTO, TWEN
+sts 0xBC, r16
+ldi r16, 200           ; let the STOP finish
+pause:
+dec r16
+brne pause
+ret
+print:
+lds r16, 0xC0          ; UCSR0A: until UDRE
+sbrs r16, 5
+rjmp print
+sts 0xC6, r24          ; UDR0
+ret
+```
+
+### The firmware debugger
+
+**Simulate > Firmware Debugger...** opens a debugger on the selected ATmega328P or Arduino Uno (or
+the circuit's first). It shows the instructions round the program counter (▶), disassembled in
+avr-as syntax with their byte addresses; the registers R0-R31, X, Y and Z, PC, SP and SREG (its
+flags as ITHSVNZC, capitals set) and the cycle count; and the ports and the peripherals' registers.
+
+- **Break at** an address (in hex, as the listing shows it: `0x0034`), or double-click a line in
+  the listing, to stop before the instruction there runs (●). The run pauses with it, and the
+  status bar says where.
+- **Step** (or **F10** in the debugger) runs one instruction, or takes one interrupt, and stops
+  again: the circuit runs just long enough for it, so the pins move as the instruction moves them.
+- **Continue** (or **F5**) runs on from where it stopped; **Pause** stops the firmware where it is.
+
+While it's stopped, the circuit's time goes on but the firmware's doesn't, so a pin holds its level
+and a timer its count. Claude can read the same with `cpu_state` (the registers, flags, I/O and
+breakpoints) and `disassemble` (give the chip as the part).
 
 ---
 
@@ -9422,6 +9696,13 @@ text. It asks three things — four for a drawing spread over [sheets](#sheets),
 decides whether you get all of them or the one you are looking at.
 
 ![The export dialog over the schematic: What to export with Schematic selected and Oscilloscope traces and Both beneath it, a greyed When exporting both section offering one file or a file each plus a combined PDF, a Format list showing PNG, a Resolution list showing 2x, and checkboxes for a transparent background and a parts list](images/10-export-dialog.png)
+
+**File > Export a Share Page...** writes the circuit as one web page to share: the schematic (as
+SVG, sharp at any size), the board it's built on, the parts to buy, the steps to build it, and the
+circuit file itself, embedded, with a button to download it and open it in CirqAvalonia. It is one
+self-contained file with nothing to fetch, so it goes wherever a page can: attached to a forum post,
+put on a class's site or a GitHub Pages repository, or opened straight from disk. Wherever you put
+it is the link.
 
 **What to export** — the schematic, the oscilloscope traces, or both. Traces are only offered when
 there is something on the scope; exporting an empty plot is a worse answer than being told there is

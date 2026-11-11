@@ -8,6 +8,69 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-11
+
+A board you'd order and a bench you'd recognise. PCBs go double-sided with vias, pour their spare
+copper as ground, and are checked against a board house's design rules before the Gerbers go out,
+with a bill of materials beside them. An Arduino Uno runs real sketches with SPI and I2C, and a
+firmware debugger stops it at a breakpoint. A logic analyser, a scope and a signal generator join
+the meter on the bench. Build lessons teach building a circuit hole by hole, fault lessons can be
+written and handed out, and a circuit can be shared as one web page. 337 components in 17
+categories, 119 worked examples, 41 MCP tools, 5398 tests.
+
+### Added
+
+**Double-sided PCBs.** **PCB, Double-Sided** (or the **2-Layer PCB** button) routes on both sides,
+changing side at vias where one side is blocked, so buses can cross: the 68000 computer goes from
+about 300 jumpers to about 30. The Gerbers gain the top copper and mask, and the drill file the vias.
+
+**Ground pour.** On by default, a PCB's spare copper is filled and joined to ground, kept 0.3 mm from
+every other net and with no floating islands. Ground is routed last, and only where the pour can't
+reach. **View > Board > Ground Pour** turns it off.
+
+**Design rule check.** **View > Board > Check Design Rules** holds the board to a board house's
+standard rules, its budget 100 × 100 mm size, or home etching's: trace widths, holes, the copper
+round them, the board's size and every gap between nets, the problems listed and ringed on the board.
+
+**Bill of materials.** **File > Export a Bill of Materials...** writes the parts to buy as CSV, grouped
+by part, value and package.
+
+**An Arduino Uno running firmware.** **Arduino Uno (Firmware)**, in Dev Boards, is the ATmega328P on
+the Uno's header, its pins D0-D13 and A0-A5 as a sketch names them, feeding the circuit from 5V and
+3V3, its L LED on D13. Load a sketch's exported `.hex` with Load Memory Image.
+
+**SPI and I2C on the ATmega328P.** SPI as a master in all four modes, and the two-wire interface as
+a master with START, repeated START, STOP, ACK and NACK and the datasheet's status codes, open drain
+with clock stretching. Two new examples: a Uno counting on eight LEDs through a 74595 over SPI, and
+one writing "HI!" to a 24LC256 over I2C, reading it back and printing it on a terminal.
+
+**A firmware debugger.** **Simulate > Firmware Debugger...** shows an ATmega's or Uno's code round the
+program counter, disassembled, with its registers, flags and I/O. Breakpoints stop it before an
+instruction, and the run with it; Step runs one instruction. Claude reads the same with `cpu_state`
+and `disassemble`.
+
+**A logic analyser, a scope and a signal generator on the bench.** Eight logic probes and a UART,
+I2C or SPI decoder; two scope channels; and a function generator whose lead, like any bench lead, is
+dragged onto a hole to wire it there.
+
+**Build lessons.** **Simulate > Fault Finding > Build Lessons** builds an example on a breadboard step
+by step, clicking the holes each step names, then measures it with the meter: scored, best kept.
+
+**Lessons of your own.** **Save as a Lesson...** writes a circuit, its hidden fault and the symptom to
+start from as a `.cirqlesson` file to hand out; **Open a Lesson...** opens one, scored like the rest.
+
+**A share page.** **File > Export a Share Page...** writes the circuit as one self-contained web page:
+the schematic, the board, the parts, the build steps and the circuit file to download.
+
+### Fixed
+
+- The ATmega328P's USART sent a byte queued behind another with its stop bit cut to a cycle, which a
+  receiver read as garbage: back-to-back bytes now each get their full stop bit.
+- The ATmega328P could miss its first edges: right after powering up it now asks for a time point
+  at once, rather than letting the circuit take a long first step without it.
+- The ATmega328P's inputs switch at its datasheet's levels (high from 0.6·VCC), so a TTL part's
+  3.4 V high reads high.
+
 ## [1.1.0] - 2026-11-10
 
 From the bench to a board you can order: the protoboard view now builds the circuit on a
@@ -2940,7 +3003,8 @@ First public build of CirqAvalonia — an electronic circuit analyzer and mixed-
 
 **501 tests** measure the solver against closed-form answers rather than recorded output.
 
-[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/Harlock123/CIRQAvalonia/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v0.48.0...v1.0.0

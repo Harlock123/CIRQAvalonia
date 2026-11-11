@@ -41,6 +41,10 @@
         <Separator />
         <MenuItem Header="_Export..." InputGesture="Ctrl+E" Command="{Binding ExportCommand}"
                   ToolTip.Tip="Write the schematic and the traces out as PNG, JPEG, BMP, SVG or PDF" />
+        <MenuItem Header="Export a S_hare Page..." Command="{Binding ExportSharePageCommand}"
+                  ToolTip.Tip="One web page with the schematic, the board, the parts, the steps and the circuit file in it, to attach to a post or put on a site" />
+        <MenuItem Header="Export a _Bill of Materials..." Command="{Binding ExportBillOfMaterialsCommand}"
+                  ToolTip.Tip="The parts to buy, as CSV: grouped by part, value and package, with their designators" />
         <MenuItem Header="Export _Gerber Files for a PCB..." Command="{Binding ExportGerbersCommand}"
                   ToolTip.Tip="The circuit on a single-sided printed circuit board, as a board house takes it: copper, solder mask, silkscreen, outline and drill files, zipped" />
         <Separator />
@@ -129,11 +133,30 @@
                     ToolTip.Tip="A pad at every hole, wired on the back" />
           <MenuItem Header="P_CB" ToggleType="Radio" IsChecked="{Binding IsPcb, Mode=TwoWay}"
                     ToolTip.Tip="A single-sided printed circuit board: traces routed on the back, ready for Gerber export" />
+          <MenuItem Header="PCB, _Double-Sided" ToggleType="Radio" IsChecked="{Binding IsDoubleSidedPcb, Mode=TwoWay}"
+                    ToolTip.Tip="A double-sided printed circuit board: traces on both sides, joined through by vias" />
+          <Separator />
+          <MenuItem Header="_Ground Pour" ToggleType="CheckBox" IsChecked="{Binding IsGroundPour, Mode=TwoWay}"
+                    ToolTip.Tip="On a PCB, fill the spare copper and join it to ground" />
+          <MenuItem Header="Check Design _Rules">
+            <MenuItem Header="_Board House (Standard)" Command="{Binding CheckDesignRulesCommand}" CommandParameter="0"
+                      ToolTip.Tip="0.127 mm traces and gaps, 0.3 mm holes" />
+            <MenuItem Header="Board House (Budget, 100 × 100 mm)" Command="{Binding CheckDesignRulesCommand}" CommandParameter="1"
+                      ToolTip.Tip="The standard rules, and the board no bigger than the cheapest price is for" />
+            <MenuItem Header="_Home Etching" Command="{Binding CheckDesignRulesCommand}" CommandParameter="2"
+                      ToolTip.Tip="0.3 mm traces and gaps, 0.6 mm holes: what toner transfer and an etching bath can do" />
+          </MenuItem>
         </MenuItem>
         <MenuItem Header="Build _Guide..." Command="{Binding OpenBuildGuideCommand}"
                   ToolTip.Tip="The board as numbered steps to build it from, shown on the board one at a time" />
         <MenuItem Header="_Multimeter on the Bench" ToggleType="CheckBox" IsChecked="{Binding IsMeterShown, Mode=TwoWay}"
                   ToolTip.Tip="A meter with two probes to drag onto holes, reading the volts between them as the circuit runs" />
+        <MenuItem Header="_Logic Analyser on the Bench" ToggleType="CheckBox" IsChecked="{Binding IsAnalyserShown, Mode=TwoWay}"
+                  ToolTip.Tip="Eight logic probes to clip onto holes, their traces on its display, and a UART, I2C or SPI decoder" />
+        <MenuItem Header="S_cope on the Bench" ToggleType="CheckBox" IsChecked="{Binding IsBenchScopeShown, Mode=TwoWay}"
+                  ToolTip.Tip="A two-channel scope whose probes clip onto holes, showing the voltages without leaving the board" />
+        <MenuItem Header="Add a Signal _Generator to the Bench" Command="{Binding AddBenchGeneratorCommand}"
+                  ToolTip.Tip="A function generator on the bench: drag its OUT lead onto a hole to wire it there" />
         <Separator />
         <MenuItem Header="Zoom _In" InputGesture="Ctrl+OemPlus" Command="{Binding ZoomInCommand}" />
         <MenuItem Header="Zoom _Out" InputGesture="Ctrl+OemMinus" Command="{Binding ZoomOutCommand}" />
@@ -171,6 +194,8 @@
         <MenuItem Header="Re_set" InputGesture="F8" Command="{Binding ResetSimulationCommand}" />
         <Separator />
         <MenuItem Header="C_onditions..." Command="{Binding ShowConditionsCommand}" />
+        <MenuItem Header="Firmware _Debugger..." Command="{Binding OpenFirmwareDebuggerCommand}"
+                  ToolTip.Tip="An ATmega328P's or Arduino Uno's firmware laid open: breakpoints, a single step, the registers and I/O" />
         <MenuItem Header="Fault F_inding">
           <MenuItem Header="_Hide a Fault" Command="{Binding HideFaultCommand}"
                     ToolTip.Tip="Hide a fault somewhere in the circuit (a pin not making contact, two pins bridged, a part in backwards) for you to find" />
@@ -180,6 +205,13 @@
                     ToolTip.Tip="Select the part you suspect on the schematic or the board, then ask" />
           <MenuItem Header="Coach _Me (AI Chat)" Command="{Binding CoachMeCommand}"
                     ToolTip.Tip="Claude guides you to the fault without giving it away: what to measure next, and what it shows" />
+          <MenuItem Header="_Save as a Lesson..." Command="{Binding SaveFaultLessonCommand}"
+                    ToolTip.Tip="Save this circuit, the fault hidden in it and the symptom it shows, as a lesson file to hand out" />
+          <MenuItem Header="_Open a Lesson..." Command="{Binding OpenFaultLessonCommand}"
+                    ToolTip.Tip="Open a lesson file: its circuit, its fault hidden, the clock started" />
+          <MenuItem Header="_Build Lessons" Name="BuildLessonsMenu"
+                    ToolTip.Tip="Build an example on a breadboard step by step, clicking each step's holes, then measure it with the meter; scored, with your best kept" />
+          <MenuItem Header="_End the Build Lesson" Command="{Binding EndBuildLessonCommand}" />
           <MenuItem Header="_Lessons" Name="LessonsMenu"
                     ToolTip.Tip="Puzzles on the examples, each with a symptom to start from; scored, with your best kept" />
           <MenuItem Header="_Reveal the Fault" Command="{Binding RevealFaultCommand}" />
@@ -465,6 +497,13 @@
                                    SelectedComponent="{Binding SelectedComponent, Mode=TwoWay}"
                                    MeterShown="{Binding IsMeterShown}"
                                    BuildStep="{Binding BuildGuideStep}"
+                                   DrcIssues="{Binding DrcIssues}"
+                                   AnalyserShown="{Binding IsAnalyserShown}"
+                                   BuildLessonStep="{Binding BuildLessonStep}"
+                                   IsBuildingLesson="{Binding IsBuildingLesson}"
+                                   BuildLessonMarks="{Binding BuildLessonMarks}"
+                                   BenchScopeShown="{Binding IsBenchScopeShown}"
+                                   BenchTimebase="{Binding Scope.TimebasePerDivision}"
                                    IsVisible="{Binding IsProtoboardView}" />
 
         <!-- The build guide: one step at a time, the board showing what the steps so far have fitted. -->
@@ -524,6 +563,8 @@
                     Command="{Binding SetBoardKindCommand}" CommandParameter="Perfboard" ToolTip.Tip="Pads, wired on the back" />
             <Button Classes="sheet" Classes.current="{Binding IsPcb}" Content="PCB" CornerRadius="4" FontSize="11" Padding="8,3"
                     Command="{Binding SetBoardKindCommand}" CommandParameter="Pcb" ToolTip.Tip="A printed circuit board, its traces routed" />
+            <Button Classes="sheet" Classes.current="{Binding IsDoubleSidedPcb}" Content="2-Layer PCB" CornerRadius="4" FontSize="11" Padding="8,3"
+                    Command="{Binding SetBoardKindCommand}" CommandParameter="DoubleSidedPcb" ToolTip.Tip="A double-sided printed circuit board, with vias" />
             <Border Width="1" Margin="3,2" Background="{DynamicResource PanelBorder}" />
             <Button Name="BuildGuideButton" Classes="sheet" Classes.current="{Binding IsBuildGuideOpen}" Content="Build Guide" CornerRadius="4" FontSize="11" Padding="8,3"
                     Command="{Binding OpenBuildGuideCommand}" ToolTip.Tip="Step by step, as you'd build it" />

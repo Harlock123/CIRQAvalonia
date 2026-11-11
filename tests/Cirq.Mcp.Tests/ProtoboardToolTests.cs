@@ -77,7 +77,7 @@ public class ProtoboardToolTests
         Assert.Contains("isn't a hole", await Error(b.Tools.ArrangeProtoboard([new() { Part = "R1", To = "12" }])));
         await b.Tools.Undo();
         Assert.Equal(Cirq.Core.Topology.BoardKind.Stripboard, b.Circuit.Board.Kind);
-        Assert.Contains("breadboard, stripboard, perfboard or pcb", await Error(b.Tools.ArrangeProtoboard(board: "veroboard")));
+        Assert.Contains("breadboard, stripboard, perfboard, pcb or double_sided_pcb", await Error(b.Tools.ArrangeProtoboard(board: "veroboard")));
         Assert.Contains(steps.Count > 0 ? "Cut" : "", string.Join(" ", (await Parse(b.Tools.BuildGuide()))["steps"]!.AsArray().Select(x => (string)x!)));
         await b.Tools.Undo();
         Assert.Equal(Cirq.Core.Topology.BoardKind.Breadboard, b.Circuit.Board.Kind);
@@ -101,9 +101,15 @@ public class ProtoboardToolTests
         Assert.Contains("C1", (string)(await Parse(b.Tools.Fault("reveal")))["fault"]!);
         Assert.Contains("hide, hint, measure, guess", await Error(b.Tools.Fault("find")));
 
-        // On a PCB, routed and matching; and measure reads the faulty circuit, as a meter would.
+        // On a PCB, routed and matching, held to a board house's rules; double-sided, with the pour off.
         var pcb = await Parse(b.Tools.ArrangeProtoboard(board: "pcb"));
         Assert.True((bool)pcb["matches"]!);
+        Assert.Contains("passes", (string)pcb["design_rules"]!);
+        var two = await Parse(b.Tools.ArrangeProtoboard(board: "double_sided_pcb", ground_pour: false));
+        Assert.True((bool)two["matches"]!);
+        Assert.Contains("double-sided printed circuit board", (string)two["board"]!);
+        Assert.False(b.Circuit.Board.GroundPour);
+        Assert.Contains("double_sided_pcb", await Error(b.Tools.ArrangeProtoboard(board: "pcb3")));
         Assert.Contains("Have the printed circuit board made", string.Join(" ", (await Parse(b.Tools.BuildGuide()))["steps"]!.AsArray().Select(x => (string)x!)));
         await Parse(b.Tools.Fault("hide", pin: "C1.A"));
         var reading = await Parse(b.Tools.Fault("measure", pin: "R1.B"));

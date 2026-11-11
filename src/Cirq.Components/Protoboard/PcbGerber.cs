@@ -7,34 +7,45 @@ namespace Cirq.Components.Protoboard;
 
 /// <summary>
 /// A printed circuit board's manufacturing files, as a board house takes them: Gerber RS-274X (with X2 attributes) for
-/// the copper on the back, its solder mask, the component side's silkscreen and the board's outline, and an Excellon
-/// drill file for the holes. Millimetres throughout, the origin at the board's bottom left corner, seen from the
+/// the copper on the back (and on the component side, double-sided), its solder mask, the component side's silkscreen
+/// and the board's outline, and an Excellon drill file for the holes and vias. Millimetres throughout, the origin at the board's bottom left corner, seen from the
 /// component side, as Gerber viewers show a board.
 /// <para>
 /// The copper is the layout's: a round pad at every pin (pin 1 of a chip or a header square), the traces at their width
 /// (<see cref="PcbRouter.SignalWidth"/>, wider for supplies and ground). The silkscreen has each part's outline and its
-/// designator, and a line for each wire jumper to be fitted on the component side.
+/// designator, and a line for each wire jumper to be fitted on the component side. A ground pour is written as regions,
+/// under the pads and traces. Vias are tented: the solder mask covers them.
 /// </para>
 /// </summary>
 public static class PcbGerber
 {
     private const double SilkWidth = 0.15, EdgeWidth = 0.1, MaskExpansion = 0.1, TextHeight = 1.2;
 
-    /// <summary>The files, by name, for a board <paramref name="name"/>: name-B_Cu.gbl, name-B_Mask.gbs, name-F_SilkS.gto, name-Edge_Cuts.gm1 and name.drl.</summary>
+    /// <summary>
+    /// The files, by name, for a board <paramref name="name"/>: name-B_Cu.gbl, name-B_Mask.gbs, name-F_SilkS.gto,
+    /// name-Edge_Cuts.gm1 and name.drl, and on a double-sided board name-F_Cu.gtl and name-F_Mask.gts too.
+    /// </summary>
     public static IReadOnlyDictionary<string, string> Files(ProtoboardLayout layout, string name)
     {
         ArgumentNullException.ThrowIfNull(layout);
-        if (layout.Kind != BoardKind.Pcb) throw new ArgumentException("Gerber files are made from a printed circuit board's layout.", nameof(layout));
+        if (!layout.Kind.IsPcb()) throw new ArgumentException("Gerber files are made from a printed circuit board's layout.", nameof(layout));
         var stem = Safe(name);
         var board = new Board(layout);
-        return new Dictionary<string, string>(StringComparer.Ordinal)
+        var files = new Dictionary<string, string>(StringComparer.Ordinal)
         {
-            [$"{stem}-B_Cu.gbl"] = board.Copper(),
-            [$"{stem}-B_Mask.gbs"] = board.Mask(),
+            [$"{stem}-B_Cu.gbl"] = board.Copper(0),
+            [$"{stem}-B_Mask.gbs"] = board.Mask(0),
             [$"{stem}-F_SilkS.gto"] = board.Silkscreen(),
             [$"{stem}-Edge_Cuts.gm1"] = board.Outline(),
             [$"{stem}.drl"] = board.Drill(),
         };
+        if (layout.Layers == 2)
+        {
+            files[$"{stem}-F_Cu.gtl"] = board.Copper(1);
+            files[$"{stem}-F_Mask.gts"] = board.Mask(1);
+        }
+
+        return files;
     }
 
     /// <summary>The files in a zip, as a board house's order form takes them.</summary>
@@ -112,15 +123,33 @@ public static class PcbGerber
             return (round, square);
         }
 
-        public string Copper()
+        /// <summary>A copper layer: 0 the back, 1 the component side.</summary>
+        public string Copper(int layer)
         {
-            var g = Header("Copper,L1,Bot", "Positive");
+            var g = Header(layout.Layers == 1 ? "Copper,L1,Bot" : layer == 1 ? "Copper,L1,Top" : "Copper,L2,Bot", "Positive");
             g.Append(CultureInfo.InvariantCulture, $"%ADD10C,{F(PcbRouter.PadDiameter)}*%\n%ADD11R,{F(PcbRouter.PadDiameter)}X{F(PcbRouter.PadDiameter)}*%\n");
-            g.Append(CultureInfo.InvariantCulture, $"%ADD12C,{F(PcbRouter.SignalWidth)}*%\n%ADD13C,{F(PcbRouter.PowerWidth)}*%\n");
+            g.Append(CultureInfo.InvariantCulture, $"%ADD12C,{F(PcbRouter.SignalWidth)}*%\n%ADD13C,{F(PcbRouter.PowerWidth)}*%\n%ADD14C,{F(PcbRouter.ViaDiameter)}*%\n");
+
+            // The pour first, as regions; everything else is drawn over it.
+            foreach (var area in layout.Pour.Where(a => a.Layer == layer))
+            {
+                var (l, t) = Mm((area.Left, area.Top));
+                var (r, b) = Mm((area.Right, area.Bottom));
+                g.Append("G36*\n");
+                Line(g, [(l, t), (r, t), (r, b), (l, b), (l, t)]);
+                g.Append("G37*\n");
+            }
+
             foreach (var (width, aperture) in new[] { (false, "D12"), (true, "D13") })
             {
                 g.Append(aperture).Append("*\n");
-                foreach (var trace in layout.Wires.Where(w => w.IsTrace && (w.Role != WireRole.Signal) == width)) Line(g, trace.Route.Select(Mm));
+                foreach (var trace in layout.Wires.Where(w => w.IsTrace && w.Layer == layer && (w.Role != WireRole.Signal) == width)) Line(g, trace.Route.Select(Mm));
+            }
+
+            if (layout.Vias.Count > 0)
+            {
+                g.Append("D14*\n");
+                foreach (var via in layout.Vias) Flash(g, Mm(via));
             }
 
             var (round, square) = Pads();
@@ -131,9 +160,9 @@ public static class PcbGerber
             return g.Append("M02*\n").ToString();
         }
 
-        public string Mask()
+        public string Mask(int layer)
         {
-            var g = Header("Soldermask,Bot", "Negative");
+            var g = Header(layer == 1 ? "Soldermask,Top" : "Soldermask,Bot", "Negative");
             var size = PcbRouter.PadDiameter + (2 * MaskExpansion);
             g.Append(CultureInfo.InvariantCulture, $"%ADD10C,{F(size)}*%\n%ADD11R,{F(size)}X{F(size)}*%\n");
             var (round, square) = Pads();
@@ -204,9 +233,16 @@ public static class PcbGerber
         {
             var text = new StringBuilder();
             text.Append("M48\n; DRILL file from CirqAvalonia\nFMAT,2\nMETRIC\n");
-            text.Append(CultureInfo.InvariantCulture, $"T1C{F(PcbRouter.DrillDiameter)}\n%\nG90\nG05\nT1\n");
+            text.Append(CultureInfo.InvariantCulture, $"T1C{F(PcbRouter.DrillDiameter)}\n");
+            if (layout.Vias.Count > 0) text.Append(CultureInfo.InvariantCulture, $"T2C{F(PcbRouter.ViaDrill)}\n");
+            text.Append("%\nG90\nG05\nT1\n");
             var (round, square) = Pads();
             foreach (var (x, y) in round.Concat(square)) text.Append(CultureInfo.InvariantCulture, $"X{F(x)}Y{F(y)}\n");
+            if (layout.Vias.Count > 0)
+            {
+                text.Append("T2\n");
+                foreach (var (x, y) in layout.Vias.Select(Mm)) text.Append(CultureInfo.InvariantCulture, $"X{F(x)}Y{F(y)}\n");
+            }
             return text.Append("M30\n").ToString();
         }
 

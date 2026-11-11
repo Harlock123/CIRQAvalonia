@@ -31,8 +31,11 @@ public sealed record StripSegment(int Column, int From, int To, Net? Net);
 /// <param name="Route">Where it runs, in pitches, from <paramref name="From"/> to <paramref name="To"/>: kept off the parts where it can be.</param>
 public sealed record BoardWire(string Key, Net Net, BoardHole From, BoardHole To, WireRole Role, int Colour, bool ByHand, IReadOnlyList<(double X, double Y)> Route)
 {
-    /// <summary>A printed circuit board's copper trace, on the back; its jumpers and every other board's wires are not.</summary>
+    /// <summary>A printed circuit board's copper trace; its jumpers and every other board's wires are not.</summary>
     public bool IsTrace { get; init; }
+
+    /// <summary>A trace's layer: 0 the back (the only one on a single-sided board), 1 the component side.</summary>
+    public int Layer { get; init; }
 }
 
 /// <summary>A lead from a bench part's terminal to a hole.</summary>
@@ -99,6 +102,15 @@ public sealed class ProtoboardLayout
 
     /// <summary>A stripboard's strips as the cuts leave them: each run of copper, and the net it carries if any.</summary>
     public IReadOnlyList<StripSegment> Segments { get; init; } = [];
+
+    /// <summary>A double-sided PCB's vias: where a trace goes through the board from one side to the other.</summary>
+    public IReadOnlyList<BoardHole> Vias { get; init; } = [];
+
+    /// <summary>A PCB's ground pour, as rectangles of copper on each layer.</summary>
+    public IReadOnlyList<PourArea> Pour { get; init; } = [];
+
+    /// <summary>How many layers of copper a PCB has: 1, or 2 when double-sided.</summary>
+    public int Layers => Kind.CopperLayers();
 
     /// <summary>The net at each hole in use, on a stripboard or perfboard (a breadboard's come from its strips).</summary>
     public IReadOnlyDictionary<BoardHole, Net> HoleNets { get; init; } = new Dictionary<BoardHole, Net>();
@@ -260,8 +272,14 @@ public sealed class ProtoboardLayout
                 text.Append(CultureInfo.InvariantCulture, $" The {Breadboard.RailName(row)} rails carry {NetName(net)}.");
         else
         {
-            text.Append(CultureInfo.InvariantCulture, $" A {Kind.ToString().ToLowerInvariant()} {Columns} holes across and {Rows} down");
-            text.Append(Kind == BoardKind.Stripboard ? $", strips A to {SolderedLayout.Letters(Columns)} running down, {Cuts.Count} cut{(Cuts.Count == 1 ? "" : "s")}." : ".");
+            var what = Kind switch { BoardKind.Pcb => "printed circuit board", BoardKind.DoubleSidedPcb => "double-sided printed circuit board", _ => Kind.ToString().ToLowerInvariant() };
+            text.Append(CultureInfo.InvariantCulture, $" A {what} {Columns} holes across and {Rows} down");
+            text.Append(Kind switch
+            {
+                BoardKind.Stripboard => $", strips A to {SolderedLayout.Letters(Columns)} running down, {Cuts.Count} cut{(Cuts.Count == 1 ? "" : "s")}.",
+                _ when Kind.IsPcb() => $", {Wires.Count(w => w.IsTrace)} traces, {Vias.Count} vias, {Wires.Count(w => !w.IsTrace)} jumpers{(Pour.Count > 0 ? ", ground poured" : "")}.",
+                _ => ".",
+            });
             foreach (var (column, net) in Rails.OrderBy(r => r.Key))
                 text.Append(CultureInfo.InvariantCulture, $" Strip {SolderedLayout.Letters(column)} carries {Caption(net)}.");
         }

@@ -295,4 +295,26 @@ public class ProcessorToolTests
         await b.Tools.AddParts([new() { Kind = "Resistor" }]);
         Assert.Contains("no SID", await Error(b.Tools.SidState()));
     }
+    [Fact]
+    public async Task An_atmegas_registers_io_and_flash_are_there_for_an_agent()
+    {
+        using var b = new Bench();
+        await b.Tools.LoadExample("Arduino Uno SPI Counter");
+        var uno = b.Circuit.Components.OfType<Cirq.Components.Processors.ArduinoUnoFirmware>().Single();
+        await b.Tools.RunTransient(System.Text.Json.JsonSerializer.SerializeToElement("2m"), plot: false);
+
+        var state = await Parse(b.Tools.CpuState(uno.Name));
+        Assert.Equal("Arduino Uno", (string)state["chip"]!);
+        Assert.Equal("running", (string)state["state"]!);
+        Assert.Equal("$51", (string)state["io"]!["SPCR"]!);
+        Assert.Equal("$08FF", (string)state["sp"]!);
+        Assert.Equal(32, state["registers"]!.AsObject().Count);
+        Assert.True((long)state["cycles"]! > 10_000);
+
+        var listing = await Parse(b.Tools.Disassemble(uno.Name, address: 0, count: 4));
+        var lines = listing["lines"]!.AsArray().Select(l => (string)l!).ToList();
+        Assert.StartsWith("$0000", lines[0]);
+        Assert.Contains("rjmp 0x0001", lines[0]);
+        Assert.Contains("ldi r16, 0x08", lines[1]);
+    }
 }

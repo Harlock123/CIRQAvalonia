@@ -166,9 +166,19 @@ public partial class MainWindow : Window
         _board.VoltageAt = terminal => viewModel.Simulation.VoltageAt(terminal);
         _board.CurrentInto = terminal => viewModel.Simulation.CurrentInto(terminal);
         _board.IsRunning = () => viewModel.Simulation.IsRunning;
+        _board.BenchProbe += (_, probe) => viewModel.SetBenchProbe(probe.Label, probe.Kind, probe.Terminal);
+        _board.BuildLessonHole += (_, hole) => viewModel.BuildLessonHole(hole);
+        _board.MeterProbed += (_, reading) => viewModel.BuildLessonReading(reading.Red, reading.Volts);
+        _board.BenchLeadMoved += (_, move) => viewModel.MoveBenchLead(move.Lead, move.To);
         _board.LayoutChanged += (_, _) => viewModel.SetBuildSteps(_board.BuildSteps);
         viewModel.RequestBuildSheet += async (_, _) => await SaveBuildSheetAsync();
         WireUpLessons(viewModel);
+        viewModel.RequestFirmwareDebugger += (_, chip) =>
+            new FirmwareDebuggerWindow(new FirmwareDebuggerViewModel(viewModel, chip)).Show(this);
+        viewModel.RequestMessage += async (_, report) =>
+        {
+            if (viewModel.FileDialogs is { } dialogs) await dialogs.ReportAsync(report.Title, report.Text);
+        };
         viewModel.RequestArrangeProtoboard += (_, _) => _board.ArrangeAutomatically();
         viewModel.PropertyChanged += (_, e) =>
         {
@@ -219,6 +229,23 @@ public partial class MainWindow : Window
 
             Fill();
             menu.SubmenuOpened += (_, _) => Fill();
+        }
+
+        if (this.FindControl<MenuItem>("BuildLessonsMenu") is { } builds)
+        {
+            void FillBuilds()
+            {
+                builds.Items.Clear();
+                foreach (var lesson in BuildLessons.All)
+                {
+                    var item = new MenuItem { Header = viewModel.BuildLessonHeader(lesson), Command = viewModel.StartBuildLessonCommand, CommandParameter = lesson };
+                    ToolTip.SetTip(item, lesson.Intro);
+                    builds.Items.Add(item);
+                }
+            }
+
+            FillBuilds();
+            builds.SubmenuOpened += (_, _) => FillBuilds();
         }
 
         viewModel.RequestCoach += (_, prompt) =>

@@ -24,6 +24,19 @@ public enum BoardKind
 
     /// <summary>A single-sided printed circuit board: pads where the pins go, joined by routed copper traces on the back.</summary>
     Pcb,
+
+    /// <summary>A double-sided printed circuit board: traces on both sides, joined through the board by vias.</summary>
+    DoubleSidedPcb,
+}
+
+/// <summary>What each kind of board is.</summary>
+public static class BoardKinds
+{
+    /// <summary>A printed circuit board, single- or double-sided.</summary>
+    public static bool IsPcb(this BoardKind kind) => kind is BoardKind.Pcb or BoardKind.DoubleSidedPcb;
+
+    /// <summary>How many layers of copper it has for traces: two on a double-sided PCB, else one.</summary>
+    public static int CopperLayers(this BoardKind kind) => kind == BoardKind.DoubleSidedPcb ? 2 : 1;
 }
 
 /// <summary>Where one part was put by hand: a hole for each of its pins, or a spot on the bench beside the boards.</summary>
@@ -55,8 +68,22 @@ public sealed class BoardArrangement
     /// <summary>Nothing arranged by hand: the board is laid out automatically.</summary>
     public bool IsEmpty => _parts.Count == 0 && _wires.Count == 0;
 
-    /// <summary>Nothing to save: laid out automatically, on breadboards.</summary>
-    public bool IsDefault => IsEmpty && _kind == BoardKind.Breadboard;
+    /// <summary>Nothing to save: laid out automatically, on breadboards, with the usual ground pour.</summary>
+    public bool IsDefault => IsEmpty && _kind == BoardKind.Breadboard && _groundPour;
+
+    private bool _groundPour = true;
+
+    /// <summary>On a PCB, the free copper filled and joined to ground (on by default).</summary>
+    public bool GroundPour
+    {
+        get => _groundPour;
+        set
+        {
+            if (_groundPour == value) return;
+            _groundPour = value;
+            Version++;
+        }
+    }
 
     /// <summary>Counts every change, so a view can tell its drawing is out of date without comparing contents.</summary>
     public int Version { get; private set; }
@@ -117,6 +144,7 @@ public sealed class BoardArrangement
     {
         Clear();
         Kind = BoardKind.Breadboard;
+        GroundPour = true;
     }
 
     /// <summary>Takes another arrangement's contents in place of this one's.</summary>
@@ -129,6 +157,7 @@ public sealed class BoardArrangement
         foreach (var (id, placement) in other._parts) _parts[id] = placement;
         foreach (var (key, wire) in other._wires) _wires[key] = wire;
         _kind = other._kind;
+        _groundPour = other._groundPour;
         Version++;
     }
 }

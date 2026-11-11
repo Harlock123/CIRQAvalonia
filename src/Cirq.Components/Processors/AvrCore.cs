@@ -3,7 +3,8 @@ namespace Cirq.Components.Processors;
 /// <summary>
 /// An ATmega328P's insides with no circuit: the AVR instruction set with the datasheet's cycle counts, the 32 KB flash,
 /// 2 KB of SRAM, 1 KB of EEPROM, and the peripherals a sketch uses: the three GPIO ports, timers 0, 1 and 2 with their
-/// PWM modes, the USART, the ADC, the external and pin-change interrupts, and sleep.
+/// PWM modes, the USART, the SPI master, the two-wire interface (I2C) as a master, the ADC, the external and pin-change
+/// interrupts, and sleep.
 /// <para>
 /// It runs a cycle at a time against whoever holds it (<see cref="Atmega328p"/>), which samples the pins into
 /// <see cref="PinInputs"/> and the analog inputs into <see cref="AnalogInputs"/>, calls <see cref="Step"/>, and watches
@@ -29,6 +30,8 @@ public sealed class AvrCore
     public const int OCR1AL = 0x88, OCR1AH = 0x89, OCR1BL = 0x8A, OCR1BH = 0x8B;
     public const int TCCR2A = 0xB0, TCCR2B = 0xB1, TCNT2 = 0xB2, OCR2A = 0xB3, OCR2B = 0xB4;
     public const int UCSR0A = 0xC0, UCSR0B = 0xC1, UCSR0C = 0xC2, UBRR0L = 0xC4, UBRR0H = 0xC5, UDR0 = 0xC6;
+    public const int SPCR = 0x4C, SPSR = 0x4D, SPDR = 0x4E;
+    public const int TWBR = 0xB8, TWSR = 0xB9, TWAR = 0xBA, TWDR = 0xBB, TWCR = 0xBC;
 
     // ---- interrupt vectors, as the datasheet numbers them ----
     public const int VectorInt0 = 1, VectorInt1 = 2, VectorPcint0 = 3, VectorPcint1 = 4, VectorPcint2 = 5;
@@ -36,6 +39,7 @@ public sealed class AvrCore
     public const int VectorTimer1CompA = 11, VectorTimer1CompB = 12, VectorTimer1Ovf = 13;
     public const int VectorTimer0CompA = 14, VectorTimer0CompB = 15, VectorTimer0Ovf = 16;
     public const int VectorUsartRx = 18, VectorUsartUdre = 19, VectorUsartTx = 20, VectorAdc = 21;
+    public const int VectorSpi = 17, VectorTwi = 24;
 
     /// <summary>Everything the chip holds: copied whole to keep a run's end state.</summary>
     public sealed class Registers
@@ -64,6 +68,16 @@ public sealed class AvrCore
         // The ADC: cycles left of a conversion.
         public int AdcCycles = -1;
         public bool AdcFirst = true;
+
+        // The SPI master: half clocks left of a byte, the countdown to the next, the shift registers and the pins.
+        public int SpiHalves, SpiCountdown, SpiOut, SpiIn;
+        public bool SpiSck, SpiMosi;
+
+        // The two-wire interface: what it's doing (0 idle, 1 start, 2 stop, 3 a byte), its step in that, the countdown,
+        // the bit, the byte, whether it's reading; whether it owns the bus, has sent an address and is receiving; and
+        // whether it's pulling each line low.
+        public int TwiAction, TwiPhase, TwiCountdown, TwiBit, TwiByte;
+        public bool TwiOwns, TwiAddressed, TwiReceiving, TwiSdaLow, TwiSclLow, TwiAck;
 
         // Last seen levels, for edges.
         public byte LastPinB, LastPinC, LastPinD;
@@ -155,6 +169,8 @@ public sealed class AvrCore
         SP = DataSize - 1;
         D[UCSR0A] = 0x20;
         D[UCSR0C] = 0x06;
+        D[TWSR] = 0xF8;
+        D[TWDR] = 0xFF;
     }
 
     private byte Read(int address)
@@ -174,6 +190,9 @@ public sealed class AvrCore
                 D[UCSR0A] &= 0x7F;
                 return D[UDR0];
             case ADCL: return D[ADCL];
+            case SPDR:
+                D[SPSR] &= 0x3F;   // SPIF and WCOL go once SPDR is read after SPSR
+                return D[SPDR];
             default: return D[address];
         }
     }
@@ -213,6 +232,25 @@ public sealed class AvrCore
                 // ADIF is cleared by writing a one to it, and otherwise kept as it is.
                 D[ADCSRA] = (byte)((value & ~0x10) | ((value & 0x10) != 0 ? 0 : D[ADCSRA] & 0x10));
                 if ((value & 0x40) != 0 && (value & 0x80) != 0 && State.AdcCycles < 0) StartConversion();
+                return;
+            case SPDR:
+                D[SPSR] &= 0x3F;
+                if (State.SpiHalves > 0) { D[SPSR] |= 0x40; return; }   // WCOL: written mid-transfer
+                if ((D[SPCR] & 0x50) != 0x50) { D[SPDR] = value; return; }
+                StartSpi(value);
+                return;
+            case SPSR:
+                D[SPSR] = (byte)((D[SPSR] & 0xFE) | (value & 0x01));
+                return;
+            case TWCR:
+                WriteTwcr(value);
+                return;
+            case TWSR:
+                D[TWSR] = (byte)((D[TWSR] & 0xF8) | (value & 0x03));
+                return;
+            case TWDR:
+                if ((D[TWCR] & 0x80) == 0 && State.TwiAction != 0) { D[TWCR] |= 0x08; return; }   // TWWC
+                D[TWDR] = value;
                 return;
             case EECR:
                 D[EECR] = (byte)(value & 0x3F);
@@ -312,10 +350,12 @@ public sealed class AvrCore
         if ((D[TIMSK0] & 0x02) != 0 && (D[TIFR0] & 0x02) != 0) return VectorTimer0CompA;
         if ((D[TIMSK0] & 0x04) != 0 && (D[TIFR0] & 0x04) != 0) return VectorTimer0CompB;
         if ((D[TIMSK0] & 0x01) != 0 && (D[TIFR0] & 0x01) != 0) return VectorTimer0Ovf;
+        if ((D[SPCR] & 0x80) != 0 && (D[SPSR] & 0x80) != 0) return VectorSpi;
         if ((D[UCSR0B] & 0x80) != 0 && (D[UCSR0A] & 0x80) != 0) return VectorUsartRx;
         if ((D[UCSR0B] & 0x20) != 0 && (D[UCSR0A] & 0x20) != 0) return VectorUsartUdre;
         if ((D[UCSR0B] & 0x40) != 0 && (D[UCSR0A] & 0x40) != 0) return VectorUsartTx;
         if ((D[ADCSRA] & 0x08) != 0 && (D[ADCSRA] & 0x10) != 0) return VectorAdc;
+        if ((D[TWCR] & 0x05) == 0x05 && (D[TWCR] & 0x80) != 0) return VectorTwi;
         return 0;
     }
 
@@ -338,6 +378,7 @@ public sealed class AvrCore
             case VectorTimer0Ovf: D[TIFR0] &= unchecked((byte)~0x01); break;
             case VectorUsartTx: D[UCSR0A] &= unchecked((byte)~0x40); break;
             case VectorAdc: D[ADCSRA] &= unchecked((byte)~0x10); break;
+            case VectorSpi: D[SPSR] &= 0x7F; break;
         }
     }
 
@@ -779,6 +820,8 @@ public sealed class AvrCore
             Timer8(2);
             Timer16();
             Usart();
+            Spi();
+            Twi();
             Adc();
         }
     }
@@ -965,7 +1008,8 @@ public sealed class AvrCore
     {
         if (TxEnabled)
         {
-            if (State.TxBits == 0 && State.TxPending)
+            // The next byte goes once the last one's stop bit has run its full length.
+            if (State.TxBits == 0 && State.TxCountdown <= 0 && State.TxPending)
             {
                 // Start bit, the data bits LSB first, the stop bit(s).
                 var bits = FrameBits;
@@ -991,11 +1035,11 @@ public sealed class AvrCore
                 }
 
                 State.TxCountdown--;
-                if (State.TxBits == 0 && State.TxCountdown <= 0) D[UCSR0A] |= 0x40;
+                if (State.TxBits == 0 && State.TxCountdown <= 0 && !State.TxPending) D[UCSR0A] |= 0x40;
             }
-            else if (State.TxCountdown > 0 && --State.TxCountdown == 0)
+            else if (State.TxCountdown > 0 && --State.TxCountdown == 0 && !State.TxPending)
             {
-                D[UCSR0A] |= 0x40;
+                D[UCSR0A] |= 0x40;   // TXC: the frame is out and nothing waits behind it
             }
         }
         else
@@ -1046,6 +1090,249 @@ public sealed class AvrCore
         }
 
         State.RxLast = line;
+    }
+
+    // ---- the SPI master ----
+
+    /// <summary>SPI on and the master: SPE and MSTR.</summary>
+    public bool SpiMaster => (D[SPCR] & 0x50) == 0x50;
+
+    /// <summary>CPU cycles to half an SPI clock: the divider SPR1:0 gives, halved by SPI2X.</summary>
+    private int SpiHalf => Math.Max(1, (D[SPCR] & 0x03) switch { 0 => 4, 1 => 16, 2 => 64, _ => 128 } / ((D[SPSR] & 0x01) != 0 ? 2 : 1) / 2);
+
+    private void StartSpi(byte value)
+    {
+        State.SpiOut = value;
+        State.SpiIn = 0;
+        State.SpiHalves = 16;
+        State.SpiCountdown = SpiHalf;
+        State.SpiSck = (D[SPCR] & 0x08) != 0;
+        if ((D[SPCR] & 0x04) == 0) State.SpiMosi = SpiBit(0);   // CPHA 0: the first bit is out before the first edge
+    }
+
+    /// <summary>The <paramref name="index"/>th bit of the byte going out, in the order DORD says.</summary>
+    private bool SpiBit(int index) => (State.SpiOut & (1 << ((D[SPCR] & 0x20) != 0 ? index : 7 - index))) != 0;
+
+    private void Spi()
+    {
+        // In master mode, SS as an input pulled low makes the chip a slave, as the datasheet says.
+        if (SpiMaster && (D[DDRB] & 0x04) == 0 && (PinInputs[0] & 0x04) == 0)
+        {
+            D[SPCR] &= unchecked((byte)~0x10);
+            D[SPSR] |= 0x80;
+            State.SpiHalves = 0;
+            return;
+        }
+
+        if (State.SpiHalves == 0 || --State.SpiCountdown > 0) return;
+        State.SpiCountdown = SpiHalf;
+        var half = 16 - State.SpiHalves;           // 0 to 15: even halves end in a leading edge, odd in a trailing one
+        var bit = half / 2;
+        var leading = half % 2 == 0;
+        State.SpiSck = !State.SpiSck;
+        var cpha = (D[SPCR] & 0x04) != 0;
+        var sample = leading != cpha;
+        if (sample)
+        {
+            if ((PinInputs[0] & 0x10) != 0) State.SpiIn |= 1 << ((D[SPCR] & 0x20) != 0 ? bit : 7 - bit);
+        }
+        else if (cpha) State.SpiMosi = SpiBit(bit);
+        else if (bit < 7) State.SpiMosi = SpiBit(bit + 1);
+
+        if (--State.SpiHalves > 0) return;
+        D[SPDR] = (byte)State.SpiIn;
+        D[SPSR] |= 0x80;
+    }
+
+    // ---- the two-wire interface (I2C), as a master ----
+
+    /// <summary>TWEN: the two-wire interface has SDA and SCL.</summary>
+    public bool TwiEnabled => (D[TWCR] & 0x04) != 0;
+
+    /// <summary>Whether the two-wire interface is part way through something: the pins want watching closely.</summary>
+    public bool TwiBusy => TwiEnabled && State.TwiAction != 0;
+
+    /// <summary>CPU cycles to a quarter of an I2C bit: the datasheet's F_CPU / (16 + 2·TWBR·4^TWPS), in quarters.</summary>
+    public int TwiQuarter => Math.Max(1, (16 + (2 * D[TWBR] * (1 << (2 * (D[TWSR] & 0x03))))) / 4);
+
+    private bool Sda => (PinInputs[1] & 0x10) != 0;
+
+    private bool Scl => (PinInputs[1] & 0x20) != 0;
+
+    private void WriteTwcr(byte value)
+    {
+        // TWINT is cleared by writing a one to it; TWWC isn't written.
+        var flag = (value & 0x80) != 0 ? 0 : D[TWCR] & 0x80;
+        D[TWCR] = (byte)((value & 0x77) | flag);
+        if ((value & 0x04) == 0)
+        {
+            State.TwiAction = 0;
+            State.TwiOwns = State.TwiSdaLow = State.TwiSclLow = false;
+            return;
+        }
+
+        if ((value & 0x80) == 0) return;
+        State.TwiPhase = 0;
+        State.TwiCountdown = TwiQuarter * 2;
+        if ((value & 0x20) != 0) State.TwiAction = 1;
+        else if ((value & 0x10) != 0) State.TwiAction = 2;
+        else if (State.TwiOwns)
+        {
+            State.TwiAction = 3;
+            State.TwiBit = 0;
+            State.TwiReceiving = !State.TwiAddressed ? false : State.TwiReceiving;
+            State.TwiByte = State.TwiReceiving ? 0 : D[TWDR];
+            State.TwiAck = (value & 0x40) != 0;
+        }
+    }
+
+    private void Done(int status)
+    {
+        D[TWSR] = (byte)((status & 0xF8) | (D[TWSR] & 0x03));
+        D[TWCR] |= 0x80;
+        State.TwiAction = 0;
+    }
+
+    /// <summary>Waits out the countdown; true when it's done.</summary>
+    private bool Wait() => --State.TwiCountdown <= 0;
+
+    private void Next(int phase, int quarters = 2)
+    {
+        State.TwiPhase = phase;
+        State.TwiCountdown = TwiQuarter * quarters;
+    }
+
+    private void Twi()
+    {
+        if (!TwiEnabled || State.TwiAction == 0) return;
+        switch (State.TwiAction)
+        {
+            case 1: Start(); break;
+            case 2: Stop(); break;
+            case 3: Byte(); break;
+        }
+    }
+
+    /// <summary>START, or a repeated START when it already has the bus: SDA falling while SCL is high.</summary>
+    private void Start()
+    {
+        switch (State.TwiPhase)
+        {
+            case 0:
+                // Already holding the bus (SCL low): let SDA go, then SCL, before falling again.
+                if (State.TwiOwns) { State.TwiSdaLow = false; Next(1); }
+                else if (Sda && Scl) { State.TwiSdaLow = true; Next(3); }
+                break;
+            case 1:
+                if (!Wait()) break;
+                State.TwiSclLow = false;
+                Next(2);
+                break;
+            case 2:
+                if (!Scl) break;   // a slave stretching the clock
+                if (!Wait()) break;
+                State.TwiSdaLow = true;
+                Next(3);
+                break;
+            case 3:
+                if (!Wait()) break;
+                State.TwiSclLow = true;
+                Next(4);
+                break;
+            case 4:
+                if (!Wait()) break;
+                var repeated = State.TwiOwns;
+                State.TwiOwns = true;
+                State.TwiAddressed = false;
+                D[TWCR] &= unchecked((byte)~0x20);
+                Done(repeated ? 0x10 : 0x08);
+                break;
+        }
+    }
+
+    /// <summary>STOP: SDA rising while SCL is high, and the bus let go.</summary>
+    private void Stop()
+    {
+        switch (State.TwiPhase)
+        {
+            case 0:
+                State.TwiSdaLow = true;
+                Next(1);
+                break;
+            case 1:
+                if (!Wait()) break;
+                State.TwiSclLow = false;
+                Next(2);
+                break;
+            case 2:
+                if (!Scl) break;
+                if (!Wait()) break;
+                State.TwiSdaLow = false;
+                Next(3);
+                break;
+            case 3:
+                if (!Wait()) break;
+                State.TwiOwns = false;
+                State.TwiAddressed = false;
+                D[TWCR] &= unchecked((byte)~0x10);
+                D[TWSR] = (byte)(0xF8 | (D[TWSR] & 0x03));
+                State.TwiAction = 0;   // no TWINT after a STOP
+                break;
+        }
+    }
+
+    /// <summary>A byte and its acknowledge: eight bits out (or in) and a ninth, SDA set while SCL is low and read while it's high.</summary>
+    private void Byte()
+    {
+        switch (State.TwiPhase)
+        {
+            case 0:
+                // SCL low: put the bit on SDA. Sending, it's the byte's; receiving, SDA is let go, but for our acknowledge.
+                var bit = State.TwiBit;
+                State.TwiSdaLow = State.TwiReceiving
+                    ? bit == 8 && State.TwiAck
+                    : bit < 8 && (State.TwiByte & (0x80 >> bit)) == 0;
+                Next(1);
+                break;
+            case 1:
+                if (!Wait()) break;
+                State.TwiSclLow = false;
+                Next(2);
+                break;
+            case 2:
+                if (!Scl) break;   // clock stretching
+                if (!Wait()) break;
+                if (State.TwiBit < 8 && State.TwiReceiving && Sda) State.TwiByte |= 0x80 >> State.TwiBit;
+                var acked = !Sda;
+                State.TwiSclLow = true;
+                if (State.TwiBit++ < 8)
+                {
+                    Next(0, 0);
+                    State.TwiCountdown = 1;
+                    break;
+                }
+
+                State.TwiSdaLow = false;
+                Finish(acked);
+                break;
+        }
+    }
+
+    private void Finish(bool acked)
+    {
+        if (!State.TwiAddressed)
+        {
+            // The address byte: its low bit says which way the rest goes.
+            State.TwiAddressed = true;
+            State.TwiReceiving = (State.TwiByte & 1) != 0;
+            Done(State.TwiReceiving ? acked ? 0x40 : 0x48 : acked ? 0x18 : 0x20);
+        }
+        else if (State.TwiReceiving)
+        {
+            D[TWDR] = (byte)State.TwiByte;
+            Done(State.TwiAck ? 0x50 : 0x58);
+        }
+        else Done(acked ? 0x28 : 0x30);
     }
 
     // ---- the ADC ----
@@ -1145,6 +1432,13 @@ public sealed class AvrCore
             (2, 3) => 5,
             _ => -1,
         };
+        if (TwiEnabled && port == 1 && bit is 4 or 5) return (bit == 4 ? State.TwiSdaLow : State.TwiSclLow) ? false : null;
+        if (SpiMaster && port == 0)
+        {
+            if (bit == 4) return null;
+            if (bit is 3 or 5 && (D[ddr] & (1 << bit)) != 0) return bit == 3 ? State.SpiMosi : State.SpiSck;
+        }
+
         if ((D[ddr] & (1 << bit)) == 0) return null;
         if (oc >= 0 && OcDriving(oc)) return State.Oc[oc];
         return (D[portRegister] & (1 << bit)) != 0;

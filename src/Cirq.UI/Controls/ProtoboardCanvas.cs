@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
+using Avalonia.Media.Immutable;
 using Cirq.Components.Protoboard;
 using Cirq.Core.Topology;
 using Cirq.UI.Rendering;
@@ -31,6 +32,90 @@ public sealed class ProtoboardCanvas : Control
 
     public static readonly StyledProperty<int> BuildStepProperty =
         AvaloniaProperty.Register<ProtoboardCanvas, int>(nameof(BuildStep), -1);
+
+    public static readonly StyledProperty<int> BuildLessonStepProperty =
+        AvaloniaProperty.Register<ProtoboardCanvas, int>(nameof(BuildLessonStep), -1);
+
+    public static readonly StyledProperty<bool> IsBuildingLessonProperty =
+        AvaloniaProperty.Register<ProtoboardCanvas, bool>(nameof(IsBuildingLesson));
+
+    public static readonly StyledProperty<IReadOnlyList<BoardHole>?> BuildLessonMarksProperty =
+        AvaloniaProperty.Register<ProtoboardCanvas, IReadOnlyList<BoardHole>?>(nameof(BuildLessonMarks));
+
+    /// <summary>A guided build's step on hand: the board shows only the steps before it, or -1 with no build under way.</summary>
+    public int BuildLessonStep
+    {
+        get => GetValue(BuildLessonStepProperty);
+        set => SetValue(BuildLessonStepProperty, value);
+    }
+
+    /// <summary>While a guided build's holes are being clicked: a click on a hole is an answer, not a grab.</summary>
+    public bool IsBuildingLesson
+    {
+        get => GetValue(IsBuildingLessonProperty);
+        set => SetValue(IsBuildingLessonProperty, value);
+    }
+
+    /// <summary>The holes of the step on hand clicked so far, lit.</summary>
+    public IReadOnlyList<BoardHole>? BuildLessonMarks
+    {
+        get => GetValue(BuildLessonMarksProperty);
+        set => SetValue(BuildLessonMarksProperty, value);
+    }
+
+    /// <summary>Raised with the hole clicked during a guided build.</summary>
+    public event EventHandler<BoardHole>? BuildLessonHole;
+
+    /// <summary>Raised when the meter's red probe is put down: where, and what it reads (null when it reads nothing).</summary>
+    public event EventHandler<(BoardHole? Red, double? Volts)>? MeterProbed;
+
+    public static readonly StyledProperty<bool> AnalyserShownProperty =
+        AvaloniaProperty.Register<ProtoboardCanvas, bool>(nameof(AnalyserShown));
+
+    public static readonly StyledProperty<bool> BenchScopeShownProperty =
+        AvaloniaProperty.Register<ProtoboardCanvas, bool>(nameof(BenchScopeShown));
+
+    public static readonly StyledProperty<double> BenchTimebaseProperty =
+        AvaloniaProperty.Register<ProtoboardCanvas, double>(nameof(BenchTimebase), 1e-3);
+
+    /// <summary>The logic analyser out on the bench.</summary>
+    public bool AnalyserShown
+    {
+        get => GetValue(AnalyserShownProperty);
+        set => SetValue(AnalyserShownProperty, value);
+    }
+
+    /// <summary>The two-channel scope out on the bench.</summary>
+    public bool BenchScopeShown
+    {
+        get => GetValue(BenchScopeShownProperty);
+        set => SetValue(BenchScopeShownProperty, value);
+    }
+
+    /// <summary>Time per division of the bench instruments' displays: the scope's own, so they show the same stretch.</summary>
+    public double BenchTimebase
+    {
+        get => GetValue(BenchTimebaseProperty);
+        set => SetValue(BenchTimebaseProperty, value);
+    }
+
+    /// <summary>Raised when a bench instrument's probe is clipped onto a hole (the terminal it's on) or taken off (null).</summary>
+    public event EventHandler<(string Label, Cirq.Core.Probing.ProbeKind Kind, Terminal? Terminal)>? BenchProbe;
+
+    /// <summary>Raised when a bench lead (a supply's, a generator's) is dragged onto another hole: wire it to what's there.</summary>
+    public event EventHandler<(Terminal Lead, Terminal To)>? BenchLeadMoved;
+
+    public static readonly StyledProperty<IReadOnlyList<DrcIssue>?> DrcIssuesProperty =
+        AvaloniaProperty.Register<ProtoboardCanvas, IReadOnlyList<DrcIssue>?>(nameof(DrcIssues));
+
+    /// <summary>What the last design rule check found, ringed on the board until the board changes.</summary>
+    public IReadOnlyList<DrcIssue>? DrcIssues
+    {
+        get => GetValue(DrcIssuesProperty);
+        set => SetValue(DrcIssuesProperty, value);
+    }
+
+    private ProtoboardLayout? _drcLayout;
 
     /// <summary>Whether the multimeter is out on the bench.</summary>
     public bool MeterShown
@@ -96,7 +181,7 @@ public sealed class ProtoboardCanvas : Control
     private long _signature;
 
     // A move in progress: what was grabbed, where, and the board as it would be if dropped now.
-    private enum Grab { None, Pan, Part, Lead, WireEnd, Bench, Probe }
+    private enum Grab { None, Pan, Part, Lead, WireEnd, Bench, Probe, Tip, BenchLead }
 
     private Grab _grab;
     private Point _lastPointer;
@@ -114,7 +199,9 @@ public sealed class ProtoboardCanvas : Control
 
     static ProtoboardCanvas()
     {
-        AffectsRender<ProtoboardCanvas>(CircuitProperty, SelectedComponentProperty, MeterShownProperty, BuildStepProperty);
+        AffectsRender<ProtoboardCanvas>(CircuitProperty, SelectedComponentProperty, MeterShownProperty, BuildStepProperty, DrcIssuesProperty,
+            AnalyserShownProperty, BenchScopeShownProperty, BenchTimebaseProperty, BuildLessonStepProperty, BuildLessonMarksProperty);
+        DrcIssuesProperty.Changed.AddClassHandler<ProtoboardCanvas>((canvas, _) => canvas._drcLayout = canvas.Layout);
     }
 
     public ProtoboardCanvas()
@@ -269,9 +356,32 @@ public sealed class ProtoboardCanvas : Control
         {
             var steps = BuildStep >= 0 && _candidate is null ? BuildSteps : [];
             var current = BuildStep >= 0 && BuildStep < steps.Count ? steps[BuildStep] : null;
+            var visible = current is null ? null : Visible(shown, steps, BuildStep);
+            var lit = _lit;
+
+            // A guided build shows only what's been fitted, the step on hand unmarked (finding its holes is the point),
+            // and the holes clicked for it lit.
+            if (BuildLessonStep >= 0)
+            {
+                visible = Visible(shown, BuildSteps, BuildLessonStep - 1);
+                current = null;
+                lit = BuildLessonMarks is { Count: > 0 } marks ? marks.ToHashSet() : null;
+            }
+
             ProtoboardRenderer.Draw(canvas, shown, new ProtoboardRenderOptions(
-                SelectedComponent, _hoverStrip, _grabbedWire, _lit, current is null ? null : Visible(shown, steps, BuildStep), current,
-                MeterShown ? Meter(shown) : null));
+                SelectedComponent, _hoverStrip, _grabbedWire, lit, visible, current,
+                MeterShown ? Meter(shown) : null,
+                DrcIssues is { Count: > 0 } issues && ReferenceEquals(_drcLayout, shown) ? [.. issues.Select(i => (i.X, i.Y))] : null,
+                Instruments(shown)));
+
+            // A bench lead being dragged: a line from where it leaves the equipment to the pointer.
+            if (_grab == Grab.BenchLead && _grabbedBenchLead is { } dragged && _probeAt is { } to)
+            {
+                var from = dragged.Route[0];
+                var scale = ProtoboardRenderer.Unit;
+                canvas.DrawLine(new ImmutablePen(new ImmutableSolidColorBrush(Color.Parse("#C02F80ED")), 0.3 * scale, new ImmutableDashStyle([2, 2], 0)),
+                    new Point(from.X * scale, from.Y * scale), new Point(to.X * scale, to.Y * scale));
+            }
 
             // A move that can't be made: the part ringed in red where it was, until it's let go.
             if (_refusal is not null && _grabbedPart is { } part && ProtoboardRenderer.Bounds(shown, part) is { } box)
@@ -354,6 +464,47 @@ public sealed class ProtoboardCanvas : Control
             return;
         }
 
+        // A guided build: a click on a hole is the answer to the step on hand.
+        if (IsBuildingLesson && BuildLessonStep >= 0 && point.Properties.IsLeftButtonPressed)
+        {
+            if (hole is { } answer) BuildLessonHole?.Invoke(this, answer);
+            return;
+        }
+
+        // A bench instrument's probe tip, or its body (the analyser's decoder turns to the next).
+        if (point.Properties.IsLeftButtonPressed)
+            foreach (var instrument in Instruments(layout))
+            {
+                foreach (var lead in instrument.Leads)
+                    if (Distance(lead.Tip, (x, y)) < 0.8)
+                    {
+                        _grabbedTip = lead.Name;
+                        Begin(Grab.Tip, e, $"The {instrument.Title}'s {lead.Name} probe");
+                        return;
+                    }
+
+                if (instrument.Contains(x, y))
+                {
+                    if (instrument.Logic)
+                    {
+                        _decoder = (_decoder + 1) % Decoders.Length;
+                        StatusChanged?.Invoke(this, $"Logic analyser: {Decoders[_decoder]}");
+                        InvalidateVisual();
+                    }
+
+                    return;
+                }
+            }
+
+        // The end of a lead from the bench: dragged onto another hole, it's wired to what's there.
+        if (hole is { } leadEnd && point.Properties.IsLeftButtonPressed
+            && layout.Bench.SelectMany(b => b.Leads).FirstOrDefault(l => l.To == leadEnd) is { } benchLead)
+        {
+            _grabbedBenchLead = benchLead;
+            Begin(Grab.BenchLead, e, $"{benchLead.Terminal.Owner?.Name}'s {benchLead.Terminal.Name} lead");
+            return;
+        }
+
         // A lead's end or a jumper's end, before the part they belong to.
         if (hole is { } at)
         {
@@ -428,6 +579,12 @@ public sealed class ProtoboardCanvas : Control
             case Grab.None:
                 Hover(layout, x, y);
                 return;
+            case Grab.Tip or Grab.BenchLead:
+                _probeAt = (x, y);
+                var over = layout.Nearest(x, y, 0.6);
+                StatusChanged?.Invoke(this, over is { } o ? $"On {layout.HoleName(o)}" : _grab == Grab.Tip ? "Drop it on a hole, or off the board to unclip it" : "Drop it on a hole");
+                InvalidateVisual();
+                return;
             case Grab.Probe:
                 _probeAt = (x, y);
                 var near = layout.Nearest(x, y, 0.6);
@@ -483,6 +640,35 @@ public sealed class ProtoboardCanvas : Control
         _grab = Grab.None;
         e.Pointer.Capture(null);
 
+        if (grab == Grab.Tip && Layout is { } benchBoard && _grabbedTip is { } name)
+        {
+            var (x, y) = ToPitches(e.GetPosition(this));
+            var hole = benchBoard.Nearest(x, y, 0.6);
+            _tips[name] = hole;
+            _probeAt = null;
+            var terminal = hole is { } h && benchBoard.NetAt(h) is { } net ? Contact(net) : null;
+            BenchProbe?.Invoke(this, (TipLabel(name), name.StartsWith('D') ? Cirq.Core.Probing.ProbeKind.Logic : Cirq.Core.Probing.ProbeKind.Voltage, terminal));
+            StatusChanged?.Invoke(this, hole is { } at ? $"{name} on {benchBoard.HoleName(at)}" : $"{name} unclipped");
+            InvalidateVisual();
+            return;
+        }
+
+        if (grab == Grab.BenchLead && Layout is { } leadBoard && _grabbedBenchLead is { } moved)
+        {
+            var (x, y) = ToPitches(e.GetPosition(this));
+            _probeAt = null;
+            _grabbedBenchLead = null;
+            if (leadBoard.Nearest(x, y, 0.6) is { } to && to != moved.To && leadBoard.NetAt(to) is { } net && Contact(net) is { } target
+                && !ReferenceEquals(net, moved.Net))
+            {
+                BenchLeadMoved?.Invoke(this, (moved.Terminal, target));
+                StatusChanged?.Invoke(this, $"{moved.Terminal.Owner?.Name}.{moved.Terminal.Name} wired to {ProtoboardLayout.NetName(net)} ({leadBoard.HoleName(to)})");
+            }
+            else StatusChanged?.Invoke(this, "Drop the lead on a hole of another net to wire it there");
+            InvalidateVisual();
+            return;
+        }
+
         if (grab == Grab.Probe && Layout is { } board)
         {
             var (x, y) = ToPitches(e.GetPosition(this));
@@ -491,6 +677,11 @@ public sealed class ProtoboardCanvas : Control
             else _blackTip = hole;
             _probeAt = null;
             StatusChanged?.Invoke(this, MeterSays(board));
+            if (_grabbedRed && MeterRange == 0)
+            {
+                double? volts = _redTip is { } r && _blackTip is { } b && Volts(board, r) is { } vr && Volts(board, b) is { } vb && IsRunning?.Invoke() == true ? vr - vb : null;
+                MeterProbed?.Invoke(this, (_redTip, volts));
+            }
             InvalidateVisual();
             return;
         }
@@ -610,6 +801,99 @@ public sealed class ProtoboardCanvas : Control
         }
 
         return visible;
+    }
+
+    // ───────────────────────────── the logic analyser and the bench scope ─────────────────────────────
+
+    private static readonly string[] Decoders =
+        ["no decoder", "UART at 9600 baud on D0", "UART at 115,200 baud on D0", "I2C: D0 SDA, D1 SCL", "SPI: D0 SCK, D1 MOSI, D2 MISO"];
+
+    private static readonly string[] ChannelColours = ["#E53935", "#FB8C00", "#FDD835", "#43A047", "#1E88E5", "#8E24AA", "#6D4C41", "#B0BEC5"];
+
+    private readonly Dictionary<string, BoardHole?> _tips = [];
+    private string? _grabbedTip;
+    private BenchLead? _grabbedBenchLead;
+    private int _decoder;
+
+    /// <summary>The probe a tip makes: the analyser's channels and the bench scope's, named so they're told apart on the scope too.</summary>
+    public static string TipLabel(string tip) => tip.StartsWith('D') ? $"LA {tip}" : $"Bench {tip}";
+
+    private List<InstrumentView> Instruments(ProtoboardLayout layout)
+    {
+        var views = new List<InstrumentView>();
+        if (!AnalyserShown && !BenchScopeShown) return views;
+        var (_, _, _, bottom) = layout.Extent;
+        var x = MeterShown ? 2.0 + MeterView.Width + 2.0 : 2.0;
+        var y = bottom + 2.0;
+        var span = Math.Max(1e-9, BenchTimebase * 10);
+        if (AnalyserShown)
+        {
+            const double width = 26, height = 16;
+            var names = Enumerable.Range(0, 8).Select(i => $"D{i}").ToList();
+            var traces = new List<InstrumentTrace>();
+            foreach (var (name, i) in names.Select((n, i) => (n, i)))
+                traces.Add(Trace(TipLabel(name), ChannelColours[i], span, 0, 1));
+            views.Add(new InstrumentView("Logic analyser", x, y, width, height,
+                [.. names.Select((n, i) => Lead(layout, n, ChannelColours[i], (x + 2.5 + (i * 3.0), y), (x + 2.5 + (i * 3.0), y - 2.0)))],
+                traces, $"{Decoders[_decoder]}{Decode()}  ·  {Cirq.Core.Units.SiPrefix.Format(BenchTimebase, "s")}/div", Logic: true));
+            x += width + 2.0;
+        }
+
+        if (BenchScopeShown)
+        {
+            const double width = 24, height = 16;
+            var colours = new[] { "#FDD835", "#26C6DA" };
+            var points = new[] { "CH1", "CH2" }.Select(n => Points(TipLabel(n), span)).ToList();
+            var all = points.SelectMany(p => p.Points).Select(p => p.V).ToList();
+            var (min, max) = all.Count > 0 ? (Math.Min(0, all.Min()), Math.Max(1e-3, all.Max())) : (0.0, 5.0);
+            var traces = points.Select((p, i) => new InstrumentTrace(colours[i], p.Points, p.Start, span, min, max * 1.05)).ToList();
+            views.Add(new InstrumentView("Scope", x, y, width, height,
+                [Lead(layout, "CH1", colours[0], (x + 6, y), (x + 6, y - 2.0)), Lead(layout, "CH2", colours[1], (x + 14, y), (x + 14, y - 2.0))],
+                traces, $"{Cirq.Core.Units.SiPrefix.Format(BenchTimebase, "s")}/div  ·  0 to {Cirq.Core.Units.SiPrefix.Format(max, "V")}", Logic: false));
+        }
+
+        return views;
+    }
+
+    private InstrumentLead Lead(ProtoboardLayout layout, string name, string colour, (double X, double Y) jack, (double X, double Y) parked)
+    {
+        _tips.TryGetValue(name, out var hole);
+        var tip = _grab == Grab.Tip && _grabbedTip == name && _probeAt is { } at ? at : hole is { } h ? layout.Position(h) : parked;
+        return new InstrumentLead(name, colour, jack, tip, hole is not null);
+    }
+
+    private (IReadOnlyList<(double T, double V)> Points, double Start) Points(string label, double span)
+    {
+        if (Circuit?.Probes.FirstOrDefault(p => p.Label == label) is not { } probe) return ([], 0);
+        var history = probe.HistoryBuffer.ToArray();
+        if (history.Length == 0) return ([], 0);
+        var end = history[^1].Time;
+        var start = end - span;
+        return ([.. history.Where(d => d.Time >= start).Select(d => (d.Time, d.Value))], start);
+    }
+
+    private InstrumentTrace Trace(string label, string colour, double span, double min, double max)
+    {
+        var (points, start) = Points(label, span);
+        return new InstrumentTrace(colour, points, start, span, min, max);
+    }
+
+    /// <summary>What the analyser's decoder makes of its channels: the last of it, as fits under the display.</summary>
+    private string Decode()
+    {
+        if (_decoder == 0 || Circuit is null) return "";
+        Cirq.Engine.Decoding.LogicTrace? Channel(int i) =>
+            Circuit.Probes.FirstOrDefault(p => p.Label == TipLabel($"D{i}")) is { } probe ? Cirq.Engine.Decoding.LogicTrace.From(probe.HistoryBuffer.ToArray()) : null;
+        var result = _decoder switch
+        {
+            1 or 2 when Channel(0) is { } line => Cirq.Engine.Decoding.UartDecoder.Decode(line, _decoder == 1 ? 9600 : 115200),
+            3 when Channel(0) is { } sda && Channel(1) is { } scl => Cirq.Engine.Decoding.I2cDecoder.Decode(sda, scl),
+            4 when Channel(0) is { } sck => Cirq.Engine.Decoding.SpiDecoder.Decode(sck, Channel(1), Channel(2), null),
+            _ => null,
+        };
+        if (result is null) return ": clip the channels on";
+        var text = result.Spans.Count > 0 ? result.Transcript : (result.Summary.Length > 0 ? result.Summary : "nothing yet");
+        return ": " + (text.Length > 38 ? "…" + text[^37..] : text);
     }
 
     // ───────────────────────────── the multimeter ─────────────────────────────

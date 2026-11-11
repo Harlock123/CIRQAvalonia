@@ -520,16 +520,18 @@ public sealed partial class CircuitTools(ICircuitHost host)
         [Description("The moves, in order, e.g. [{\"part\": \"U1\", \"to\": \"f20\"}, {\"part\": \"R1\", \"to\": \"a14\", \"pin\": \"B\"}]. On stripboard, perfboard and a PCB holes are strip (column) letter and hole number, e.g. \"C12\". Optional.")] BoardMove[]? moves = null,
         [Description("Parts to hand back to the automatic layout, e.g. [\"R3\"]. Optional.")] string[]? release = null,
         [Description("Forget every place made by hand first, so the board is laid out afresh.")] bool reset = false,
-        [Description("What to build it on: \"breadboard\", \"stripboard\" (copper strips, cut and linked) , \"perfboard\" (pads wired on the back) or \"pcb\" (a single-sided printed circuit board, its traces routed on the back, a jumper where one can't get through; the editor exports its Gerber files). Optional.")] string? board = null,
+        [Description("What to build it on: \"breadboard\", \"stripboard\" (copper strips, cut and linked) , \"perfboard\" (pads wired on the back), \"pcb\" (a single-sided printed circuit board, its traces routed on the back, a jumper where one can't get through) or \"double_sided_pcb\" (traces on both sides, joined through by vias); the editor exports a PCB's Gerber files. Optional.")] string? board = null,
+        [Description("On a PCB, whether the spare copper is poured as ground (on by default). Optional.")] bool? ground_pour = null,
         CancellationToken cancel = default) =>
         Edit("Arrange the protoboard", s =>
         {
-            if (!reset && (moves is null || moves.Length == 0) && (release is null || release.Length == 0) && board is null)
+            if (!reset && (moves is null || moves.Length == 0) && (release is null || release.Length == 0) && board is null && ground_pour is null)
                 throw new ArgumentException("Give moves, release, reset or board: there's nothing to do.");
             if (board is not null)
             {
-                if (!Enum.TryParse<BoardKind>(board.Trim(), true, out var kind) || !Enum.IsDefined(kind) || int.TryParse(board, out _))
-                    throw new ArgumentException($"board is breadboard, stripboard, perfboard or pcb, not \"{board}\".");
+                var name = new string([.. board.Where(char.IsLetterOrDigit)]);
+                if (!Enum.TryParse<BoardKind>(name, true, out var kind) || !Enum.IsDefined(kind) || int.TryParse(board, out _))
+                    throw new ArgumentException($"board is breadboard, stripboard, perfboard, pcb or double_sided_pcb, not \"{board}\".");
                 s.Circuit.Board.Kind = kind;
             }
 
@@ -561,8 +563,19 @@ public sealed partial class CircuitTools(ICircuitHost host)
                 s.Circuit.Board.CopyFrom(edit.Arrangement!);
             }
 
+            if (ground_pour is { } poured) s.Circuit.Board.GroundPour = poured;
+
             var now = Cirq.Components.Protoboard.ProtoboardLayout.Arrange(s.Circuit);
-            return new JsonObject { ["board"] = now.Describe(), ["matches"] = now.Matches };
+            var result = new JsonObject { ["board"] = now.Describe(), ["matches"] = now.Matches };
+            if (now.Kind.IsPcb())
+            {
+                var issues = Cirq.Components.Protoboard.DesignRules.Check(now, Cirq.Components.Protoboard.PcbRules.BoardHouse);
+                result["vias"] = now.Vias.Count;
+                result["jumpers"] = now.Wires.Count(w => !w.IsTrace);
+                result["design_rules"] = Cirq.Components.Protoboard.DesignRules.Summary(issues, Cirq.Components.Protoboard.PcbRules.BoardHouse);
+            }
+
+            return result;
         }, cancel);
 
     [McpServerTool(Name = "build_guide", ReadOnly = true, Idempotent = true)]

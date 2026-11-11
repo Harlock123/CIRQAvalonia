@@ -99,6 +99,10 @@ public sealed class ProtoboardRecord
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Kind { get; set; }
 
+    /// <summary>False when a PCB's ground pour is turned off; absent when it is on, as it is by default.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? GroundPour { get; set; }
+
     public List<BoardPartRecord> Parts { get; set; } = [];
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

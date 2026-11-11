@@ -324,13 +324,19 @@ public class BoardBuildingTests
     }
     // ───────────────────────────── printed circuit board ─────────────────────────────
 
-    [Fact]
-    public void A_pcb_is_routed_with_traces_that_never_touch_another_net()
+    [Theory]
+    [InlineData(BoardKind.Pcb, true)]
+    [InlineData(BoardKind.Pcb, false)]
+    [InlineData(BoardKind.DoubleSidedPcb, true)]
+    [InlineData(BoardKind.DoubleSidedPcb, false)]
+    public void A_pcb_is_routed_with_traces_that_never_touch_another_net(BoardKind kind, bool pour)
     {
         var circuit = GateCircuit();
-        circuit.Board.Kind = BoardKind.Pcb;
+        circuit.Board.Kind = kind;
+        circuit.Board.GroundPour = pour;
         var layout = ProtoboardLayout.Arrange(circuit);
-        Assert.Equal(BoardKind.Pcb, layout.Kind);
+        Assert.Equal(kind, layout.Kind);
+        Assert.Equal(pour, layout.Pour.Count > 0);
         Assert.True(layout.Matches, string.Join(" ", layout.Problems));
         Assert.Empty(layout.Cuts);
         Assert.Contains(layout.Wires, w => w.IsTrace);
@@ -340,7 +346,7 @@ public class BoardBuildingTests
         var netlist = circuit.BuildNetlist();
         var pads = layout.Parts.SelectMany(p => p.Package.Pins.Select((t, i) => (t, h: p.Holes[i]))).Where(x => x.t is not null)
             .ToDictionary(x => ((int)(2 * SolderedLayout.Position(x.h).X), (int)(2 * SolderedLayout.Position(x.h).Y)), x => netlist.NetOf(x.t!));
-        var owner = new Dictionary<(int, int), Net>();
+        var owner = new Dictionary<(int, int, int), Net>();
         foreach (var trace in layout.Wires.Where(w => w.IsTrace))
         {
             Assert.Same(trace.Net, layout.NetAt(trace.From));
@@ -352,8 +358,9 @@ public class BoardBuildingTests
                 {
                     var cell = ((int)Math.Round(2 * (a.X + ((b.X - a.X) * k / Math.Max(1, steps)))), (int)Math.Round(2 * (a.Y + ((b.Y - a.Y) * k / Math.Max(1, steps)))));
                     if (pads.TryGetValue(cell, out var padNet)) Assert.Equal(trace.Net.Index, padNet.Index);
-                    if (owner.TryGetValue(cell, out var other)) Assert.Same(trace.Net, other);
-                    owner[cell] = trace.Net;
+                    if (owner.TryGetValue((trace.Layer, cell.Item1, cell.Item2), out var other)) Assert.Same(trace.Net, other);
+                    owner[(trace.Layer, cell.Item1, cell.Item2)] = trace.Net;
+                    Assert.InRange(trace.Layer, 0, layout.Layers - 1);
                 }
             }
         }
@@ -383,6 +390,7 @@ public class BoardBuildingTests
     {
         var circuit = GateCircuit();
         circuit.Board.Kind = BoardKind.Pcb;
+        circuit.Board.GroundPour = false;   // its regions are lines too; the pour has a test of its own
         var layout = ProtoboardLayout.Arrange(circuit);
         var files = PcbGerber.Files(layout, "gate board");
         Assert.Equal(["gate_board-B_Cu.gbl", "gate_board-B_Mask.gbs", "gate_board-Edge_Cuts.gm1", "gate_board-F_SilkS.gto", "gate_board.drl"], files.Keys.Order(StringComparer.Ordinal));
@@ -422,5 +430,144 @@ public class BoardBuildingTests
 
         circuit.Board.Kind = BoardKind.Perfboard;
         Assert.Throws<ArgumentException>(() => PcbGerber.Files(ProtoboardLayout.Arrange(circuit), "x"));
+    }
+    // ───────────────────────────── double-sided, the pour, the rules, the bill ─────────────────────────────
+
+    /// <summary>Every input of a 7400 tied to a pin across the chip: crossings a single side can't make.</summary>
+    private static Circuit CrowdedGate()
+    {
+        var circuit = GateCircuit();
+        var gate = circuit.Components.OfType<Ic7400>().Single();
+        circuit.Connect(gate.TerminalByName("2A"), gate.TerminalByName("4B"));
+        circuit.Connect(gate.TerminalByName("2B"), gate.TerminalByName("3A"));
+        circuit.Connect(gate.TerminalByName("2Y"), gate.TerminalByName("3B"));
+        circuit.Connect(gate.TerminalByName("3Y"), gate.TerminalByName("4A"));
+        return circuit;
+    }
+
+    [Fact]
+    public void A_double_sided_board_crosses_with_vias_where_a_single_side_needs_jumpers()
+    {
+        var circuit = CrowdedGate();
+        circuit.Board.GroundPour = false;
+        circuit.Board.Kind = BoardKind.Pcb;
+        var single = ProtoboardLayout.Arrange(circuit);
+        circuit.Board.Kind = BoardKind.DoubleSidedPcb;
+        var both = ProtoboardLayout.Arrange(circuit);
+        Assert.True(both.Matches, string.Join(" ", both.Problems));
+        Assert.Equal(2, both.Layers);
+        Assert.Empty(single.Vias);
+        Assert.True(both.Wires.Count(w => !w.IsTrace) <= single.Wires.Count(w => !w.IsTrace));
+
+        // A via is where a trace changes side: a trace ends there on each.
+        foreach (var via in both.Vias)
+            Assert.Equal(2, both.Wires.Where(w => w.IsTrace && (w.From == via || w.To == via)).Select(w => w.Layer).Distinct().Count());
+        if (both.Vias.Count > 0) Assert.Contains(both.Wires, w => w.IsTrace && w.Layer == 1);
+    }
+
+    [Fact]
+    public void The_ground_pour_keeps_clear_of_other_nets_and_joins_grounds_pads()
+    {
+        var circuit = GateCircuit();
+        circuit.Board.Kind = BoardKind.Pcb;
+        circuit.Board.GroundPour = false;
+        var bare = ProtoboardLayout.Arrange(circuit);
+        circuit.Board.GroundPour = true;
+        var poured = ProtoboardLayout.Arrange(circuit);
+        Assert.True(poured.Matches, string.Join(" ", poured.Problems));
+        Assert.NotEmpty(poured.Pour);
+
+        // Ground needs no more traces than without the pour (usually none: the pour joins its pads).
+        bool Ground(BoardWire w) => w.Net.IsGround && w.IsTrace;
+        Assert.True(poured.Wires.Count(Ground) <= bare.Wires.Count(Ground));
+
+        // No pour within the clearance of another net's pad, anywhere.
+        var pitch = PcbRouter.Pitch;
+        foreach (var part in poured.Parts)
+            for (var i = 0; i < part.Holes.Count; i++)
+            {
+                if (poured.NetAt(part.Holes[i]) is { IsGround: true }) continue;
+                var (x, y) = SolderedLayout.Position(part.Holes[i]);
+                var keep = (PcbRouter.PadDiameter / 2 + GroundPour.Clearance - 0.01) / pitch;
+                Assert.DoesNotContain(poured.Pour, a => Math.Max(Math.Abs(Math.Clamp(x, a.Left, a.Right) - x), 0) is var dx
+                    && Math.Abs(Math.Clamp(y, a.Top, a.Bottom) - y) is var dy && Math.Sqrt((dx * dx) + (dy * dy)) < keep);
+            }
+
+        // The pour goes out in the Gerbers as regions, and the setting is saved.
+        Assert.Contains("G36*", PcbGerber.Files(poured, "gate").Single(f => f.Key.EndsWith(".gbl", StringComparison.Ordinal)).Value);
+        circuit.Board.GroundPour = false;
+        var json = CircuitSerializer.ToJson(circuit);
+        Assert.Contains("\"GroundPour\": false", json);
+        Assert.False(CircuitSerializer.FromJson(json).Circuit.Board.GroundPour);
+    }
+
+    [Fact]
+    public void A_double_sided_boards_gerbers_have_both_copper_layers_and_drill_the_vias()
+    {
+        var circuit = CrowdedGate();
+        circuit.Board.Kind = BoardKind.DoubleSidedPcb;
+        var layout = ProtoboardLayout.Arrange(circuit);
+        var files = PcbGerber.Files(layout, "two");
+        Assert.Contains("two-F_Cu.gtl", files.Keys);
+        Assert.Contains("two-F_Mask.gts", files.Keys);
+        Assert.Contains("%TF.FileFunction,Copper,L1,Top*%", files["two-F_Cu.gtl"]);
+        Assert.Contains("%TF.FileFunction,Copper,L2,Bot*%", files["two-B_Cu.gbl"]);
+        if (layout.Vias.Count > 0)
+        {
+            Assert.Contains("T2C0.500", files["two.drl"]);
+            Assert.Equal(layout.Vias.Count, files["two.drl"].Split("T2\n")[1].Split('\n').Count(l => l.StartsWith('X')));
+        }
+
+        var json = CircuitSerializer.ToJson(circuit);
+        Assert.Equal(BoardKind.DoubleSidedPcb, CircuitSerializer.FromJson(json).Circuit.Board.Kind);
+    }
+
+    [Fact]
+    public void The_design_rule_check_holds_the_board_to_a_board_houses_limits()
+    {
+        var circuit = GateCircuit();
+        circuit.Board.Kind = BoardKind.Pcb;
+        var layout = ProtoboardLayout.Arrange(circuit);
+
+        // A board house's standard rules: it passes.
+        Assert.Empty(DesignRules.Check(layout, PcbRules.BoardHouse));
+        Assert.Contains("passes", DesignRules.Summary([], PcbRules.BoardHouse));
+
+        // Gaps a board this dense doesn't leave: neighbouring pads of a chip are 0.94 mm apart edge to edge.
+        var etched = DesignRules.Check(layout, PcbRules.HomeEtching with { MinClearance = 1.0 });
+        Assert.Contains(etched, i => i.Rule == "Clearance");
+        Assert.All(etched, i => Assert.InRange(i.X, 0, SolderedLayout.Width(layout.Columns)));
+
+        // A board too big for the budget size.
+        var tight = PcbRules.Budget with { MaxWidth = 10, MaxHeight = 10 };
+        Assert.Contains(DesignRules.Check(layout, tight), i => i.Rule == "Board size");
+
+        // Rules finer than the parts allow: the holes and the rings.
+        var fine = new PcbRules("Fine", 0.5, 0.1, 1.0, 0.5);
+        var found = DesignRules.Check(layout, fine);
+        Assert.Contains(found, i => i.Rule == "Trace width");
+        Assert.Contains(found, i => i.Rule == "Drill");
+        Assert.Contains(found, i => i.Rule == "Annular ring");
+        Assert.Equal(0, DesignRules.SegmentDistance((0, 0), (2, 2), (0, 2), (2, 0)));
+        Assert.Equal(1, DesignRules.SegmentDistance((0, 0), (2, 0), (0, 1), (2, 1)), 9);
+    }
+
+    [Fact]
+    public void The_bill_of_materials_groups_the_parts_and_lists_the_bench_apart()
+    {
+        var circuit = GateCircuit();
+        var extra = circuit.Add(new Resistor(10e3));
+        var lines = BillOfMaterials.Lines(circuit);
+        var tenK = lines.Single(l => l.Value == "10kΩ");
+        Assert.Equal(2, tenK.Quantity);
+        Assert.Equal(["R1", extra.Name], tenK.Designators);
+        Assert.Contains(lines, l => l.Part == "7400" && l.Package == "DIP-14");
+        Assert.Equal("axial resistor", tenK.Package);
+        Assert.DoesNotContain(lines, l => l.Designators.Any(d => d.StartsWith("GND", StringComparison.Ordinal)));
+
+        var csv = BillOfMaterials.Csv(circuit);
+        Assert.StartsWith("Designators,Quantity,Part,Value,Package\r\n", csv, StringComparison.Ordinal);
+        Assert.Contains("On the bench", csv);
+        Assert.Contains($"R1 {extra.Name},2,", csv);
     }
 }

@@ -307,4 +307,286 @@ public class AtmegaTests
         fresh.AdoptRunState(state);
         Assert.Equal(chip.Core.Pc, fresh.Core.Pc);
     }
+    // ───────────────────────────── SPI and I2C ─────────────────────────────
+
+    /// <summary>A circuit with an ATmega328P on 5 V running <paramref name="source"/>.</summary>
+    private static (Circuit Circuit, Atmega328p Chip, DcVoltageSource Supply, Ground Ground) Board(string source)
+    {
+        var circuit = new Circuit();
+        var supply = circuit.Add(new DcVoltageSource(5));
+        var chip = circuit.Add(new Atmega328p());
+        var ground = circuit.Add(new Ground());
+        circuit.Connect(supply.Terminals[1], ground.Terminals[0]);
+        circuit.Connect(supply.Terminals[0], chip.Vcc);
+        circuit.Connect(supply.Terminals[0], chip.Avcc);
+        circuit.Connect(chip.Gnd, ground.Terminals[0]);
+        circuit.Connect(chip.Gnd2, ground.Terminals[0]);
+        chip.Load(Cirq.Components.Digital.MemoryImage.FromBinary(AssemblerAvr.Assemble(source)));
+        Assert.Null(chip.FirmwareError);
+        return (circuit, chip, supply, ground);
+    }
+
+    private static CircuitSimulator RunFor(Circuit circuit, double seconds)
+    {
+        var simulator = new CircuitSimulator(circuit, new Cirq.Core.Simulation.SimulationSettings { TimeStep = 1e-6, MaxTimeStep = 1e-4, AdaptiveTimeStep = true });
+        simulator.Reset();
+        simulator.SolveOperatingPoint();
+        simulator.Run(seconds);
+        return simulator;
+    }
+
+    /// <summary>
+    /// SPI as a master into a 74595: 0xA5 shifted out MSB first at 1 MHz and latched onto the outputs, then 0x3C, the
+    /// register's serial output wired back to MISO so the first byte comes back in.
+    /// </summary>
+    public const string SpiShiftOut = """
+        ldi r16, 0x08
+        out 0x3E, r16
+        ldi r16, 0xFF
+        out 0x3D, r16
+        ldi r16, 0x2E          ; PB1 (the latch), SS, MOSI and SCK outputs
+        out 0x04, r16
+        ldi r16, 0x51          ; SPCR: SPE, MSTR, fosc/16
+        out 0x2C, r16
+        ldi r24, 0xA5
+        rcall send
+        ldi r24, 0x3C
+        rcall send
+        sts 0x0100, r25        ; what came back
+        done:
+        rjmp done
+        send:
+        out 0x2E, r24          ; SPDR
+        wait:
+        in r16, 0x2D           ; SPSR
+        sbrs r16, 7
+        rjmp wait
+        in r25, 0x2E
+        sbi 0x05, 1            ; latch
+        cbi 0x05, 1
+        ret
+        """;
+
+    [Fact]
+    public void Spi_shifts_bytes_into_a_74595_and_reads_back_what_falls_out()
+    {
+        var (circuit, chip, supply, ground) = Board(SpiShiftOut);
+        var register = circuit.Add(new Ic74595());
+        circuit.Connect(register.Vcc, supply.Terminals[0]);
+        circuit.Connect(register.Gnd, ground.Terminals[0]);
+        circuit.Connect(register.TerminalByName("SRCLR"), supply.Terminals[0]);
+        circuit.Connect(register.TerminalByName("OE"), ground.Terminals[0]);
+        circuit.Connect(register.TerminalByName("SER"), chip.TerminalByName("PB3"));
+        circuit.Connect(register.TerminalByName("SRCLK"), chip.TerminalByName("PB5"));
+        circuit.Connect(register.TerminalByName("RCLK"), chip.TerminalByName("PB1"));
+        circuit.Connect(register.TerminalByName("QH'"), chip.TerminalByName("PB4"));
+        RunFor(circuit, 1e-3);
+
+        // 0x3C latched onto the outputs, QA the last bit in; and 0xA5, the first byte, back through MISO.
+        Assert.Equal(0x3C, register.Latched);
+        Assert.Equal(0xA5, chip.Core[0x0100]);
+        Assert.True(chip.Core.SpiMaster);
+    }
+
+    /// <summary>
+    /// I2C as a master to a 24LC256: "HI!" written at address 0, then read back (a repeated START between) into SRAM,
+    /// with the statuses kept.
+    /// </summary>
+    public const string I2cEepromWriteRead = """
+        ldi r16, 0x08
+        out 0x3E, r16
+        ldi r16, 0xFF
+        out 0x3D, r16
+        sbi 0x08, 4            ; pull-ups on SDA and SCL
+        sbi 0x08, 5
+        ldi r16, 72            ; 100 kHz at 16 MHz
+        sts 0xB8, r16
+        rcall start
+        sts 0x0110, r18
+        ldi r24, 0xA0          ; the EEPROM, writing
+        rcall send
+        sts 0x0111, r18
+        ldi r24, 0
+        rcall send
+        rcall send
+        ldi r24, 'H'
+        rcall send
+        ldi r24, 'I'
+        rcall send
+        ldi r24, '!'
+        rcall send
+        sts 0x0112, r18
+        rcall stop
+        rcall start
+        ldi r24, 0xA0
+        rcall send
+        ldi r24, 0
+        rcall send
+        rcall send
+        rcall start            ; a repeated START
+        sts 0x0113, r18
+        ldi r24, 0xA1          ; reading
+        rcall send
+        sts 0x0114, r18
+        ldi r16, 0xC4          ; a byte, acknowledged
+        rcall go
+        lds r24, 0xBB
+        sts 0x0100, r24
+        ldi r16, 0xC4
+        rcall go
+        lds r24, 0xBB
+        sts 0x0101, r24
+        ldi r16, 0x84          ; the last, not acknowledged
+        rcall go
+        lds r24, 0xBB
+        sts 0x0102, r24
+        sts 0x0115, r18
+        rcall stop
+        done:
+        rjmp done
+        start:
+        ldi r16, 0xA4          ; TWINT, TWSTA, TWEN
+        rjmp go
+        send:
+        sts 0xBB, r24
+        ldi r16, 0x84          ; TWINT, TWEN
+        go:
+        sts 0xBC, r16
+        wait:
+        lds r16, 0xBC
+        sbrs r16, 7
+        rjmp wait
+        lds r18, 0xB9
+        andi r18, 0xF8
+        ret
+        stop:
+        ldi r16, 0x94          ; TWINT, TWSTO, TWEN
+        sts 0xBC, r16
+        ldi r16, 200
+        pause:
+        dec r16
+        brne pause
+        ret
+        """;
+
+    [Fact]
+    public void I2c_writes_to_an_eeprom_and_reads_it_back_with_the_datasheets_statuses()
+    {
+        var (circuit, chip, supply, ground) = Board(I2cEepromWriteRead);
+        var eeprom = circuit.Add(new Cirq.Components.Buses.I2cEeprom());
+        circuit.Connect(eeprom.Vcc, supply.Terminals[0]);
+        circuit.Connect(eeprom.Gnd, ground.Terminals[0]);
+        circuit.Connect(eeprom.Sda, chip.TerminalByName("PC4/ADC4"));
+        circuit.Connect(eeprom.Scl, chip.TerminalByName("PC5/ADC5"));
+        foreach (var line in new[] { eeprom.Sda, eeprom.Scl })
+        {
+            var pull = circuit.Add(new Resistor(4.7e3));
+            circuit.Connect(pull.Terminals[0], supply.Terminals[0]);
+            circuit.Connect(pull.Terminals[1], line);
+        }
+
+        RunFor(circuit, 3e-3);
+
+        Assert.Equal("HI!", new string([.. Enumerable.Range(0, 3).Select(i => (char)eeprom.Read(i))]));
+        Assert.Equal("HI!", new string([.. Enumerable.Range(0, 3).Select(i => (char)chip.Core[0x0100 + i])]));
+        Assert.Equal([0x08, 0x18, 0x28, 0x10, 0x40, 0x58], Enumerable.Range(0, 6).Select(i => (int)chip.Core[0x0110 + i]).ToArray());
+    }
+    [Fact]
+    public void An_arduino_uno_runs_the_blink_on_d13_and_feeds_the_circuit_from_its_rails()
+    {
+        var circuit = new Circuit();
+        var uno = circuit.Add(new ArduinoUnoFirmware());
+        var ground = circuit.Add(new Ground());
+        var load = circuit.Add(new Resistor(1e3));
+        var led = circuit.Add(new Resistor(330));
+        circuit.Connect(uno.TerminalByName("GND"), ground.Terminals[0]);
+        circuit.Connect(uno.TerminalByName("3V3"), load.Terminals[0]);
+        circuit.Connect(load.Terminals[1], ground.Terminals[0]);
+        var d13 = uno.TerminalByName("D13/LED");
+        circuit.Connect(d13, led.Terminals[0]);
+        circuit.Connect(led.Terminals[1], ground.Terminals[0]);
+        Assert.Equal(["D0/RX", "D1/TX", "D2", "D3", "D4", "D5", "D6", "D7", "D8", "D9", "D10", "D11", "D12", "D13/LED", "A0", "A1", "A2", "A3", "A4", "A5"],
+            uno.Gpio.Select(t => t.Name));
+        Assert.Equal("Arduino Uno", uno.PartNumber);
+
+        uno.Load(Cirq.Components.Digital.MemoryImage.FromBinary(AssemblerAvr.Assemble(".equ PERIOD = 624\n" + Blink)));
+        var simulator = new CircuitSimulator(circuit, new Cirq.Core.Simulation.SimulationSettings { TimeStep = 2e-5, MaxTimeStep = 2e-4, AdaptiveTimeStep = true });
+        simulator.Reset();
+        simulator.SolveOperatingPoint();
+        Assert.Equal(5.0, simulator.NodeVoltage(uno.Vcc), 3);
+        Assert.Equal(3.3, simulator.NodeVoltage(load.Terminals[0]), 3);
+
+        var lit = false;
+        var dark = false;
+        while (simulator.Time < 0.035)
+        {
+            simulator.Step();
+            if (uno.LedLit) lit = true;
+            else if (simulator.Time > 0.001) dark = true;
+            Assert.Equal(uno.LedLit, simulator.NodeVoltage(d13) > 2.5);
+        }
+
+        Assert.True(lit && dark);
+    }
+    // ───────────────────────────── the debugger ─────────────────────────────
+
+    [Theory]
+    [InlineData(nameof(SpiShiftOut))]
+    [InlineData(nameof(I2cEepromWriteRead))]
+    [InlineData(nameof(Blink))]
+    public void The_disassembler_reads_back_what_the_assembler_wrote(string program)
+    {
+        var source = (string)typeof(AtmegaTests).GetField(program)!.GetValue(null)!;
+        if (program == nameof(Blink)) source = ".equ PERIOD = 624\n" + source;
+        var bytes = AssemblerAvr.Assemble(source);
+        var words = Enumerable.Range(0, AvrCore.FlashWords).Select(i => i * 2 + 1 < bytes.Length ? (ushort)(bytes[i * 2] | (bytes[(i * 2) + 1] << 8)) : (ushort)0).ToArray();
+        for (var at = 0; at < bytes.Length / 2;)
+        {
+            var (text, length) = AvrDisassembler.Disassemble(words, at);
+            Assert.DoesNotContain(".dw", text);
+            var again = AssemblerAvr.Assemble($".org {at}\n{text}\n");
+            Assert.Equal(bytes.Skip(at * 2).Take(length * 2), again.Skip(at * 2).Take(length * 2));
+            at += length;
+        }
+
+        Assert.Equal(("ldi r16, 0x08", 1), AvrDisassembler.Disassemble(words.Length > 0 ? AssemblerAvr.Assemble("ldi r16, 8").Chunk(2).Select(b => (ushort)(b[0] | (b[1] << 8))).Concat(new ushort[15]).ToArray() : [], 0));
+    }
+
+    [Fact]
+    public void A_breakpoint_stops_the_firmware_before_its_instruction_and_a_step_runs_one()
+    {
+        var (circuit, chip, _, _) = Board(SpiShiftOut);
+        var send = Enumerable.Range(0, 64).First(i => AvrDisassembler.Disassemble(chip.Core.State.Flash, i).Text == "out 0x2E, r24");
+        chip.Breakpoints.Add(send * 2);
+        var simulator = new CircuitSimulator(circuit, new Cirq.Core.Simulation.SimulationSettings { TimeStep = 1e-6, MaxTimeStep = 1e-4, AdaptiveTimeStep = true });
+        simulator.Reset();
+        simulator.SolveOperatingPoint();
+        while (!chip.Halted && simulator.Time < 1e-3) simulator.Step();
+
+        Assert.True(chip.Halted);
+        Assert.Equal("breakpoint", chip.HaltReason);
+        Assert.Equal(send, chip.Core.Pc);
+        Assert.Equal(0xA5, chip.Core[24]);
+        Assert.Equal(0, chip.Core.State.SpiHalves);   // not yet sent
+
+        // Halted, the circuit's time goes on but the firmware's doesn't.
+        var cycles = chip.Core.State.Cycles;
+        for (var i = 0; i < 20; i++) simulator.Step();
+        Assert.Equal(cycles, chip.Core.State.Cycles);
+
+        // One step: the OUT runs, and the transfer starts.
+        chip.StepInstruction();
+        while (!chip.Halted) simulator.Step();
+        Assert.Equal("step", chip.HaltReason);
+        Assert.Equal(send + 1, chip.Core.Pc);
+        Assert.Equal(16, chip.Core.State.SpiHalves);
+
+        // Resumed, it runs to the breakpoint again on the second byte.
+        chip.Resume();
+        var until = simulator.Time + 1e-3;
+        while (!chip.Halted && simulator.Time < until) simulator.Step();
+        Assert.True(chip.Halted);
+        Assert.Equal(send, chip.Core.Pc);
+        Assert.Equal(0x3C, chip.Core[24]);
+    }
 }

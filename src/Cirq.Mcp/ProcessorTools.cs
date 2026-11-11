@@ -11,7 +11,7 @@ namespace Cirq.Mcp;
 public sealed partial class CircuitTools
 {
     [McpServerTool(Name = "cpu_state", ReadOnly = true, Idempotent = true)]
-    [Description("A processor's state. A 6502, 65C02, 6510 or 8500: its registers (A, X, Y, S, PC), its flags (NV-BDIZC, capitals set), the instruction it is executing (disassembled from its bus), how many cycles and instructions it has run, whether it is running, waiting (WAI) or stopped (STP/JAM), any reads that found the data bus at no logic level, its last bus cycles, and on a 6510 or 8500 its I/O port ($0000 direction, $0001 data, and the P0-P5 pins). A 68000: D0-D7, A0-A7, USP and SSP, PC, SR and its flags (T, S, the interrupt mask, XNZVC), the last instruction it finished, its clocks, bus cycles and wait states, the last exception, whether it is running, stopped (STOP), halted (double bus fault) or held in reset, and its last bus cycles with size, function code and wait states. A 6809 or 6809E: A, B, D, X, Y, U, S, PC, DP and CC with its flags (EFHINZVC, capitals set), the instruction it is executing, its E cycles (dead ones included) and instructions, the last interrupt it took, whether NMI is armed, whether it is running, in SYNC, in CWAI, halted, granted the bus or stopped, MRDY's stretch, and its last bus cycles with the dead ($FFFF) ones marked. A Z80: AF, BC, DE, HL and the alternate set, IX, IY, SP, PC, I and R, WZ, IFF1 and IFF2, the interrupt mode, the flags (SZYHXPNC, capitals set), the instruction it is executing, its T-states, instructions and wait states, the last interrupt, whether it is running, halted (HALT), holding the bus released (/BUSREQ) or held in reset, and its last machine cycles with the refreshes and acknowledges marked. An 8085: A, BC, DE, HL, SP and PC, the flags (SZKAPVC, capitals set — K and V the undocumented ones), the interrupt enable, the RST 7.5/6.5/5.5 masks, the RST 7.5 and TRAP latches, SID, SOD and HLDA, the instruction it is executing, its T-states, instructions, wait and hold states, the last interrupt (with the bytes an INTR acknowledge read off the bus), whether it is running, halted (HLT), holding the bus (HOLD) or held in reset, and its last machine cycles with the bus idle cycles and acknowledges marked. In the app this is the live simulation; otherwise where the last run_transient left it.")]
+    [Description("A processor's state. A 6502, 65C02, 6510 or 8500: its registers (A, X, Y, S, PC), its flags (NV-BDIZC, capitals set), the instruction it is executing (disassembled from its bus), how many cycles and instructions it has run, whether it is running, waiting (WAI) or stopped (STP/JAM), any reads that found the data bus at no logic level, its last bus cycles, and on a 6510 or 8500 its I/O port ($0000 direction, $0001 data, and the P0-P5 pins). A 68000: D0-D7, A0-A7, USP and SSP, PC, SR and its flags (T, S, the interrupt mask, XNZVC), the last instruction it finished, its clocks, bus cycles and wait states, the last exception, whether it is running, stopped (STOP), halted (double bus fault) or held in reset, and its last bus cycles with size, function code and wait states. A 6809 or 6809E: A, B, D, X, Y, U, S, PC, DP and CC with its flags (EFHINZVC, capitals set), the instruction it is executing, its E cycles (dead ones included) and instructions, the last interrupt it took, whether NMI is armed, whether it is running, in SYNC, in CWAI, halted, granted the bus or stopped, MRDY's stretch, and its last bus cycles with the dead ($FFFF) ones marked. A Z80: AF, BC, DE, HL and the alternate set, IX, IY, SP, PC, I and R, WZ, IFF1 and IFF2, the interrupt mode, the flags (SZYHXPNC, capitals set), the instruction it is executing, its T-states, instructions and wait states, the last interrupt, whether it is running, halted (HALT), holding the bus released (/BUSREQ) or held in reset, and its last machine cycles with the refreshes and acknowledges marked. An 8085: A, BC, DE, HL, SP and PC, the flags (SZKAPVC, capitals set — K and V the undocumented ones), the interrupt enable, the RST 7.5/6.5/5.5 masks, the RST 7.5 and TRAP latches, SID, SOD and HLDA, the instruction it is executing, its T-states, instructions, wait and hold states, the last interrupt (with the bytes an INTR acknowledge read off the bus), whether it is running, halted (HLT), holding the bus (HOLD) or held in reset, and its last machine cycles with the bus idle cycles and acknowledges marked. An ATmega328P or Arduino Uno: R0-R31, X, Y and Z, PC (a byte address), SP and SREG (ITHSVNZC, capitals set), the instruction at PC, its cycles, whether it is asleep or stopped in the debugger (and its breakpoints), the ports (PORT, DDR and PIN of B, C and D) and the timers', USART's, SPI's, TWI's and ADC's registers. In the app this is the live simulation; otherwise where the last run_transient left it.")]
     public Task<string> CpuState(
         [Description("The processor's designator, e.g. \"U2\". Optional when the circuit has only one.")] string? part = null,
         [Description("How many of its most recent bus cycles to list, from 0 to 64. Default 16.")] int cycles = 16,
@@ -20,6 +20,7 @@ public sealed partial class CircuitTools
         {
             if (cycles is < 0 or > 64) throw new ArgumentException("cycles must be from 0 to 64.");
             var any = AnyProcessor(s.Circuit, part);
+            if (any is Atmega328p avr) return StateAvr(avr);
             if (any is Cpu68000 m68k) return State68000(m68k, cycles);
             if (any is Processor6809 m6809) return State6809(m6809, cycles);
             if (any is CpuZ80 z80) return StateZ80(z80, cycles);
@@ -63,7 +64,7 @@ public sealed partial class CircuitTools
         }, cancel);
 
     [McpServerTool(Name = "disassemble", ReadOnly = true, Idempotent = true)]
-    [Description("Disassembles code held in a memory part (a ROM or RAM), as the processor would see it: give the address in the processor's memory map and where the chip starts in it (origin; a ROM decoded at $8000 has origin 32768). Lists each instruction's address, bytes and text. For a 6502 (variant 65C02 or 6502) undocumented NMOS opcodes are marked *, and with the chip holding $FFFA-$FFFF the NMI, reset and IRQ vectors are given too. For a 68000 (variant 68000) give the pair of byte-wide chips its 16-bit memory is made of: part the even bytes (D8-D15) and odd_part the odd ones (D0-D7); origin is then where the pair starts, and with origin 0 the reset vectors (the stack pointer and PC) are given. For a 6809 (variant 6809) undocumented opcodes are marked *, and with the chip holding $FFF2-$FFFF the SWI3, SWI2, FIRQ, IRQ, SWI, NMI and RESET vectors are given too. For a Z80 (variant Z80) in Zilog's syntax, the undocumented opcodes (IXH and IXL, SLL, the DDCB copies, the ED duplicates) marked *. For an 8085 (variant 8085) in Intel's mnemonics, the undocumented DSUB, ARHL, RDEL, LDHI, LDSI, RSTV, SHLX, LHLX, JNK and JK marked *, and with the chip holding $0000-$003F the restart addresses (RST 0-7, TRAP, RST 5.5, 6.5, 7.5) named.")]
+    [Description("Disassembles code held in a memory part (a ROM or RAM), as the processor would see it: give the address in the processor's memory map and where the chip starts in it (origin; a ROM decoded at $8000 has origin 32768). Lists each instruction's address, bytes and text. For a 6502 (variant 65C02 or 6502) undocumented NMOS opcodes are marked *, and with the chip holding $FFFA-$FFFF the NMI, reset and IRQ vectors are given too. For a 68000 (variant 68000) give the pair of byte-wide chips its 16-bit memory is made of: part the even bytes (D8-D15) and odd_part the odd ones (D0-D7); origin is then where the pair starts, and with origin 0 the reset vectors (the stack pointer and PC) are given. For a 6809 (variant 6809) undocumented opcodes are marked *, and with the chip holding $FFF2-$FFFF the SWI3, SWI2, FIRQ, IRQ, SWI, NMI and RESET vectors are given too. For a Z80 (variant Z80) in Zilog's syntax, the undocumented opcodes (IXH and IXL, SLL, the DDCB copies, the ED duplicates) marked *. For an 8085 (variant 8085) in Intel's mnemonics, the undocumented DSUB, ARHL, RDEL, LDHI, LDSI, RSTV, SHLX, LHLX, JNK and JK marked *, and with the chip holding $0000-$003F the restart addresses (RST 0-7, TRAP, RST 5.5, 6.5, 7.5) named. For an ATmega328P or Arduino Uno give the chip itself as part: its flash, from address (a byte address, default where its PC is), in avr-as syntax, jump and branch targets as word addresses.")]
     public Task<string> Disassemble(
         [Description("The memory part's designator, e.g. \"U3\".")] string part,
         [Description("Where to start, in the processor's address space, e.g. 32768 for $8000. Default: the origin.")] int? address = null,
@@ -74,6 +75,7 @@ public sealed partial class CircuitTools
         CancellationToken cancel = default) =>
         Read("disassemble", s =>
         {
+            if (Pins.Part(s.Circuit, part) is Atmega328p avrChip) return DisassembleAvr(avrChip, address, count);
             if (variant?.Trim() is "68000" or "68k" or "MC68000") return Disassemble68000(s.Circuit, part, odd_part, address, origin, count);
             if (variant?.Trim().ToUpperInvariant() is "6809" or "MC6809" or "6809E" or "MC6809E") return Disassemble6809(s.Circuit, part, address, origin, count);
             if (variant?.Trim().ToUpperInvariant() is "Z80" or "Z8400") return DisassembleZ80(s.Circuit, part, address, origin, count);
@@ -1046,22 +1048,77 @@ public sealed partial class CircuitTools
         return result;
     }
 
+    private static JsonObject StateAvr(Atmega328p chip)
+    {
+        var core = chip.Core;
+        var sreg = core.StatusRegister;
+        var registers = new JsonObject();
+        for (var r = 0; r < 32; r++) registers[$"r{r}"] = string.Create(CultureInfo.InvariantCulture, $"${core[r]:X2}");
+        int Pair(int low) => core[low] | (core[low + 1] << 8);
+        string H2(int a) => string.Create(CultureInfo.InvariantCulture, $"${core[a]:X2}");
+        var io = new JsonObject();
+        foreach (var (name, address) in new[]
+                 {
+                     ("PORTB", AvrCore.PORTB), ("DDRB", AvrCore.DDRB), ("PINB", AvrCore.PINB), ("PORTC", AvrCore.PORTC), ("DDRC", AvrCore.DDRC), ("PINC", AvrCore.PINC),
+                     ("PORTD", AvrCore.PORTD), ("DDRD", AvrCore.DDRD), ("PIND", AvrCore.PIND), ("TCCR0B", AvrCore.TCCR0B), ("TCNT0", AvrCore.TCNT0), ("TCCR1B", AvrCore.TCCR1B),
+                     ("TIMSK1", AvrCore.TIMSK1), ("UCSR0A", AvrCore.UCSR0A), ("UCSR0B", AvrCore.UCSR0B), ("SPCR", AvrCore.SPCR), ("SPSR", AvrCore.SPSR), ("SPDR", AvrCore.SPDR),
+                     ("TWCR", AvrCore.TWCR), ("TWSR", AvrCore.TWSR), ("TWDR", AvrCore.TWDR), ("ADMUX", AvrCore.ADMUX), ("ADCSRA", AvrCore.ADCSRA),
+                 })
+            io[name] = name.StartsWith("PIN", StringComparison.Ordinal) ? string.Create(CultureInfo.InvariantCulture, $"${core.PinInputs[name[3] - 'B']:X2}") : H2(address);
+        var result = new JsonObject
+        {
+            ["part"] = chip.Name,
+            ["chip"] = chip.PartNumber,
+            ["pc"] = string.Create(CultureInfo.InvariantCulture, $"${core.Pc * 2:X4}"),
+            ["instruction"] = AvrDisassembler.Disassemble(core.State.Flash, core.Pc).Text,
+            ["sp"] = string.Create(CultureInfo.InvariantCulture, $"${core.StackPointer:X4}"),
+            ["sreg"] = string.Concat("ITHSVNZC".Select((f, i) => (sreg & (0x80 >> i)) != 0 ? f : char.ToLowerInvariant(f))),
+            ["x"] = string.Create(CultureInfo.InvariantCulture, $"${Pair(26):X4}"),
+            ["y"] = string.Create(CultureInfo.InvariantCulture, $"${Pair(28):X4}"),
+            ["z"] = string.Create(CultureInfo.InvariantCulture, $"${Pair(30):X4}"),
+            ["registers"] = registers,
+            ["cycles"] = core.State.Cycles,
+            ["state"] = chip.Halted ? $"stopped in the debugger ({chip.HaltReason})" : core.State.Sleeping ? "asleep (SLEEP)" : chip.FirmwareError is not null ? "bad firmware" : "running",
+            ["breakpoints"] = new JsonArray([.. chip.Breakpoints.Order().Select(b => (JsonNode)string.Create(CultureInfo.InvariantCulture, $"${b:X4}"))]),
+            ["io"] = io,
+        };
+        return result;
+    }
+
+    private static JsonObject DisassembleAvr(Atmega328p chip, int? address, int count)
+    {
+        if (count is < 1 or > 200) throw new ArgumentException("count must be from 1 to 200.");
+        var flash = chip.Core.State.Flash;
+        var start = address is { } a ? a / 2 : chip.Core.Pc;
+        if (start < 0 || start >= flash.Length) throw new ArgumentException($"The flash is $0000-${(flash.Length * 2) - 1:X4}; address ${(address ?? 0):X4} isn't in it.");
+        var lines = new JsonArray();
+        for (var (at, i) = (start, 0); i < count && at < flash.Length; i++)
+        {
+            var (text, words) = AvrDisassembler.Disassemble(flash, at);
+            var bytes = string.Join(" ", Enumerable.Range(0, words).Select(w => string.Create(CultureInfo.InvariantCulture, $"{flash[at + w] & 0xFF:X2} {flash[at + w] >> 8:X2}")));
+            lines.Add((JsonNode)string.Create(CultureInfo.InvariantCulture, $"${at * 2:X4}  {bytes,-12} {text}{(at == chip.Core.Pc ? "   <- PC" : "")}"));
+            at += words;
+        }
+
+        return new JsonObject { ["part"] = chip.Name, ["lines"] = lines };
+    }
+
     /// <summary>A 6502-family processor or a 68000: the one called <paramref name="name"/>, or the circuit's only processor.</summary>
     private static CircuitComponent AnyProcessor(Circuit circuit, string? name)
     {
-        var all = circuit.Components.Where(c => c is Processor6502 or Cpu68000 or Processor6809 or CpuZ80 or Cpu8085).ToList();
+        var all = circuit.Components.Where(c => c is Processor6502 or Cpu68000 or Processor6809 or CpuZ80 or Cpu8085 or Atmega328p).ToList();
         if (string.IsNullOrWhiteSpace(name))
         {
             return all.Count switch
             {
                 1 => all[0],
-                0 => throw new ArgumentException("The circuit has no 6502, 65C02, 6510, 68000, 6809, Z80 or 8085."),
+                0 => throw new ArgumentException("The circuit has no 6502, 65C02, 6510, 68000, 6809, Z80, 8085 or ATmega328P."),
                 _ => throw new ArgumentException($"The circuit has {all.Count} processors ({string.Join(", ", all.Select(c => c.Name))}): say which with part."),
             };
         }
 
         var c = Pins.Part(circuit, name);
-        return c is Processor6502 or Cpu68000 or Processor6809 or CpuZ80 or Cpu8085 ? c : throw new ArgumentException($"{c.Name} is a {c.ComponentType}, not a processor.{(all.Count > 0 ? $" The processors: {string.Join(", ", all.Select(p => p.Name))}." : "")}");
+        return c is Processor6502 or Cpu68000 or Processor6809 or CpuZ80 or Cpu8085 or Atmega328p ? c : throw new ArgumentException($"{c.Name} is a {c.ComponentType}, not a processor.{(all.Count > 0 ? $" The processors: {string.Join(", ", all.Select(p => p.Name))}." : "")}");
     }
 
     /// <summary>The processor called <paramref name="name"/>, or the circuit's only one.</summary>

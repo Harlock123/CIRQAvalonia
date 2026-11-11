@@ -25,10 +25,17 @@ namespace Cirq.Components.Processors;
 /// on PD2 and PD3, /RESET on PC6 (pulled up). VCC, AVCC and AREF are read for the supply and the ADC's reference.
 /// </para>
 /// </summary>
-public sealed partial class Atmega328p : DigitalIc, IBreakpointSource, IRunState
+public partial class Atmega328p : DigitalIc, IBreakpointSource, IRunState
 {
     /// <summary>The internal pull-ups, between 20 and 50 kΩ on the datasheet.</summary>
     public const double PullUpResistance = 35e3;
+
+    /// <summary>
+    /// The datasheet's input levels at 5 V, which the pins are read with: high from 0.6·VCC and low below 0.3·VCC, so a
+    /// TTL part's 3.4 V high reads high, as it does on a real Uno. The outputs swing as <see cref="LogicLevels.Cmos5V"/>
+    /// says, and that is the part's saved setting.
+    /// </summary>
+    public static LogicLevels AvrLevels { get; } = LogicLevels.Cmos5V with { Name = "AVR 5V", Vih = 3.0, Vil = 1.5 };
 
     private readonly AvrCore _core = new();
     private readonly Terminal[] _gpio = new Terminal[20];
@@ -37,8 +44,25 @@ public sealed partial class Atmega328p : DigitalIc, IBreakpointSource, IRunState
     private double _cpuTime;
     private LogicState[] _driving = new LogicState[20];
 
-    public Atmega328p() : base(28)
+    // The Uno's own rails (5V, IOREF, 3V3) and its ground pins after the first, stamped as sources.
+    private readonly List<(Terminal Terminal, double Volts)> _rails = [];
+    private readonly List<Terminal> _grounds = [];
+
+    public Atmega328p() : this(uno: false)
     {
+    }
+
+    /// <summary>The chip, as a DIP-28, or (<paramref name="uno"/>) on an Arduino Uno's header.</summary>
+    protected Atmega328p(bool uno) : base(28)
+    {
+        if (uno)
+        {
+            Terminals = BuildUno();
+            ConfigurePins([Reset, .. _gpio], [.. _gpio]);
+            _core.Reset();
+            return;
+        }
+
         PropagationDelay = 5e-9;
         Levels = LogicLevels.Cmos5V;
         var pins = new Terminal[29];
@@ -85,23 +109,101 @@ public sealed partial class Atmega328p : DigitalIc, IBreakpointSource, IRunState
         _core.Reset();
     }
 
+    /// <summary>The Uno's header: its pins in the board's order and places, the chip's ports and ADC behind them.</summary>
+    private List<Terminal> BuildUno()
+    {
+        PropagationDelay = 5e-9;
+        Levels = LogicLevels.Cmos5V;
+        var profile = Boards.BoardProfile.ArduinoUno;
+        var all = new List<Terminal>();
+        var at = 0;
+        Terminal? vcc = null, reset = null, aref = null;
+        var pins = profile.LeftPins.Select((p, i) => (Pin: p, Offset: Boards.BoardPackage.PinOffset(profile, i, left: true)))
+            .Concat(profile.RightPins.Select((p, i) => (Pin: p, Offset: Boards.BoardPackage.PinOffset(profile, i, left: false))));
+        var gpio = new SortedDictionary<int, (Terminal Terminal, int Port, int Bit)>();
+        foreach (var (pin, offset) in pins)
+        {
+            var id = $"p{pin.Number}";
+            Terminal t;
+            switch (pin.Name)
+            {
+                case "5V":
+                    t = new Terminal(id, pin.Name, TerminalType.Power, offset);
+                    vcc = t;
+                    _rails.Add((t, 5.0));
+                    break;
+                case "IOREF":
+                    t = new Terminal(id, pin.Name, TerminalType.Power, offset);
+                    _rails.Add((t, 5.0));
+                    break;
+                case "3V3":
+                    t = new Terminal(id, pin.Name, TerminalType.Power, offset);
+                    _rails.Add((t, 3.3));
+                    break;
+                case "GND":
+                    t = new Terminal(id, pin.Name, TerminalType.Ground, offset);
+                    _grounds.Add(t);
+                    break;
+                case "RESET":
+                    t = reset = new Terminal(id, pin.Name, TerminalType.Input, offset);
+                    break;
+                case "AREF":
+                    t = aref = new Terminal(id, pin.Name, TerminalType.Passive, offset);
+                    break;
+                case var name when name.StartsWith('D') && int.TryParse(name[1..], out var d):
+                    t = new Terminal(id, pin.Label, TerminalType.Bidirectional, offset);
+                    gpio[d] = (t, d < 8 ? 2 : 0, d < 8 ? d : d - 8);
+                    break;
+                case var name when name.StartsWith('A') && int.TryParse(name[1..], out var a):
+                    t = new Terminal(id, pin.Name, TerminalType.Bidirectional, offset);
+                    gpio[100 + a] = (t, 1, a);
+                    _adc[a] = t;
+                    break;
+                default:
+                    t = new Terminal(id, pin.Name, TerminalType.Passive, offset);   // VIN: the board's input, not modelled
+                    break;
+            }
+
+            all.Add(t);
+        }
+
+        foreach (var (_, (terminal, port, bit)) in gpio)
+        {
+            _gpio[at] = terminal;
+            _map[at++] = (port, bit);
+        }
+
+        Vcc = vcc!;
+        Gnd = _grounds[0];
+        Gnd2 = _grounds.Count > 1 ? _grounds[1] : _grounds[0];
+        Reset = reset!;
+        Avcc = vcc!;
+        Aref = aref!;
+        _grounds.RemoveAt(0);
+        return all;
+    }
+
+    /// <summary>Its rails, and its ground pins after the first, as sources: the Uno feeds the circuit round it.</summary>
+    public override int VoltageSourceCount => base.VoltageSourceCount + _rails.Count + _grounds.Count;
+
     public override string PartNumber => "ATmega328P";
 
     public override string ComponentType => "ATmega328P";
 
     public override bool LabelsPins => true;
 
-    public Terminal Reset { get; }
+    public Terminal Reset { get; private set; } = null!;
 
-    public Terminal Xtal1 { get; }
+    /// <summary>The crystal's pins on the DIP; the Uno has its crystal on the board.</summary>
+    public Terminal? Xtal1 { get; }
 
-    public Terminal Xtal2 { get; }
+    public Terminal? Xtal2 { get; }
 
-    public Terminal Avcc { get; }
+    public Terminal Avcc { get; private set; } = null!;
 
-    public Terminal Aref { get; }
+    public Terminal Aref { get; private set; } = null!;
 
-    public Terminal Gnd2 { get; }
+    public Terminal Gnd2 { get; private set; } = null!;
 
     /// <summary>The GPIO pins, PD0-PD7 then PB0-PB5 then PC0-PC5 in pin order, as <see cref="DigitalComponent.OutputTerminals"/>.</summary>
     public IReadOnlyList<Terminal> Gpio => _gpio;
@@ -168,15 +270,69 @@ public sealed partial class Atmega328p : DigitalIc, IBreakpointSource, IRunState
         return $"{image.ByteCount} bytes of firmware";
     }
 
+    // ---- the debugger ----
+
+    /// <summary>Byte addresses in flash it stops at, before running the instruction there.</summary>
+    public HashSet<int> Breakpoints { get; } = [];
+
+    /// <summary>Stopped at a breakpoint or after a single step: the firmware waits, its pins held, until it's resumed.</summary>
+    public bool Halted { get; private set; }
+
+    /// <summary>Why it stopped: "breakpoint" or "step"; null while it runs.</summary>
+    public string? HaltReason { get; private set; }
+
+    private bool _skipBreakpoint, _stepOne;
+
+    /// <summary>Lets it run on, past the breakpoint it stopped at.</summary>
+    public void Resume()
+    {
+        if (!Halted) return;
+        Halted = false;
+        HaltReason = null;
+        _skipBreakpoint = true;
+    }
+
+    /// <summary>Runs one instruction (or takes one interrupt), then stops again.</summary>
+    public void StepInstruction()
+    {
+        Halted = false;
+        HaltReason = null;
+        _skipBreakpoint = true;
+        _stepOne = true;
+    }
+
+    /// <summary>Stops it where it is, as a breakpoint would.</summary>
+    public void Break()
+    {
+        Halted = true;
+        HaltReason = "paused";
+    }
+
     /// <summary>How far ahead of the circuit it runs between samples of its pins, in seconds.</summary>
-    public double Window => _core.RxEnabled ? Math.Clamp(_core.BitCycles / ClockFrequency / 8, 1e-6, 200e-6) : 200e-6;
+    public double Window =>
+        _core.TwiBusy ? Math.Clamp(_core.TwiQuarter / ClockFrequency, 0.2e-6, 200e-6)
+        : _core.RxEnabled ? Math.Clamp(_core.BitCycles / ClockFrequency / 8, 1e-6, 200e-6)
+        : 200e-6;
 
     /// <summary>Where the firmware has run to, or a window on: the circuit is never let step past the chip unwatched.</summary>
-    public double? NextBreakpointAfter(double time) => _cpuTime > time + 1e-12 ? _cpuTime : time + Window;
+    public double? NextBreakpointAfter(double time) => _cpuTime > time + 1e-12 ? _cpuTime : time + (_fresh ? 1e-9 : Window);
+
+    // Just powered up or reset, it hasn't looked ahead yet: it wants a time point straight away to start from, or the
+    // circuit would stride past its first edges with nobody watching.
+    private bool _fresh = true;
 
     public override void StampMatrix(MnaSystem system, SimulationState state)
     {
         base.StampMatrix(system, state);
+        // A rail or a spare ground pin left unconnected is on ground's own node: its branch carries nothing.
+        var branch = base.VoltageSourceCount;
+        var reference = system.Node(Gnd);
+        foreach (var (terminal, volts) in _rails.Concat(_grounds.Select(g => (g, 0.0))))
+        {
+            var b = system.Branch(this, branch++);
+            if (system.Node(terminal) == reference) system.Add(b, b, 1.0);
+            else system.StampVoltageSource(b, system.Node(terminal), reference, volts);
+        }
         var vcc = system.Node(Vcc);
         system.StampResistor(system.Node(Reset), vcc, PullUpResistance);
         for (var i = 0; i < _gpio.Length; i++)
@@ -189,6 +345,7 @@ public sealed partial class Atmega328p : DigitalIc, IBreakpointSource, IRunState
         if (context.IsInitializing)
         {
             _cpuTime = time;
+            _fresh = true;
             Drive(context, time);
             return;
         }
@@ -201,9 +358,17 @@ public sealed partial class Atmega328p : DigitalIc, IBreakpointSource, IRunState
             return;
         }
 
+        // Stopped in the debugger: time goes on for the circuit, not for the firmware.
+        if (Halted)
+        {
+            _cpuTime = time;
+            return;
+        }
+
         // Still ahead of the circuit from last time: nothing to do until it catches up.
         if (_cpuTime > time + 1e-12) return;
 
+        _fresh = false;
         Sample(context);
         var period = 1.0 / Math.Max(ClockFrequency, 1);
         var limit = time + Window;
@@ -212,7 +377,24 @@ public sealed partial class Atmega328p : DigitalIc, IBreakpointSource, IRunState
         var changed = false;
         while (_cpuTime < limit && !changed)
         {
+            if (!_skipBreakpoint && Breakpoints.Count > 0 && Breakpoints.Contains(_core.Pc * 2))
+            {
+                Halted = true;
+                HaltReason = "breakpoint";
+                break;
+            }
+
+            _skipBreakpoint = false;
             var cycles = _core.Step();
+            if (_stepOne)
+            {
+                _cpuTime += cycles * period;
+                _stepOne = false;
+                Halted = true;
+                HaltReason = "step";
+                break;
+            }
+
             _cpuTime += cycles * period;
             changed = Outputs();
         }
@@ -225,7 +407,7 @@ public sealed partial class Atmega328p : DigitalIc, IBreakpointSource, IRunState
     {
         var ports = new byte[3];
         for (var i = 0; i < _gpio.Length; i++)
-            if (context.ReadInput(_gpio[i], Levels).IsHigh()) ports[_map[i].Port] |= (byte)(1 << _map[i].Bit);
+            if (context.ReadInput(_gpio[i], AvrLevels).IsHigh()) ports[_map[i].Port] |= (byte)(1 << _map[i].Bit);
         Array.Copy(ports, _core.PinInputs, 3);
         var ground = context.NodeVoltage(Gnd);
         for (var i = 0; i < _adc.Length; i++) _core.AnalogInputs[i] = context.NodeVoltage(_adc[i]) - ground;
@@ -267,6 +449,10 @@ public sealed partial class Atmega328p : DigitalIc, IBreakpointSource, IRunState
         base.ResetLogic();
         _core.Reset();
         _cpuTime = 0;
+        _fresh = true;
+        Halted = false;
+        HaltReason = null;
+        _stepOne = _skipBreakpoint = false;
         _driving = new LogicState[_gpio.Length];
         Array.Fill(_driving, LogicState.Unknown);
     }

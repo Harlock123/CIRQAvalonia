@@ -239,6 +239,7 @@ public sealed partial class SimulationController : ObservableObject, IDisposable
                 Settings.AdaptiveTimeStep = Circuit.AdaptiveTimeStep;
 
                 Simulator = new CircuitSimulator(Circuit, Settings);
+                _debugged = [.. Flattening.Flatten(Circuit.Components).OfType<Cirq.Components.Processors.Atmega328p>()];
 
                 // A circuit with nothing that integrates and no waveform to follow changes only when its logic does:
                 // it steps from one event to the next, landing on every one, instead of plodding at a step sized
@@ -263,6 +264,19 @@ public sealed partial class SimulationController : ObservableObject, IDisposable
             }
         }
     }
+
+    // The microcontrollers a breakpoint can stop the run in.
+    private Cirq.Components.Processors.Atmega328p[] _debugged = [];
+
+    private Cirq.Components.Processors.Atmega328p? HaltedChip()
+    {
+        foreach (var chip in _debugged)
+            if (chip.Halted) return chip;
+        return null;
+    }
+
+    /// <summary>Raised (on the run's thread) when a microcontroller's firmware stops at a breakpoint or after a step.</summary>
+    public event Action<Cirq.Components.Processors.Atmega328p>? FirmwareHalted;
 
     /// <summary>The live run steps from one logic event to the next (see <see cref="Rebuild"/>).</summary>
     public bool SteppingByEvents { get; private set; }
@@ -290,6 +304,9 @@ public sealed partial class SimulationController : ObservableObject, IDisposable
         {
             if (!Rebuild()) return;
         }
+
+        // Running again carries on from a breakpoint.
+        foreach (var chip in _debugged) chip.Resume();
 
         _cancellation = new CancellationTokenSource();
         IsRunning = true;
@@ -405,6 +422,7 @@ public sealed partial class SimulationController : ObservableObject, IDisposable
 
             var sliceStart = clock.Elapsed;
             var steps = 0;
+            Cirq.Components.Processors.Atmega328p? halted = null;
 
             try
             {
@@ -419,6 +437,7 @@ public sealed partial class SimulationController : ObservableObject, IDisposable
                         {
                             simulator.Step();
                             steps++;
+                            if (_debugged.Length > 0 && (halted = HaltedChip()) is not null) break;
                         }
                     }
                     else
@@ -431,6 +450,7 @@ public sealed partial class SimulationController : ObservableObject, IDisposable
                         {
                             simulator.Step();
                             steps++;
+                            if (_debugged.Length > 0 && (halted = HaltedChip()) is not null) break;
                         }
                     }
 
@@ -462,6 +482,14 @@ public sealed partial class SimulationController : ObservableObject, IDisposable
             }
 
             if (steps > 0) Advanced?.Invoke();
+
+            if (halted is not null)
+            {
+                IsRunning = false;
+                Status = $"{halted.Name} stopped at ${halted.Core.Pc * 2:X4} ({halted.HaltReason}): Firmware Debugger to look, Run to carry on";
+                FirmwareHalted?.Invoke(halted);
+                return;
+            }
 
             // Yield so the render thread gets the CPU even at maximum throughput.
             Thread.Sleep(1);

@@ -30,6 +30,7 @@ public static class BuildSheet
             BoardKind.Stripboard => "stripboard",
             BoardKind.Perfboard => "perfboard",
             BoardKind.Pcb => "a printed circuit board",
+            BoardKind.DoubleSidedPcb => "a double-sided printed circuit board",
             _ => layout.Boards == 1 ? "a breadboard" : $"{layout.Boards} breadboards",
         };
 
@@ -47,8 +48,8 @@ public static class BuildSheet
             .Append("</style></head><body>");
         html.Append("<h1>").Append(E(title)).Append("</h1><p class=\"sub\">Built on ").Append(E(on)).Append(": ")
             .Append(layout.Parts.Count).Append(" parts on the board, ").Append(layout.Bench.Count).Append(" on the bench, ")
-            .Append(layout.Kind == BoardKind.Pcb ? layout.Wires.Count(w => w.IsTrace) : layout.Wires.Count)
-            .Append(layout.Kind switch { BoardKind.Stripboard => " wire links, ", BoardKind.Pcb => $" traces, {layout.Wires.Count(w => !w.IsTrace)} jumpers, ", _ => " wires, " })
+            .Append(layout.Kind.IsPcb() ? layout.Wires.Count(w => w.IsTrace) : layout.Wires.Count)
+            .Append(layout.Kind switch { BoardKind.Stripboard => " wire links, ", BoardKind.Pcb or BoardKind.DoubleSidedPcb => $" traces, {layout.Vias.Count} vias, {layout.Wires.Count(w => !w.IsTrace)} jumpers, ", _ => " wires, " })
             .Append(layout.Kind == BoardKind.Stripboard ? $"{layout.Cuts.Count} strip cuts. " : "")
             .Append(layout.Matches ? "<span class=\"ok\">The board matches the schematic.</span>" : $"<span class=\"bad\">{E(string.Join(" ", layout.Problems))}</span>")
             .Append("</p>");

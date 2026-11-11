@@ -174,7 +174,7 @@ public static class SolderedLayout
 
             var cuts = Strips ? Cut() : [];
             var segments = Strips ? Segment(cuts) : [];
-            var wires = Strips ? Link(segments) : kind == BoardKind.Pcb ? Traces() : Wire();
+            var wires = Strips ? Link(segments) : kind.IsPcb() ? Traces() : Wire();
             var problems = Check(segments, wires);
 
             var holeNets = new Dictionary<BoardHole, Net>();
@@ -194,6 +194,8 @@ public static class SolderedLayout
                 Cuts = cuts,
                 Segments = segments,
                 HoleNets = holeNets,
+                Vias = _vias,
+                Pour = _pour,
             };
         }
 
@@ -772,7 +774,14 @@ public static class SolderedLayout
 
         // ---- printed circuit board: routed traces ----
 
-        /// <summary>Each net's pads joined by copper traces on the back, routed round each other; a jumper where one can't be.</summary>
+        private List<BoardHole> _vias = [];
+        private IReadOnlyList<PourArea> _pour = [];
+        private IReadOnlyList<(BoardHole A, BoardHole B)> _pourJoins = [];
+
+        /// <summary>
+        /// Each net's pads joined by copper traces, routed round each other, on one side or both; a jumper where one
+        /// can't be; and the ground pour, if it's on, round them all.
+        /// </summary>
         private List<BoardWire> Traces()
         {
             var nets = _netHoles.OrderBy(n => n.Key.IsGround ? -1 : n.Key.Index).Select(n => new PcbRouter.NetPads(n.Key, n.Value.Distinct().ToList())).ToList();
@@ -789,9 +798,45 @@ public static class SolderedLayout
                         under.Add(hole);
                 }
 
-            return PcbRouter.Route(nets, loose, under, _columns, _rows, (net, a, b, route) => route is null
-                ? new BoardWire($"jumper:{Name(a)}-{Name(b)}", net, a, b, Role(net), Colour(net), false, [Position(a), Position(b)])
-                : new BoardWire($"trace:{Name(a)}-{Name(b)}", net, a, b, Role(net), Colour(net), false, route) { IsTrace = true });
+            var pour = hand.GroundPour && _ground is not null && _netHoles.ContainsKey(_ground);
+            var routing = PcbRouter.Route(nets, loose, under, _columns, _rows, kind.CopperLayers(), (net, a, b, route, layer) => route is null
+                    ? new BoardWire($"jumper:{Name(a)}-{Name(b)}", net, a, b, Role(net), Colour(net), false, [Position(a), Position(b)])
+                    : new BoardWire($"trace{(layer == 1 ? "-top" : "")}:{Name(a)}-{Name(b)}", net, a, b, Role(net), Colour(net), false, route) { IsTrace = true, Layer = layer },
+                pour ? (wires, vias) => Pour(wires, vias).Joins : null);
+            _vias = routing.Vias;
+            if (pour)
+            {
+                var final = Pour(routing.Wires, routing.Vias);
+                _pour = final.Areas;
+                _pourJoins = final.Joins;
+            }
+
+            return routing.Wires;
+        }
+
+        /// <summary>The ground pour round the copper so far: every pad, via, trace and jumper's end.</summary>
+        private GroundPour.Result Pour(List<BoardWire> wires, List<BoardHole> vias)
+        {
+            var copper = new List<GroundPour.Copper>();
+            foreach (var (hole, net) in _pins) copper.Add(new(net, -1, Position(hole), Position(hole), PcbRouter.PadDiameter));
+            var netOf = new Dictionary<BoardHole, Net>();
+            foreach (var wire in wires)
+            {
+                netOf[wire.From] = wire.Net;
+                netOf[wire.To] = wire.Net;
+                if (wire.IsTrace)
+                {
+                    var width = wire.Role == WireRole.Signal ? PcbRouter.SignalWidth : PcbRouter.PowerWidth;
+                    for (var i = 1; i < wire.Route.Count; i++) copper.Add(new(wire.Net, wire.Layer, wire.Route[i - 1], wire.Route[i], width));
+                }
+                else
+                    foreach (var end in new[] { wire.From, wire.To })
+                        if (!_pins.ContainsKey(end)) copper.Add(new(wire.Net, -1, Position(end), Position(end), PcbRouter.PadDiameter));
+            }
+
+            foreach (var via in vias)
+                if (netOf.TryGetValue(via, out var net)) copper.Add(new(net, -1, Position(via), Position(via), PcbRouter.ViaDiameter));
+            return GroundPour.Pour(Width(_columns), Height(_rows), kind.CopperLayers(), copper, _netHoles[_ground!].Distinct().ToList());
         }
 
         // ---- the check ----
@@ -823,6 +868,7 @@ public static class SolderedLayout
             }
 
             foreach (var wire in wires) Union(Node(wire.From), Node(wire.To));
+            foreach (var (a, b) in _pourJoins) Union(Node(a), Node(b));
             var at = new Dictionary<Terminal, string>();
             foreach (var part in _parts)
                 for (var i = 0; i < part.Package.Pins.Count; i++)

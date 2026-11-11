@@ -293,6 +293,10 @@ public static partial class Examples
                 LoadEsp32Gpio),
             new("ATmega328P Blink", "An Arduino Uno's chip on its own, running firmware: Timer1's compare interrupt toggles PB5 (pin 13) twice a second, and the LED on it blinks at 1 Hz",
                 LoadAtmegaBlink),
+            new("Arduino Uno SPI Counter", "A Uno running firmware that counts in binary on eight LEDs, shifting each count into a 74595 over SPI and latching it, ten times a second",
+                LoadUnoSpiCounter),
+            new("Arduino Uno I2C EEPROM", "A Uno writing \"HI!\" to a 24LC256 over I2C, reading it back with a repeated START, and printing it on a serial terminal at 9600 baud",
+                LoadUnoI2cEeprom),
         ]),
 
         new("Computers",
