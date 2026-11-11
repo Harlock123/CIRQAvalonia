@@ -554,6 +554,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
             Simulation.Pause();
             ReplaceCircuitWith(result.Circuit);
+            _speedChosen = false;
 
             History.Reset(Circuit);
             Simulation.InvalidateTopology();
@@ -656,6 +657,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         }
 
         ReplaceCircuitWith(result.Circuit);
+        _speedChosen = false;
 
         CurrentFilePath = path;
         IsModified = false;
@@ -1273,6 +1275,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     {
         Simulation.Pause();
         ReplaceCircuitWith(loaded);
+        _speedChosen = false;
         CurrentFilePath = path;
         IsModified = false;
         History.Reset(Circuit);
@@ -1698,6 +1701,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
         Simulation.IsMaximumThroughput = option.IsMaximum;
         if (!option.IsMaximum) Simulation.SpeedFactor = option.Factor;
+        _speedChosen = true;
 
         RefreshSpeedSelection();
         StatusMessage = $"Simulation speed: {option.Label}";
@@ -1712,7 +1716,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     /// from the menu; an agent building a counter has no menu, so unless it names a speed the pace is chosen here
     /// from the slowest clock or generator in the circuit, fast enough for a cycle or two a second (and never past
     /// real time), and the timebase widened to hold a few of its periods. A circuit with nothing setting a pace is
-    /// left as it is.
+    /// left as it is, and so is a speed somebody chose from the menu. A person pressing Run gets the same, since a
+    /// saved circuit carries no speed of its own.
     /// </para>
     /// </summary>
     /// <param name="speed">A fraction of real time, infinity for as fast as it goes, or null to choose.</param>
@@ -1736,7 +1741,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             RefreshSpeedSelection();
             said.Add($"Speed {SpeedLabel}");
         }
-        else if (slowest.Hz > 0 && !Simulation.IsMaximumThroughput && slowest.Hz * Simulation.SpeedFactor < 0.5)
+        else if (slowest.Hz > 0 && !_speedChosen && !Simulation.IsMaximumThroughput && slowest.Hz * Simulation.SpeedFactor < 0.5)
         {
             // Slower than a cycle every two seconds is a line that looks dead; two a second is one you can watch.
             Simulation.SpeedFactor = Math.Min(1.0, 2.0 / slowest.Hz);
@@ -2249,7 +2254,27 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         ActiveTool = Enum.TryParse<EditorTool>(tool, true, out var parsed) ? parsed : EditorTool.Select;
 
     [RelayCommand]
-    private void PlayPause() => Simulation.TogglePlayPause();
+    private void PlayPause()
+    {
+        if (Simulation.IsRunning)
+        {
+            Simulation.Pause();
+            return;
+        }
+
+        // The same pace an agent's Run gets: a saved circuit carries no speed, so one with a 2 Hz clock opened into a
+        // window at a thousandth of real time would otherwise sit flat. A speed chosen from the menu is left alone.
+        var paced = PaceForRun(null);
+        Simulation.Play();
+        if (paced is not null && Simulation.IsRunning)
+            StatusMessage = $"Running. {paced} Simulate › Speed changes it.";
+    }
+
+    /// <summary>
+    /// Set when Simulate › Speed was chosen by hand since this circuit was opened or started, so Run keeps it rather
+    /// than choosing a pace from the circuit.
+    /// </summary>
+    private bool _speedChosen;
 
     [RelayCommand]
     private void Step() => Simulation.StepOnce();
@@ -2270,6 +2295,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
         Simulation.Pause();
         Circuit.Clear();
+        _speedChosen = false;
         RefreshSheets();
         SelectedComponent = null;
         Circuit.Title = "Untitled circuit";
@@ -2288,6 +2314,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
         Simulation.Pause();
         Circuit.Clear();
+        _speedChosen = false;
         SelectedComponent = null;
         example.Build(this);
         RefreshSheets();

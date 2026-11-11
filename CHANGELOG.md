@@ -41,7 +41,9 @@ built with a 1 Hz clock took a quarter of an hour to show an edge; asking about 
 transient, whose traces made it look as though it had started working. Now `transport run` sets a
 pace from the circuit's slowest clock or generator (a cycle or two a second, never past real time)
 and widens the scope's timebase to hold a few periods, and says what it set; `speed` on it chooses
-one outright, `"max"` included.
+one outright, `"max"` included. Run (`F5`) does the same for a circuit you open yourself, since a
+file carries no speed: a saved 2 Hz counter counts as soon as it runs. A speed chosen from
+Simulate › Speed is kept until another circuit is opened.
 
 ## [0.48.0] - 2026-11-05
 

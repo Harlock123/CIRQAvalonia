@@ -805,6 +805,13 @@ Transport lives on the **Simulate** menu and on three keys:
 - 1/10, 1/100, 1/1000, 1/10000 speed
 - Maximum throughput — run as fast as the solver can, ignoring the clock
 
+A circuit file doesn't carry a speed, so Run picks one when the circuit's slowest clock, generator,
+oscillator or pattern generator would take more than two seconds to show a cycle: fast enough for
+a cycle or two a second, never past real time, with the scope's timebase widened to show a few of
+them. The status bar says what it set. A 2 Hz counter opened into a window left at 1/1000 counts
+straight away instead of sitting flat for minutes. Choose a speed from the menu and Run keeps it
+until you open or start another circuit.
+
 Slow it down to watch a counter tick; use maximum throughput to get a long waveform quickly. The
 status bar shows the elapsed simulated time and the solver's rate while it runs.
 

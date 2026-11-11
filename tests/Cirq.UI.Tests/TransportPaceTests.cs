@@ -91,6 +91,40 @@ public class TransportPaceTests(WindowSession session) : IDisposable
     });
 
     [Fact]
+    public void A_saved_circuit_with_a_slow_clock_runs_with_F5_at_a_pace_it_can_be_seen_at_unless_a_speed_was_chosen() => session.Run(() =>
+    {
+        // Saved, then opened into a window still at the opening example's thousandth of real time.
+        var circuit = new Cirq.Core.Topology.Circuit { Title = "Two hertz" };
+        circuit.Add(new Cirq.Components.Digital.ClockSource { Frequency = 2 });
+        circuit.Add(new Cirq.Components.Sources.Ground());
+        var path = Path.Combine(_folder, "two-hertz.cirq");
+        Cirq.Components.Serialization.CircuitSerializer.Save(circuit, path);
+
+        var (editor, _) = Open();
+        Assert.True(Finish(editor.LoadFromAsync(path)));
+        Assert.Equal(1e-3, editor.Simulation.SpeedFactor);
+
+        editor.PlayPauseCommand.Execute(null);
+        Assert.True(editor.Simulation.IsRunning);
+        Assert.Equal(1.0, editor.Simulation.SpeedFactor);
+        Assert.Contains("CLK1 at 2Hz can be seen", editor.StatusMessage);
+        editor.PlayPauseCommand.Execute(null);
+        Assert.False(editor.Simulation.IsRunning);
+
+        // Chosen from the menu, and kept: Run doesn't second-guess a person.
+        editor.SetSpeedCommand.Execute(editor.SpeedOptions.First(o => o.Factor == 1e-3 && !o.IsMaximum));
+        editor.PlayPauseCommand.Execute(null);
+        Assert.Equal(1e-3, editor.Simulation.SpeedFactor);
+        editor.PlayPauseCommand.Execute(null);
+
+        // Until another circuit is opened.
+        Assert.True(Finish(editor.LoadFromAsync(path)));
+        editor.PlayPauseCommand.Execute(null);
+        Assert.Equal(1.0, editor.Simulation.SpeedFactor);
+        editor.PlayPauseCommand.Execute(null);
+    });
+
+    [Fact]
     public void A_circuit_with_nothing_setting_a_pace_runs_at_the_speed_it_was_left_at() => session.Run(() =>
     {
         var (editor, tools) = Open();
