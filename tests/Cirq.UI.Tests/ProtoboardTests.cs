@@ -35,15 +35,23 @@ public class ProtoboardTests(WindowSession session) : IDisposable
     {
         var library = new Cirq.UI.Agents.EditorLibrary();
         var bad = new List<string>();
+        var (wires, over) = (0, 0);
         foreach (var example in library.Examples)
         {
             var circuit = library.LoadExample(example.Name).Circuit;
             var layout = ProtoboardLayout.Arrange(circuit);
             if (!layout.Matches) bad.Add($"{example.Name}: {string.Join(" ", layout.Problems)}");
             else if (layout.Parts.Count + layout.Bench.Count == 0) bad.Add($"{example.Name}: nothing on the board");
+
+            // The wires are routed round the parts: what's left over a body is a wire's tip going into a hole beside
+            // one, a pitch or two on a board, never wires lying across chips.
+            if (layout.CoveredLength > 8) bad.Add($"{example.Name}: {layout.CoveredLength:0.0} pitches of wire over parts");
+            wires += layout.Wires.Count + layout.Bench.Sum(b => b.Leads.Count);
+            over += layout.WiresOverParts;
         }
 
         Assert.True(bad.Count == 0, string.Join("\n", bad));
+        Assert.True(over < wires / 10, $"{over} of {wires} wires pass over a part");
     }
 
     [Fact]

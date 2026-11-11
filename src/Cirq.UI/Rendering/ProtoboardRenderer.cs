@@ -82,17 +82,15 @@ public static class ProtoboardRenderer
 
         for (var board = 1; board <= layout.Boards; board++) DrawBoard(canvas, layout, board, options);
 
-        foreach (var part in layout.Parts.Where(p => p.Package.Form == BoardForm.Dip)) DrawDip(canvas, part);
+        // The wires lie on the board and the parts stand on top of them, as they do on a real one: a wire is never
+        // drawn over a part, and the layout routes them round the parts where it can, so they stay in sight too.
         foreach (var wire in layout.Wires) DrawWire(canvas, wire, ReferenceEquals(wire, options.Wire));
+        foreach (var item in layout.Bench)
+            foreach (var lead in item.Leads) DrawLead(canvas, lead);
+
+        foreach (var part in layout.Parts.Where(p => p.Package.Form == BoardForm.Dip)) DrawDip(canvas, part);
         foreach (var part in layout.Parts.Where(p => p.Package.Form == BoardForm.Inline)) DrawInline(canvas, part);
         foreach (var part in layout.Parts.Where(p => p.Package.Form == BoardForm.TwoLead)) DrawTwoLead(canvas, part);
-
-        foreach (var item in layout.Bench)
-        {
-            for (var i = 0; i < item.Leads.Count; i++)
-                DrawLead(canvas, item.LeadStart(item.Package.Pins.ToList().IndexOf(item.Leads[i].Terminal)), item.Leads[i]);
-        }
-
         foreach (var item in layout.Bench) DrawBench(canvas, item);
 
         if (options.Selected is { } selected && Bounds(layout, selected) is { } box)
@@ -187,35 +185,54 @@ public static class ProtoboardRenderer
     private static void DrawWire(ISymbolCanvas canvas, BoardWire wire, bool picked)
     {
         var colour = WireColour(wire.Role, wire.Colour);
-        var (a, b) = (P(Breadboard.Position(wire.From)), P(Breadboard.Position(wire.To)));
-        var length = Breadboard.Distance(wire.From, wire.To);
-        var straight = Math.Abs(a.X - b.X) < 0.01 || Math.Abs(a.Y - b.Y) < 0.01;
-        var path = new SymbolPath();
-        using (var ctx = path.Open())
-        {
-            ctx.BeginFigure(a, false);
-            if (straight || length <= 4) ctx.LineTo(b);
-            else
-            {
-                // Cut to length and lying nearly flat, as a tidy board is wired: a long one bows a little, towards the top.
-                var lift = Math.Min(0.07 * length, 1.8) * Unit;
-                var (dx, dy) = (b.X - a.X, b.Y - a.Y);
-                var norm = Math.Sqrt((dx * dx) + (dy * dy));
-                var (nx, ny) = (-dy / norm, dx / norm);
-                if (ny > 0) (nx, ny) = (-nx, -ny);
-                ctx.CubicBezierTo(new Point(a.X + (dx * 0.25) + (nx * lift), a.Y + (dy * 0.25) + (ny * lift)),
-                    new Point(a.X + (dx * 0.75) + (nx * lift), a.Y + (dy * 0.75) + (ny * lift)), b);
-            }
-
-            ctx.EndFigure(false);
-        }
-
+        var path = Along(wire.Route);
         canvas.DrawGeometry(null, Pen("#33000000", 0.5), Shifted(path));
         canvas.DrawGeometry(null, Pen(Darker(colour, 0.45), 0.42), path);
         canvas.DrawGeometry(null, Pen(colour, 0.3), path);
         if (picked) canvas.DrawGeometry(null, Pen("#802F80ED", 0.7), path);
-        foreach (var end in new[] { a, b })
-            canvas.DrawEllipse(Silver, Pen("#7D838A", 0.05), end, 0.2 * Unit, 0.2 * Unit);
+        foreach (var end in new[] { wire.From, wire.To })
+            canvas.DrawEllipse(Silver, Pen("#7D838A", 0.05), P(Breadboard.Position(end)), 0.2 * Unit, 0.2 * Unit);
+    }
+
+    /// <summary>
+    /// A wire's route as a path: a curve's points joined as they are, and a dog-leg's corners rounded off, as a wire
+    /// bent by hand is.
+    /// </summary>
+    private static SymbolPath Along(IReadOnlyList<(double X, double Y)> route)
+    {
+        var points = route.Select(P).ToList();
+        var path = new SymbolPath();
+        using var ctx = path.Open();
+        ctx.BeginFigure(points[0], false);
+        if (points.Count > 2)
+        {
+            for (var i = 1; i < points.Count - 1; i++)
+            {
+                var (prev, corner, next) = (points[i - 1], points[i], points[i + 1]);
+                var inLength = Math.Sqrt(((corner.X - prev.X) * (corner.X - prev.X)) + ((corner.Y - prev.Y) * (corner.Y - prev.Y)));
+                var outLength = Math.Sqrt(((next.X - corner.X) * (next.X - corner.X)) + ((next.Y - corner.Y) * (next.Y - corner.Y)));
+                var r = Math.Min(0.8 * Unit, Math.Min(inLength, outLength) / 2);
+                if (r < 0.01 || inLength < 1e-6 || outLength < 1e-6)
+                {
+                    ctx.LineTo(corner);
+                    continue;
+                }
+
+                var before = new Point(corner.X - ((corner.X - prev.X) / inLength * r), corner.Y - ((corner.Y - prev.Y) / inLength * r));
+                var after = new Point(corner.X + ((next.X - corner.X) / outLength * r), corner.Y + ((next.Y - corner.Y) / outLength * r));
+                ctx.LineTo(before);
+                ctx.CubicBezierTo(new Point((before.X + corner.X) / 2, (before.Y + corner.Y) / 2), new Point((after.X + corner.X) / 2, (after.Y + corner.Y) / 2), after);
+            }
+
+            ctx.LineTo(points[^1]);
+        }
+        else
+        {
+            for (var i = 1; i < points.Count; i++) ctx.LineTo(points[i]);
+        }
+
+        ctx.EndFigure(false);
+        return path;
     }
 
     /// <summary>The same path a little down and to the right, for its shadow.</summary>
@@ -679,24 +696,14 @@ public static class ProtoboardRenderer
 
     // ───────────────────────────── the bench ─────────────────────────────
 
-    private static void DrawLead(ISymbolCanvas canvas, (double X, double Y) start, BenchLead lead)
+    private static void DrawLead(ISymbolCanvas canvas, BenchLead lead)
     {
         var colour = WireColour(lead.Role, lead.Colour);
-        var a = P(start);
-        var b = P(Breadboard.Position(lead.To));
-        var reach = Math.Max(3.0 * Unit, Math.Abs(b.X - a.X) * 0.45);
-        var path = new SymbolPath();
-        using (var ctx = path.Open())
-        {
-            ctx.BeginFigure(a, false);
-            ctx.CubicBezierTo(new Point(a.X + reach, a.Y), new Point(b.X - (reach * 0.4), b.Y - (2.0 * Unit)), b);
-            ctx.EndFigure(false);
-        }
-
+        var path = Along(lead.Route);
         canvas.DrawGeometry(null, Pen("#33000000", 0.5), Shifted(path));
         canvas.DrawGeometry(null, Pen(Darker(colour, 0.45), 0.42), path);
         canvas.DrawGeometry(null, Pen(colour, 0.3), path);
-        canvas.DrawEllipse(Silver, Pen("#7D838A", 0.05), b, 0.2 * Unit, 0.2 * Unit);
+        canvas.DrawEllipse(Silver, Pen("#7D838A", 0.05), P(Breadboard.Position(lead.To)), 0.2 * Unit, 0.2 * Unit);
     }
 
     private static void DrawBench(ISymbolCanvas canvas, BenchPart item)

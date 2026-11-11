@@ -274,16 +274,30 @@ public sealed partial class CircuitTools
     }
 
     [McpServerTool(Name = "transport")]
-    [Description("Works the editor's own simulation, as its Run (F5), Pause and Reset (F8) buttons do: run lets the person watch the circuit live (the scope scrolling, LEDs lighting, displays counting), pause stops it, reset rebuilds it and solves the bias point again. Only in the app; the headless server has no live simulation (use run_transient).")]
+    [Description("Works the editor's own simulation, as its Run (F5), Pause and Reset (F8) buttons do: run lets the person watch the circuit live (the scope scrolling, LEDs lighting, displays counting), pause stops it, reset rebuilds it and solves the bias point again. The live run goes at the Simulate menu's speed (a thousandth of real time unless something set it), which is right for audio-rate circuits and far too slow to see a clock of a few hertz; so unless speed is given, run first sets a pace from the circuit's slowest clock or generator, fast enough to see a cycle or two a second, and widens the scope's timebase to hold a few periods, and says what it set. Only in the app; the headless server has no live simulation (use run_transient).")]
     public Task<string> Transport(
         [Description("run, pause or reset.")] string action,
-        CancellationToken cancel = default) =>
-        Read($"pressed {action}", s =>
+        [Description("For run: how fast, as a fraction of real time (1 is real time, \"0.01\" a hundredth) or \"max\" for as fast as it goes. Default: chosen from the circuit's clocks and generators.")] JsonElement? speed = null,
+        CancellationToken cancel = default)
+    {
+        double? pace = null;
+        if (speed is { ValueKind: not JsonValueKind.Null } given)
+        {
+            pace = given.ValueKind == JsonValueKind.String && string.Equals(given.GetString()?.Trim(), "max", StringComparison.OrdinalIgnoreCase)
+                ? double.PositiveInfinity
+                : Seconds(given, "speed");
+            if (pace is <= 0 or > 1000 && !double.IsPositiveInfinity(pace.Value))
+                throw new McpException("speed is a fraction of real time, more than 0 and at most 1000, or \"max\".");
+        }
+
+        return Read($"pressed {action}", s =>
         {
             if (!Enum.TryParse<TransportAction>(action?.Trim(), true, out var a) || !Enum.IsDefined(a) || int.TryParse(action, out _))
                 throw new ArgumentException($"action is run, pause or reset, not \"{action}\".");
-            return new JsonObject { ["status"] = s.Transport(a) };
+            if (pace is not null && a != TransportAction.Run) throw new ArgumentException("speed goes with run.");
+            return new JsonObject { ["status"] = s.Transport(a, pace) };
         }, cancel);
+    }
 
     [McpServerTool(Name = "set_scope", Idempotent = true)]
     [Description("Sets the editor's oscilloscope, so the person sees what matters: its time per division (ten divisions across) and volts per division. Only in the app.")]

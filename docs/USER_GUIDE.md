@@ -5607,9 +5607,12 @@ more room gets a second board, and a third, stacked below and jumpered rail to r
   on its own) stand on a row of header pins, labelled.
 - **Supplies, generators, dev boards, motors, speakers and displays** sit on the bench to the left,
   their leads plugged into the board.
-- **Jumper wires** join each net's strips, cut to length and lying nearly flat: black for ground,
-  red for the supply, orange for a second supply, and a colour of its own for each other net, the
-  same colour wherever that net goes.
+- **Jumper wires** join each net's strips: black for ground, red for the supply, orange for a
+  second supply, and a colour of its own for each other net, the same colour wherever that net goes.
+  They lie on the board under the parts, as real ones do, so a wire never hides a part, and each is
+  routed to keep off the parts' bodies: straight where the way is clear, bowed round a part, along
+  the channel or the gaps beside the rails, or threaded between two chips. The holes each wire uses
+  are chosen with that in mind, and the leads from the bench are routed the same way.
 
 The view checks itself. It works out what is connected to what from the board alone, from the
 strips, the wires and the leads, and holds that against the schematic's netlist, and the status bar
@@ -9479,7 +9482,7 @@ it is told to.
 | The protoboard | `render_protoboard` (the board as a picture, with every part's holes), `arrange_protoboard` (move parts or leads to holes by name, `e12`, `T+5`; or lay it out afresh) |
 | Run | `operating_point`, `run_transient`, `ac_sweep`, `dc_sweep`, `get_trace` |
 | Memories and processors | `load_memory` (an image as Intel HEX, S-records, hex bytes, base64 or a file, all its bytes or one lane of a 68000's pair), `read_memory`, `cpu_state` (registers, flags, recent bus cycles, a 6510's port; a 68000's D0-D7, A0-A7, USP, SSP, SR and wait states; a 6809's; a Z80's main and alternate registers, IX, IY, I, R, IFF1 and IFF2 and its mode; an 8085's registers, flags with V and K, interrupt enable, masks and latches, SID and SOD), `disassemble` (6502, 6809, Z80 or 8085 code, or 68000 code across a ROM pair), `sid_state` (a SID's voices, envelopes, filter and volume), `peripheral_state` (a 6821's, 6850's, 68681's, 68230's or 68901's registers, channels and timers, a Z80 PIO's, CTC's, SIO's or DART's, with what is pending and under service in the daisy chain, and an 8155's or 8156's, 8255A's, 8251A's, 8253's or 8254's, or 8259A's) |
-| The editor | `transport` (Run, Pause, Reset), `set_scope`, `undo`, `redo` |
+| The editor | `transport` (Run, Pause, Reset; Run picks a speed and timebase the circuit's clocks can be seen at, or takes the `speed` it is given), `set_scope`, `undo`, `redo` |
 | Files | `new_circuit`, `open_circuit`, `save_circuit` |
 
 A run comes back as measurements (frequency, duty cycle, peak to peak, rise time, the −3 dB corner)

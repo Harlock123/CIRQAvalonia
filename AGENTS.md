@@ -73,7 +73,9 @@ dotnet run --project src/Cirq.UI -- --mcp      # the MCP server on stdio, headle
     named-pin table, a TO-92 or TO-220 in its datasheet's leg order, two leads, a header module, or bench
     equipment), `ProtoboardLayout` (the automatic layout from the netlist, honouring `Circuit.Board`'s hand-made
     places first, and the check that rebuilds the connections from the board alone and holds them against the
-    netlist) and `ProtoboardEdits` (moves by hand, each freezing the rest of the board). The view is
+    netlist), `WireRouter` (each jumper's and lead's path round the part bodies: simple shapes first, then A*
+    over a half-pitch grid, pulled tight) and `ProtoboardEdits` (moves by hand, each freezing the rest of the
+    board). The view is
     `Controls/ProtoboardCanvas.cs`, drawn by `Rendering/ProtoboardRenderer.cs` through `ISymbolCanvas`, so the
     export is the same drawing.
   - `Serialization/` reads and writes `.cirq` files (indented JSON).

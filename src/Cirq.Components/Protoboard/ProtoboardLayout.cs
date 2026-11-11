@@ -25,10 +25,12 @@ public sealed record BoardPart(CircuitComponent Part, BoardPackage Package, IRea
 
 /// <summary>A jumper wire between two holes, carrying one net.</summary>
 /// <param name="Key">Which two strips it joins: the same key while the layout keeps that wire, so a moved end can be remembered.</param>
-public sealed record BoardWire(string Key, Net Net, BoardHole From, BoardHole To, WireRole Role, int Colour, bool ByHand);
+/// <param name="Route">Where it runs, in pitches, from <paramref name="From"/> to <paramref name="To"/>: kept off the parts where it can be.</param>
+public sealed record BoardWire(string Key, Net Net, BoardHole From, BoardHole To, WireRole Role, int Colour, bool ByHand, IReadOnlyList<(double X, double Y)> Route);
 
 /// <summary>A lead from a bench part's terminal to a hole.</summary>
-public sealed record BenchLead(Terminal Terminal, Net Net, BoardHole To, WireRole Role, int Colour);
+/// <param name="Route">Where it runs, in pitches, from the equipment to its hole: kept off the parts where it can be.</param>
+public sealed record BenchLead(Terminal Terminal, Net Net, BoardHole To, WireRole Role, int Colour, IReadOnlyList<(double X, double Y)> Route);
 
 /// <summary>Equipment on the bench beside the boards, in pitches, with its leads.</summary>
 public sealed record BenchPart(
@@ -59,8 +61,10 @@ public sealed class ProtoboardLayout
         int boards, IReadOnlyList<BoardPart> parts, IReadOnlyList<BenchPart> bench, IReadOnlyList<BoardWire> wires,
         IReadOnlyDictionary<BoardStrip, Net> strips, IReadOnlyDictionary<int, Net> rails,
         IReadOnlyDictionary<Guid, string> refused, IReadOnlyList<string> problems, IReadOnlyList<string> unplaced,
-        IReadOnlyDictionary<Net, string>? captions = null)
+        IReadOnlyDictionary<Net, string>? captions = null, int crossing = 0, double covered = 0)
     {
+        WiresOverParts = crossing;
+        CoveredLength = covered;
         _captions = captions ?? new Dictionary<Net, string>();
         Boards = boards;
         Parts = parts;
@@ -101,6 +105,12 @@ public sealed class ProtoboardLayout
 
     /// <summary>Parts there was no room for.</summary>
     public IReadOnlyList<string> Unplaced { get; }
+
+    /// <summary>How many jumpers and leads still pass over a part somewhere: the router keeps them off where it can.</summary>
+    public int WiresOverParts { get; }
+
+    /// <summary>How much wire, in pitches, lies over parts, all the wires and leads together.</summary>
+    public double CoveredLength { get; }
 
     /// <summary>The board is the schematic: every net joined up, no two nets touching.</summary>
     public bool Matches => Problems.Count == 0;
@@ -336,6 +346,7 @@ public sealed class ProtoboardLayout
         private readonly List<string> _notes = [];
         private readonly Dictionary<Net, int> _colours = [];
         private readonly Dictionary<Net, string> _captions = [];
+        private WireRouter _router = null!;
         private readonly List<(double X, double Y, double R)> _discs = [];
         private readonly List<(double L, double T, double R, double B)> _boxes = [];
         private Netlist? _netlist;
@@ -389,12 +400,15 @@ public sealed class ProtoboardLayout
                 if (!placed) _unplaced.Add(next.Part.Name);
             }
 
+            // Every part is placed now, so the wires can be routed round them.
+            _router = new WireRouter(_discs, _boxes, _boards);
             PlaceBench(benchParts);
             var wires = Wire();
             var problems = Check(built, wires);
 
+            var routes = wires.Select(w => w.Route).Concat(_bench.SelectMany(b => b.Leads).Select(l => l.Route)).Select(_router.Covered).ToList();
             return new ProtoboardLayout(_boards, _parts, _bench, wires, new Dictionary<BoardStrip, Net>(_stripNet),
-                new Dictionary<int, Net>(_rails), _refused, problems, _unplaced, _captions);
+                new Dictionary<int, Net>(_rails), _refused, problems, _unplaced, _captions, routes.Count(c => c > 0), routes.Sum());
         }
 
         private Net NetOf(Terminal terminal) => _netlist!.NetOf(terminal);
@@ -877,7 +891,7 @@ public sealed class ProtoboardLayout
                     }
 
                     Take(spot.Hole, net);
-                    leads.Add(new BenchLead(pin, net, spot.Hole, Role(net), Colour(net)));
+                    leads.Add(new BenchLead(pin, net, spot.Hole, Role(net), Colour(net), _router.Route(start, Breadboard.Position(spot.Hole))));
                 }
 
                 _bench.Add(new BenchPart(part, package, x, top, width, height, leads, byHand));
@@ -922,59 +936,105 @@ public sealed class ProtoboardLayout
                 var tree = new List<BoardStrip> { start };
                 var rest = nodes.Where(s => s != start).ToList();
 
+                // Prim's tree, each strip outside it remembering its cheapest way in, so that a new strip joining is
+                // weighed against the others once rather than every pair being weighed again.
+                var bestFor = new Dictionary<BoardStrip, (double Cost, BoardStrip From, BoardHole A, BoardHole B)>();
+                void Consider(BoardStrip b, BoardStrip a)
+                {
+                    if (Pair(a, b, kept) is { } e && (!bestFor.TryGetValue(b, out var now) || e.Cost < now.Cost))
+                        bestFor[b] = (e.Cost, a, e.A, e.B);
+                }
+
+                void Reconsider(BoardStrip b)
+                {
+                    bestFor.Remove(b);
+                    foreach (var a in tree) Consider(b, a);
+                }
+
+                foreach (var b in rest) Consider(b, start);
+
                 while (rest.Count > 0)
                 {
-                    (BoardStrip From, BoardStrip To, BoardHole A, BoardHole B)? best = null;
-                    var lowest = double.MaxValue;
-                    foreach (var a in tree)
-                    {
-                        var holesA = Breadboard.HolesOf(a).Where(Free).ToList();
-                        if (holesA.Count == 0) continue;
-                        foreach (var b in rest)
-                        {
-                            var key = WireKey(a, b);
-                            if (kept.TryGetValue(key, out var own) && (Breadboard.StripOf(own.From), Breadboard.StripOf(own.To)) is var (f, g)
-                                && ((f == a && g == b) || (f == b && g == a)))
-                            {
-                                if (0 < lowest)
-                                {
-                                    lowest = 0;
-                                    best = f == a ? (a, b, own.From, own.To) : (a, b, own.To, own.From);
-                                }
-
-                                continue;
-                            }
-
-                            foreach (var ha in holesA)
-                                foreach (var hb in Breadboard.HolesOf(b).Where(Free))
-                                {
-                                    var d = Breadboard.Distance(ha, hb);
-                                    if (d < lowest)
-                                    {
-                                        lowest = d;
-                                        best = (a, b, ha, hb);
-                                    }
-                                }
-                        }
-                    }
-
-                    if (best is not { } edge)
+                    var next = rest.Where(bestFor.ContainsKey).OrderBy(b => bestFor[b].Cost).Cast<BoardStrip?>().FirstOrDefault();
+                    if (next is not { } joining)
                     {
                         _notes.Add($"There was no free hole left to wire {NetName(net)} with.");
                         break;
                     }
 
-                    var wireKey = WireKey(edge.From, edge.To);
+                    // A wire moved by hand keeps the holes reserved for it; any other edge's holes must still be free.
+                    var edge = bestFor[joining];
+                    var own = kept.TryGetValue(WireKey(edge.From, joining), out var hand) && (hand.From == edge.A || hand.To == edge.A);
+                    if (!own && (!Free(edge.A) || !Free(edge.B)))
+                    {
+                        Reconsider(joining);
+                        continue;
+                    }
+
+                    var wireKey = WireKey(edge.From, joining);
                     var byHand = kept.Remove(wireKey);
                     _used.Add(edge.A);
                     _used.Add(edge.B);
-                    wires.Add(new BoardWire(wireKey, net, edge.A, edge.B, Role(net), Colour(net), byHand));
-                    tree.Add(edge.To);
-                    rest.Remove(edge.To);
+                    wires.Add(new BoardWire(wireKey, net, edge.A, edge.B, Role(net), Colour(net), byHand,
+                        _router.Route(Breadboard.Position(edge.A), Breadboard.Position(edge.B))));
+                    tree.Add(joining);
+                    rest.Remove(joining);
+                    bestFor.Remove(joining);
+
+                    foreach (var r in rest)
+                    {
+                        if (bestFor.TryGetValue(r, out var was) && was.A == edge.A) Reconsider(r);
+                        else Consider(r, joining);
+                    }
                 }
             }
 
             return wires;
+        }
+
+        /// <summary>
+        /// The cheapest jumper between two strips of a net: the shortest one that keeps off the parts (a straight wire
+        /// over a body costs as much as a detour three times what it covers), or the one moved there by hand.
+        /// </summary>
+        private (double Cost, BoardHole A, BoardHole B)? Pair(BoardStrip a, BoardStrip b, Dictionary<string, (BoardHole From, BoardHole To)> kept)
+        {
+            if (kept.TryGetValue(WireKey(a, b), out var own))
+            {
+                var (f, g) = (Breadboard.StripOf(own.From), Breadboard.StripOf(own.To));
+                if (f == a && g == b) return (0, own.From, own.To);
+                if (f == b && g == a) return (0, own.To, own.From);
+            }
+
+            // Nearest first, so the looking stops as soon as nothing left can be cheaper than the best found.
+            // A rail's fifty holes are narrowed to the ones that matter: those near the strip it is joining, or the left
+            // end, where two rails are jumpered to each other.
+            IEnumerable<BoardHole> Near(BoardStrip strip, BoardStrip other)
+            {
+                var free = Breadboard.HolesOf(strip).Where(Free);
+                if (!strip.IsRail) return free;
+                if (other.IsRail) return free.OrderBy(h => h.Column).Take(4);
+                var close = free.Where(h => Math.Abs(h.Column - other.Column) <= 4).ToList();
+                return close.Count > 0 ? close : free.OrderBy(h => Math.Abs(h.Column - other.Column)).Take(4);
+            }
+
+            var holesB = Near(b, a).ToList();
+            var pairs = Near(a, b)
+                .SelectMany(ha => holesB.Select(hb => (D: Breadboard.Distance(ha, hb), A: ha, B: hb)))
+                .OrderBy(p => p.D).ThenBy(p => p.A.Row).ThenBy(p => p.A.Column).ThenBy(p => p.B.Row).ThenBy(p => p.B.Column);
+            (double, BoardHole, BoardHole)? best = null;
+            var lowest = double.MaxValue;
+            foreach (var (d, ha, hb) in pairs)
+            {
+                if (d >= lowest) break;
+                var cost = d + (3 * _router.Covered(ha, hb));
+                if (cost < lowest)
+                {
+                    lowest = cost;
+                    best = (cost, ha, hb);
+                }
+            }
+
+            return best;
         }
 
         // ---- the check ----

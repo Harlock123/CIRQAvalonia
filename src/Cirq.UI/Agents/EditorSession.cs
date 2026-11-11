@@ -42,11 +42,14 @@ public sealed class EditorSession(MainWindowViewModel editor) : ICircuitSession
 
     public string? Redo() => editor.RedoStep();
 
-    public string Transport(TransportAction action)
+    public string Transport(TransportAction action, double? speed = null)
     {
         switch (action)
         {
-            case TransportAction.Run: editor.Simulation.Play(); break;
+            case TransportAction.Run:
+                var paced = editor.PaceForRun(speed);
+                editor.Simulation.Play();
+                return paced is null ? editor.Simulation.Status : $"{editor.Simulation.Status}. {paced}";
             case TransportAction.Pause: editor.Simulation.Pause(); break;
             default: editor.Simulation.ResetSimulation(); break;
         }

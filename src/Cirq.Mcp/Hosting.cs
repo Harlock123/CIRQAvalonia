@@ -77,7 +77,12 @@ public interface ICircuitSession
     /// Runs, pauses or resets the editor's own simulation (the transport), returning its status line. The headless
     /// server has no transport and says so.
     /// </summary>
-    string Transport(TransportAction action);
+    /// <param name="action">Run, pause or reset.</param>
+    /// <param name="speed">
+    /// For run: how fast, as a fraction of real time (<see cref="double.PositiveInfinity"/> for as fast as it goes), or
+    /// null to choose a pace from the circuit's own clocks and generators so they can be seen.
+    /// </param>
+    string Transport(TransportAction action, double? speed = null);
 
     /// <summary>Sets the scope's time and volts per division (null leaves one as it is); returns what they are.</summary>
     (double Timebase, double VoltsPerDivision)? Scope(double? timebase, double? voltsPerDivision);
@@ -203,7 +208,7 @@ public sealed class HeadlessSession : ICircuitSession
         return label;
     }
 
-    public string Transport(TransportAction action) =>
+    public string Transport(TransportAction action, double? speed = null) =>
         throw new NotSupportedException("The headless server has no running simulation to start or stop. Use run_transient, which runs the circuit and reports what the probes saw; the editor's Run button is only there when an agent is attached to the open app.");
 
     public (double Timebase, double VoltsPerDivision)? Scope(double? timebase, double? voltsPerDivision) => null;

@@ -15,7 +15,8 @@ shows the circuit built on white solderless breadboards, and `F11` goes back to 
 laid out from the schematic's own netlist: chips straddle the channel left to right as they read on
 the schematic, resistors (with their real colour bands), capacitors, diodes and LEDs go beside the
 pins they join, transistors and regulators stand in the pin order of their usual package, ground
-and the supply take the rails, coloured jumpers join each net's strips, and supplies, generators and
+and the supply take the rails, coloured jumpers join each net's strips (lying under the parts and
+routed round their bodies, between the chips and along the channel, so no part is hidden), and supplies, generators and
 dev boards sit on the bench with their leads. A circuit too big for one board gets more. The board
 checks itself against the schematic and says so in the status bar, and while the circuit runs its
 LEDs light and its displays show their digits. Drag a part, a single lead, or a jumper's end along
@@ -31,6 +32,16 @@ with every request in its tooltip. **Cost…** in the panel's header sets a budg
 between requests (another message carries it on), your own prices if Anthropic's change, and shows
 today's and this month's totals, kept in `chat-usage.json` as counts and dollars only. The dollars
 are estimates; the Anthropic Console has the bill.
+
+### Fixed
+
+**A circuit the AI Chat built and started could sit with its clock flat.** The editor's own run goes at
+Simulate › Speed, a thousandth of real time unless an example set it otherwise, so a counter Claude
+built with a 1 Hz clock took a quarter of an hour to show an edge; asking about it then ran a
+transient, whose traces made it look as though it had started working. Now `transport run` sets a
+pace from the circuit's slowest clock or generator (a cycle or two a second, never past real time)
+and widens the scope's timebase to hold a few periods, and says what it set; `speed` on it chooses
+one outright, `"max"` included.
 
 ## [0.48.0] - 2026-11-05
 

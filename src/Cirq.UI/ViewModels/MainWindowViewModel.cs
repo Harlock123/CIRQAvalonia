@@ -1703,6 +1703,62 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         StatusMessage = $"Simulation speed: {option.Label}";
     }
 
+    /// <summary>
+    /// Sets the editor's own run going at a pace its circuit can be watched at, before an agent presses Run.
+    /// <para>
+    /// The run goes at Simulate › Speed, a thousandth of real time unless something set it otherwise, and its step
+    /// follows the scope's timebase. That suits the RC filter the window opens on and nothing slow: a counter clocked at
+    /// 1 Hz would take a quarter of an hour to show one edge, and its clock line sits flat. A person sets the speed
+    /// from the menu; an agent building a counter has no menu, so unless it names a speed the pace is chosen here
+    /// from the slowest clock or generator in the circuit, fast enough for a cycle or two a second (and never past
+    /// real time), and the timebase widened to hold a few of its periods. A circuit with nothing setting a pace is
+    /// left as it is.
+    /// </para>
+    /// </summary>
+    /// <param name="speed">A fraction of real time, infinity for as fast as it goes, or null to choose.</param>
+    /// <returns>What was set, in words, or null when nothing changed.</returns>
+    public string? PaceForRun(double? speed)
+    {
+        var said = new List<string>();
+        var slowest = Flattening.Flatten(Circuit.Components).Select(c => c switch
+        {
+            Cirq.Components.Digital.ClockSource clock => (c.Name, Hz: clock.Frequency),
+            Cirq.Components.Sources.FunctionGenerator generator => (c.Name, Hz: generator.Frequency),
+            Cirq.Components.Digital.OscillatorModule oscillator => (c.Name, Hz: oscillator.Frequency),
+            Cirq.Components.Digital.PatternGenerator pattern => (c.Name, Hz: pattern.StepRate),
+            _ => (c.Name, Hz: 0.0),
+        }).Where(f => f.Hz > 0 && double.IsFinite(f.Hz)).OrderBy(f => f.Hz).FirstOrDefault();
+
+        if (speed is { } wanted)
+        {
+            Simulation.IsMaximumThroughput = double.IsPositiveInfinity(wanted);
+            if (!Simulation.IsMaximumThroughput) Simulation.SpeedFactor = wanted;
+            RefreshSpeedSelection();
+            said.Add($"Speed {SpeedLabel}");
+        }
+        else if (slowest.Hz > 0 && !Simulation.IsMaximumThroughput && slowest.Hz * Simulation.SpeedFactor < 0.5)
+        {
+            // Slower than a cycle every two seconds is a line that looks dead; two a second is one you can watch.
+            Simulation.SpeedFactor = Math.Min(1.0, 2.0 / slowest.Hz);
+            RefreshSpeedSelection();
+            said.Add($"Speed set to {SpeedLabel} so {slowest.Name} at {Cirq.Core.Units.SiPrefix.Format(slowest.Hz, "Hz")} can be seen");
+        }
+
+        // A screen that holds less than two of the slowest period shows a flat line or a single step.
+        if (slowest.Hz > 0 && Scope.TimebasePerDivision * 10 < 2.0 / slowest.Hz)
+        {
+            var target = 4.0 / slowest.Hz / 10;
+            var decade = Math.Pow(10, Math.Floor(Math.Log10(target)));
+            var nice = new[] { 1.0, 2.0, 5.0, 10.0 }.Select(m => m * decade).First(t => t >= target * 0.999);
+            Scope.TimebasePerDivision = Math.Min(nice, 10.0);
+            said.Add($"timebase {Cirq.Core.Units.SiPrefix.Format(Scope.TimebasePerDivision, "s")}/div");
+        }
+
+        if (said.Count == 0) return null;
+        RefreshSpeedSelection();
+        return string.Join(", ", said) + ".";
+    }
+
     /// <summary>Marks whichever speed entry matches the controller's current setting.</summary>
     public void RefreshSpeedSelection()
     {

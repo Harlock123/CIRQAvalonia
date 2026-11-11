@@ -112,6 +112,42 @@ public class ProtoboardTests
         Assert.Same(layout.NetAt(r.Holes[1]), layout.NetAt(d.Holes[0]));
         Assert.True(layout.NetAt(d.Holes[1])!.IsGround);
         Assert.Contains("matches the schematic", layout.Describe());
+
+        // Every wire and lead has a route from its end to its hole, and none crosses a part.
+        Assert.Equal(0, layout.WiresOverParts);
+        foreach (var lead in bench.Leads) Assert.Equal(Breadboard.Position(lead.To), lead.Route[^1]);
+        foreach (var wire in layout.Wires)
+        {
+            Assert.Equal(Breadboard.Position(wire.From), wire.Route[0]);
+            Assert.Equal(Breadboard.Position(wire.To), wire.Route[^1]);
+        }
+    }
+
+    [Fact]
+    public void A_wire_that_would_cross_a_chip_goes_round_it()
+    {
+        // Two resistors either side of a 7400, one above it to the left and one below it to the right, on one net: the
+        // jumper joining them must not lie across the chip.
+        var circuit = new Circuit();
+        var gate = circuit.Add(new Ic7400());
+        var left = circuit.Add(new Resistor(1e3));
+        var right = circuit.Add(new Resistor(1e3));
+        circuit.Connect(left.Terminals[1], right.Terminals[0]);
+        var layout = ProtoboardLayout.Arrange(circuit);
+        var chip = layout.Find(gate)!;
+        var edit = ProtoboardEdits.MovePart(circuit, layout, left, layout.Find(left)!.Holes[0], new BoardHole(1, Breadboard.F + 3, chip.Holes[0].Column + 9));
+        Assert.True(edit.Succeeded, edit.Problem);
+        circuit.Board.CopyFrom(edit.Arrangement!);
+        layout = ProtoboardLayout.Arrange(circuit);
+        var r = layout.Find(right)!;
+        edit = ProtoboardEdits.MovePart(circuit, layout, right, r.Holes[0], new BoardHole(1, Breadboard.A + 1, 1));
+        Assert.True(edit.Succeeded, edit.Problem);
+        circuit.Board.CopyFrom(edit.Arrangement!);
+        layout = ProtoboardLayout.Arrange(circuit);
+
+        Assert.True(layout.Matches, string.Join(" ", layout.Problems));
+        Assert.NotEmpty(layout.Wires);
+        Assert.Equal(0, layout.WiresOverParts);
     }
 
     [Fact]
