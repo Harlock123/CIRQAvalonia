@@ -8,6 +8,20 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-11-19
+
+AI agents on other computers: the editor's MCP server can now be reached over the network, with an access token, so
+an agent on another machine works in the open window as one on this computer does. 428 components, 164 worked
+examples, 41 MCP tools, 5772 tests.
+
+### Added
+
+- **AI agents on other computers.** AI › Connect an Agent can open a network door: MCP over HTTP at `/mcp` (port
+  8767), so an agent on another computer works in the open window as a local one does. Every request needs the
+  access token (Copy Token, New Token; kept in its own owner-only file), requests from other sites' web pages are
+  refused, and a certificate and key make it HTTPS. `CirqAvalonia --mcp --http [ADDRESS:]PORT` does the same
+  headless, with `--token` and `--cert`/`--key`.
+
 ## [1.4.0] - 2026-11-11
 
 Fifty-four more parts, from the modules on every hobbyist's bench to the chips of the 1970s: a CAN controller that

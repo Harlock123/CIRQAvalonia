@@ -52,7 +52,7 @@ Core ← Engine ← Components ← UI, which keeps the whole engine headless-tes
 ```bash
 dotnet run --project src/Cirq.UI     # the editor
 dotnet run --project src/Cirq.Cli    # the same engine, no window
-dotnet test                          # 5766 tests
+dotnet test                          # 5772 tests
 ./scripts/build-guide.sh             # the user guide as a PDF
 ```
 
@@ -193,6 +193,26 @@ that only your user account can open: nothing outside the machine can reach it. 
 `CirqAvalonia --mcp` is a headless server with a circuit of its own and no window at all, and
 `--root FOLDER` sets the folder its files are read from and saved to (an agent can't open or write
 anything outside it, or write over a file it didn't make unless told to).
+
+**An agent on another computer** can connect over the network instead. In *AI > Connect an Agent*,
+tick *Allow AI agents on other computers*: the window works as on the pipe (in the window you used
+last, every change shown, Ctrl+Z undoing it), served as MCP's Streamable HTTP at `/mcp` on port
+8767 of every network the computer is on (the address, the port, a working folder for those agents
+and an HTTPS certificate and key, PEM files, are below it). Every request must carry the access
+token, `Authorization: Bearer <token>`; *Copy Token* copies it and *New Token* replaces it, so agents
+given the old one can't connect. The token is kept in `mcp-network-token` beside the settings,
+readable only by you on Linux and macOS, never in `settings.json`. A request from a web page on
+another site is refused too. On the other computer, for Claude Code:
+
+```
+claude mcp add --transport http cirqavalonia http://192.168.1.20:8767/mcp --header "Authorization: Bearer <token>"
+```
+
+Headless, `CirqAvalonia --mcp --http [ADDRESS:]PORT` serves a circuit of its own over the network
+until Ctrl+C, with `--token TOKEN` (or `CIRQAVALONIA_MCP_TOKEN`; without either it makes one and
+prints it) and `--cert FILE --key FILE` for HTTPS. Plain HTTP is unencrypted: on a network you
+don't trust, use a certificate or a reverse proxy that does HTTPS, and never open the port to the
+internet. An agent with the token can do what a local one can, inside its working folder.
 
 Underneath, `src/Cirq.Mcp` is the server (no Avalonia: the palette, the examples and the schematic
 picture are handed to it by the editor) and `src/Cirq.Chat` the chat's conversation and its Claude

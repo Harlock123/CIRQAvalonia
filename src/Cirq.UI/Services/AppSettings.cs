@@ -33,6 +33,26 @@ public sealed class AppSettings
     /// </summary>
     public bool AllowAgents { get; set; }
 
+    /// <summary>
+    /// Whether AI agents on other computers may work in the app, over the network door (MCP Streamable HTTP at
+    /// <c>/mcp</c>, every request carrying the access token). Off until somebody turns it on.
+    /// </summary>
+    public bool AllowNetworkAgents { get; set; }
+
+    /// <summary>The address the network door listens on: 0.0.0.0 (every network), localhost, or one of this computer's.</summary>
+    public string NetworkAgentsAddress { get; set; } = "0.0.0.0";
+
+    /// <summary>The network door's port.</summary>
+    public int NetworkAgentsPort { get; set; } = Cirq.Mcp.McpCommandLine.NetworkPort;
+
+    /// <summary>The working folder for agents on the network (their open and save paths start there and stay inside); Documents if empty.</summary>
+    public string NetworkAgentsFolder { get; set; } = string.Empty;
+
+    /// <summary>A certificate (PEM) for the network door to serve HTTPS with, and its private key (PEM); plain HTTP if empty.</summary>
+    public string NetworkAgentsCertificate { get; set; } = string.Empty;
+
+    public string NetworkAgentsKey { get; set; } = string.Empty;
+
     /// <summary>The AI Chat carries on by itself past its tool-call limit, rather than waiting for "continue".</summary>
     public bool ChatAutoContinue { get; set; } = true;
 

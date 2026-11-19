@@ -113,21 +113,31 @@ dotnet run --project src/Cirq.UI -- --mcp      # the MCP server on stdio, headle
     built-in example circuits.
   - `Views/` has one window per analysis. `Rendering/` draws the schematic, and `Services/` holds settings,
     autosave, export, printing and the `SimulationController`.
-- `src/Cirq.Mcp/`: the MCP server agents drive the editor through (ModelContextProtocol.Core). No Avalonia.
+- `src/Cirq.Mcp/`: the MCP server agents drive the editor through (ModelContextProtocol.Core, and .AspNetCore for
+  the network door). No Avalonia.
   - `CircuitTools.cs` and `SimulationTools.cs` are the tools, as `[McpServerTool]` methods; `CircuitServer.cs` has the
     instructions every agent is told and the argument checks; `Recipes.cs` the saved recipes (MCP prompts).
   - Handlers touch the circuit only through `ICircuitHost.RunAsync` and an `ICircuitSession` (`Hosting.cs`):
     `HeadlessHost` has a circuit of its own, `LiveHost` the open window's, on the UI thread. The palette, the
     examples and the schematic picture come from the host's `ICircuitLibrary`, which the editor supplies.
   - `LiveListener` (a per-user named pipe) and `LiveBridge` (`--mcp --attach`) let outside agents into the editor.
+  - `NetworkListener` (with `NetworkSettings` and `NetworkToken`) is the network door: the SDK's Streamable HTTP
+    handler (ModelContextProtocol.AspNetCore) on Kestrel at `/mcp`, off until the person turns it on
+    (`AppSettings.AllowNetworkAgents`, in AI › Connect an Agent, or `--mcp --http`). Every request passes `Guard` (a
+    bearer token compared in constant time; no `Origin` from another host) first: keep it in front of anything added.
+    The token lives only in `mcp-network-token` beside the settings (owner-only), `--token` or
+    `CIRQAVALONIA_MCP_TOKEN`; never put it in `settings.json`, a status line, a log or an exception. Sessions get
+    `CircuitServer.Configure`'s options, so the door serves exactly what the pipe does. It is the same file as AVA
+    Modeler's (`AVAModeler.Mcp/NetworkListener.cs`, the namespace apart): fix both together. Tests listen on
+    localhost, port 0.
 - `src/Cirq.Chat/`: the AI Chat's conversation (`ChatSession`), its Claude client (the Anthropic SDK), the API key
   store and the bridge to the MCP server's tools. No UI. `ChatUsage.cs` is what it uses: `TokenUsage` from the
   stream's usage, `ChatPricing` (list prices as of a date, overridable from `AppSettings.ChatPrices`), the
   `UsageLedger` behind the totals (`chat-usage.json`, one per app: `App.ChatUsage`) and the `UsageEntry` line
   after each turn. Tests that look at the whole conversation use `Shown()`, which leaves those lines out.
 - `src/Cirq.UI/Agents/`: the editor's side: `EditorLibrary` (the palette, examples and print-coloured PNG),
-  `EditorSession` (a window's document, undo and transport as an agent sees them) and `LiveAgents` (the pipe door
-  and every window's chat host). The panel is `Views/ChatPanel.cs`.
+  `EditorSession` (a window's document, undo and transport as an agent sees them) and `LiveAgents` (the pipe door,
+  the network door and every window's chat host; `App.SyncNetworkAsync` keeps the network door as the settings say). The panel is `Views/ChatPanel.cs`.
 - `src/Cirq.Cli/`: the `cirq` tool. `CommandLine.Run` takes its writers as arguments, so tests drive it without
   starting a process.
 - `tools/Cirq.Docs/`: turns the Markdown guide into print-ready HTML (Markdig). It is never shipped.

@@ -2,8 +2,8 @@
 
   <PropertyGroup>
     <RootNamespace>Cirq.Mcp</RootNamespace>
-    <!-- The MCP server: AI agents build and simulate circuits through it, headless over stdio or live
-         in the editor through a local pipe. No Avalonia: the palette, the examples and the schematic
+    <!-- The MCP server: AI agents build and simulate circuits through it, headless over stdio, live
+         in the editor through a local pipe, or over the network (HTTP, with a token). No Avalonia: the palette, the examples and the schematic
          picture come from the host (ICircuitLibrary), so this sits beside the UI rather than on it. -->
   </PropertyGroup>
 
@@ -16,6 +16,9 @@
   <ItemGroup>
     <!-- The official C# MCP SDK's core: the server, client and transports, without the hosting extras. -->
     <PackageReference Include="ModelContextProtocol.Core" />
+    <!-- The network door (NetworkListener): the SDK's Streamable HTTP handler on Kestrel. -->
+    <PackageReference Include="ModelContextProtocol.AspNetCore" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <!-- Plots of a run for the agent to look at, drawn directly (see Plots.cs). -->
     <PackageReference Include="SkiaSharp" />
   </ItemGroup>

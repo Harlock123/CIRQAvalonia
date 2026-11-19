@@ -70,9 +70,14 @@ public static class CircuitServer
         Version = typeof(CircuitServer).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0] ?? "1.0",
     };
 
-    public static McpServerOptions Options(ICircuitHost host)
+    public static McpServerOptions Options(ICircuitHost host) => Configure(new McpServerOptions(), host);
+
+    /// <summary>Fills a new session's options (ones the network door's HTTP handler made) as <see cref="Options"/> makes them.</summary>
+    public static McpServerOptions Configure(McpServerOptions options, ICircuitHost host)
     {
-        var options = new McpServerOptions { ServerInfo = Info, ServerInstructions = Instructions, ToolCollection = [] };
+        options.ServerInfo = Info;
+        options.ServerInstructions = Instructions;
+        options.ToolCollection = [];
         options.Filters.Request.CallToolFilters.Add(next => async (request, cancel) =>
         {
             var tool = request.Params is { } p && options.ToolCollection.TryGetPrimitive(p.Name, out var t) ? t.ProtocolTool : null;

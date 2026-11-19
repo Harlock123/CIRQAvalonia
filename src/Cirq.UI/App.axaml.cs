@@ -68,6 +68,79 @@ public partial class App : Application
         return status;
     }
 
+    private string? _tokenInMemory;
+
+    /// <summary>The network door's token file, beside the settings (null for a settings store that isn't a file's, as tests' fakes).</summary>
+    private NetworkToken? TokenStore => SettingsStore is JsonSettingsStore store && Path.GetDirectoryName(store.Location) is { Length: > 0 } folder ? Cirq.Mcp.NetworkToken.In(folder) : null;
+
+    /// <summary>The network door's access token (made the first time it's asked for; never in settings.json).</summary>
+    public string NetworkToken => TokenStore?.Get() ?? (_tokenInMemory ??= NetworkListener.NewToken());
+
+    /// <summary>Makes a new token (agents given the old one can no longer connect), reopens an open door with it, and returns it.</summary>
+    public string RenewNetworkToken()
+    {
+        var token = TokenStore?.Renew() ?? (_tokenInMemory = NetworkListener.NewToken());
+        _ = SyncNetworkAsync();
+        return token;
+    }
+
+    /// <summary>Why the network door didn't open the last time it tried, or null.</summary>
+    public string? NetworkProblem { get; private set; }
+
+    private Task<string>? _networkSync;
+    private bool _syncNetworkAgain;
+
+    /// <summary>
+    /// Opens, closes or reopens the network door to match the settings (and the token), and returns a line for the
+    /// status bar. One at a time; a change meanwhile runs again after, and the task ends when the door is as the
+    /// settings now say.
+    /// </summary>
+    public Task<string> SyncNetworkAsync()
+    {
+        if (_networkSync is { IsCompleted: false })
+        {
+            _syncNetworkAgain = true;
+            return _networkSync;
+        }
+        return _networkSync = RunNetworkSync();
+    }
+
+    private async Task<string> RunNetworkSync()
+    {
+        string status = "";
+        do
+        {
+            _syncNetworkAgain = false;
+            var s = Settings;
+            var want = s.AllowNetworkAgents
+                ? new NetworkSettings(s.NetworkAgentsAddress, s.NetworkAgentsPort, NetworkToken, NullIfEmpty(s.NetworkAgentsCertificate), NullIfEmpty(s.NetworkAgentsKey))
+                : null;
+            string root = NullIfEmpty(s.NetworkAgentsFolder) ?? DocumentsFolder;
+            status = "";
+            if (Agents.NetworkRunning && (want == null || want != Agents.NetworkSettings || root != Agents.NetworkRoot))
+            {
+                await Agents.StopNetworkAsync();
+                if (want == null) status = "AI agents on other computers are shut out.";
+            }
+            NetworkProblem = null;
+            if (want != null && !Agents.NetworkRunning)
+            {
+                NetworkProblem = await Agents.StartNetworkAsync(want, root);
+                status = NetworkProblem is { } problem
+                    ? $"AI agents on other computers can't connect: {problem}"
+                    : $"AI agents on other computers may connect (MCP): {Agents.NetworkUrls.FirstOrDefault()}, with the access token (AI › Connect an Agent).";
+            }
+        }
+        while (_syncNetworkAgain);
+        return status;
+    }
+
+    private static string? NullIfEmpty(string s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
+
+    private static string DocumentsFolder =>
+        Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments) is { Length: > 0 } docs && Directory.Exists(docs)
+            ? docs : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+
     public override void Initialize() => AvaloniaXamlLoader.Load(this);
 
     public override void OnFrameworkInitializationCompleted()
@@ -99,8 +172,14 @@ public partial class App : Application
                     window.StatusMessage = n > 0 ? $"AI agents connected: {n}. Their changes show here, and Ctrl+Z undoes them." : "The AI agent disconnected.";
             };
             if (Settings.AllowAgents) SetAllowAgents(true);
+            if (Settings.AllowNetworkAgents)
+                _ = SyncNetworkAsync().ContinueWith(t => Avalonia.Threading.Dispatcher.UIThread.Post(() => { if (t.Result.Length > 0) viewModel.StatusMessage = t.Result; }), TaskScheduler.Default);
             // The pipe closes as this is called; the sessions wind down on their own.
-            desktop.Exit += (_, _) => _ = Agents.StopAsync();
+            desktop.Exit += (_, _) =>
+            {
+                _ = Agents.StopAsync();
+                _ = Agents.StopNetworkAsync();
+            };
         }
 
         base.OnFrameworkInitializationCompleted();

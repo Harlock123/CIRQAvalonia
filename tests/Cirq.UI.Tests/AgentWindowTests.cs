@@ -260,6 +260,72 @@ public class AgentWindowTests(WindowSession session) : IDisposable
         }
     });
 
+    [Fact]
+    public void Agents_on_other_computers_get_in_with_the_token_and_the_dialog_shows_the_door() => session.Run(() =>
+    {
+        var (window, editor) = Open();
+        var settings = App.Settings;
+        try
+        {
+            settings.AllowNetworkAgents = true;
+            settings.NetworkAgentsAddress = "localhost";
+            settings.NetworkAgentsPort = 0;
+            settings.NetworkAgentsFolder = _folder;
+            Assert.StartsWith("AI agents on other computers may connect", Finish(App.SyncNetworkAsync()));
+            Assert.True(App.Agents.NetworkRunning);
+            // The token is kept beside the test's own settings file, owner-only, and never in it.
+            Assert.True(File.Exists(Path.Combine(_folder, NetworkToken.FileName)));
+
+            McpClientConnect(App.Agents.NetworkPort, App.NetworkToken, client =>
+            {
+                App.Agents.Activated(editor);
+                int before = editor.Circuit.Components.Count;
+                var result = Finish(client.CallToolAsync("add_parts", new Dictionary<string, object?> { ["parts"] = new object[] { new { kind = "Resistor" } } }).AsTask());
+                Assert.False(result.IsError == true);
+                Assert.Equal(before + 1, editor.Circuit.Components.Count);
+            });
+
+            // A new token shuts out the old one.
+            string old = App.NetworkToken;
+            App.RenewNetworkToken();
+            Finish(App.SyncNetworkAsync());
+            Assert.True(App.Agents.NetworkRunning);
+            Assert.ThrowsAny<Exception>(() => McpClientConnect(App.Agents.NetworkPort, old, _ => { }));
+
+            // The dialog's section: the switch ticked, the token masked, the address to give.
+            var section = window.NetworkSection(App);
+            var texts = section.GetLogicalDescendants().OfType<TextBlock>().Select(t => t.Text ?? "").ToList();
+            Assert.Contains(MainWindow.Mask(App.NetworkToken), texts);
+            Assert.DoesNotContain(texts, t => t.Contains(App.NetworkToken));
+            Assert.Contains(texts, t => t.Contains($":{App.Agents.NetworkPort}/mcp"));
+            Assert.True(section.GetLogicalDescendants().OfType<CheckBox>().Single(c => c.Name == "AllowNetworkAgents").IsChecked);
+
+            settings.AllowNetworkAgents = false;
+            Assert.Equal("AI agents on other computers are shut out.", Finish(App.SyncNetworkAsync()));
+            Assert.False(App.Agents.NetworkRunning);
+        }
+        finally
+        {
+            settings.AllowNetworkAgents = false;
+            settings.NetworkAgentsPort = Cirq.Mcp.McpCommandLine.NetworkPort;
+            settings.NetworkAgentsAddress = "0.0.0.0";
+            settings.NetworkAgentsFolder = "";
+            Finish(App.SyncNetworkAsync());
+        }
+    });
+
+    private static void McpClientConnect(int port, string token, Action<ModelContextProtocol.Client.McpClient> use)
+    {
+        var client = Finish(ModelContextProtocol.Client.McpClient.CreateAsync(new ModelContextProtocol.Client.HttpClientTransport(new ModelContextProtocol.Client.HttpClientTransportOptions
+        {
+            Endpoint = new Uri($"http://127.0.0.1:{port}/mcp"),
+            TransportMode = ModelContextProtocol.Client.HttpTransportMode.StreamableHttp,
+            AdditionalHeaders = new Dictionary<string, string> { ["Authorization"] = "Bearer " + token },
+        }), new ModelContextProtocol.Client.McpClientOptions { ProtocolVersion = "2025-11-25" }));
+        try { use(client); }
+        finally { Finish(client.DisposeAsync().AsTask()); }
+    }
+
     public void Dispose()
     {
         session.Run(() =>

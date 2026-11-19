@@ -9,7 +9,8 @@ namespace Cirq.UI.Agents;
 /// The application's door for AI agents, and the live host they and the AI Chat work through.
 /// <para>
 /// While agents are allowed (AI › Allow AI Agents), a <see cref="LiveListener"/> takes connections from
-/// <c>CirqAvalonia --mcp --attach</c> bridges, and every call runs on the UI thread against the window used last, so
+/// <c>CirqAvalonia --mcp --attach</c> bridges (and, while agents on other computers are allowed, a
+/// <see cref="NetworkListener"/> MCP clients on the network), and every call runs on the UI thread against the window used last, so
 /// the canvas redraws as the agent works and Ctrl+Z undoes its steps. Each window's AI Chat gets a host of its own
 /// (<see cref="ChatHost"/>) on that window, whether or not outside agents are allowed. Calls wait while a dialog is
 /// open or the person is dragging on the canvas.
@@ -119,5 +120,58 @@ public sealed class LiveAgents : ILiveCircuit, IUiThread, IAsyncDisposable
         await listener.DisposeAsync();
     }
 
-    public async ValueTask DisposeAsync() => await StopAsync();
+    private NetworkListener? _network;
+
+    /// <summary>Whether the network door is open.</summary>
+    public bool NetworkRunning => _network != null;
+
+    /// <summary>The settings and working folder the network door was opened with (to tell when they've changed).</summary>
+    public NetworkSettings? NetworkSettings { get; private set; }
+
+    public string? NetworkRoot { get; private set; }
+
+    /// <summary>Where the network door listens, while it's open.</summary>
+    public IReadOnlyList<string> NetworkUrls => _network?.Urls ?? [];
+
+    /// <summary>The network door's port, while it's open (the one the system chose, for port 0).</summary>
+    public int NetworkPort => _network?.Port ?? 0;
+
+    /// <summary>
+    /// Opens the network door: agents on other computers work in the window used last through the same live host as the
+    /// pipe's, in <paramref name="root"/>. Returns why it couldn't open, or null.
+    /// </summary>
+    public async Task<string?> StartNetworkAsync(NetworkSettings settings, string root)
+    {
+        if (_network != null) return null;
+        if (!Directory.Exists(root)) return $"the working folder {root} doesn't exist.";
+        var listener = new NetworkListener(settings, CircuitServer.Name, o => CircuitServer.Configure(o, new LiveHost(this, this, Library, root) { BusyWait = BusyWait }));
+        listener.ConnectionsChanged += n => Dispatcher.UIThread.Post(() => ConnectionsChanged?.Invoke(n));
+        try
+        {
+            await listener.StartAsync();
+        }
+        catch (IOException e)
+        {
+            return e.Message;
+        }
+        _network = listener;
+        NetworkSettings = settings;
+        NetworkRoot = root;
+        return null;
+    }
+
+    public async Task StopNetworkAsync()
+    {
+        var listener = _network;
+        _network = null;
+        NetworkSettings = null;
+        NetworkRoot = null;
+        if (listener != null) await listener.DisposeAsync();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await StopAsync();
+        await StopNetworkAsync();
+    }
 }

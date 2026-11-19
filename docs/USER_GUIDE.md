@@ -10476,6 +10476,34 @@ for an agent working on its own. `--root FOLDER` sets the folder its files are r
 to; it can't open or write anything outside that folder, or write over a file it didn't make unless
 it is told to.
 
+### An agent on another computer
+
+An agent on another computer on your network can connect too, without CirqAvalonia installed there.
+In **AI > Connect an Agent...**, tick **Allow AI agents on other computers**. The application then
+serves MCP over HTTP at `/mcp`, on port 8767 of every network the computer is on, and the agent works
+in the window you used last exactly as one on this computer does. Below the box are the address to
+listen on (`0.0.0.0` for every network, `localhost`, or one of the computer's own addresses), the
+port, the working folder for those agents (Documents if empty), and an HTTPS certificate and its
+private key as PEM files (plain HTTP if empty). Each change takes effect as you leave the box.
+
+Anything on the network can reach a port, so every request must carry the **access token**:
+**Copy Token** copies it, and **New Token** makes another, after which agents given the old one can't
+connect. The token is kept in a file of its own beside the settings, readable only by you, and the
+dialog shows only its first and last four characters. Then, on the other computer, for Claude Code:
+
+```
+claude mcp add --transport http cirqavalonia http://192.168.1.20:8767/mcp --header "Authorization: Bearer <token>"
+```
+
+The dialog shows the exact address. Plain HTTP is not encrypted: on a network you don't trust, give a
+certificate, or put a reverse proxy that does HTTPS in front, and never open the port to the internet.
+An agent with the token can do what a local one can, inside its working folder, so give it only to
+agents you'd let use the computer that way.
+
+Without a window, `CirqAvalonia --mcp --http 0.0.0.0:8767` serves a circuit of its own over the
+network until Ctrl+C; `--token TOKEN` (or the `CIRQAVALONIA_MCP_TOKEN` environment variable) gives the
+token, and without either it makes one and prints it; `--cert FILE --key FILE` serve HTTPS.
+
 ### What an agent can do
 
 | | |

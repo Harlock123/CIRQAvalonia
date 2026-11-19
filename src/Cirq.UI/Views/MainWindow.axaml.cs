@@ -1163,6 +1163,93 @@ public partial class MainWindow : Window
         _chat.FocusInput();
     }
 
+    /// <summary>
+    /// The network door's part of Connect an Agent: the switch, where it listens, the working folder, HTTPS, the token
+    /// (masked; Copy and New) and how a client on another computer connects. Each change is saved and applied at once.
+    /// </summary>
+    internal Control NetworkSection(App app)
+    {
+        var s = app.Settings;
+        var panel = new StackPanel { Spacing = 6, Name = "NetworkSection" };
+        var allow = new CheckBox
+        {
+            Name = "AllowNetworkAgents",
+            Content = "Allow AI agents on other computers (MCP over the network, with an access token)",
+            IsChecked = s.AllowNetworkAgents,
+        };
+        ToolTip.SetTip(allow, "Any MCP client on your network that has the token can then work in the window you used last, as an agent on this computer can. Plain HTTP unless you give a certificate.");
+        var details = new StackPanel { Spacing = 6 };
+        var state = new SelectableTextBlock { Name = "NetworkState", TextWrapping = Avalonia.Media.TextWrapping.Wrap, FontSize = 12 };
+        var token = new TextBlock { Name = "NetworkToken", FontFamily = new Avalonia.Media.FontFamily("monospace"), VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center };
+        void Show()
+        {
+            details.IsVisible = allow.IsChecked == true;
+            token.Text = Mask(app.NetworkToken);
+            var url = app.Agents.NetworkUrls.FirstOrDefault() ?? $"http://<this computer>:{s.NetworkAgentsPort}/mcp";
+            state.Text = (app.Agents.NetworkRunning
+                    ? "Agents connect to " + string.Join(" or ", app.Agents.NetworkUrls) + " with the header \"Authorization: Bearer <token>\". For Claude Code on the other computer:\n\n"
+                    : "Not listening: " + (app.NetworkProblem ?? "opening…") + "\n\nFor Claude Code on the other computer, once it's open:\n\n")
+                + $"    claude mcp add --transport http cirqavalonia {url} --header \"Authorization: Bearer <token>\"";
+        }
+        async Task Apply()
+        {
+            app.SettingsStore.Save(s);
+            var status = await app.SyncNetworkAsync();
+            if (status.Length > 0 && DataContext is MainWindowViewModel vm) vm.StatusMessage = status;
+            Show();
+        }
+        TextBox Setting(string name, string value, string placeholder, Action<string> set)
+        {
+            var box = new TextBox { Name = name, Text = value, PlaceholderText = placeholder };
+            var applied = box.Text;
+            async Task Changed()
+            {
+                if (box.Text == applied) return;
+                applied = box.Text;
+                set(box.Text?.Trim() ?? "");
+                await Apply();
+            }
+            box.LostFocus += async (_, _) => await Changed();
+            box.KeyDown += async (_, e) => { if (e.Key == Avalonia.Input.Key.Enter) await Changed(); };
+            return box;
+        }
+        details.Children.Add(Setting("NetworkAddress", s.NetworkAgentsAddress, "Listen on: 0.0.0.0 (every network), localhost, or one of this computer's addresses", v => s.NetworkAgentsAddress = v.Length > 0 ? v : "0.0.0.0"));
+        details.Children.Add(Setting("NetworkPort", s.NetworkAgentsPort.ToString(System.Globalization.CultureInfo.InvariantCulture), "Port", v =>
+        {
+            if (int.TryParse(v, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var port) && port is >= 1 and <= 65535) s.NetworkAgentsPort = port;
+        }));
+        details.Children.Add(Setting("NetworkFolder", s.NetworkAgentsFolder, "Working folder for network agents (Documents if empty)", v => s.NetworkAgentsFolder = v));
+        details.Children.Add(Setting("NetworkCertificate", s.NetworkAgentsCertificate, "HTTPS certificate, a PEM file (plain HTTP if empty)", v => s.NetworkAgentsCertificate = v));
+        details.Children.Add(Setting("NetworkKey", s.NetworkAgentsKey, "The certificate's private key, a PEM file", v => s.NetworkAgentsKey = v));
+        var copy = new Button { Content = "Copy Token" };
+        copy.Click += async (_, _) =>
+        {
+            if (TopLevel.GetTopLevel(this)?.Clipboard is { } clipboard) await Avalonia.Input.Platform.ClipboardExtensions.SetTextAsync(clipboard, app.NetworkToken);
+        };
+        var renew = new Button { Name = "NewTokenButton", Content = "New Token" };
+        ToolTip.SetTip(renew, "Makes a new access token: agents given the old one can no longer connect.");
+        renew.Click += async (_, _) =>
+        {
+            app.RenewNetworkToken();
+            await app.SyncNetworkAsync();
+            Show();
+        };
+        details.Children.Add(new StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal, Spacing = 8, Children = { new TextBlock { Text = "Access token:", VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center }, token, copy, renew } });
+        details.Children.Add(state);
+        allow.IsCheckedChanged += async (_, _) =>
+        {
+            s.AllowNetworkAgents = allow.IsChecked == true;
+            await Apply();
+        };
+        Show();
+        panel.Children.Add(allow);
+        panel.Children.Add(details);
+        return panel;
+    }
+
+    /// <summary>A token as it's shown: its first and last four characters.</summary>
+    internal static string Mask(string token) => token.Length <= 12 ? new string('•', token.Length) : token[..4] + "…" + token[^4..];
+
     /// <summary>How to give an outside agent (Claude Code, Claude Desktop) CirqAvalonia's tools.</summary>
     private async Task ShowConnectAgentAsync(App app)
     {
@@ -1180,8 +1267,11 @@ public partial class MainWindow : Window
                 $"    \"cirqavalonia\": {{ \"command\": \"{exe.Replace("\\", "\\\\")}\", \"args\": [\"--mcp\", \"--attach\"] }}\n\n" +
                 "The agent then works in the window you used last, and you see every change; Ctrl+Z undoes its steps. Without --attach the server works on a circuit of its own with no window, " +
                 "and --root FOLDER sets the folder its files are read from and saved to.\n\n" +
-                "Or press F12 for the AI Chat, which needs only an Anthropic API key.",
+                "Or press F12 for the AI Chat, which needs only an Anthropic API key.\n\n" +
+                "An agent on another computer can connect over the network instead, once you allow it below: it needs the address and the access token. " +
+                "Give the token only to agents you'd let use this computer that way, and use HTTPS on a network you don't trust.",
         };
+        var network = NetworkSection(app);
         var close = new Button { Name = "CloseButton", Content = "Close", Width = 90, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right, HorizontalContentAlignment = Avalonia.Layout.HorizontalAlignment.Center };
         var dialog = new Window
         {
@@ -1190,7 +1280,7 @@ public partial class MainWindow : Window
             SizeToContent = SizeToContent.Height,
             CanResize = false,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            Content = new Border { Padding = new Thickness(18), Child = new StackPanel { Spacing = 14, Children = { text, close } } },
+            Content = new Border { Padding = new Thickness(18), Child = new StackPanel { Spacing = 14, Children = { text, network, close } } },
         };
         dialog.Bind(BackgroundProperty, dialog.GetResourceObservable("PanelBackground"));
         text.Bind(SelectableTextBlock.ForegroundProperty, dialog.GetResourceObservable("TextPrimary"));

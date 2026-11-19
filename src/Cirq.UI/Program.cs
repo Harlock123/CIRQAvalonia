@@ -15,8 +15,14 @@ internal static class Program
     public static int Main(string[] args)
     {
         if (McpCommandLine.Wanted(args))
-            return McpCommandLine.RunAsync(args, () => new EditorLibrary(), Console.OpenStandardInput(), Console.OpenStandardOutput(), Console.Error)
+        {
+            // Ctrl+C or a stop signal ends the server cleanly (the network door closes its port and ends its sessions).
+            using var stop = new CancellationTokenSource();
+            Console.CancelKeyPress += (_, e) => { e.Cancel = true; stop.Cancel(); };
+            using var term = System.Runtime.InteropServices.PosixSignalRegistration.Create(System.Runtime.InteropServices.PosixSignal.SIGTERM, c => { c.Cancel = true; stop.Cancel(); });
+            return McpCommandLine.RunAsync(args, () => new EditorLibrary(), Console.OpenStandardInput(), Console.OpenStandardOutput(), Console.Error, stop.Token)
                 .GetAwaiter().GetResult();
+        }
 
         BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
         return 0;
