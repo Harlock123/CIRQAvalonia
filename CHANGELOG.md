@@ -8,6 +8,12 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-11-20
+
+The AI Chat on any model: Claude, or one with an OpenAI-compatible API on this computer, on your network or in the
+cloud, with Undo this reply, a timeline of what each answer changed, and chat history. 428 components, 164 worked
+examples, 45 MCP tools, 5776 tests.
+
 ### Added
 
 - **The AI Chat runs on any model with an OpenAI-compatible API**, as well as Claude: a local model through Ollama,
@@ -3127,7 +3133,9 @@ First public build of CirqAvalonia — an electronic circuit analyzer and mixed-
 
 **501 tests** measure the solver against closed-form answers rather than recorded output.
 
-[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/Harlock123/CIRQAvalonia/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v1.5.0...v1.6.0
+[1.5.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/Harlock123/CIRQAvalonia/compare/v1.1.0...v1.2.0
