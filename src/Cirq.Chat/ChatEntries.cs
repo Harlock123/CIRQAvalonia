@@ -67,8 +67,8 @@ public sealed class ToolEntry : ChatEntry
     public string FirstLine => Running ? "…" : Brief(Result) is { Length: > 0 } line ? line : Images.Count > 0 ? "a picture" : "done";
 
     /// <summary>
-    /// A result in a few words: the MCP tools mostly answer in JSON, so the first few plain values, or how many each list
-    /// holds; otherwise the first line of the text.
+    /// A result in a few words: the MCP tools mostly answer in JSON, so "done" and the counts after it, or the first few
+    /// plain values; otherwise the first line of the text.
     /// </summary>
     private static string Brief(string result)
     {
@@ -78,6 +78,12 @@ public sealed class ToolEntry : ChatEntry
         {
             using var doc = JsonDocument.Parse(result);
             var o = doc.RootElement;
+            string? Count(string name) => o.TryGetProperty(name, out var p) && p.ValueKind == JsonValueKind.Object && p.TryGetProperty("after", out var after) ? $"{after.GetRawText()} {name}" : null;
+            if (o.TryGetProperty("done", out var done) && done.ValueKind == JsonValueKind.String)
+            {
+                var counts = new[] { Count("points"), Count("polygons") }.OfType<string>().ToList();
+                return done.GetString() + (counts.Count > 0 ? ": " + string.Join(", ", counts) : "");
+            }
             var plain = o.EnumerateObject()
                 .Where(p => p.Value.ValueKind is JsonValueKind.String or JsonValueKind.Number or JsonValueKind.True or JsonValueKind.False)
                 .Take(3).Select(p => $"{p.Name} {(p.Value.ValueKind == JsonValueKind.String ? p.Value.GetString() : p.Value.GetRawText())}").ToList();
@@ -102,6 +108,20 @@ public sealed class ToolEntry : ChatEntry
             if (first.Length > 90) first = first[..90] + "…";
             return $"{Name}{(Summary.Length > 0 ? " " + Summary : "")} {(IsError ? "✗" : "→")} {first}";
         }
+    }
+
+    /// <summary>How far a long call has got (0 to 1), or null while it hasn't said.</summary>
+    public double? Progress { get; private set; }
+
+    /// <summary>The call's last progress line ("frame 12 of 30"), or null.</summary>
+    public string? ProgressText { get; private set; }
+
+    internal void Report(double done, string? text)
+    {
+        if (!Running) return;
+        Progress = Math.Clamp(done, 0, 1);
+        if (text != null) ProgressText = text;
+        Raise();
     }
 
     internal void Finish(ToolOutcome outcome)
@@ -148,6 +168,80 @@ public sealed class NoticeEntry(string text, NoticeKind kind, bool canRetry = fa
     {
         if (!CanRetry) return;
         CanRetry = false;
+        Raise();
+    }
+}
+
+/// <summary>Where an <see cref="ReplyUndoEntry"/> stands.</summary>
+public enum ReplyUndoState
+{
+    /// <summary>The button can be pressed.</summary>
+    Available,
+    /// <summary>The restore is under way.</summary>
+    Undoing,
+    /// <summary>The reply was undone.</summary>
+    Undone,
+    /// <summary>An earlier reply was undone, which took this one back with it.</summary>
+    Superseded,
+    /// <summary>The restore failed (see <see cref="ReplyUndoEntry.Message"/>); it can be tried again.</summary>
+    Failed,
+}
+
+/// <summary>
+/// After a reply that changed the circuit: Undo this reply, which puts both back as they were before it
+/// (the checkpoint the chat took just before the reply's first change).
+/// </summary>
+public sealed class ReplyUndoEntry(string checkpoint) : ChatEntry
+{
+    /// <summary>The checkpoint's name on the MCP server.</summary>
+    public string Checkpoint { get; } = checkpoint;
+
+    public ReplyUndoState State { get; private set; } = ReplyUndoState.Available;
+
+    /// <summary>Why the restore failed, or null.</summary>
+    public string? Message { get; private set; }
+
+    /// <summary>What the reply changed, in a line ("+3 parts, +4 wires"), for the timeline.</summary>
+    public string Summary { get; internal set; } = "";
+
+    /// <summary>The reply's number in the chat (1 for the first that changed something).</summary>
+    public int Number { get; internal set; }
+
+    /// <summary>A small picture of the schematic as it was before the reply, once the timeline has asked for it.</summary>
+    public ToolImage? Before { get; internal set; }
+
+    /// <summary>The button can be pressed (it's there, and not under way or done).</summary>
+    public bool CanUndo => State is ReplyUndoState.Available or ReplyUndoState.Failed;
+
+    internal void Set(ReplyUndoState state, string? message = null)
+    {
+        State = state;
+        Message = message;
+        Raise();
+    }
+}
+
+/// <summary>
+/// A question the app asks the person for an agent (MCP elicitation): an agent's call would remove most of a layer.
+/// The panel shows it with Go Ahead and Don't; the call waits for the answer.
+/// </summary>
+public sealed class ConfirmEntry(string question) : ChatEntry
+{
+    private readonly TaskCompletionSource<bool> _answer = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    public string Question { get; } = question;
+
+    /// <summary>Null until answered: true to go ahead.</summary>
+    public bool? Answer { get; private set; }
+
+    internal Task<bool> Answered => _answer.Task;
+
+    /// <summary>The person's answer (the panel's buttons call it); a second answer is ignored.</summary>
+    public void Choose(bool goAhead)
+    {
+        if (Answer != null) return;
+        Answer = goAhead;
+        _answer.TrySetResult(goAhead);
         Raise();
     }
 }

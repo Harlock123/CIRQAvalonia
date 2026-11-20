@@ -8,6 +8,21 @@ Add the new section **before** tagging: the workflow reads the changelog at the 
 
 ## [Unreleased]
 
+### Added
+
+- **The AI Chat runs on any model with an OpenAI-compatible API**, as well as Claude: a local model through Ollama,
+  LM Studio, llama.cpp or vLLM (no key, nothing leaves your computer), one on another computer on your network, or
+  OpenAI and other cloud services with their own key. Setup… chooses it, with Core tools only for small models and
+  Model sees pictures for ones that read images.
+- **Undo this reply** puts the circuit back as it was before an answer, as one undo step, and **Timeline** lists every
+  answer that changed the circuit with a picture of it before. The MCP server has four new tools for them and for
+  agents: checkpoint, diff, render_checkpoint and restore_checkpoint (45 tools).
+- **Chat history**, kept on this computer only if you tick Keep chat history: reopen, carry on or export as Markdown.
+
+### Changed
+
+- The AI Chat panel is AVA Modeler's, in CirqAvalonia's theme: prices and the budget moved from Cost… into Setup….
+
 ## [1.5.0] - 2026-11-19
 
 AI agents on other computers: the editor's MCP server can now be reached over the network, with an access token, so

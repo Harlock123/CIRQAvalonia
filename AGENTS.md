@@ -130,11 +130,15 @@ dotnet run --project src/Cirq.UI -- --mcp      # the MCP server on stdio, headle
     `CircuitServer.Configure`'s options, so the door serves exactly what the pipe does. It is the same file as AVA
     Modeler's (`AVAModeler.Mcp/NetworkListener.cs`, the namespace apart): fix both together. Tests listen on
     localhost, port 0.
-- `src/Cirq.Chat/`: the AI Chat's conversation (`ChatSession`), its Claude client (the Anthropic SDK), the API key
-  store and the bridge to the MCP server's tools. No UI. `ChatUsage.cs` is what it uses: `TokenUsage` from the
+- `src/Cirq.Chat/`: the AI Chat's conversation (`ChatSession`), its model clients (`AnthropicBackend` on the Anthropic
+  SDK, `OpenAICompatibleBackend` and `OpenAICompatibleClient` for Ollama, LM Studio, a server on the network, OpenAI
+  or another cloud service), the API key stores (Anthropic's, and the OpenAI-compatible server's own file), saved
+  chats (`ChatHistory`) and the bridge to the MCP server's tools. No UI. It is AVA Modeler's `AVAModeler.Chat` with
+  Cirq's prompt, core tools and tool-line summaries: fix the two together. Undo this reply and the timeline use the
+  server's checkpoint tools (`UndoCheckpointTools.cs`: checkpoint, diff, render_checkpoint, restore_checkpoint). `ChatUsage.cs` is what it uses: `TokenUsage` from the
   stream's usage, `ChatPricing` (list prices as of a date, overridable from `AppSettings.ChatPrices`), the
   `UsageLedger` behind the totals (`chat-usage.json`, one per app: `App.ChatUsage`) and the `UsageEntry` line
-  after each turn. Tests that look at the whole conversation use `Shown()`, which leaves those lines out.
+  after each turn. Tests that look at the whole conversation use `Shown()`, which leaves those lines and the Undo this reply buttons out.
 - `src/Cirq.UI/Agents/`: the editor's side: `EditorLibrary` (the palette, examples and print-coloured PNG),
   `EditorSession` (a window's document, undo and transport as an agent sees them) and `LiveAgents` (the pipe door,
   the network door and every window's chat host; `App.SyncNetworkAsync` keeps the network door as the settings say). The panel is `Views/ChatPanel.cs`.

@@ -52,9 +52,10 @@ public sealed record ModelPrice(string Model, double Input, double Output, doubl
 
 /// <summary>
 /// What the chat's models cost, to turn tokens into an estimate. The defaults are Anthropic's list prices for the
-/// Claude API when this was written (October 2026): prices change, so the person can set their own in the chat's Cost…
-/// dialog (kept in settings.json), and the panel always marks the dollars as about (≈) and points to the Anthropic
-/// Console for the bill. A cache write is the five-minute cache's 1.25 × input.
+/// Claude API when this was written (October 2026): prices change, so the person can set their own in Setup… (kept in
+/// preferences), and the panel always marks the dollars as about (≈) and points to the Anthropic Console for the bill.
+/// A cache write is the five-minute cache's 1.25 × input. Models on an OpenAI-compatible server have no price: local
+/// ones are free, and a gateway's are its own.
 /// </summary>
 public static class ChatPricing
 {
@@ -83,8 +84,8 @@ public sealed class UsageDay
 }
 
 /// <summary>
-/// The chat's use day by day, kept in <c>chat-usage.json</c> in the settings folder (every window's chat adds to it),
-/// for the panel's today and this-month totals. Holds only counts and dollars, never a word of a chat. Reset
+/// The chat's use day by day, kept in <c>chat-usage.json</c> in the settings folder (both apps' chats add to their
+/// own), for the panel's today and this-month totals. Holds only counts and dollars, never a word of a chat. Reset
 /// clears it. Ones made without a path (tests, test windows) keep it in memory only.
 /// </summary>
 public sealed class UsageLedger
@@ -184,6 +185,15 @@ public sealed class UsageEntry : ChatEntry
         Model = model;
     }
 
+    /// <summary>Shown again from a saved chat: its line only.</summary>
+    internal UsageEntry(string line)
+    {
+        Requests = [];
+        _saved = line;
+    }
+
+    private readonly string? _saved;
+
     public IReadOnlyList<RequestUsage> Requests { get; }
 
     public string? Model { get; }
@@ -200,6 +210,7 @@ public sealed class UsageEntry : ChatEntry
     {
         get
         {
+            if (_saved != null) return _saved;
             int n = Requests.Count;
             var parts = new List<string> { $"This turn: {n} request{(n == 1 ? "" : "s")}", Tokens.Describe() };
             if (Pictures > 0) parts.Add(Pictures == 1 ? "1 picture" : $"{Pictures} pictures");
@@ -209,7 +220,7 @@ public sealed class UsageEntry : ChatEntry
     }
 
     /// <summary>Each request on a line of its own, for the tag's tooltip.</summary>
-    public string Details => string.Join("\n", Requests.Select((r, i) =>
+    public string Details => Requests.Count == 0 ? Line : string.Join("\n", Requests.Select((r, i) =>
         $"Request {i + 1}: {r.Tokens.Describe()}{(r.Tokens.CacheWrite > 0 ? $", {TokenUsage.Short(r.Tokens.CacheWrite)} written to the cache" : "")}"
         + (r.Pictures > 0 ? $", {r.Pictures} picture{(r.Pictures == 1 ? "" : "s")}" : "")
         + (r.Cost is { } c ? $" · ≈ {ChatPricing.Dollars(c)}" : ""))) + "\nEstimates: the Anthropic Console has the bill.";

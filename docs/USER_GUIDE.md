@@ -10428,32 +10428,60 @@ everything it does is an ordinary edit: **each step is one undo step**, among yo
 takes its work back a step at a time and `Ctrl+Y` puts it back. A step that fails changes nothing.
 While a dialog is open over the window, or you are dragging a part, its next step waits for you.
 
-The row under the input box has the **model** (Claude Opus is the most capable; Sonnet and Haiku are
-quicker and cost less), **Auto-continue** and **Send**, which becomes **Stop** while Claude is
-working. One request may make 60 tool calls; with Auto-continue ticked it carries on by itself past
-that, up to 600, instead of stopping to ask you to say "continue". **New Chat** forgets the
-conversation (not the circuit).
+The row under the input box has **Auto-continue** and **Send**, which becomes **Stop** while the
+model is working. One request may make 60 tool calls; with Auto-continue ticked it carries on by
+itself past that, up to 600, instead of stopping to ask you to say "continue". **New Chat** forgets
+the conversation (not the circuit).
 
-The chat needs an **Anthropic API key**, and your own Anthropic account is billed for what it uses.
-Set the `ANTHROPIC_API_KEY` environment variable before starting CirqAvalonia, or press **Key…** in
-the panel and paste one: it is kept in a file of its own beside `settings.json` that only your user
-account can read, is sent only to the Anthropic API, and is only ever shown masked (`sk-ant-…1234`).
-The environment variable wins when both are set. Files the chat opens or saves are in your Documents
-folder.
+After an answer that changed the circuit, **Undo this reply** puts the whole circuit back as it was
+before that answer (one undo step, so `Ctrl+Z` brings it back), and later answers go with it.
+**Timeline** lists every such answer, newest first, with a small picture of the schematic before it;
+**Go Back** returns to before any of them. **History** keeps your chats on this computer, to reopen,
+carry on or export as Markdown, but only once you tick *Keep chat history*: it is off at first,
+because a chat may hold a client's details.
 
-**What it uses** shows as it goes. The line under the model and Send says what this chat has used so
-far — *This chat: 37.0k in (29.4k from cache) · 180 out · ≈ $0.047* — counting up while Claude works,
-with *this turn* added until it finishes; hover it for today's and this month's totals. Each turn
-ends with a small line of its own (*This turn: 3 requests · … · 1 picture · ≈ $0.020*), whose tooltip
+#### Choosing the model
+
+**Setup…** in the panel's header chooses where the model runs:
+
+- **Claude**, through Anthropic's API: Opus is the most capable, Sonnet and Haiku are quicker and cost
+  less. It needs an **Anthropic API key**, and your own Anthropic account is billed for what it uses.
+  Set the `ANTHROPIC_API_KEY` environment variable before starting CirqAvalonia, or press **Key…** and
+  paste one: it is kept in a file of its own beside `settings.json` that only your user account can
+  read, is sent only to the Anthropic API, and is only ever shown masked (`sk-ant-…1234`). The
+  environment variable wins when both are set.
+- **An OpenAI-compatible server**: any server that speaks the OpenAI Chat Completions API. Give its
+  address and the model's name (**Refresh** lists the models it has):
+  - **On this computer**: Ollama (`http://localhost:11434/v1`), LM Studio (`http://localhost:1234/v1`),
+    llama.cpp's `llama-server` or vLLM. Nothing leaves your computer, there is nothing to pay, and no key
+    is needed. Pick a model that can call tools (qwen3, llama3.1, mistral-small…) and give Ollama room
+    for the tools: `OLLAMA_CONTEXT_LENGTH=32768 ollama serve`.
+  - **On another computer on your network**: the same servers at that computer's address, such as
+    `http://192.168.1.20:11434/v1` (start Ollama with `OLLAMA_HOST=0.0.0.0`). Usually no key either.
+  - **OpenAI or another cloud service**: `https://api.openai.com/v1` with a model such as `gpt-4.1`, or
+    another service's OpenAI-compatible address (OpenRouter, Groq, Mistral, Google's Gemini), with that
+    service's key entered under **Key…** (kept in its own owner-only file). That account is billed.
+
+  **Core tools only** (on at first) offers the model a shorter list of the main tools, which small
+  models choose among much better; untick it for a large one. Tick **Model sees pictures** only for a
+  model that can read images, so it gets the schematics and plots; otherwise it is told to check its
+  work from the numbers. Changing where the model runs starts a new chat.
+
+Files the chat opens or saves are in your Documents folder.
+
+**What it uses** shows as it goes. The line under Send says what this chat has used so far — *This
+chat: 37.0k in (29.4k from cache) · 180 out · ≈ $0.047* — counting up while the model works, with
+*this turn* added until it finishes; hover it for today's and this month's totals. Each turn ends
+with a small line of its own (*This turn: 3 requests · … · 1 picture · ≈ $0.020*), whose tooltip
 lists every request. A turn is often several requests, because each tool call sends the conversation
-again; the prompt cache makes most of each one cheap, which is what *from cache* counts. The tokens
-are the ones the API reports, and the dollars are an estimate from Anthropic's list prices: the
-Anthropic Console has the bill. **Cost…** in the panel's header sets a **budget** — the chat stops
-between requests when it has used about that many dollars, and sending another message lets it carry
-on for as much again — and each model's prices (input, output, cache write and cache read, in dollars
-a million tokens), so the estimate stays right if they change. It also shows today's and this month's
-totals, kept in `chat-usage.json` beside `settings.json` as counts and dollars only, never a word of a
-chat, and **Reset Totals** clears them.
+again; Claude's prompt cache makes most of each one cheap, which is what *from cache* counts. The
+tokens are the ones the server reports, and the dollars are an estimate from Anthropic's list prices
+(the Anthropic Console has the bill; another server's tokens are counted with no price). **Setup…**
+also sets a **budget** — the chat stops between requests when it has used about that many dollars,
+and sending another message lets it carry on for as much again — and each Claude model's prices
+(input, output, cache write and cache read, in dollars a million tokens), so the estimate stays right
+if they change. The totals are kept in `chat-usage.json` beside `settings.json` as counts and dollars
+only, never a word of a chat.
 
 ### Letting an outside agent in
 

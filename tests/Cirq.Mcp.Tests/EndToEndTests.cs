@@ -19,6 +19,7 @@ public class EndToEndTests
         "render_protoboard", "arrange_protoboard", "build_guide", "fault",
         "get_spice_netlist", "load_memory",
         "read_memory", "cpu_state", "disassemble", "sid_state", "peripheral_state", "operating_point", "run_transient", "get_trace", "ac_sweep", "dc_sweep", "transport", "set_scope",
+        "checkpoint", "diff", "render_checkpoint", "restore_checkpoint",
     ];
 
     [Fact]

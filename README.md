@@ -170,13 +170,16 @@ as MCP prompts, and every example circuit can be loaded by name.
 Claude builds it on the canvas in front of you. Each tool call shows as a line that opens to its
 input and result, with thumbnails of the schematics and plots it looked at; the scope shows its runs.
 Every change is **one undo step**, shared with your own, so `Ctrl+Z` takes Claude's work back a step
-at a time. It needs an Anthropic API key: set `ANTHROPIC_API_KEY` before starting, or press **Key…**
-in the panel (it is kept in a file only your account can read, and only ever shown masked). Your own
-API account is billed for what it uses. Claude Opus, Sonnet and Haiku are offered; **Auto-continue**
-lets a long job carry on past the 60-calls-per-request limit by itself (up to 600), and Stop ends it
-at any point. A line under Send shows what the chat has used as it goes — tokens as the API reports
-them and an estimate in dollars — each turn ends with a line of its own, and **Cost…** sets a budget
-the chat stops at, the prices it estimates with, and shows today's and this month's totals.
+at a time, and **Undo this reply** puts back everything one answer did. **Setup…** chooses the model:
+Claude (your own Anthropic API key: set `ANTHROPIC_API_KEY` or press **Key…**; it is kept in a file only
+your account can read and only ever shown masked), or any model with an OpenAI-compatible API — on this
+computer or your network through Ollama, LM Studio, llama.cpp or vLLM, with no key and nothing leaving
+your network, or OpenAI and other cloud services with their own key. **Auto-continue** lets a long job
+carry on past the 60-calls-per-request limit by itself (up to 600), and Stop ends it at any point. A
+line under Send shows what the chat has used as it goes (tokens and, for Claude, an estimate in
+dollars); Setup sets a budget the chat stops at and the prices it estimates with. **History** keeps
+past chats (only if you tick *Keep chat history*), and **Timeline** shows each answer that changed the
+circuit with a picture of it before, to go back to.
 
 ![The AI Chat after designing a 1 kHz RC low-pass: the filter on the canvas, the square wave and its rounded response in the scope, and in the chat the frequency sweep opened to show its input, its result and the Bode plot Claude looked at, with its answer giving the corner at 997.3 Hz](docs/images/36-ai-chat-bode.png)
 

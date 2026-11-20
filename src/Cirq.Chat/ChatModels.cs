@@ -1,4 +1,5 @@
 using Cirq.Mcp;
+using McpTool = ModelContextProtocol.Protocol.Tool;
 
 namespace Cirq.Chat;
 
@@ -23,7 +24,7 @@ public static class ChatModels
     public static string Label(string id) => All.FirstOrDefault(m => m.Id == id).Label ?? id;
 }
 
-/// <summary>What Claude is told: the MCP server's own instructions, and a few lines about working inside the app.</summary>
+/// <summary>What the model is told: the MCP server's own instructions, and a few lines about working inside the program.</summary>
 public static class ChatPrompt
 {
     public const string InApp = """
@@ -32,4 +33,30 @@ public static class ChatPrompt
 
     /// <summary>The system prompt: the same instructions every MCP agent gets, then <see cref="InApp"/>.</summary>
     public static string System => CircuitServer.Instructions.TrimEnd() + "\n\n" + InApp.TrimEnd();
+
+    /// <summary>Added for a model given only <see cref="ChatTools.Core"/>.</summary>
+    public const string CoreToolsNote =
+        "In this chat you have a core set of the server's tools, not all of them: the instructions above may name tools you don't have, so work with the ones you're given.";
+
+    /// <summary>Added for a model that can't see pictures (its tools' pictures become a line of text).</summary>
+    public const string NoPicturesNote =
+        "You can't see pictures in this chat: render_schematic and the plots still show the person, but check your work yourself with get_circuit, check_circuit and the runs' measurements.";
+}
+
+/// <summary>Which of the MCP server's tools the chat offers a model.</summary>
+public static class ChatTools
+{
+    /// <summary>
+    /// The core set for small local models, which choose better among fewer tools: finding and placing parts, wiring
+    /// and probing them, a look and a check, the main runs, and files.
+    /// </summary>
+    public static readonly IReadOnlyList<string> Core =
+    [
+        "list_parts", "describe_part", "new_circuit", "add_parts", "connect", "set_part", "remove_parts", "add_probe",
+        "get_circuit", "check_circuit", "render_schematic", "operating_point", "run_transient", "ac_sweep",
+        "save_circuit", "open_circuit", "undo",
+    ];
+
+    /// <summary>The core tools among <paramref name="tools"/>, in the server's order.</summary>
+    public static IReadOnlyList<McpTool> CoreOf(IReadOnlyList<McpTool> tools) => tools.Where(t => Core.Contains(t.Name)).ToList();
 }

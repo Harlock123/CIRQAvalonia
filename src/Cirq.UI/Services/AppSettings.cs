@@ -68,6 +68,24 @@ public sealed class AppSettings
     /// <summary>About how many dollars an AI Chat may spend before it stops and asks (null: no limit).</summary>
     public double? ChatBudget { get; set; }
 
+    /// <summary>Where the AI Chat's model runs: "Anthropic" (Claude), or "OpenAICompatible" (any OpenAI Chat Completions server).</summary>
+    public string ChatProvider { get; set; } = "Anthropic";
+
+    /// <summary>The OpenAI-compatible server's address (Ollama's by default; a machine on the network or a cloud service's works too).</summary>
+    public string ChatServerUrl { get; set; } = "http://localhost:11434/v1";
+
+    /// <summary>The model on that server.</summary>
+    public string ChatServerModel { get; set; } = string.Empty;
+
+    /// <summary>Offer a server's model the core tools only (small local models choose better among fewer).</summary>
+    public bool ChatCoreTools { get; set; } = true;
+
+    /// <summary>The server's model can read pictures, so tools' pictures go to it.</summary>
+    public bool ChatModelSeesPictures { get; set; }
+
+    /// <summary>Keep chats on this computer (off at first: a chat may hold a client's details).</summary>
+    public bool ChatKeepHistory { get; set; }
+
     /// <summary>The best score on each fault-finding lesson, by its name.</summary>
     public Dictionary<string, int> FaultScores { get; set; } = [];
 

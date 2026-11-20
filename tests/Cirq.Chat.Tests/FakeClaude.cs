@@ -176,5 +176,5 @@ internal static class Json
 internal static class ShownEntries
 {
     /// <summary>The chat's entries but the line after each turn saying what it used (the usage tests look at those).</summary>
-    public static IReadOnlyList<ChatEntry> Shown(this ChatSession chat) => chat.Entries.Where(e => e is not UsageEntry).ToList();
+    public static IReadOnlyList<ChatEntry> Shown(this ChatSession chat) => chat.Entries.Where(e => e is not (UsageEntry or ReplyUndoEntry)).ToList();
 }

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Anthropic;
 using Anthropic.Models.Messages;
 using McpTool = ModelContextProtocol.Protocol.Tool;
@@ -6,10 +7,11 @@ using McpTool = ModelContextProtocol.Protocol.Tool;
 namespace Cirq.Chat;
 
 /// <summary>
-/// One chat with Claude: the conversation kept for the session, and the agent loop. A message goes to the Messages API
-/// (streamed, so text shows as it's written) with the MCP server's tools; each <c>tool_use</c> runs through the
-/// <see cref="IToolBridge"/> and its result goes back (pictures as image blocks, failures as <c>is_error</c>), until
-/// Claude stops, the step cap is reached, or the person presses Stop.
+/// One chat with a model: the conversation kept for the session, and the agent loop. A message goes to the provider's
+/// API (streamed, so text shows as it's written) with the MCP server's tools; each tool call runs through the
+/// <see cref="IToolBridge"/> and its result goes back, until the model stops, the step cap is reached, or the person
+/// presses Stop. The provider is Claude through Anthropic's Messages API, or any model behind an OpenAI-compatible
+/// Chat Completions API (a local server such as Ollama, or a gateway); each keeps the conversation in its own API's shape.
 /// </summary>
 /// <remarks>
 /// It runs its continuations on the caller's context (no <c>ConfigureAwait(false)</c>), so in the app every entry and
@@ -18,51 +20,187 @@ namespace Cirq.Chat;
 public sealed class ChatSession(IToolBridge tools)
 {
     private readonly List<ChatEntry> _entries = [];
-    private readonly List<(bool User, List<ContentBlockParam> Blocks)> _turns = [];
+    /// <summary>The conversation in neither provider's shape, as it was sent and answered: what a saved chat keeps.</summary>
+    private readonly List<LogTurn> _log = [];
+
+    /// <summary>
+    /// The checkpoint taken before the reply under way first changed something ("" when it couldn't be taken), or null
+    /// before its first change.
+    /// </summary>
+    private string? _replyCheckpoint;
+    private int _replies;
+
+    /// <summary>A line for the model with the person's next message, saying a reply was undone.</summary>
+    private string? _undoNote;
+
+    /// <summary>The person or another agent changed the object or the scene since the model last looked.</summary>
+    private bool _objectChangedElsewhere, _sceneChangedElsewhere;
+    private bool _wired;
+    private SynchronizationContext? _context;
+    private int _replyNumber;
+    private volatile bool _undoing;
+
+    /// <summary>
+    /// The saved chats' folder (when history is kept): reply checkpoints are kept on disk under the chat's own folder
+    /// there, so Undo this reply still works after the chat is reopened. Null keeps them for this session only.
+    /// </summary>
+    public string? CheckpointsFolder { get; set; }
+
+    private string? ChatCheckpoints => CheckpointsFolder is { } root && ChatId.Length > 0 ? Path.Combine(root, ChatId, "checkpoints") : null;
+
+    /// <summary>What the model is told, with the person's next message, when someone else changed the object or the scene.</summary>
+    public static string ChangedElsewhereNote(bool obj, bool scene) =>
+        "[From the program, not typed by the person: the person (or another agent) changed the circuit since you last looked. Look again (get_circuit, or diff from a checkpoint) before relying on what you saw.]";
+
+    /// <summary>The bridge's questions and notices come here (once).</summary>
+    private void Wire()
+    {
+        _context ??= SynchronizationContext.Current;
+        if (_wired) return;
+        _wired = true;
+        tools.Ask = AskAsync;
+        tools.ChangedElsewhere += (obj, scene) =>
+        {
+            _objectChangedElsewhere |= obj;
+            _sceneChangedElsewhere |= scene;
+        };
+    }
+
+    /// <summary>Puts a line in the chat on the UI's thread (questions arrive on the MCP client's).</summary>
+    private void AddOnUi(ChatEntry entry)
+    {
+        if (_context == null || SynchronizationContext.Current == _context) Add(entry);
+        else _context.Post(_ => Add(entry), null);
+    }
+
+    /// <summary>A question the server asks the person: shown with buttons; Stop, or the request ending, says no.</summary>
+    private async Task<bool> AskAsync(string question, CancellationToken cancel)
+    {
+        // The person's own Undo this reply (or Go Back) is the go-ahead already.
+        if (_undoing) return true;
+        var entry = new ConfirmEntry(question);
+        AddOnUi(entry);
+        using var stop = cancel.Register(() => entry.Choose(false));
+        using var running = _running?.Token.Register(() => entry.Choose(false));
+        return await entry.Answered.ConfigureAwait(false);
+    }
+
+    /// <summary>What the model is told, with the person's next message, after Undo this reply.</summary>
+    public const string UndoNote =
+        "[From the program, not typed by the person: the person pressed Undo this reply, so the circuit is back as it was before one of your earlier replies began. Whatever that reply, and any after it, changed is gone; look again (get_circuit) before relying on it.]";
+    private (string Model, string? Server) _opened = ("", null);
+    private readonly AnthropicBackend _anthropic = new();
+    private readonly OpenAICompatibleBackend _server = new();
+    private ChatProvider _provider;
     private CancellationTokenSource? _running;
     private int _generation;
     private IReadOnlyList<McpTool>? _toolDefinitions;
-    private readonly List<RequestUsage> _turnRequests = [];
     private TokenUsage _chatTokens, _live;
     private double _chatCost;
+    private bool _unpriced;
+    private readonly List<RequestUsage> _turnRequests = [];
     private int _pendingPictures;
     private double _allowance;
-    private double? _budget;
-
-    /// <summary>The Claude API client, or null while there's no key.</summary>
-    public IAnthropicClient? Client { get; set; }
-
-    /// <summary>The model the next request uses (one of <see cref="ChatModels.All"/>).</summary>
-    public string Model { get; set; } = ChatModels.Default;
-
-    /// <summary>The most tool calls one request may make before the chat stops and says so.</summary>
-    public int MaxToolCalls { get; set; } = 60;
 
     /// <summary>
-    /// How many times one request carries on by itself after <see cref="MaxToolCalls"/>, as if the person had said
-    /// "continue" (0: it stops and asks). Each time, the count starts again and a line in the chat says so; Stop ends it
-    /// at any point. This bounds what one request can cost.
+    /// Where the model runs. Changing it starts a new chat: a conversation can't move between providers (their messages
+    /// and tool calls are kept in different shapes).
     /// </summary>
-    public int AutoContinues { get; set; }
+    public ChatProvider Provider
+    {
+        get => _provider;
+        set
+        {
+            if (value == _provider) return;
+            bool any = _entries.Count > 0 || Working;
+            _provider = value;
+            if (ReadOnlyProvider is { } was)
+            {
+                // A saved chat shown read-only comes alive when the provider it was with is chosen again.
+                if (was == value) LoadBackend();
+                ReadOnlyChanged?.Invoke();
+                return;
+            }
+            if (any) NewChat();
+        }
+    }
 
-    public long MaxTokens { get; set; } = 32000;
+    /// <summary>This chat's id: the name of its file in the history.</summary>
+    public string ChatId { get; private set; } = "";
 
-    /// <summary>What to say when there's no key (the panel says how to set one).</summary>
-    public string NoKeyText { get; set; } =
-        $"There's no Anthropic API key yet. Set the {ApiKeyStore.EnvironmentVariable} environment variable before starting CirqAvalonia, or enter a key with the Key… button above. Your own API account is billed for what the chat uses.";
+    /// <summary>When this chat started.</summary>
+    public DateTimeOffset Created { get; private set; }
 
-    public IReadOnlyList<ChatEntry> Entries => _entries;
+    /// <summary>The clock new chats are dated by (tests set their own).</summary>
+    public Func<DateTimeOffset> Clock { get; set; } = () => DateTimeOffset.Now;
+
+    /// <summary>The OpenAI-compatible server as a saved chat names it: host and port only (the panel sets it).</summary>
+    public string? ServerName { get; set; }
+
+    /// <summary>
+    /// When a saved chat with the other provider is open, that provider: the chat is shown but can't be carried on (its
+    /// messages are in the other API's terms) until that provider is chosen again, or New Chat starts afresh.
+    /// </summary>
+    public ChatProvider? ReadOnlyProvider { get; private set; }
+
+    /// <summary>Whether the chat on show is read-only (see <see cref="ReadOnlyProvider"/>).</summary>
+    public bool ReadOnly => ReadOnlyProvider != null;
+
+    /// <summary>Raised when <see cref="ReadOnly"/> changes.</summary>
+    public event Action? ReadOnlyChanged;
+
+    /// <summary>Whether there's anything to save: the person has said something.</summary>
+    public bool HasConversation => _entries.OfType<UserEntry>().Any();
+
+    /// <summary>A turn of the conversation: the person's words, the model's reply and calls, or the calls' outcomes.</summary>
+    private sealed record LogTurn(string Role, string Text, IReadOnlyList<ToolCall> Calls, IReadOnlyList<(ToolCall Call, ToolOutcome Outcome)> Results);
+
+    private IChatBackend Backend => _provider == ChatProvider.Anthropic ? _anthropic : _server;
+
+    /// <summary>The Claude API client, or null while there's no key.</summary>
+    public IAnthropicClient? Client { get => _anthropic.Client; set => _anthropic.Client = value; }
+
+    /// <summary>The Claude model the next request uses (one of <see cref="ChatModels.All"/>).</summary>
+    public string Model { get => _anthropic.Model; set => _anthropic.Model = value; }
+
+    /// <summary>The OpenAI-compatible server's client (its base URL and any key), or null while none is set.</summary>
+    public OpenAICompatibleClient? Server { get => _server.Client; set => _server.Client = value; }
+
+    /// <summary>The model on the OpenAI-compatible server, by the server's name for it.</summary>
+    public string ServerModel { get => _server.Model; set => _server.Model = value ?? ""; }
+
+    /// <summary>Offer the OpenAI-compatible model only <see cref="ChatTools.Core"/> (on by default: small models do better).</summary>
+    public bool CoreToolsOnly { get => _server.CoreToolsOnly; set => _server.CoreToolsOnly = value; }
+
+    /// <summary>
+    /// What the model is told before the conversation: <see cref="ChatPrompt.System"/> (CirqAvalonia's server
+    /// instructions and its in-app lines) unless an app gives its own, for both providers.
+    /// </summary>
+    public string SystemPrompt
+    {
+        get => _anthropic.SystemPrompt;
+        set { _anthropic.SystemPrompt = value; _server.SystemPrompt = value; }
+    }
+
+    /// <summary>The tools an OpenAI-compatible model gets with <see cref="CoreToolsOnly"/> (<see cref="ChatTools.Core"/> unless an app gives its own), and the note that says so.</summary>
+    public IReadOnlyList<string> CoreTools { get => _server.CoreTools; set => _server.CoreTools = value; }
+
+    /// <inheritdoc cref="CoreTools"/>
+    public string CoreToolsNote { get => _server.CoreToolsNote; set => _server.CoreToolsNote = value; }
+
+    /// <summary>Send the OpenAI-compatible model the tools' pictures (a vision model); otherwise it's told one was made.</summary>
+    public bool ModelSeesPictures { get => _server.ModelSeesPictures; set => _server.ModelSeesPictures = value; }
+
+    /// <summary>The model as the chat's lines name it: "Claude", or "The model".</summary>
+    public string Who => _provider == ChatProvider.Anthropic ? "Claude" : "The model";
 
     // ───────────────────────────── what it uses ─────────────────────────────
 
-    /// <summary>The person's own prices (the panel's Cost…), over <see cref="ChatPricing.Defaults"/>.</summary>
+    /// <summary>The person's own prices (Setup…), over <see cref="ChatPricing.Defaults"/>.</summary>
     public IReadOnlyList<ModelPrice> OwnPrices { get; set; } = [];
 
     /// <summary>Where each request's use is added up day by day (the panel's today and this month), or null.</summary>
     public UsageLedger? Ledger { get; set; }
-
-    /// <summary>The time a request's use is booked at (tests set it).</summary>
-    public Func<DateTimeOffset> Clock { get; set; } = () => DateTimeOffset.Now;
 
     /// <summary>
     /// About how many dollars a chat may spend before it stops between requests and says so (null: no limit). Sending
@@ -77,21 +215,22 @@ public sealed class ChatSession(IToolBridge tools)
             _allowance = _budget is { } b ? Math.Max(_allowance, b) : 0;
         }
     }
+    private double? _budget;
 
-    /// <summary>The price the next request is reckoned at: the model's, or null if it has none.</summary>
-    public ModelPrice? Price => ChatPricing.Find(Model, OwnPrices);
+    /// <summary>The model the next request's price is looked up by, or null for one with none (an OpenAI-compatible server's).</summary>
+    public ModelPrice? Price => _provider == ChatProvider.Anthropic ? ChatPricing.Find(Model, OwnPrices) : null;
 
     /// <summary>This chat's tokens so far, the request under way included.</summary>
     public TokenUsage ChatTokens => _chatTokens + _live;
 
-    /// <summary>This chat's estimated cost so far, the request under way included.</summary>
-    public double ChatCost => _chatCost + (Price?.Cost(_live) ?? 0);
+    /// <summary>This chat's estimated cost so far (the request under way included), or null if any of it had no price.</summary>
+    public double? ChatCost => _unpriced ? null : _chatCost + (Price?.Cost(_live) ?? 0);
 
-    /// <summary>The turn under way's tokens (since the person's last message), the request under way included.</summary>
+    /// <summary>The turn under way's tokens and estimated cost (since the person's last message), the request under way included.</summary>
     public TokenUsage TurnTokens => _turnRequests.Aggregate(_live, (a, r) => a + r.Tokens);
 
-    /// <summary>The turn under way's estimated cost, the request under way included.</summary>
-    public double TurnCost => _turnRequests.Sum(r => r.Cost ?? 0) + (Price?.Cost(_live) ?? 0);
+    public double? TurnCost => _turnRequests.Any(r => r.Cost == null) || (Price == null && !_live.IsEmpty) ? null
+        : _turnRequests.Sum(r => r.Cost!.Value) + (Price?.Cost(_live) ?? 0);
 
     /// <summary>Raised as the tokens used change: during a request as the API reports them, and after it.</summary>
     public event Action? UsageChanged;
@@ -101,14 +240,38 @@ public sealed class ChatSession(IToolBridge tools)
     {
         _live = default;
         if (used.IsEmpty && used.Requests == 0) return;
-        double? cost = Price?.Cost(used);
-        _chatCost += cost ?? 0;
+        var price = Price;
+        double? cost = price?.Cost(used);
+        if (cost == null) _unpriced = true;
+        else _chatCost += cost.Value;
         _chatTokens += used;
         _turnRequests.Add(new RequestUsage(used, cost, _pendingPictures));
         _pendingPictures = 0;
         Ledger?.Add(Clock(), used, cost);
         UsageChanged?.Invoke();
     }
+
+    /// <summary>The most tool calls one request may make before the chat stops and says so.</summary>
+    public int MaxToolCalls { get; set; } = 60;
+
+    /// <summary>
+    /// How many times one request carries on by itself after <see cref="MaxToolCalls"/>, as if the person had said
+    /// "continue" (0: it stops and asks). Each time, the count starts again and a line in the chat says so; Stop ends it
+    /// at any point. This bounds what one request can cost.
+    /// </summary>
+    public int AutoContinues { get; set; }
+
+    public long MaxTokens { get => _anthropic.MaxTokens; set => _anthropic.MaxTokens = value; }
+
+    /// <summary>What to say when there's no key (the panel says how to set one).</summary>
+    public string NoKeyText { get; set; } =
+        $"There's no Anthropic API key yet. Set the {ApiKeyStore.EnvironmentVariable} environment variable before starting CirqAvalonia, or enter a key with the Key… button above. Your own API account is billed for what the chat uses.";
+
+    /// <summary>What to say when the OpenAI-compatible server or its model isn't set.</summary>
+    public string NoServerText { get; set; } =
+        "No model is set for the OpenAI-compatible server yet. Press Setup… above, enter the server's base URL (Ollama's is http://localhost:11434/v1) and a model name; Refresh lists the server's models.";
+
+    public IReadOnlyList<ChatEntry> Entries => _entries;
 
     /// <summary>A new entry was added at the end.</summary>
     public event Action<ChatEntry>? EntryAdded;
@@ -122,38 +285,53 @@ public sealed class ChatSession(IToolBridge tools)
     /// <summary>A request is under way (Send has become Stop).</summary>
     public bool Working => _running != null;
 
-    /// <summary>The conversation as it will be sent (for tests): each turn (the person's or Claude's) and its blocks.</summary>
-    internal IReadOnlyList<(bool User, List<ContentBlockParam> Blocks)> Turns => _turns;
+    /// <summary>The Claude conversation as it will be sent (for tests): each turn (the person's or Claude's) and its blocks.</summary>
+    internal IReadOnlyList<(bool User, List<ContentBlockParam> Blocks)> Turns => _anthropic.Turns;
 
-    /// <summary>Sends what the person typed and works until Claude has finished with it.</summary>
+    /// <summary>The OpenAI-compatible conversation as it will be sent, after the system message (for tests).</summary>
+    internal IReadOnlyList<JsonObject> ServerMessages => _server.Messages;
+
+    private string NotReadyText => _provider == ChatProvider.Anthropic ? NoKeyText : NoServerText;
+
+    /// <summary>Sends what the person typed and works until the model has finished with it.</summary>
     public async Task SendAsync(string text, CancellationToken cancel = default)
     {
         text = text.Trim();
-        if (text.Length == 0 || Working) return;
+        if (text.Length == 0 || Working || ReadOnly) return;
+        Wire();
+        if (ChatId.Length == 0) StartId();
         foreach (var n in _entries.OfType<NoticeEntry>()) n.RetryGone();
         Add(new UserEntry(text));
-        if (Client == null)
+        if (!Backend.Ready)
         {
-            Add(new NoticeEntry(NoKeyText, NoticeKind.Info));
+            Add(new NoticeEntry(NotReadyText, NoticeKind.Info));
             return;
         }
-        AddToUserTurn(new TextBlockParam { Text = text });
+        // After Undo this reply, or someone else's change, the model is told, so it doesn't build on what's gone.
+        var notes = new List<string>();
+        if (_undoNote != null) notes.Add(_undoNote);
+        else if (HasConversation && (_objectChangedElsewhere || _sceneChangedElsewhere)) notes.Add(ChangedElsewhereNote(_objectChangedElsewhere, _sceneChangedElsewhere));
+        (_objectChangedElsewhere, _sceneChangedElsewhere) = (false, false);
+        var sent = notes.Count > 0 ? string.Join("\n\n", notes) + "\n\n" + text : text;
+        _undoNote = null;
+        Backend.AddUserText(sent);
+        _log.Add(new LogTurn("user", sent, [], []));
         // Stopped by the budget: the person's carrying on allows as much again.
-        if (_budget is { } b && ChatCost >= _allowance) _allowance = ChatCost + b;
+        if (_budget is { } b && ChatCost is { } spent && spent >= _allowance) _allowance = spent + b;
         await RunAsync(cancel);
     }
 
     /// <summary>Sends the conversation again after an error (nothing new is added).</summary>
     public async Task RetryAsync(CancellationToken cancel = default)
     {
-        if (Working) return;
+        if (Working || ReadOnly) return;
         foreach (var n in _entries.OfType<NoticeEntry>()) n.RetryGone();
-        if (Client == null)
+        if (!Backend.Ready)
         {
-            Add(new NoticeEntry(NoKeyText, NoticeKind.Info));
+            Add(new NoticeEntry(NotReadyText, NoticeKind.Info));
             return;
         }
-        if (_turns.Count == 0 || !_turns[^1].User) return;
+        if (!Backend.EndsWithPerson) return;
         await RunAsync(cancel);
     }
 
@@ -167,12 +345,26 @@ public sealed class ChatSession(IToolBridge tools)
         // A request still winding down after the stop belongs to the old chat: it adds nothing to the new one.
         _generation++;
         _entries.Clear();
-        _turns.Clear();
-        (_chatTokens, _live, _chatCost, _pendingPictures) = (default, default, 0, 0);
+        _log.Clear();
+        _undoNote = null;
+        (_objectChangedElsewhere, _sceneChangedElsewhere) = (false, false);
+        _anthropic.Clear();
+        _server.Clear();
+        ChatId = "";
+        (_chatTokens, _live, _chatCost, _unpriced, _pendingPictures) = (default, default, 0, false, 0);
         _turnRequests.Clear();
         _allowance = _budget ?? 0;
         UsageChanged?.Invoke();
+        bool wasReadOnly = ReadOnly;
+        ReadOnlyProvider = null;
         Cleared?.Invoke();
+        if (wasReadOnly) ReadOnlyChanged?.Invoke();
+    }
+
+    private void StartId()
+    {
+        Created = Clock();
+        ChatId = ChatHistory.NewId(Created);
     }
 
     private void Add(ChatEntry entry)
@@ -181,30 +373,29 @@ public sealed class ChatSession(IToolBridge tools)
         EntryAdded?.Invoke(entry);
     }
 
-    /// <summary>Adds blocks to the conversation's last user turn, or starts one (turns must alternate).</summary>
-    private void AddToUserTurn(params ContentBlockParam[] blocks)
-    {
-        if (_turns.Count > 0 && _turns[^1].User) _turns[^1].Blocks.AddRange(blocks);
-        else _turns.Add((true, [.. blocks]));
-    }
-
     private async Task RunAsync(CancellationToken cancel)
     {
         using var running = CancellationTokenSource.CreateLinkedTokenSource(cancel);
         _running = running;
         _turnRequests.Clear();
+        _replyCheckpoint = null;
         int generation = _generation;
         WorkingChanged?.Invoke();
         try
         {
-            await LoopAsync(running.Token);
+            await LoopAsync(Backend, running.Token);
         }
         finally
         {
             // What the turn used, after it (a request cut short counts what was reported of it).
             if (generation == _generation)
             {
+                if (_replyCheckpoint is { Length: > 0 } checkpoint && await ChangedSinceAsync(checkpoint) is { } summary && generation == _generation)
+                    Add(new ReplyUndoEntry(checkpoint) { Summary = summary, Number = ++_replyNumber });
+                // The chat's own changes this turn aren't someone else's.
+                (_objectChangedElsewhere, _sceneChangedElsewhere) = (false, false);
                 if (!_live.IsEmpty) Commit(_live with { Requests = 1 });
+                // Shown only when the API reported tokens (some OpenAI-compatible servers don't).
                 if (_turnRequests.Any(r => !r.Tokens.IsEmpty)) Add(new UsageEntry([.. _turnRequests], Price?.Model));
             }
             _running = null;
@@ -212,21 +403,22 @@ public sealed class ChatSession(IToolBridge tools)
         }
     }
 
-    private async Task LoopAsync(CancellationToken cancel)
+    private async Task LoopAsync(IChatBackend backend, CancellationToken cancel)
     {
         int calls = 0, continues = 0, generation = _generation;
         bool Gone() => generation != _generation;
+        var who = Who;
         for (int request = 0; ; request++)
         {
             // The budget is checked between requests (never the first of a turn: the person's message is a go-ahead).
-            if (request > 0 && _budget is { } budget && ChatCost >= _allowance)
+            if (request > 0 && _budget is { } budget && ChatCost is { } spent && spent >= _allowance)
             {
-                Add(new NoticeEntry($"Stopped at the chat's budget: it has used about {ChatPricing.Dollars(ChatCost)} (the budget is {ChatPricing.Dollars(budget)} a go). " +
-                    "Send another message to let Claude carry on for as much again, or change the budget with Cost… above.", NoticeKind.Info));
+                Add(new NoticeEntry($"Stopped at the chat's budget: it has used about {ChatPricing.Dollars(spent)} (the budget is {ChatPricing.Dollars(budget)} a go). " +
+                    $"Send another message to let {(who == "Claude" ? who : "the model")} carry on for as much again, or change the budget in Setup….", NoticeKind.Info));
                 return;
             }
             var reply = new AssistantEntry();
-            Message message;
+            BackendReply message;
             try
             {
                 _toolDefinitions ??= await tools.ListToolsAsync(cancel);
@@ -235,7 +427,7 @@ public sealed class ChatSession(IToolBridge tools)
             catch (Exception e) when (e is not OperationCanceledException || !cancel.IsCancellationRequested)
             {
                 if (Gone()) return;
-                Add(new NoticeEntry($"The app's tools for Claude couldn't start: {e.Message}", NoticeKind.Error, canRetry: true));
+                Add(new NoticeEntry($"The app's tools for the chat couldn't start: {e.Message}", NoticeKind.Error, canRetry: true));
                 return;
             }
             catch (OperationCanceledException)
@@ -245,7 +437,18 @@ public sealed class ChatSession(IToolBridge tools)
             }
             try
             {
-                message = await StreamAsync(Request(), reply, cancel);
+                message = await backend.ReplyAsync(_toolDefinitions, text =>
+                {
+                    if (Gone()) return;
+                    // The reply shows once it has words (a turn of tool calls only shows its tool lines).
+                    if (reply.Text.Length == 0 && !_entries.Contains(reply)) Add(reply);
+                    reply.Append(text);
+                }, cancel, u =>
+                {
+                    if (Gone()) return;
+                    _live = u;
+                    UsageChanged?.Invoke();
+                });
             }
             catch (OperationCanceledException) when (cancel.IsCancellationRequested)
             {
@@ -264,30 +467,27 @@ public sealed class ChatSession(IToolBridge tools)
                 return;
             }
             if (Gone()) return;
-            var used = Tokens(message.Usage);
-            Commit(used.IsEmpty ? _live with { Requests = 1 } : used);
+            Commit(message.Usage.IsEmpty ? _live with { Requests = 1 } : message.Usage);
             reply.Finish();
+            // As the backend keeps it: a reply with no words and no calls isn't kept.
+            if (reply.Text.Length > 0 || message.Calls.Count > 0) _log.Add(new LogTurn("assistant", reply.Text, message.Calls, []));
 
-            // An empty reply (a refusal can be one) isn't kept: the API takes no empty turns.
-            var assistant = AssistantBlocks(message);
-            if (assistant.Count > 0) _turns.Add((false, assistant));
-            var uses = message.Content.Select(b => b.TryPickToolUse(out var u) ? u : null).OfType<ToolUseBlock>().ToList();
-            if (uses.Count == 0)
+            if (message.Calls.Count == 0)
             {
-                if (message.StopReason?.Value() is StopReason.MaxTokens)
-                    Add(new NoticeEntry("Claude's reply reached its length limit and was cut short. Say \"continue\" to go on.", NoticeKind.Info));
-                else if (message.StopReason?.Value() is StopReason.Refusal)
-                    Add(new NoticeEntry("Claude declined that request.", NoticeKind.Info));
+                if (message.End is ReplyEnd.MaxTokens)
+                    Add(new NoticeEntry($"{who}'s reply reached its length limit and was cut short. Say \"continue\" to go on.", NoticeKind.Info));
+                else if (message.End is ReplyEnd.Refusal)
+                    Add(new NoticeEntry($"{who} declined that request.", NoticeKind.Info));
                 return;
             }
 
-            var results = new List<ContentBlockParam>();
+            var results = new List<(ToolCall, ToolOutcome)>();
             bool capped = false, stopped = false;
-            foreach (var use in uses)
+            foreach (var use in message.Calls)
             {
                 if (stopped || capped)
                 {
-                    results.Add(Result(use.ID, ToolOutcome.Error(stopped ? "Not run: the person pressed Stop." : $"Not run: the limit of {MaxToolCalls} tool calls for one request was reached.")));
+                    results.Add((use, ToolOutcome.Error(stopped ? "Not run: the person pressed Stop." : $"Not run: the limit of {MaxToolCalls} tool calls for one request was reached.")));
                     continue;
                 }
                 if (calls >= MaxToolCalls && continues < AutoContinues)
@@ -299,34 +499,42 @@ public sealed class ChatSession(IToolBridge tools)
                 if (calls >= MaxToolCalls)
                 {
                     capped = true;
-                    results.Add(Result(use.ID, ToolOutcome.Error($"Not run: the limit of {MaxToolCalls} tool calls for one request was reached.")));
+                    results.Add((use, ToolOutcome.Error($"Not run: the limit of {MaxToolCalls} tool calls for one request was reached.")));
                     continue;
                 }
                 calls++;
                 var entry = new ToolEntry(use.Name, use.Input);
                 Add(entry);
                 ToolOutcome outcome;
-                try
+                if (use.Problem != null) outcome = ToolOutcome.Error(use.Problem);
+                else
                 {
-                    outcome = await tools.CallAsync(use.Name, use.Input, cancel);
-                }
-                catch (OperationCanceledException) when (cancel.IsCancellationRequested)
-                {
-                    stopped = true;
-                    outcome = ToolOutcome.Error("Stopped by the person before it finished.");
-                }
-                catch (Exception e)
-                {
-                    outcome = ToolOutcome.Error($"{use.Name} failed: {e.Message}");
+                    try
+                    {
+                        if (_replyCheckpoint == null && Changes(use.Name)) await TakeReplyCheckpointAsync(cancel);
+                        // A long call's progress shows on its line (Progress posts back to this thread).
+                        var progress = new Progress<(double Done, string? Message)>(p => entry.Report(p.Done, p.Message));
+                        outcome = await tools.CallAsync(use.Name, use.Input, progress, cancel);
+                    }
+                    catch (OperationCanceledException) when (cancel.IsCancellationRequested)
+                    {
+                        stopped = true;
+                        outcome = ToolOutcome.Error("Stopped by the person before it finished.");
+                    }
+                    catch (Exception e)
+                    {
+                        outcome = ToolOutcome.Error($"{use.Name} failed: {e.Message}");
+                    }
                 }
                 if (Gone()) return;
                 entry.Finish(outcome);
-                results.Add(Result(use.ID, outcome));
-                // Its pictures go to Claude with the next request.
-                _pendingPictures += outcome.Images.Count;
+                results.Add((use, outcome));
             }
-            // Every tool_use has its tool_result, so the conversation can go on after a stop or the cap.
-            AddToUserTurn([.. results]);
+            // Every tool call has its result, so the conversation can go on after a stop or the cap.
+            backend.AddResults(results);
+            // The pictures go to the model with the next request (an OpenAI-compatible model's only if it sees them).
+            if (_provider == ChatProvider.Anthropic || ModelSeesPictures) _pendingPictures += results.Sum(r => r.Item2.Images.Count);
+            _log.Add(new LogTurn("results", "", [], results));
             if (stopped)
             {
                 Add(new NoticeEntry("Stopped.", NoticeKind.Info));
@@ -335,8 +543,8 @@ public sealed class ChatSession(IToolBridge tools)
             if (capped)
             {
                 Add(new NoticeEntry(AutoContinues == 0
-                    ? $"Stopped after {MaxToolCalls} tool calls, the most one request may make. Say \"continue\" to let Claude carry on, or tick Auto-continue."
-                    : $"Stopped after {MaxToolCalls * (AutoContinues + 1)} tool calls ({MaxToolCalls}, then {AutoContinues} automatic continues), the most one request may make. Say \"continue\" to let Claude carry on.", NoticeKind.Info));
+                    ? $"Stopped after {MaxToolCalls} tool calls, the most one request may make. Say \"continue\" to let {(who == "Claude" ? who : "the model")} carry on, or tick Auto-continue."
+                    : $"Stopped after {MaxToolCalls * (AutoContinues + 1)} tool calls ({MaxToolCalls}, then {AutoContinues} automatic continues), the most one request may make. Say \"continue\" to let {(who == "Claude" ? who : "the model")} carry on.", NoticeKind.Info));
                 return;
             }
             if (cancel.IsCancellationRequested)
@@ -347,106 +555,333 @@ public sealed class ChatSession(IToolBridge tools)
         }
     }
 
+    // ───────────────────────────── undo this reply ─────────────────────────────
+
+    /// <summary>Whether a tool may change the object or the scene (it isn't marked read-only).</summary>
+    private bool Changes(string tool) =>
+        _toolDefinitions?.FirstOrDefault(t => t.Name == tool) is { } definition && definition.Annotations?.ReadOnlyHint != true;
+
     /// <summary>
-    /// The request: the system prompt and the tools marked for prompt caching (the tool schemas are most of every
-    /// request), and automatic caching of the conversation so far.
+    /// Takes the checkpoint Undo this reply goes back to, just before the reply's first change. A server without
+    /// checkpoints (or a failure) just means the reply has no undo button.
     /// </summary>
-    internal MessageCreateParams Request() => new()
+    private async Task TakeReplyCheckpointAsync(CancellationToken cancel)
     {
-        Model = Model,
-        MaxTokens = MaxTokens,
-        System = new List<TextBlockParam> { new() { Text = ChatPrompt.System, CacheControl = new CacheControlEphemeral() } },
-        Tools = ToolsFor(_toolDefinitions ?? []),
-        Messages = _turns.Select(t => t.User ? (MessageParam)new UserMessageParam { Content = t.Blocks.ToList() } : new AssistantMessageParam { Content = t.Blocks.ToList() }).ToList(),
-        CacheControl = new CacheControlEphemeral(),
-    };
-
-    /// <summary>The MCP tools as Messages API tools, schemas unchanged; the last one carries the cache breakpoint.</summary>
-    internal static List<ToolUnion> ToolsFor(IReadOnlyList<McpTool> definitions)
-    {
-        var list = new List<ToolUnion>();
-        for (int i = 0; i < definitions.Count; i++)
+        string name = $"reply {++_replies}";
+        var input = new Dictionary<string, JsonElement>
         {
-            var d = definitions[i];
-            var schema = d.InputSchema.EnumerateObject().ToDictionary(p => p.Name, p => p.Value.Clone());
-            var tool = new Tool { Name = d.Name, Description = d.Description ?? "", InputSchema = InputSchema.FromRawUnchecked(schema) };
-            // Set only on the last: a property set to null would still be sent (as null).
-            if (i == definitions.Count - 1) tool = tool with { CacheControl = new CacheControlEphemeral() };
-            list.Add(tool);
+            ["name"] = JsonSerializer.SerializeToElement(name),
+            ["note"] = JsonSerializer.SerializeToElement("Taken by the chat before this reply's first change, for its Undo this reply button."),
+        };
+        // With history kept, it's kept on disk with the chat, so Undo this reply works after the chat is reopened.
+        tools.CheckpointFolder = ChatCheckpoints;
+        if (ChatCheckpoints != null) input["persist"] = JsonSerializer.SerializeToElement(true);
+        try
+        {
+            var outcome = await tools.CallAsync("checkpoint", input, cancel);
+            _replyCheckpoint = outcome.IsError ? "" : name;
         }
-        return list;
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            _replyCheckpoint = "";
+        }
     }
 
-    private async Task<Message> StreamAsync(MessageCreateParams request, AssistantEntry reply, CancellationToken cancel)
+    /// <summary>
+    /// What changed since the checkpoint, in a line for the timeline; null if nothing did ("changes" if it can't tell).
+    /// </summary>
+    private async Task<string?> ChangedSinceAsync(string checkpoint)
     {
-        // Text shows as it streams; the whole reply is put together from the same events afterwards, by the SDK.
-        // The input's tokens come with the start and the output's grow with each delta, so the panel counts as it goes.
-        var events = new List<RawMessageStreamEvent>();
-        int generation = _generation;
-        await foreach (var ev in Client!.Messages.CreateStreaming(request, cancel).WithCancellation(cancel))
+        try
         {
-            events.Add(ev);
-            if (ev.TryPickContentBlockDelta(out var delta) && delta.Delta.TryPickText(out var text))
+            var outcome = await tools.CallAsync("diff", new Dictionary<string, JsonElement> { ["since"] = JsonSerializer.SerializeToElement(checkpoint) });
+            if (outcome.IsError) return "changes";
+            var diff = JsonNode.Parse(outcome.Text) as JsonObject;
+            if (diff?["changed"] is JsonValue changed && changed.TryGetValue(out bool value) && !value) return null;
+            return diff == null ? "changes" : Summarise(diff);
+        }
+        catch (Exception e) when (e is JsonException or InvalidOperationException or IOException)
+        {
+            return "changes";
+        }
+    }
+
+    /// <summary>A diff in a line: "+3 parts, −1, 2 changed; +4 wires; probes; settings".</summary>
+    public static string Summarise(JsonObject diff)
+    {
+        int Count(JsonNode? n) => n is JsonArray a ? a.Count : 0;
+        var parts = diff["parts"];
+        int added = Count(parts?["added"]), removed = Count(parts?["removed"]), changed = Count(parts?["changed"]);
+        int wiresAdded = (int?)diff["wires"]?["added"] ?? 0, wiresRemoved = (int?)diff["wires"]?["removed"] ?? 0;
+        var bits = new List<string>();
+        if (added > 0) bits.Add($"+{added} part{(added == 1 ? "" : "s")}");
+        if (removed > 0) bits.Add($"\u2212{removed} part{(removed == 1 ? "" : "s")}");
+        if (changed > 0) bits.Add($"{changed} changed");
+        if (wiresAdded > 0) bits.Add($"+{wiresAdded} wire{(wiresAdded == 1 ? "" : "s")}");
+        if (wiresRemoved > 0) bits.Add($"\u2212{wiresRemoved} wire{(wiresRemoved == 1 ? "" : "s")}");
+        if ((bool?)diff["probes_changed"] == true) bits.Add("probes");
+        if ((bool?)diff["other_changed"] == true) bits.Add("settings");
+        return bits.Count > 0 ? string.Join(", ", bits) : "changes";
+    }
+
+    /// <summary>
+    /// A small picture of the schematic before a reply (its checkpoint drawn), for the timeline; kept on the entry. Null
+    /// if it can't be drawn (the checkpoint is gone).
+    /// </summary>
+    public async Task<ToolImage?> PictureBeforeAsync(ReplyUndoEntry entry, int width = 160, int height = 120, CancellationToken cancel = default)
+    {
+        if (entry.Before is { } kept && width <= 160) return kept;
+        tools.CheckpointFolder = ChatCheckpoints;
+        var input = new Dictionary<string, JsonElement>
+        {
+            ["name"] = JsonSerializer.SerializeToElement(entry.Checkpoint),
+            ["width"] = JsonSerializer.SerializeToElement(width),
+            ["height"] = JsonSerializer.SerializeToElement(height),
+        };
+        try
+        {
+            var outcome = await tools.CallAsync("render_checkpoint", input, cancel);
+            if (outcome.IsError || outcome.Images.Count == 0) return null;
+            if (width <= 160) entry.Before = outcome.Images[0];
+            return outcome.Images[0];
+        }
+        catch (Exception e) when (e is InvalidOperationException or IOException) { return null; }
+    }
+
+    /// <summary>The replies that changed something, oldest first: the timeline's rows.</summary>
+    public IReadOnlyList<ReplyUndoEntry> Timeline => [.. _entries.OfType<ReplyUndoEntry>()];
+
+    /// <summary>
+    /// Undo this reply: puts the circuit back as it was before the reply (one undo step, so the
+    /// person's Ctrl+Z brings it back). Later replies' buttons go, since they're undone too, and the model is told with
+    /// the next message. Returns whether it was undone; a failure is shown on the entry, which can be tried again.
+    /// </summary>
+    public async Task<bool> UndoReplyAsync(ReplyUndoEntry entry, CancellationToken cancel = default)
+    {
+        if (Working || !entry.CanUndo || !_entries.Contains(entry)) return false;
+        Wire();
+        entry.Set(ReplyUndoState.Undoing);
+        tools.CheckpointFolder = ChatCheckpoints;
+        ToolOutcome outcome;
+        try
+        {
+            _undoing = true;
+            outcome = await tools.CallAsync("restore_checkpoint", new Dictionary<string, JsonElement> { ["name"] = JsonSerializer.SerializeToElement(entry.Checkpoint) }, cancel);
+        }
+        catch (Exception e)
+        {
+            outcome = ToolOutcome.Error(e.Message);
+        }
+        finally
+        {
+            _undoing = false;
+        }
+        if (outcome.IsError)
+        {
+            entry.Set(ReplyUndoState.Failed, outcome.Text);
+            return false;
+        }
+        entry.Set(ReplyUndoState.Undone);
+        foreach (var later in _entries.Skip(_entries.IndexOf(entry) + 1).OfType<ReplyUndoEntry>())
+            if (later.CanUndo) later.Set(ReplyUndoState.Superseded);
+        if (HasConversation) _undoNote = UndoNote;
+        return true;
+    }
+
+    // ───────────────────────────── saving and opening chats ─────────────────────────────
+
+    /// <summary>
+    /// The chat as it's saved: what the panel shows and the conversation in a shape either provider can be given again.
+    /// Each picture goes through <paramref name="keep"/> (which returns the name it's kept under, or null to leave it
+    /// out: too big); the same picture is asked about once. Never a key.
+    /// </summary>
+    public StoredChat ToStored(Func<ToolImage, string?> keep)
+    {
+        if (ChatId.Length == 0) StartId();
+        var kept = new Dictionary<ToolImage, string?>(ReferenceEqualityComparer.Instance);
+        string? Keep(ToolImage i) => kept.TryGetValue(i, out var name) ? name : kept[i] = keep(i);
+        (List<string>? Names, int Left) Pictures(IReadOnlyList<ToolImage> images)
+        {
+            if (images.Count == 0) return (null, 0);
+            var names = images.Select(Keep).ToList();
+            return (names.OfType<string>().ToList(), names.Count(n => n == null));
+        }
+        var chat = new StoredChat
+        {
+            Id = ChatId, Created = Created, Updated = Clock(),
+            // A chat open read-only keeps the provider, model and server it was with.
+            Provider = ReadOnlyProvider ?? _provider,
+            Model = ReadOnly ? _opened.Model : _provider == ChatProvider.Anthropic ? Model : ServerModel,
+            Server = ReadOnly ? _opened.Server : _provider == ChatProvider.OpenAICompatible ? ServerName : null,
+            Title = Title(),
+            Usage = _chatTokens, Cost = _unpriced ? null : _chatCost,
+        };
+        foreach (var e in _entries)
+        {
+            switch (e)
             {
-                // The reply shows once it has words (a turn of tool calls only shows its tool lines).
-                if (reply.Text.Length == 0 && !_entries.Contains(reply)) Add(reply);
-                reply.Append(text.Text);
-            }
-            else if (generation == _generation && ev.TryPickStart(out var start))
-            {
-                _live = Tokens(start.Message.Usage);
-                UsageChanged?.Invoke();
-            }
-            else if (generation == _generation && ev.TryPickDelta(out var md))
-            {
-                var u = md.Usage;
-                _live = _live with
+                case UserEntry u: chat.Entries.Add(new StoredEntry { Kind = "user", Text = u.Text }); break;
+                case AssistantEntry a when a.Text.Length > 0: chat.Entries.Add(new StoredEntry { Kind = "assistant", Text = a.Text }); break;
+                case ToolEntry t:
                 {
-                    Output = u.OutputTokens,
-                    Input = u.InputTokens ?? _live.Input,
-                    CacheWrite = u.CacheCreationInputTokens ?? _live.CacheWrite,
-                    CacheRead = u.CacheReadInputTokens ?? _live.CacheRead,
-                };
-                UsageChanged?.Invoke();
+                    var (names, left) = Pictures(t.Images);
+                    chat.Entries.Add(new StoredEntry { Kind = "tool", Name = t.Name, Input = t.Input, Text = t.Result, Error = t.IsError, Images = names, ImagesLeftOut = left });
+                    break;
+                }
+                case NoticeEntry n: chat.Entries.Add(new StoredEntry { Kind = "notice", Text = n.Text, Error = n.Kind == NoticeKind.Error }); break;
+                case UsageEntry u: chat.Entries.Add(new StoredEntry { Kind = "usage", Text = u.Line }); break;
+                case ReplyUndoEntry r:
+                    chat.Entries.Add(new StoredEntry { Kind = "undo", Name = r.Checkpoint, Text = r.Summary, Input = $"{r.State}|{r.Number}" });
+                    break;
             }
         }
-        return await events.ToAsyncEnumerable().Aggregate();
-    }
-
-    internal static TokenUsage Tokens(Usage u) =>
-        new(u.InputTokens, u.OutputTokens, u.CacheCreationInputTokens ?? 0, u.CacheReadInputTokens ?? 0, 1);
-
-    /// <summary>Claude's reply as it goes back in the next request: text, tool calls and thinking, unchanged.</summary>
-    private static List<ContentBlockParam> AssistantBlocks(Message message)
-    {
-        var blocks = new List<ContentBlockParam>();
-        foreach (var b in message.Content)
+        foreach (var t in _log)
         {
-            if (b.TryPickText(out var text)) { if (text.Text.Length > 0) blocks.Add(new TextBlockParam { Text = text.Text }); }
-            else if (b.TryPickThinking(out var thinking)) blocks.Add(new ThinkingBlockParam { Thinking = thinking.Thinking, Signature = thinking.Signature });
-            else if (b.TryPickRedactedThinking(out var redacted)) blocks.Add(new RedactedThinkingBlockParam { Data = redacted.Data });
-            else if (b.TryPickToolUse(out var use)) blocks.Add(new ToolUseBlockParam { ID = use.ID, Name = use.Name, Input = use.Input });
+            chat.Turns.Add(t.Role switch
+            {
+                "user" => new StoredTurn { Role = "user", Text = t.Text },
+                "assistant" => new StoredTurn
+                {
+                    Role = "assistant", Text = t.Text,
+                    Calls = t.Calls.Count == 0 ? null : t.Calls.Select(c => new StoredCall { Id = c.Id, Name = c.Name, Input = c.Input.ToDictionary(), Problem = c.Problem }).ToList(),
+                },
+                _ => new StoredTurn
+                {
+                    Role = "results",
+                    Results = t.Results.Select(r =>
+                    {
+                        var (names, left) = Pictures(r.Outcome.Images);
+                        return new StoredResult { Id = r.Call.Id, Name = r.Call.Name, Text = r.Outcome.Text, Error = r.Outcome.IsError, Images = names, ImagesLeftOut = left };
+                    }).ToList(),
+                },
+            });
         }
-        return blocks;
+        return chat;
     }
 
-    /// <summary>A tool's outcome as a tool_result: its pictures as image blocks, then its text; failures marked is_error.</summary>
-    internal static ToolResultBlockParam Result(string id, ToolOutcome outcome)
+    /// <summary>The chat's title: the start of the person's first message.</summary>
+    private string Title()
     {
-        var content = new List<Block>();
-        foreach (var image in outcome.Images)
-            content.Add(new ImageBlockParam { Source = new Base64ImageSource { Data = Convert.ToBase64String(image.Data), MediaType = MediaTypeOf(image.MediaType) } });
-        if (outcome.Text.Length > 0 || content.Count == 0) content.Add(new TextBlockParam { Text = outcome.Text.Length > 0 ? outcome.Text : "(no output)" });
-        var result = new ToolResultBlockParam { ToolUseID = id, Content = content };
-        if (outcome.IsError) result = result with { IsError = true };
-        return result;
+        var first = _entries.OfType<UserEntry>().FirstOrDefault()?.Text.Replace('\n', ' ').Trim() ?? "";
+        return first.Length > 60 ? first[..59].TrimEnd() + "…" : first;
     }
 
-    private static MediaType MediaTypeOf(string mime) => mime switch
+    /// <summary>
+    /// Opens a saved chat in place of this one: its lines as they were (pictures read through <paramref name="image"/>;
+    /// any that are gone are left out), and its conversation given to the provider's backend so it can carry on, if it
+    /// was with the provider in use; otherwise it's shown read-only (<see cref="ReadOnlyProvider"/>).
+    /// </summary>
+    public void Open(StoredChat chat, Func<string, ToolImage?> image)
     {
-        "image/jpeg" => MediaType.ImageJpeg,
-        "image/gif" => MediaType.ImageGif,
-        "image/webp" => MediaType.ImageWebP,
-        _ => MediaType.ImagePng,
-    };
+        NewChat();
+        ChatId = chat.Id;
+        Created = chat.Created;
+        _opened = (chat.Model, chat.Server);
+        IReadOnlyList<ToolImage> Pictures(List<string>? names) => (names ?? []).Select(image).OfType<ToolImage>().ToList();
+        foreach (var e in chat.Entries)
+        {
+            switch (e.Kind)
+            {
+                case "user": Add(new UserEntry(e.Text)); break;
+                case "assistant":
+                {
+                    var a = new AssistantEntry();
+                    a.Append(e.Text);
+                    a.Finish();
+                    Add(a);
+                    break;
+                }
+                case "tool":
+                {
+                    Dictionary<string, System.Text.Json.JsonElement> input;
+                    try { input = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, System.Text.Json.JsonElement>>(e.Input ?? "{}") ?? []; }
+                    catch (System.Text.Json.JsonException) { input = []; }
+                    var t = new ToolEntry(e.Name ?? "tool", input);
+                    var note = e.ImagesLeftOut > 0 ? $"\n({e.ImagesLeftOut} picture(s) too big to keep)" : "";
+                    t.Finish(new ToolOutcome(e.Error, e.Text + note, Pictures(e.Images)));
+                    Add(t);
+                    break;
+                }
+                case "notice": Add(new NoticeEntry(e.Text, e.Error ? NoticeKind.Error : NoticeKind.Info)); break;
+                case "usage": Add(new UsageEntry(e.Text)); break;
+                case "undo" when e.Name is { Length: > 0 } checkpoint:
+                {
+                    // Its checkpoint is on disk with the chat (when history was kept), so the button works again.
+                    var parts = (e.Input ?? "").Split('|');
+                    var undo = new ReplyUndoEntry(checkpoint) { Summary = e.Text, Number = parts.Length > 1 && int.TryParse(parts[1], out var n) ? n : 0 };
+                    if (Enum.TryParse<ReplyUndoState>(parts[0], out var state) && state is ReplyUndoState.Undone or ReplyUndoState.Superseded) undo.Set(state);
+                    Add(undo);
+                    _replyNumber = Math.Max(_replyNumber, undo.Number);
+                    if (checkpoint.StartsWith("reply ", StringComparison.Ordinal) && int.TryParse(checkpoint[6..], out var k)) _replies = Math.Max(_replies, k);
+                    break;
+                }
+            }
+        }
+        // Its use so far carries on from where it was (a chat saved before usage was kept starts from nothing).
+        (_chatTokens, _chatCost, _unpriced) = (chat.Usage, chat.Cost ?? 0, chat.Cost == null && !chat.Usage.IsEmpty);
+        if (_budget is { } b) _allowance = Math.Max(b, _chatCost + b);
+        UsageChanged?.Invoke();
+        LogTurn? open = null;
+        foreach (var t in chat.Turns)
+        {
+            switch (t.Role)
+            {
+                case "user":
+                    Close();
+                    _log.Add(new LogTurn("user", t.Text ?? "", [], []));
+                    break;
+                case "assistant":
+                    Close();
+                    var calls = (t.Calls ?? []).Select(c => new ToolCall(c.Id, c.Name, c.Input, c.Problem)).ToList();
+                    var turn = new LogTurn("assistant", t.Text ?? "", calls, []);
+                    _log.Add(turn);
+                    if (calls.Count > 0) open = turn;
+                    break;
+                case "results" when open != null:
+                    var results = new List<(ToolCall, ToolOutcome)>();
+                    foreach (var call in open.Calls)
+                    {
+                        var r = (t.Results ?? []).FirstOrDefault(x => x.Id == call.Id);
+                        results.Add((call, r == null
+                            ? ToolOutcome.Error("Not run: the chat was closed before it finished.")
+                            : new ToolOutcome(r.Error, r.Text + (r.ImagesLeftOut > 0 ? $"\n({r.ImagesLeftOut} picture(s) weren't kept with the saved chat.)" : ""), Pictures(r.Images))));
+                    }
+                    _log.Add(new LogTurn("results", "", [], results));
+                    open = null;
+                    break;
+            }
+        }
+        Close();
+        if (chat.Provider == _provider) LoadBackend();
+        else
+        {
+            ReadOnlyProvider = chat.Provider;
+            ReadOnlyChanged?.Invoke();
+        }
+
+        // Calls left without results (the app closed mid-request) get them, so the conversation can go on.
+        void Close()
+        {
+            if (open == null) return;
+            _log.Add(new LogTurn("results", "", [], open.Calls.Select(c => (c, ToolOutcome.Error("Not run: the chat was closed before it finished."))).ToList()));
+            open = null;
+        }
+    }
+
+    /// <summary>Gives the provider's backend the logged conversation, in its own shape, so the chat can carry on.</summary>
+    private void LoadBackend()
+    {
+        var backend = Backend;
+        backend.Clear();
+        foreach (var t in _log)
+        {
+            switch (t.Role)
+            {
+                case "user": backend.AddUserText(t.Text); break;
+                case "assistant": backend.AddAssistant(t.Text, t.Calls); break;
+                default: backend.AddResults(t.Results); break;
+            }
+        }
+        ReadOnlyProvider = null;
+    }
 }

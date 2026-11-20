@@ -31,7 +31,7 @@ public class UsageTests
         Assert.True(changes >= 6, $"{changes}");
         var used = chat.ChatTokens;
         Assert.Equal(new TokenUsage(300, 60, 3000, 15000, 3), used);
-        Assert.Equal(3 * PerRequest, chat.ChatCost, 9);
+        Assert.Equal(3 * PerRequest, chat.ChatCost!.Value, 9);
         // The line after the turn: its requests, the picture that went to Claude with the third, the estimate.
         var line = Assert.IsType<UsageEntry>(chat.Entries[^1]);
         Assert.Equal(3, line.Requests.Count);
@@ -49,7 +49,7 @@ public class UsageTests
         // Another message adds to the chat; prices of the person's own change the estimate; New Chat starts from nothing.
         api.Reply(Say("You're welcome."));
         await rig.Send("thanks");
-        Assert.Equal(4 * PerRequest, chat.ChatCost, 9);
+        Assert.Equal(4 * PerRequest, chat.ChatCost!.Value, 9);
         Assert.Equal(2, chat.Entries.OfType<UsageEntry>().Count());
         chat.OwnPrices = [new ModelPrice(chat.Model, 8, 40, 10, 0.4)];
         Assert.Equal(2 * PerRequest, chat.Price!.Cost(new TokenUsage(100, 20, 1000, 5000)), 9);
